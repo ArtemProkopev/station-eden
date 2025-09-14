@@ -1,0 +1,23 @@
+# пакеты/сборка
+node_modules
+dist
+.next
+
+# секреты/локальные окружения
+.env
+.env.local
+apps/**/.env
+apps/**/.env.local
+
+# логи
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ОС/IDE
+.DS_Store
+Thumbs.db
+.idea
+.vscode/*
+!.vscode/extensions.json
