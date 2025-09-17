@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { User } from './user.entity'
@@ -17,16 +17,14 @@ export class UsersService {
 		return this.repo.findOne({ where: { id } })
 	}
 
-	// Без хеша (безопасный дефолт для большинства мест)
 	findByEmail(email: string) {
 		return this.repo.findOne({ where: { email } })
 	}
 
-	// С хешем — специально для логина/валидации
 	findByEmailWithHash(email: string) {
 		return this.repo
 			.createQueryBuilder('u')
-			.addSelect('u.passwordHash') // важно: поле в entity с select:false
+			.addSelect('u.passwordHash')
 			.where('u.email = :email', { email })
 			.getOne()
 	}
@@ -35,7 +33,8 @@ export class UsersService {
 		return this.repo.save(this.repo.create(data))
 	}
 
-	removeById(id: string) {
-		return this.repo.delete(id)
+	async removeById(id: string) {
+		const res = await this.repo.delete(id)
+		if (!res.affected) throw new NotFoundException('User not found')
 	}
 }
