@@ -1,23 +1,58 @@
-# пакеты/сборка
-node_modules
-dist
-.next
-
-# секреты/локальные окружения
-.env
-.env.local
-apps/**/.env
-apps/**/.env.local
-
-# логи
+# ========== Node / пакетные менеджеры ==========
+node_modules/
+.pnpm-debug.log*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
+*.log
 
-# ОС/IDE
+# ========== Сборка / артефакты ==========
+# (глобально и в подпапках apps/*)
+dist/
+**/dist/
+build/
+**/build/
+
+# Next.js
+.next/
+out/                  # next export (если используете)
+**/*.hot-update.*     # webpack/next HMR chunks
+
+# TypeScript инкрементальная компиляция
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# ========== Секреты / окружение ==========
+# игнорим env-файлы везде, но оставляем примеры
+.env
+.env.local
+**/.env
+**/.env.local
+**/.env.*.local
+.envrc                 # direnv
+!.env.example
+!**/.env.example
+
+# ========== Кэши / инструменты ==========
+.cache/
+.eslintcache
+.turbo/
+.npm/
+coverage/
+.nyc_output/
+
+# ========== ОС / IDE ==========
 .DS_Store
 Thumbs.db
 .idea
 .vscode/*
-!.vscode/extensions.json
+!.vscode/extensions.json  # разрешаем рекомендованные расширения
+
+# ========== Временные файлы ==========
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# ========== Безопасность ==========
+.git-credentials
