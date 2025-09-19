@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import * as bcrypt from 'bcryptjs'
 import { randomBytes } from 'crypto'
 import { Repository } from 'typeorm'
+import { User } from '../users/user.entity'
 import { UsersService } from '../users/users.service'
 import { RefreshToken } from './refresh-token.entity'
 
@@ -17,9 +18,10 @@ export class AuthService {
 	) {}
 
 	// ===== Helpers =====
-	private signAccess(payload: { id: string; email: string }) {
+	private signAccess(user: User) {
+		// включаем роль в payload (пригодится для фронта/гардов)
 		return this.jwt.sign(
-			{ sub: payload.id, email: payload.email },
+			{ sub: user.id, email: user.email, role: user.role },
 			{
 				secret: process.env.JWT_ACCESS_SECRET!,
 				expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m',
@@ -32,9 +34,8 @@ export class AuthService {
 		const alphabet =
 			'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
 		let out = ''
-		for (let i = 0; i < buf.length; i++) {
+		for (let i = 0; i < buf.length; i++)
 			out += alphabet[buf[i] % alphabet.length]
-		}
 		return out
 	}
 
@@ -55,7 +56,6 @@ export class AuthService {
 	}
 
 	private async validateUser(email: string, password: string) {
-		// Важно: берём пользователя С ХЕШЕМ
 		const user = await this.users.findByEmailWithHash(email)
 		if (!user || !user.passwordHash) {
 			throw new UnauthorizedException('Invalid credentials')
@@ -71,20 +71,39 @@ export class AuthService {
 		if (exists) throw new UnauthorizedException('Email already used')
 
 		const passwordHash = await bcrypt.hash(password, 10)
-		const user = await this.users.create({ email, passwordHash })
+		await this.users.create({ email, passwordHash, role: 'user' })
 
-		return { user: { id: user.id, email: user.email } }
+		// авто-назначение роли админа по allow-list
+		await this.users.ensureAdminRoleFor(email)
+
+		// перечитать актуального пользователя (с учётом возможной смены роли)
+		const fresh = (await this.users.findByEmail(email))!
+		const access = this.signAccess(fresh)
+		const { plain: refreshToken, expires: refreshExpires } =
+			await this.issueRefresh(fresh.id)
+
+		return {
+			user: { id: fresh.id, email: fresh.email, role: fresh.role },
+			access,
+			refreshToken,
+			refreshExpires,
+		}
 	}
 
 	async login(email: string, password: string) {
-		const user = await this.validateUser(email, password)
+		await this.validateUser(email, password)
 
-		const access = this.signAccess({ id: user.id, email: user.email })
+		// авто-назначение роли админа по allow-list
+		await this.users.ensureAdminRoleFor(email)
+
+		// перечитать актуального пользователя (с ролью)
+		const fresh = (await this.users.findByEmail(email))!
+		const access = this.signAccess(fresh)
 		const { plain: refreshToken, expires: refreshExpires } =
-			await this.issueRefresh(user.id)
+			await this.issueRefresh(fresh.id)
 
 		return {
-			user: { id: user.id, email: user.email },
+			user: { id: fresh.id, email: fresh.email, role: fresh.role },
 			access,
 			refreshToken,
 			refreshExpires,
@@ -92,7 +111,6 @@ export class AuthService {
 	}
 
 	async refresh(userId: string, refreshToken: string) {
-		// берём последний неотозванный токен пользователя
 		const rec = await this.rtRepo.findOne({
 			where: { userId, revoked: false },
 			order: { createdAt: 'DESC' },
@@ -107,11 +125,10 @@ export class AuthService {
 		// ротируем
 		await this.rtRepo.update(rec.id, { revoked: true })
 
-		// нам нужен email для access-токена
 		const user = await this.users.findById(userId)
 		if (!user) throw new UnauthorizedException('User not found')
 
-		const access = this.signAccess({ id: userId, email: user.email })
+		const access = this.signAccess(user)
 		const { plain: newRefresh, expires: refreshExpires } =
 			await this.issueRefresh(userId)
 
@@ -120,12 +137,10 @@ export class AuthService {
 
 	async logout(userId: string, refreshToken?: string) {
 		if (!refreshToken) {
-			// отозвать все активные
 			await this.rtRepo.update({ userId, revoked: false }, { revoked: true })
 			return { ok: true }
 		}
 
-		// отозвать только конкретный
 		const recs = await this.rtRepo.find({
 			where: { userId, revoked: false },
 			order: { createdAt: 'DESC' },
