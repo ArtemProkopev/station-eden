@@ -1,26 +1,36 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
+import {
+	Column,
+	CreateDateColumn,
+	Entity,
+	Index,
+	PrimaryGeneratedColumn,
+	UpdateDateColumn,
+} from 'typeorm'
 
 @Entity('users')
 export class User {
-  @PrimaryGeneratedColumn('uuid')
-  id!: string;
+	@PrimaryGeneratedColumn('uuid')
+	id!: string
 
-  @Index({ unique: true })
-  @Column({ type: 'citext', unique: true })
-  email!: string;
+	@Index({ unique: true })
+	@Column({ type: 'citext', unique: true })
+	email!: string
 
-  @Column({ type: 'text', select: false })
-  passwordHash!: string;
+	// в БД колонка password_hash
+	@Column({ name: 'password_hash', type: 'text', select: false })
+	passwordHash!: string
 
-  @Column({ type: 'text', nullable: true })
-  telegramId!: string | null;
+	// в БД колонка telegram_id
+	@Column({ name: 'telegram_id', type: 'text', nullable: true })
+	telegramId!: string | null
 
-  @Column({ type: 'text', default: 'user' })
-  role!: 'user' | 'admin';
+	// только две роли
+	@Column({ type: 'text', default: 'user' })
+	role!: 'user' | 'admin'
 
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt!: Date;
+	@CreateDateColumn({ name: 'created_at' })
+	createdAt!: Date
 
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt!: Date;
+	@UpdateDateColumn({ name: 'updated_at' })
+	updatedAt!: Date
 }
