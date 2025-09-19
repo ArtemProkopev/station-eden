@@ -1,9 +1,9 @@
 'use client';
-import { useState } from 'react';
-import { api } from '@/src/lib/api';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { api } from '@/src/lib/api'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useState } from 'react'
 
-export default function LoginPage() {
+function LoginInner() {
   const [email,setEmail]=useState(''); const [password,setPassword]=useState('');
   const [error,setError]=useState<string|null>(null);
   const router = useRouter();
@@ -41,5 +41,13 @@ export default function LoginPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="card"><p>Загрузка…</p></div>}>
+      <LoginInner />
+    </Suspense>
   );
 }
