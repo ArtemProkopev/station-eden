@@ -45,10 +45,12 @@ const RawEnvSchema = z.object({
 })
 
 // маппим старое имя JWT_SECRET в новое поле
-export const EnvSchema = RawEnvSchema.transform(env => ({
-	...env,
-	JWT_ACCESS_SECRET: env.JWT_ACCESS_SECRET ?? env.JWT_SECRET,
-})).refine(e => !!e.JWT_ACCESS_SECRET, {
+export const EnvSchema = RawEnvSchema.transform(
+	(env: z.infer<typeof RawEnvSchema>) => ({
+		...env,
+		JWT_ACCESS_SECRET: env.JWT_ACCESS_SECRET ?? env.JWT_SECRET,
+	})
+).refine((e: z.infer<typeof RawEnvSchema>) => !!e.JWT_ACCESS_SECRET, {
 	path: ['JWT_ACCESS_SECRET'],
 	message: 'Required',
 })
