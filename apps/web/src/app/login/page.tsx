@@ -26,56 +26,65 @@ function LoginInner() {
 	const tgEnabled = process.env.NEXT_PUBLIC_ENABLE_TELEGRAM === 'true'
 
 	return (
-		<div className={styles.card}>
-			<h2>Вход</h2>
-			<form onSubmit={onSubmit} className={styles.form}>
-				<input
-					required
-					type='email'
-					placeholder='email'
-					value={email}
-					onChange={e => setEmail(e.target.value)}
-					className={styles.input}
-				/>
-				<input
-					required
-					type='password'
-					placeholder='пароль'
-					value={password}
-					onChange={e => setPassword(e.target.value)}
-					className={styles.input}
-				/>
-				<button type='submit' className={styles.button}>
-					Войти
-				</button>
-			</form>
-			{error && <p style={{ color: 'crimson' }}>{error}</p>}
-			<p>
-				Нет аккаунта? <a href='/register'>Зарегистрироваться</a>
-			</p>
+		<div className={styles.container}>
+			<div className={styles.card}>
+				<form onSubmit={onSubmit} className={styles.form}>
+					<div className={styles.inputGroup}>
+						<label htmlFor="email" className={styles.label}>Username</label>
+						<input
+							id="email"
+							required
+							type='email'
+							placeholder='Enter your username'
+							value={email}
+							onChange={e => setEmail(e.target.value)}
+							className={styles.input}
+						/>
+					</div>
+					<div className={styles.inputGroup}>
+						<label htmlFor="password" className={styles.label}>Password</label>
+						<input
+							id="password"
+							required
+							type='password'
+							placeholder='Enter your password'
+							value={password}
+							onChange={e => setPassword(e.target.value)}
+							className={styles.input}
+						/>
+					</div>
+					<button type='submit' className={styles.button}>
+						LOGIN
+					</button>
+				</form>
+				{error && <p className={styles.error}>{error}</p>}
+				<p className={styles.signupText}>
+					Don't have an account? <a href='/register' className={styles.signupLink}>Sign Up</a>
+				</p>
 
-			{tgEnabled && (
-				<>
-					<hr />
-					<p>Или войти через Telegram (см. backend /auth/telegram/callback)</p>
-				</>
-			)}
+				{tgEnabled && (
+					<>
+						<hr className={styles.divider} />
+						<p className={styles.telegramText}>Or login with Telegram</p>
+					</>
+				)}
+			</div>
 		</div>
 	)
 }
 
 export default function LoginPage() {
 	return (
-		<div className={styles.container}>
-			<Suspense
-				fallback={
+		<Suspense
+			fallback={
+				<div className={styles.container}>
 					<div className={styles.card}>
-						<p>Загрузка…</p>
+						<p>Loading…</p>
 					</div>
-				}
-			>
-				<LoginInner />
-			</Suspense>
-		</div>
+				</div>
+			}
+		>
+			<LoginInner />
+		</Suspense>
 	)
 }
