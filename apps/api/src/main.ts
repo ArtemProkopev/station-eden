@@ -13,6 +13,7 @@ async function bootstrap() {
 	app.enableCors({
 		origin: process.env.API_CORS_ORIGIN?.split(',') ?? [
 			'http://localhost:3000',
+			'http://0.0.0.0:3000',
 		],
 		credentials: true,
 	})
@@ -21,6 +22,9 @@ async function bootstrap() {
 	)
 	app.useGlobalInterceptors(new ResponseInterceptor())
 	app.use(CsrfMiddleware)
-	await app.listen(process.env.API_PORT || 4000)
+
+	const port = Number(process.env.API_PORT || 4000)
+	await app.listen(port, '0.0.0.0')
+	console.log(`API listening on http://0.0.0.0:${port}`)
 }
 bootstrap()

@@ -1,13 +1,55 @@
 services:
-  db:
-    image: postgres:16
-    environment:
-      POSTGRES_USER: eden
-      POSTGRES_PASSWORD: edenpwd
-      POSTGRES_DB: eden
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file:
+      - apps/api/.env.production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:4000/auth/csrf',r=>process.exit(r.statusCode>=200&&r.statusCode<500?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [webnet]
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    env_file:
+      - apps/web/.env.production
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000',r=>process.exit(r.statusCode>=200&&r.statusCode<500?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 15
+    networks: [webnet]
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
     ports:
-      - "5432:5432"
+      - '80:80'
+      - '443:443'
     volumes:
-      - pgdata:/var/lib/postgresql/data:Z
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks: [webnet]
+
+networks:
+  webnet:
+
 volumes:
-  pgdata: {}
+  caddy_data:
+  caddy_config:

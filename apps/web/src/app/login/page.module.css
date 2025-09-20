@@ -1,0 +1,49 @@
+.container {
+	background-image: url('/login-background.jpg');
+	background-size: cover;
+	background-position: center;
+	min-height: 100vh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
+}
+
+.card {
+	background: rgba(255, 255, 255, 0.95);
+	padding: 2rem;
+	border-radius: 12px;
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+	backdrop-filter: blur(10px);
+	max-width: 400px;
+	width: 100%;
+}
+
+.form {
+	display: grid;
+	gap: 1rem;
+}
+
+.input {
+	padding: 12px;
+	border: 1px solid #ddd;
+	border-radius: 6px;
+	font-size: 16px;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.button {
+	padding: 12px;
+	background: #0070f3;
+	color: white;
+	border: none;
+	border-radius: 6px;
+	font-size: 16px;
+	cursor: pointer;
+	width: 100%;
+}
+
+.button:hover {
+	background: #0056b3;
+}
