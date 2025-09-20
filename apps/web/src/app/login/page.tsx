@@ -30,42 +30,42 @@ function LoginInner() {
 			<div className={styles.card}>
 				<form onSubmit={onSubmit} className={styles.form}>
 					<div className={styles.inputGroup}>
-						<label htmlFor="email" className={styles.label}>Username</label>
+						<label htmlFor="email" className={styles.label}>Email</label>
 						<input
 							id="email"
 							required
 							type='email'
-							placeholder='Enter your username'
+							placeholder='Введите свой email'
 							value={email}
 							onChange={e => setEmail(e.target.value)}
 							className={styles.input}
 						/>
 					</div>
 					<div className={styles.inputGroup}>
-						<label htmlFor="password" className={styles.label}>Password</label>
+						<label htmlFor="password" className={styles.label}>Пароль</label>
 						<input
 							id="password"
 							required
 							type='password'
-							placeholder='Enter your password'
+							placeholder='Введите свой пароль'
 							value={password}
 							onChange={e => setPassword(e.target.value)}
 							className={styles.input}
 						/>
 					</div>
 					<button type='submit' className={styles.button}>
-						LOGIN
+						ВОЙТИ
 					</button>
 				</form>
 				{error && <p className={styles.error}>{error}</p>}
 				<p className={styles.signupText}>
-					Don't have an account? <a href='/register' className={styles.signupLink}>Sign Up</a>
+					Нет аккаунта? <a href='/register' className={styles.signupLink}>Зарегистрироваться</a>
 				</p>
 
 				{tgEnabled && (
 					<>
 						<hr className={styles.divider} />
-						<p className={styles.telegramText}>Or login with Telegram</p>
+						<p className={styles.telegramText}>Или войти через Telegram</p>
 					</>
 				)}
 			</div>
