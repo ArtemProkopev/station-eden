@@ -1,21 +1,26 @@
 /* Сцена и панель */
 .scene {
-	min-height: calc(100vh - 120px);
-	display: grid;
-	place-items: start center;
-	padding: 28px 16px 40px;
-	contain: layout paint;
+  min-height: calc(100vh - 120px);
+  display: grid;
+  place-items: start center;
+  padding: 28px 16px 40px;
+  contain: layout paint;
+  position: relative; /* Добавляем */
+  z-index: 1; /* Добавляем */
 }
+
 .panel {
-	width: 100%;
-	max-width: 960px;
-	background: #4740a8;
-	border: 4px solid #201f5c;
-	border-radius: 36px;
-	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
-	position: relative;
-	overflow: hidden;
+  width: 100%;
+  max-width: 960px;
+  background: #4740a8;
+  border: 4px solid #201f5c;
+  border-radius: 36px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
+  position: relative;
+  overflow: hidden;
+  z-index: 1; /* Добавляем */
 }
+
 .panel::before {
 	content: '';
 	position: absolute;
