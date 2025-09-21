@@ -7,9 +7,9 @@
 	],
 	"scripts": {
 		"dev:db": "docker compose up -d",
-		"dev:web": "cross-env NEXT_PUBLIC_GIT_COMMIT=$(git rev-parse --short HEAD) pnpm --filter @station-eden/web dev",
-		"dev:web:nocache": "cross-env NEXT_PUBLIC_GIT_COMMIT=$(git rev-parse --short HEAD) pnpm --filter @station-eden/web dev:nocache",
-		"dev:api": "cross-env GIT_COMMIT=$(git rev-parse --short HEAD) pnpm --filter @station-eden/api start:dev",
+		"dev:web": "pnpm --filter @station-eden/web dev",
+		"dev:web:nocache": "pnpm --filter @station-eden/web dev:nocache",
+		"dev:api": "pnpm --filter @station-eden/api start:dev",
 		"dev": "run-p dev:db dev:api dev:web",
 		"dev:nocache": "run-p dev:db dev:api dev:web:nocache",
 		"build": "pnpm -r build",
