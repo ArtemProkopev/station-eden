@@ -1,3 +1,4 @@
+import Footer from '@/src/components/Footer'
 import Navbar from '@/src/components/Navbar'
 import './globals.css'
 
@@ -11,7 +12,7 @@ export default function RootLayout({
 			<body>
 				<Navbar />
 				<main className='container'>{children}</main>
-				<footer className='footer'>© Station Eden</footer>
+				<Footer />
 			</body>
 		</html>
 	)

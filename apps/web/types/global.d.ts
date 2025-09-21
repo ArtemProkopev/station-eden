@@ -1,4 +1,4 @@
-// Типы для CSS-модулей
+// Типы для CSS-модулей (только для web-пакета)
 declare module '*.module.css' {
 	const classes: { [key: string]: string }
 	export default classes

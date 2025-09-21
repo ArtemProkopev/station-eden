@@ -1,29 +1,29 @@
 @font-face {
-  font-family: 'RussoOne';
-  src: url('/fonts/RussoOne-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
+	font-family: 'RussoOne';
+	src: url('/fonts/RussoOne-Regular.woff2') format('woff2');
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
 }
-
 @font-face {
-  font-family: 'Nunito';
-  src: url('/fonts/Nunito-Medium.woff2') format('woff2');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
+	font-family: 'Nunito';
+	src: url('/fonts/Nunito-Medium.woff2') format('woff2');
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
 }
 
 :root {
 	color-scheme: dark;
-	--bg: #0a0f14;
-	--panel: #0f1720;
+	--bg: #0d1520;
 	--line: #123;
 	--accent: #7df9ff;
 	--accent-2: #5cffb6;
-	--text: #cfe8ff;
+	--text: #d7ecff;
+	--muted: #a8c0d9;
 	--danger: #ff6b6b;
 }
+
 * {
 	box-sizing: border-box;
 }
@@ -31,12 +31,13 @@ html,
 body {
 	height: 100%;
 }
+
 body {
 	margin: 0;
 	background: radial-gradient(
 				1200px 600px at 20% -10%,
-				#0d1219 0%,
-				var(--bg) 60%
+				#111a28 0%,
+				var(--bg) 65%
 			)
 			no-repeat,
 		var(--bg);
@@ -44,42 +45,115 @@ body {
 	font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
 		Inter, sans-serif;
 }
+
+/* =========================
+   TOPBAR — «чистое стекло»
+   ========================= */
 .topbar {
 	position: sticky;
 	top: 0;
-	z-index: 10;
-	display: flex;
+	z-index: 50;
+	padding: 10px 0;
+	background: rgba(12, 18, 25, 0.28); /* стеклофон */
+	backdrop-filter: blur(12px) saturate(120%);
+	-webkit-backdrop-filter: blur(12px) saturate(120%);
+	border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+.topbar .shell {
+	max-width: 1120px;
+	margin: 0 auto;
+	padding: 0 16px;
+
+	display: grid;
+	grid-template-columns: auto 1fr;
 	align-items: center;
-	justify-content: space-between;
-	gap: 16px;
-	padding: 10px 16px;
-	background: linear-gradient(
-		180deg,
-		rgba(18, 26, 36, 0.9),
-		rgba(18, 26, 36, 0.7)
-	);
-	border-bottom: 1px solid var(--line);
-	backdrop-filter: blur(6px);
+	gap: 14px;
+}
+.topbar .brand {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	text-decoration: none;
 }
 .topbar .brand img {
 	height: 28px;
 	display: block;
+	filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25));
 }
+
+/* Навигация */
 .topbar .nav {
 	display: flex;
-	gap: 14px;
+	justify-content: flex-end;
 }
-.topbar .nav a {
-	color: var(--text);
+.topbar .nav ul {
+	display: flex;
+	gap: 12px; /* как в футере */
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+/* Кнопки навбара — как в футере */
+.topbar .nav .link {
+	color: #e9e7ff;
 	text-decoration: none;
 	opacity: 0.9;
+	font-family: 'RussoOne', sans-serif;
+	font-size: 12px;
+	letter-spacing: 0.3px;
+	text-transform: uppercase;
+
+	display: inline-flex;
+	align-items: center;
+	border-radius: 8px;
+	padding: 6px 8px;
+	height: auto;
+
+	transition: background 0.15s ease, opacity 0.12s ease, transform 0.08s ease,
+		color 0.15s ease;
 }
-.topbar .nav a:hover {
-	color: var(--accent);
+.topbar .nav .link:hover {
+	opacity: 1;
+	background: rgba(255, 255, 255, 0.06);
 }
+.topbar .nav .link:active {
+	transform: translateY(1px);
+}
+/* Актив — как «нажата» из футера: чуть плотнее фон, без неон-подчёркивания */
+.topbar .nav .link.active {
+	opacity: 1;
+	color: #fff;
+	background: rgba(255, 255, 255, 0.1);
+	box-shadow: none;
+	border-radius: 8px;
+}
+
+.topbar .ghost-link {
+	display: inline-block;
+	width: 92px;
+	height: 14px;
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.07);
+	animation: pulse 1.1s ease-in-out infinite;
+}
+@keyframes pulse {
+	0% {
+		opacity: 0.35;
+	}
+	50% {
+		opacity: 0.15;
+	}
+	100% {
+		opacity: 0.35;
+	}
+}
+
+/* Контейнер контента */
 .container {
 	padding: 0 16px;
 }
+
+/* Утилиты/карточки */
 .card {
 	background: linear-gradient(
 		180deg,
@@ -107,6 +181,7 @@ body {
 	gap: 10px;
 	align-items: center;
 }
+
 input,
 button,
 select {
@@ -142,71 +217,92 @@ input:focus {
 	background: linear-gradient(180deg, #4a0f19, #2a0a12);
 	color: #ffd5d5;
 }
-.kv {
-	display: grid;
-	gap: 8px;
-}
-.kv > div {
-	display: flex;
-	justify-content: space-between;
-	gap: 10px;
-	padding: 8px 10px;
-	background: rgba(10, 16, 22, 0.5);
-	border: 1px dashed #123;
-	border-radius: 10px;
-}
-.kv span {
-	opacity: 0.8;
-}
-.kv code {
-	color: var(--accent-2);
-}
-.table {
-	width: 100%;
-	border-collapse: collapse;
-	font-size: 13px;
-}
-.table th,
-.table td {
-	padding: 10px 12px;
-	border-bottom: 1px solid #123;
-}
-.table th {
-	text-align: left;
-	color: var(--accent);
-	font-weight: 600;
-}
+
+/* =========================
+   FOOTER — «чистое стекло»
+   ========================= */
 .footer {
-	opacity: 0.6;
-	text-align: center;
-	padding: 20px;
-	border-top: 1px solid var(--line);
-	margin-top: 28px;
+	margin-top: 32px;
+	padding: 12px 0;
+	background: rgba(12, 18, 25, 0.22);
+	backdrop-filter: blur(10px) saturate(120%);
+	-webkit-backdrop-filter: blur(10px) saturate(120%);
+	border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
-/* активная ссылка и “скелет” пока сессия грузится */
-.topbar .nav a.active {
-	color: var(--accent);
-	text-shadow: 0 0 8px rgba(125, 249, 255, 0.35);
+.footer .shell {
+	max-width: 1120px;
+	margin: 0 auto;
+	padding: 0 16px;
+
+	display: grid;
+	grid-template-columns: 1fr auto;
+	align-items: center;
+	gap: 12px;
 }
-.topbar .nav .ghost-link {
-	display: inline-block;
-	width: 90px;
-	height: 14px;
+.footerLeft {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	flex-wrap: wrap;
+}
+.footerCopy {
+	color: var(--muted);
+}
+
+.footerNav {
+	display: flex;
+	gap: 12px;
+}
+.footerNav a {
+	color: #e9e7ff;
+	text-decoration: none;
+	opacity: 0.9;
+	font-family: 'RussoOne', sans-serif;
+	font-size: 12px;
+	letter-spacing: 0.3px;
+	text-transform: uppercase;
 	border-radius: 8px;
-	background: rgba(255, 255, 255, 0.07);
-	animation: pulse 1.1s ease-in-out infinite;
+	padding: 6px 8px;
+	transition: background 0.15s ease, opacity 0.12s ease, transform 0.08s ease,
+		color 0.15s ease;
 }
-@keyframes pulse {
-	0% {
-		opacity: 0.35;
-	}
-	50% {
-		opacity: 0.15;
-	}
-	100% {
-		opacity: 0.35;
-	}
+.footerNav a:hover {
+	opacity: 1;
+	background: rgba(255, 255, 255, 0.06);
 }
-.topbar .nav .btn {
-	padding: 8px 12px;
+.footerNav a:active {
+	transform: translateY(1px);
+}
+
+/* A11y */
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* Мобилки */
+@media (max-width: 640px) {
+	.topbar .shell {
+		grid-template-columns: 1fr;
+		gap: 10px;
+	}
+	.topbar .nav ul {
+		justify-content: center;
+	}
+
+	.footer .shell {
+		grid-template-columns: 1fr;
+		row-gap: 10px;
+		text-align: center;
+	}
+	.footerNav {
+		justify-content: center;
+	}
 }
