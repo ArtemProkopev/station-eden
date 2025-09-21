@@ -1,7 +1,9 @@
+// apps/web/src/app/register/page.tsx
 'use client'
 import GoogleAuthButton from '@/src/components/auth/GoogleAuthButton'
 import { api } from '@/src/lib/api'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import styles from './page.module.css'
 
@@ -46,6 +48,8 @@ export default function RegisterPage() {
 	const [show, setShow] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const [ok, setOk] = useState(false)
+	const sp = useSearchParams()
+	const reason = sp.get('reason')
 
 	async function onSubmit(e: React.FormEvent) {
 		e.preventDefault()
@@ -68,6 +72,13 @@ export default function RegisterPage() {
 			<div className={styles.container}>
 				<div className={styles.card}>
 					<h1 className={styles.title}>Регистрация</h1>
+
+					{reason === 'google_no_account' && (
+						<div className={`${styles.notice} ${styles.info}`} role='status'>
+							Такого Google-аккаунта у нас ещё нет — вы можете
+							зарегистрироваться сейчас.
+						</div>
+					)}
 
 					<form onSubmit={onSubmit} className={styles.form}>
 						<div className={styles.inputGroup}>
@@ -142,10 +153,8 @@ export default function RegisterPage() {
 						<>
 							<hr className={styles.hr} />
 							<div className={styles.oauthBlock}>
-								<div className={styles.oauthCaption}>
-									Или зарегистрироваться через Google
-								</div>
-								<GoogleAuthButton label='Зарегистрироваться через Google' />
+								<div className={styles.oauthCaption}>Или через Google</div>
+								<GoogleAuthButton mode='register' label='Продолжить с Google' />
 							</div>
 						</>
 					)}

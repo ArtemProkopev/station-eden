@@ -1,3 +1,4 @@
+// apps/web/src/app/login/page.tsx
 'use client'
 import GoogleAuthButton from '@/src/components/auth/GoogleAuthButton'
 import { api } from '@/src/lib/api'
@@ -48,6 +49,7 @@ function LoginInner() {
 	const router = useRouter()
 	const sp = useSearchParams()
 	const next = sp.get('next') || '/profile'
+	const reason = sp.get('reason')
 
 	async function onSubmit(e: React.FormEvent) {
 		e.preventDefault()
@@ -60,13 +62,24 @@ function LoginInner() {
 		}
 	}
 
-	const tgEnabled = process.env.NEXT_PUBLIC_ENABLE_TELEGRAM === 'true'
 	const googleEnabled = process.env.NEXT_PUBLIC_ENABLE_GOOGLE === 'true'
 
 	return (
 		<div className={styles.container}>
 			<div className={styles.card}>
 				<h1 className={styles.title}>Вход</h1>
+
+				{/* дружелюбные подсказки по редиректам из Google */}
+				{reason === 'google_exists' && (
+					<div className={`${styles.notice} ${styles.info}`} role='status'>
+						Аккаунт с этим Google-email уже существует — просто войдите.
+					</div>
+				)}
+				{reason === 'google_no_account' && (
+					<div className={`${styles.notice} ${styles.info}`} role='status'>
+						Похоже, такого аккаунта ещё нет. Вы можете зарегистрироваться.
+					</div>
+				)}
 
 				<form onSubmit={onSubmit} className={styles.form}>
 					<div className={styles.inputGroup}>
@@ -128,17 +141,14 @@ function LoginInner() {
 					</a>
 				</p>
 
-				{(tgEnabled || googleEnabled) && <hr className={styles.divider} />}
-
 				{googleEnabled && (
-					<div className={styles.oauthBlock}>
-						<div className={styles.oauthCaption}>Или войти через Google</div>
-						<GoogleAuthButton label='Войти через Google' />
-					</div>
-				)}
-
-				{tgEnabled && (
-					<p className={styles.telegramText}>Или войти через Telegram</p>
+					<>
+						<hr className={styles.divider} />
+						<div className={styles.oauthBlock}>
+							<div className={styles.oauthCaption}>Или через Google</div>
+							<GoogleAuthButton label='Войти с Google' mode='login' />
+						</div>
+					</>
 				)}
 			</div>
 		</div>

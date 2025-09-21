@@ -52,13 +52,33 @@
 
 /* Заголовок */
 .title {
-	margin: 0 0 18px 0;
+	margin: 0 0 12px 0;
 	font-size: 28px;
 	color: #fff;
 	font-family: 'RussoOne', sans-serif;
 	-webkit-text-stroke: 1.5px #7050d5;
 	paint-order: stroke fill;
 	text-shadow: 0 2px 0 #7050d5;
+}
+
+/* дружелюбные уведомления */
+.notice {
+	text-align: left;
+	margin: 10px 0 16px;
+	padding: 10px 12px;
+	border-radius: 12px;
+	font-size: 14px;
+	line-height: 1.45;
+}
+.success {
+	color: #cffad2;
+	background: rgba(80, 200, 120, 0.12);
+	border: 2px solid rgba(80, 200, 120, 0.45);
+}
+.info {
+	color: #d7ecff;
+	background: rgba(125, 249, 255, 0.1);
+	border: 2px solid rgba(125, 249, 255, 0.35);
 }
 
 /* Форма */
@@ -203,10 +223,10 @@
 }
 
 .divider {
-	border: none;
+	margin: 16px 0;
 	height: 1px;
-	background: #e1e1e1;
-	margin: 2rem 0;
+	border: 0;
+	background: rgba(255, 255, 255, 0.2);
 }
 .telegramText {
 	font-size: 14px;
@@ -226,4 +246,4 @@
 	color: var(--muted);
 }
 
-/* старый .oauthBtn удалён — больше не используется */
+/* старый .oauthBtn не используется */
