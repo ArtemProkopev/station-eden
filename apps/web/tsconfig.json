@@ -19,8 +19,7 @@
 		"resolveJsonModule": true,
 		"isolatedModules": true,
 		"plugins": [{ "name": "next" }],
-		"types": ["node"],
-		"typeRoots": ["./node_modules/@types"]
+		"types": ["node"]
 	},
 	"include": ["next-env.d.ts", "src", "types/**/*.d.ts", ".next/types/**/*.ts"],
 	"exclude": ["node_modules"]

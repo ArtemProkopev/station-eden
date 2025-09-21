@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
+    "dev:nocache": "NEXT_CACHE_DISABLED=1 next dev -p 3000",
+    "clean": "rimraf .next",
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "next lint"
@@ -17,6 +19,7 @@
   "devDependencies": {
     "@types/node": "^20.14.9",
     "@types/react": "^18.3.3",
+    "rimraf": "^5.0.10",
     "typescript": "^5.5.4"
   }
 }
