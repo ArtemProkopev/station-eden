@@ -1,6 +1,7 @@
 // apps/web/src/components/auth/GoogleAuthButton.tsx
 'use client'
 
+import { API_BASE } from '@/src/lib/flags'
 import styles from './GoogleAuthButton.module.css'
 
 type Props = {
@@ -8,13 +9,11 @@ type Props = {
 	mode?: 'login' | 'register'
 }
 
-const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
-
 export default function GoogleAuthButton({
 	label = 'Войти с Google',
 	mode = 'login',
 }: Props) {
-	const href = `${API}/auth/google?mode=${mode}`
+	const href = `${API_BASE}/auth/google?mode=${mode}`
 
 	return (
 		<div className={styles.wrap}>
@@ -38,7 +37,7 @@ export default function GoogleAuthButton({
 					/>
 					<path
 						fill='#34A853'
-						d='M9 18c2.43 0 4.47-.806 5.96-2.183l-2.904-2.257c-.806.54-1.84.86-3.056.86-2.35 0-4.34-1.586-5.05-3.718H.94v2.334A9 9 0 0 0 9 18Z'
+						d='M9 18c2.43 0 4.47-.806 5.96-2.183л-2.904-2.257c-.806.54-1.84.86-3.056.86-2.35 0-4.34-1.586-5.05-3.718H.94v2.334A9 9 0 0 0 9 18Z'
 					/>
 					<path
 						fill='#FBBC05'

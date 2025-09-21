@@ -1,10 +1,12 @@
 // apps/web/src/app/register/page.tsx
 'use client'
+
 import GoogleAuthButton from '@/src/components/auth/GoogleAuthButton'
 import { api } from '@/src/lib/api'
+import { GOOGLE_ENABLED } from '@/src/lib/flags'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import styles from './page.module.css'
 
 function EyeIcon() {
@@ -48,8 +50,11 @@ export default function RegisterPage() {
 	const [show, setShow] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const [ok, setOk] = useState(false)
+	const [mounted, setMounted] = useState(false)
 	const sp = useSearchParams()
 	const reason = sp.get('reason')
+
+	useEffect(() => setMounted(true), [])
 
 	async function onSubmit(e: React.FormEvent) {
 		e.preventDefault()
@@ -59,11 +64,11 @@ export default function RegisterPage() {
 			await api.register(email, password)
 			setOk(true)
 		} catch (err: any) {
-			setError(err.message || 'Ошибка регистрации')
+			setError(err?.message || 'Ошибка регистрации')
 		}
 	}
 
-	const googleEnabled = process.env.NEXT_PUBLIC_ENABLE_GOOGLE === 'true'
+	const googleEnabled = GOOGLE_ENABLED
 
 	return (
 		<>
@@ -149,7 +154,8 @@ export default function RegisterPage() {
 						</Link>
 					</p>
 
-					{googleEnabled && (
+					{/* Показываем Google-блок ТОЛЬКО после монтирования, чтобы избежать hydration-рассинхрона */}
+					{mounted && googleEnabled && (
 						<>
 							<hr className={styles.hr} />
 							<div className={styles.oauthBlock}>

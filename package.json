@@ -7,8 +7,8 @@
 	],
 	"scripts": {
 		"dev:db": "docker compose up -d",
-		"dev:web": "pnpm --filter @station-eden/web dev",
-		"dev:web:nocache": "pnpm --filter @station-eden/web dev:nocache",
+		"dev:web": "cross-env NEXT_PUBLIC_ENABLE_GOOGLE=true pnpm --filter @station-eden/web dev",
+		"dev:web:nocache": "cross-env NEXT_PUBLIC_ENABLE_GOOGLE=true NEXT_CACHE_DISABLED=1 pnpm --filter @station-eden/web dev:nocache",
 		"dev:api": "pnpm --filter @station-eden/api start:dev",
 		"dev": "run-p dev:db dev:api dev:web",
 		"dev:nocache": "run-p dev:db dev:api dev:web:nocache",

@@ -1,9 +1,11 @@
 // apps/web/src/app/login/page.tsx
 'use client'
+
 import GoogleAuthButton from '@/src/components/auth/GoogleAuthButton'
 import { api } from '@/src/lib/api'
+import { GOOGLE_ENABLED } from '@/src/lib/flags'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import styles from './page.module.css'
 
 function EyeIcon() {
@@ -46,10 +48,13 @@ function LoginInner() {
 	const [password, setPassword] = useState('')
 	const [show, setShow] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+	const [mounted, setMounted] = useState(false)
 	const router = useRouter()
 	const sp = useSearchParams()
 	const next = sp.get('next') || '/profile'
 	const reason = sp.get('reason')
+
+	useEffect(() => setMounted(true), [])
 
 	async function onSubmit(e: React.FormEvent) {
 		e.preventDefault()
@@ -58,18 +63,17 @@ function LoginInner() {
 			await api.login(email, password)
 			router.replace(next)
 		} catch (err: any) {
-			setError(err.message || 'Ошибка входа')
+			setError(err?.message || 'Ошибка входа')
 		}
 	}
 
-	const googleEnabled = process.env.NEXT_PUBLIC_ENABLE_GOOGLE === 'true'
+	const googleEnabled = GOOGLE_ENABLED
 
 	return (
 		<div className={styles.container}>
 			<div className={styles.card}>
 				<h1 className={styles.title}>Вход</h1>
 
-				{/* дружелюбные подсказки по редиректам из Google */}
 				{reason === 'google_exists' && (
 					<div className={`${styles.notice} ${styles.info}`} role='status'>
 						Аккаунт с этим Google-email уже существует — просто войдите.
@@ -141,7 +145,8 @@ function LoginInner() {
 					</a>
 				</p>
 
-				{googleEnabled && (
+				{/* Показываем Google-блок ТОЛЬКО после монтирования, чтобы избежать hydration-рассинхрона */}
+				{mounted && googleEnabled && (
 					<>
 						<hr className={styles.divider} />
 						<div className={styles.oauthBlock}>
