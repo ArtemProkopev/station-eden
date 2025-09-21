@@ -15,14 +15,14 @@
 		"build": "pnpm -r build",
 		"migrate:run": "pnpm --filter @station-eden/api typeorm migration:run -d apps/api/ormconfig.ts",
 		"migrate:revert": "pnpm --filter @station-eden/api typeorm migration:revert -d apps/api/ormconfig.ts",
-		"clean": "pnpm -r run clean && pnpm exec rimraf node_modules && pnpm store prune",
+		"clean": "pnpm -r run clean && rimraf node_modules && pnpm store prune",
 		"clean:artifacts": "pnpm -r run clean",
 		"doctor": "node -e \"console.log('node',process.version);\" && pnpm -v && git rev-parse --short HEAD"
 	},
 	"devDependencies": {
 		"cross-env": "^10.0.0",
 		"npm-run-all": "^4.1.5",
-		"rimraf": "^5.0.10",
+		"rimraf": "^3.0.2",
 		"typescript": "^5.5.4"
 	}
 }
