@@ -147,12 +147,6 @@ body {
 		opacity: 0.35;
 	}
 }
-
-/* Контейнер контента */
-.container {
-	padding: 0 16px;
-}
-
 /* Утилиты/карточки */
 .card {
 	background: linear-gradient(
@@ -222,8 +216,7 @@ input:focus {
    FOOTER — «чистое стекло»
    ========================= */
 .footer {
-	margin-top: 32px;
-	padding: 12px 0;
+	padding: 32px;
 	background: rgba(12, 18, 25, 0.22);
 	backdrop-filter: blur(10px) saturate(120%);
 	-webkit-backdrop-filter: blur(10px) saturate(120%);
