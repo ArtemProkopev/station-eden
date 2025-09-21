@@ -1,0 +1,106 @@
+.wrap {
+	display: grid;
+	gap: 10px;
+	justify-items: center;
+}
+
+/* Белая “гугловая” кнопка без навязчивой анимации */
+.button {
+	display: inline-grid;
+	grid-auto-flow: column;
+	align-items: center;
+	gap: 10px;
+
+	background: #ffffff;
+	color: #1f1f1f;
+	border: 1px solid #e2e5ea; /* тонкая светлая рамка */
+	border-bottom-color: #d2d6dc; /* чуть темнее снизу — глубина */
+	border-radius: 12px;
+
+	padding: 12px 16px;
+	min-width: 260px;
+
+	font-family: inherit;
+	font-weight: 700;
+	font-size: 14px;
+	letter-spacing: 0.2px;
+	text-decoration: none;
+
+	cursor: pointer;
+
+	/* темная мягкая тень в духе гугл-кнопок */
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15), 0 10px 24px rgba(0, 0, 0, 0.1);
+
+	/* без ярких focus-колец и “подсветок” */
+	transition: transform 0.06s ease, box-shadow 0.12s ease;
+}
+
+.button:hover {
+	transform: translateY(-1px);
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18), 0 16px 32px rgba(0, 0, 0, 0.16);
+}
+
+.button:active {
+	transform: translateY(0);
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) inset, 0 6px 16px rgba(0, 0, 0, 0.14);
+}
+
+.button:focus {
+	outline: 2px solid rgba(125, 249, 255, 0.3); /* аккуратный a11y-обвод, без анимаций */
+	outline-offset: 3px;
+}
+
+.button[disabled] {
+	opacity: 0.75;
+	cursor: default;
+}
+
+.icon {
+	width: 22px;
+	height: 22px;
+	display: block;
+}
+
+.text {
+	line-height: 1;
+}
+
+/* Индикатор загрузки (минималистичный) */
+.spinner {
+	width: 18px;
+	height: 18px;
+	border: 2px solid rgba(0, 0, 0, 0.14);
+	border-top-color: rgba(0, 0, 0, 0.54);
+	border-radius: 50%;
+	animation: spin 0.7s linear infinite;
+	justify-self: end;
+}
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* Подсказка, в стиле ваших карточек */
+.hint {
+	width: 100%;
+	background: linear-gradient(
+		180deg,
+		rgba(20, 28, 38, 0.6),
+		rgba(12, 18, 25, 0.6)
+	);
+	border: 1px solid #134;
+	box-shadow: 0 0 0 1px rgba(125, 249, 255, 0.06),
+		inset 0 0 40px rgba(125, 249, 255, 0.04);
+	color: var(--text);
+	border-radius: 12px;
+	padding: 10px 12px;
+	font-size: 12px;
+	text-align: center;
+}
+
+.hint code {
+	background: rgba(255, 255, 255, 0.08);
+	padding: 2px 6px;
+	border-radius: 6px;
+}

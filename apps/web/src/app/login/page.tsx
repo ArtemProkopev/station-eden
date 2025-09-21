@@ -1,13 +1,10 @@
 'use client'
+import GoogleAuthButton from '@/src/components/auth/GoogleAuthButton'
 import { api } from '@/src/lib/api'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useState } from 'react'
 import styles from './page.module.css'
 
-/** Контурные иконки: прозрачная заливка, только stroke.
- *  Цвет — currentColor (берётся из .toggleBtn => var(--placeholder)).
- *  Толще линия для читабельности.
- */
 function EyeIcon() {
 	return (
 		<svg
@@ -64,6 +61,7 @@ function LoginInner() {
 	}
 
 	const tgEnabled = process.env.NEXT_PUBLIC_ENABLE_TELEGRAM === 'true'
+	const googleEnabled = process.env.NEXT_PUBLIC_ENABLE_GOOGLE === 'true'
 
 	return (
 		<div className={styles.container}>
@@ -130,11 +128,17 @@ function LoginInner() {
 					</a>
 				</p>
 
+				{(tgEnabled || googleEnabled) && <hr className={styles.divider} />}
+
+				{googleEnabled && (
+					<div className={styles.oauthBlock}>
+						<div className={styles.oauthCaption}>Или войти через Google</div>
+						<GoogleAuthButton label='Войти через Google' />
+					</div>
+				)}
+
 				{tgEnabled && (
-					<>
-						<hr className={styles.divider} />
-						<p className={styles.telegramText}>Или войти через Telegram</p>
-					</>
+					<p className={styles.telegramText}>Или войти через Telegram</p>
 				)}
 			</div>
 		</div>

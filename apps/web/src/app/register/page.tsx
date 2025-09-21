@@ -1,10 +1,10 @@
 'use client'
+import GoogleAuthButton from '@/src/components/auth/GoogleAuthButton'
 import { api } from '@/src/lib/api'
 import Link from 'next/link'
 import { useState } from 'react'
 import styles from './page.module.css'
 
-/** Контурные иконки (fill="none"), цвет — currentColor из .toggleBtn */
 function EyeIcon() {
 	return (
 		<svg
@@ -58,6 +58,8 @@ export default function RegisterPage() {
 			setError(err.message || 'Ошибка регистрации')
 		}
 	}
+
+	const googleEnabled = process.env.NEXT_PUBLIC_ENABLE_GOOGLE === 'true'
 
 	return (
 		<>
@@ -135,6 +137,18 @@ export default function RegisterPage() {
 							Войти
 						</Link>
 					</p>
+
+					{googleEnabled && (
+						<>
+							<hr className={styles.hr} />
+							<div className={styles.oauthBlock}>
+								<div className={styles.oauthCaption}>
+									Или зарегистрироваться через Google
+								</div>
+								<GoogleAuthButton label='Зарегистрироваться через Google' />
+							</div>
+						</>
+					)}
 				</div>
 			</div>
 		</>

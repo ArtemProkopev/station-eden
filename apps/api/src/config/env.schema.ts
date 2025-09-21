@@ -14,23 +14,14 @@ const RawEnvSchema = z.object({
 	COOKIE_SECURE: z.enum(['true', 'false']).default('false'),
 	CSRF_COOKIE_NAME: z.string().default('csrf_token'),
 
-	// JWT — принимаем новое и старое имя
+	// JWT
 	JWT_ACCESS_SECRET: z
 		.string()
 		.min(32, 'JWT_ACCESS_SECRET too short')
 		.optional(),
 	JWT_SECRET: z.string().min(32, 'JWT_SECRET too short').optional(), // fallback
-	JWT_REFRESH_SECRET: z
-		.string()
-		.min(32, 'JWT_REFRESH_SECRET too short')
-		.optional(),
 	JWT_ACCESS_EXPIRES: z.string().default('15m'),
 	JWT_REFRESH_TTL_MS: z.coerce.number().optional(),
-
-	// Telegram (опционально)
-	TELEGRAM_LOGIN_ENABLED: z.enum(['true', 'false']).default('false'),
-	TELEGRAM_BOT_TOKEN: z.string().optional(),
-	TELEGRAM_BOT_NAME: z.string().optional(),
 
 	// БД
 	DATABASE_URL: z.string().url().optional(),
@@ -40,14 +31,20 @@ const RawEnvSchema = z.object({
 	POSTGRES_PASSWORD: z.string().optional(),
 	POSTGRES_DB: z.string().optional(),
 
-	// фронт
+	// фронт (только для прокидки в респонсы/редиректы при надобности)
 	NEXT_PUBLIC_API_BASE: z.string().url().optional(),
 
-	// --- NEW: allow-list админов (через запятую)
+	// allow-list админов
 	ADMIN_EMAILS: z.string().optional().default(''),
+
+	// Google OAuth
+	ENABLE_GOOGLE_LOGIN: z.enum(['true', 'false']).default('false'),
+	GOOGLE_CLIENT_ID: z.string().optional(),
+	GOOGLE_CLIENT_SECRET: z.string().optional(),
+	GOOGLE_REDIRECT_URL: z.string().url().optional(),
+	WEB_AFTER_LOGIN_URL: z.string().url().optional(),
 })
 
-// маппим старое имя JWT_SECRET в новое поле
 export const EnvSchema = RawEnvSchema.transform(env => ({
 	...env,
 	JWT_ACCESS_SECRET: env.JWT_ACCESS_SECRET ?? env.JWT_SECRET,

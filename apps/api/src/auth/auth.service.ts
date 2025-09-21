@@ -17,9 +17,8 @@ export class AuthService {
 		private readonly rtRepo: Repository<RefreshToken>
 	) {}
 
-	// ===== Helpers =====
-	private signAccess(user: User) {
-		// включаем роль в payload (пригодится для фронта/гардов)
+	/** Подписываем access JWT */
+	public signAccess(user: User) {
 		return this.jwt.sign(
 			{ sub: user.id, email: user.email, role: user.role },
 			{
@@ -39,13 +38,14 @@ export class AuthService {
 		return out
 	}
 
-	private async issueRefresh(userId: string) {
+	/** Выдаём refresh и сохраняем хэш в БД */
+	public async issueRefresh(userId: string) {
 		const plain = this.cryptoRandom(48)
 		const tokenHash = await bcrypt.hash(plain, 10)
 
 		const ttlMs =
 			parseInt(process.env.JWT_REFRESH_TTL_MS || '', 10) ||
-			30 * 24 * 60 * 60 * 1000 // 30d по умолчанию
+			30 * 24 * 60 * 60 * 1000
 		const expires = new Date(Date.now() + ttlMs)
 
 		await this.rtRepo.save(
@@ -65,7 +65,8 @@ export class AuthService {
 		return user
 	}
 
-	// ===== Public API used by controller =====
+	// ===== API =====
+
 	async register(email: string, password: string) {
 		const exists = await this.users.findByEmail(email)
 		if (exists) throw new UnauthorizedException('Email already used')
@@ -73,10 +74,8 @@ export class AuthService {
 		const passwordHash = await bcrypt.hash(password, 10)
 		await this.users.create({ email, passwordHash, role: 'user' })
 
-		// авто-назначение роли админа по allow-list
 		await this.users.ensureAdminRoleFor(email)
 
-		// перечитать актуального пользователя (с учётом возможной смены роли)
 		const fresh = (await this.users.findByEmail(email))!
 		const access = this.signAccess(fresh)
 		const { plain: refreshToken, expires: refreshExpires } =
@@ -92,11 +91,8 @@ export class AuthService {
 
 	async login(email: string, password: string) {
 		await this.validateUser(email, password)
-
-		// авто-назначение роли админа по allow-list
 		await this.users.ensureAdminRoleFor(email)
 
-		// перечитать актуального пользователя (с ролью)
 		const fresh = (await this.users.findByEmail(email))!
 		const access = this.signAccess(fresh)
 		const { plain: refreshToken, expires: refreshExpires } =
@@ -122,7 +118,6 @@ export class AuthService {
 			throw new UnauthorizedException('Refresh expired')
 		}
 
-		// ротируем
 		await this.rtRepo.update(rec.id, { revoked: true })
 
 		const user = await this.users.findById(userId)
