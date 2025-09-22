@@ -1,11 +1,10 @@
-// apps/web/src/app/register/page.tsx
 'use client'
 
 import GoogleAuthButton from '@/src/components/auth/GoogleAuthButton'
 import { api } from '@/src/lib/api'
 import { GOOGLE_ENABLED } from '@/src/lib/flags'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import styles from './page.module.css'
 
@@ -49,20 +48,28 @@ export default function RegisterPage() {
 	const [password, setPassword] = useState('')
 	const [show, setShow] = useState(false)
 	const [error, setError] = useState<string | null>(null)
-	const [ok, setOk] = useState(false)
 	const [mounted, setMounted] = useState(false)
 	const sp = useSearchParams()
 	const reason = sp.get('reason')
+	const router = useRouter()
 
 	useEffect(() => setMounted(true), [])
 
 	async function onSubmit(e: React.FormEvent) {
 		e.preventDefault()
 		setError(null)
-		setOk(false)
 		try {
-			await api.register(email, password)
-			setOk(true)
+			const res = await api.register(email, password)
+			if (res?.mfa === 'email_code_sent') {
+				router.replace(
+					`/login/verify?email=${encodeURIComponent(
+						email
+					)}&next=${encodeURIComponent('/profile')}`
+				)
+				return
+			}
+			// если сервер внезапно не вернул mfa
+			throw new Error('Не удалось запустить подтверждение по почте')
 		} catch (err: any) {
 			setError(err?.message || 'Ошибка регистрации')
 		}
@@ -73,7 +80,6 @@ export default function RegisterPage() {
 	return (
 		<>
 			<div className={styles.bg} aria-hidden />
-
 			<div className={styles.container}>
 				<div className={styles.card}>
 					<h1 className={styles.title}>Регистрация</h1>
@@ -136,15 +142,6 @@ export default function RegisterPage() {
 						</button>
 					</form>
 
-					{ok && (
-						<p className={styles.ok}>
-							Готово! Теперь{' '}
-							<Link href='/login' className={styles.link}>
-								войдите
-							</Link>
-							.
-						</p>
-					)}
 					{error && <p className={styles.error}>{error}</p>}
 
 					<p className={styles.swap}>
@@ -154,7 +151,6 @@ export default function RegisterPage() {
 						</Link>
 					</p>
 
-					{/* Показываем Google-блок ТОЛЬКО после монтирования, чтобы избежать hydration-рассинхрона */}
 					{mounted && googleEnabled && (
 						<>
 							<hr className={styles.hr} />

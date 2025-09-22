@@ -1,11 +1,10 @@
-// apps/web/src/app/login/page.tsx
 'use client'
 
 import GoogleAuthButton from '@/src/components/auth/GoogleAuthButton'
 import { api } from '@/src/lib/api'
 import { GOOGLE_ENABLED } from '@/src/lib/flags'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import styles from './page.module.css'
 
 function EyeIcon() {
@@ -43,12 +42,14 @@ function EyeOffIcon() {
 	)
 }
 
-function LoginInner() {
+export default function LoginPage() {
 	const [email, setEmail] = useState('')
 	const [password, setPassword] = useState('')
 	const [show, setShow] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+	const [busy, setBusy] = useState(false)
 	const [mounted, setMounted] = useState(false)
+
 	const router = useRouter()
 	const sp = useSearchParams()
 	const next = sp.get('next') || '/profile'
@@ -58,125 +59,126 @@ function LoginInner() {
 
 	async function onSubmit(e: React.FormEvent) {
 		e.preventDefault()
+		if (!email || !password) return
 		setError(null)
+		setBusy(true)
 		try {
-			await api.login(email, password)
-			router.replace(next)
+			const res = await api.login(email, password)
+			if (res?.mfa === 'email_code_sent') {
+				router.replace(
+					`/login/verify?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}`
+				)
+				return
+			}
+			// если MFA не стартовала — не редиректим на профиль
+			throw new Error('Не удалось запустить подтверждение по почте')
 		} catch (err: any) {
 			setError(err?.message || 'Ошибка входа')
+		} finally {
+			setBusy(false)
 		}
 	}
 
 	const googleEnabled = GOOGLE_ENABLED
 
 	return (
-		<div className={styles.container}>
-			<div className={styles.card}>
-				<h1 className={styles.title}>Вход</h1>
-
-				{reason === 'google_exists' && (
-					<div className={`${styles.notice} ${styles.info}`} role='status'>
-						Аккаунт с этим Google-email уже существует — просто войдите.
-					</div>
-				)}
-				{reason === 'google_no_account' && (
-					<div className={`${styles.notice} ${styles.info}`} role='status'>
-						Похоже, такого аккаунта ещё нет. Вы можете зарегистрироваться.
-					</div>
-				)}
-
-				<form onSubmit={onSubmit} className={styles.form}>
-					<div className={styles.inputGroup}>
-						<label htmlFor='email' className={styles.label}>
-							Email
-						</label>
-						<input
-							id='email'
-							required
-							type='email'
-							autoComplete='email'
-							placeholder='Введите свой email'
-							value={email}
-							onChange={e => setEmail(e.target.value)}
-							className={styles.input}
-						/>
-					</div>
-
-					<div className={styles.inputGroup}>
-						<label htmlFor='password' className={styles.label}>
-							Пароль
-						</label>
-						<div className={styles.inputWrap}>
-							<input
-								id='password'
-								required
-								type={show ? 'text' : 'password'}
-								autoComplete='current-password'
-								minLength={8}
-								placeholder='Введите пароль (≥8)'
-								value={password}
-								onChange={e => setPassword(e.target.value)}
-								className={styles.input}
-							/>
-							<button
-								type='button'
-								className={styles.toggleBtn}
-								aria-label={show ? 'Скрыть пароль' : 'Показать пароль'}
-								aria-pressed={show}
-								onClick={() => setShow(s => !s)}
-								title={show ? 'Скрыть пароль' : 'Показать пароль'}
-							>
-								{show ? <EyeOffIcon /> : <EyeIcon />}
-							</button>
-						</div>
-					</div>
-
-					<button type='submit' className={styles.button}>
-						ВОЙТИ
-					</button>
-				</form>
-
-				{error && <p className={styles.error}>{error}</p>}
-
-				<p className={styles.signupText}>
-					Нет аккаунта?{' '}
-					<a href='/register' className={styles.signupLink}>
-						Зарегистрироваться
-					</a>
-				</p>
-
-				{/* Показываем Google-блок ТОЛЬКО после монтирования, чтобы избежать hydration-рассинхрона */}
-				{mounted && googleEnabled && (
-					<>
-						<hr className={styles.divider} />
-						<div className={styles.oauthBlock}>
-							<div className={styles.oauthCaption}>Или через Google</div>
-							<GoogleAuthButton label='Войти с Google' mode='login' />
-						</div>
-					</>
-				)}
-			</div>
-		</div>
-	)
-}
-
-export default function LoginPage() {
-	return (
-		<Suspense
-			fallback={
-				<>
-					<div className={styles.bg} aria-hidden />
-					<div className={styles.container}>
-						<div className={styles.card}>
-							<h1 className={styles.title}>Вход</h1>
-							<p>Loading…</p>
-						</div>
-					</div>
-				</>
-			}
-		>
+		<>
 			<div className={styles.bg} aria-hidden />
-			<LoginInner />
-		</Suspense>
+			<div className={styles.container}>
+				<div className={styles.card}>
+					<h1 className={styles.title}>Вход</h1>
+
+					{reason === 'google_exists' && (
+						<div className={`${styles.notice} ${styles.info}`} role='status'>
+							Аккаунт с этим Google-email уже существует — просто войдите.
+						</div>
+					)}
+					{reason === 'google_no_account' && (
+						<div className={`${styles.notice} ${styles.info}`} role='status'>
+							Похоже, такого аккаунта ещё нет. Вы можете зарегистрироваться.
+						</div>
+					)}
+					{reason === 'email_failed' && (
+						<div className={`${styles.notice} ${styles.success}`} role='alert'>
+							Не удалось отправить письмо с кодом. Попробуйте ещё раз, проверьте
+							адрес или войдите по паролю.
+						</div>
+					)}
+
+					<form onSubmit={onSubmit} className={styles.form} noValidate>
+						<div className={styles.inputGroup}>
+							<label htmlFor='email' className={styles.label}>
+								Email
+							</label>
+							<input
+								id='email'
+								required
+								type='email'
+								autoComplete='email'
+								placeholder='Введите свой email'
+								value={email}
+								onChange={e => setEmail(e.target.value)}
+								className={styles.input}
+								disabled={busy}
+							/>
+						</div>
+
+						<div className={styles.inputGroup}>
+							<label htmlFor='password' className={styles.label}>
+								Пароль
+							</label>
+							<div className={styles.inputWrap}>
+								<input
+									id='password'
+									required
+									type={show ? 'text' : 'password'}
+									autoComplete='current-password'
+									minLength={8}
+									placeholder='Введите пароль (≥8)'
+									value={password}
+									onChange={e => setPassword(e.target.value)}
+									className={styles.input}
+									disabled={busy}
+								/>
+								<button
+									type='button'
+									className={styles.toggleBtn}
+									aria-label={show ? 'Скрыть пароль' : 'Показать пароль'}
+									aria-pressed={show}
+									onClick={() => setShow(s => !s)}
+									title={show ? 'Скрыть пароль' : 'Показать пароль'}
+									disabled={busy}
+								>
+									{show ? <EyeOffIcon /> : <EyeIcon />}
+								</button>
+							</div>
+						</div>
+
+						<button type='submit' className={styles.button} disabled={busy}>
+							{busy ? 'Отправляем код…' : 'ВОЙТИ'}
+						</button>
+					</form>
+
+					{error && <p className={styles.error}>{error}</p>}
+
+					<p className={styles.signupText}>
+						Нет аккаунта?{' '}
+						<a href='/register' className={styles.signupLink}>
+							Зарегистрироваться
+						</a>
+					</p>
+
+					{mounted && googleEnabled && (
+						<>
+							<hr className={styles.divider} />
+							<div className={styles.oauthBlock}>
+								<div className={styles.oauthCaption}>Или через Google</div>
+								<GoogleAuthButton label='Войти с Google' mode='login' />
+							</div>
+						</>
+					)}
+				</div>
+			</div>
+		</>
 	)
 }

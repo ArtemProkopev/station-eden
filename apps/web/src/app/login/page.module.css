@@ -42,8 +42,12 @@
 	border-radius: 36px;
 	padding: 4px;
 	background: linear-gradient(to bottom, #6a5bc4, #4f47a6);
-	mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-	-webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+	mask:
+		linear-gradient(#000 0 0) content-box,
+		linear-gradient(#000 0 0);
+	-webkit-mask:
+		linear-gradient(#000 0 0) content-box,
+		linear-gradient(#000 0 0);
 	-webkit-mask-composite: xor;
 	mask-composite: exclude;
 	pointer-events: none;
@@ -101,7 +105,9 @@
 	font-size: 16px;
 	width: 100%;
 	box-sizing: border-box;
-	transition: border-color 0.2s, box-shadow 0.2s;
+	transition:
+		border-color 0.2s,
+		box-shadow 0.2s;
 	background-color: #2c2b7b;
 	font-family: 'Nunito', sans-serif;
 }
@@ -142,7 +148,10 @@
 	opacity: 0.95;
 	cursor: pointer;
 	border-radius: 8px;
-	transition: opacity 0.15s ease, transform 0.08s ease, background 0.12s ease;
+	transition:
+		opacity 0.15s ease,
+		transform 0.08s ease,
+		background 0.12s ease;
 }
 .toggleBtn:hover {
 	opacity: 1;
@@ -179,7 +188,9 @@
 	-webkit-text-stroke: 2px #7050d5;
 	paint-order: stroke fill;
 	text-shadow: 0 2px 0 #7050d5;
-	box-shadow: 0 6px 0 #5a3fb5, 0 8px 10px rgba(0, 0, 0, 0.2),
+	box-shadow:
+		0 6px 0 #5a3fb5,
+		0 8px 10px rgba(0, 0, 0, 0.2),
 		inset 0 6px 0 #cd8dee;
 	transition: all 0.1s ease;
 	position: relative;
@@ -187,13 +198,17 @@
 }
 .button:hover {
 	background: #7a5ad6;
-	box-shadow: 0 4px 0 #5a3fb5, 0 6px 8px rgba(0, 0, 0, 0.15),
+	box-shadow:
+		0 4px 0 #5a3fb5,
+		0 6px 8px rgba(0, 0, 0, 0.15),
 		inset 0 6px 0 #cd8dee;
 	top: 2px;
 }
 .button:active {
 	background: #6a4ec5;
-	box-shadow: 0 2px 0 #5a3fb5, 0 4px 6px rgba(0, 0, 0, 0.1),
+	box-shadow:
+		0 2px 0 #5a3fb5,
+		0 4px 6px rgba(0, 0, 0, 0.1),
 		inset 0 6px 0 #cd8dee;
 	top: 4px;
 	transform: translateY(2px);

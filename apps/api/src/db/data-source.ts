@@ -5,11 +5,11 @@ import * as path from 'path'
 import 'reflect-metadata'
 import { DataSource } from 'typeorm'
 
+import { EmailCode } from '../auth/email-code.entity'
 import { RefreshToken } from '../auth/refresh-token.entity'
 import { EnvSchema } from '../config/env.schema'
 import { User } from '../users/user.entity'
 
-// подхватываем .env из корня монорепы (../../.env) или локальный рядом
 const rootEnv = path.resolve(process.cwd(), '../../.env')
 const localEnv = path.resolve(process.cwd(), '.env')
 const envPath = fs.existsSync(rootEnv) ? rootEnv : localEnv
@@ -23,21 +23,16 @@ const env = parsed.data
 
 const base = {
 	type: 'postgres' as const,
-	entities: [User, RefreshToken],
+	entities: [User, RefreshToken, EmailCode],
 	migrations: [path.join(__dirname, '../../migrations/*{.ts,.js}')],
 	synchronize: false,
-	// soft defaults
-	extra: {
-		connectionTimeoutMillis: 10_000,
-		max: 10,
-	},
+	extra: { connectionTimeoutMillis: 10_000, max: 10 },
 }
 
 const dataSource = env.DATABASE_URL
 	? new DataSource({
 			...base,
 			url: env.DATABASE_URL,
-			// Neon требует TLS; в деве обычно достаточно отключить проверку сертификата.
 			ssl: { rejectUnauthorized: false },
 	  })
 	: new DataSource({

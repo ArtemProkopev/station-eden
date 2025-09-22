@@ -1,0 +1,35 @@
+# --- build stage ---
+FROM node:20-alpine AS build
+WORKDIR /app
+ENV PNPM_HOME=/root/.local/share/pnpm
+RUN corepack enable
+
+# скопим всё, что нужно для monorepo сборки
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+# если есть корневые конфиги ts/… — тоже копируй при необходимости
+RUN pnpm install --frozen-lockfile
+
+# скопим исходники
+COPY apps/api apps/api
+WORKDIR /app/apps/api
+
+# prod env внутрь образа (только на build стадии)
+COPY ./.env.production ./.env
+
+RUN pnpm build
+
+# --- runtime stage ---
+FROM node:20-alpine AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=4000
+# копируем только прод-зависимости для API
+COPY --from=build /app/node_modules /app/node_modules
+COPY --from=build /app/apps/api/node_modules /app/apps/api/node_modules
+COPY --from=build /app/apps/api/dist /app/dist
+COPY --from=build /app/apps/api/.env /app/.env
+
+EXPOSE 4000
+CMD ["node", "dist/main.js"]

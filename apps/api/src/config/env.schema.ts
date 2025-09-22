@@ -1,4 +1,3 @@
-// apps/api/src/config/env.schema.ts
 import { z } from 'zod'
 
 const RawEnvSchema = z.object({
@@ -8,7 +7,7 @@ const RawEnvSchema = z.object({
 
 	// API
 	API_PORT: z.coerce.number().default(4000),
-	API_CORS_ORIGIN: z.string().optional(), // "a,b,c"
+	API_CORS_ORIGIN: z.string().optional(),
 
 	// Cookies / CSRF
 	COOKIE_SECURE: z.enum(['true', 'false']).default('false'),
@@ -31,7 +30,7 @@ const RawEnvSchema = z.object({
 	POSTGRES_PASSWORD: z.string().optional(),
 	POSTGRES_DB: z.string().optional(),
 
-	// фронт (только для прокидки в респонсы/редиректы при надобности)
+	// фронт
 	NEXT_PUBLIC_API_BASE: z.string().url().optional(),
 
 	// allow-list админов
@@ -43,6 +42,18 @@ const RawEnvSchema = z.object({
 	GOOGLE_CLIENT_SECRET: z.string().optional(),
 	GOOGLE_REDIRECT_URL: z.string().url().optional(),
 	WEB_AFTER_LOGIN_URL: z.string().url().optional(),
+
+	// SMTP (legacy, больше не требуется, оставляем optional для обратной совместимости)
+	SMTP_URL: z.string().optional(),
+	SMTP_HOST: z.string().optional(),
+	SMTP_PORT: z.coerce.number().optional(),
+	SMTP_USER: z.string().optional(),
+	SMTP_PASS: z.string().optional(),
+	SMTP_FROM: z.string().optional(),
+
+	// Resend
+	RESEND_API_KEY: z.string().optional(),
+	EMAIL_FROM: z.string().optional(),
 })
 
 export const EnvSchema = RawEnvSchema.transform(env => ({

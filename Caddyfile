@@ -1,0 +1,25 @@
+# Фронт (Next.js)
+stationeden.ru, www.stationeden.ru {
+  encode zstd gzip
+
+  reverse_proxy web:3000
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+}
+
+# Бэкенд (Nest.js API)
+api.stationeden.ru {
+  encode zstd gzip
+
+  reverse_proxy api:4000
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+}
