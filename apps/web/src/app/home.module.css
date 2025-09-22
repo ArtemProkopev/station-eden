@@ -1,0 +1,73 @@
+/* Фон как на login */
+.bg {
+	position: fixed;
+	inset: 0;
+	z-index: 0;
+	background-image: url('/login-background.png');
+	background-size: cover;
+	background-position: center;
+}
+
+.container {
+	min-height: 100vh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
+	font-family: 'Nunito', sans-serif;
+	position: relative;
+	z-index: 1;
+}
+
+.card {
+	background: #4740a8;
+	padding: 3rem 2rem;
+	border-radius: 36px;
+	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+	backdrop-filter: blur(12px);
+	max-width: 540px;
+	width: 100%;
+	text-align: center;
+	border: 4px solid #201f5c;
+	position: relative;
+	overflow: hidden;
+}
+.card::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: 36px;
+	padding: 4px;
+	background: linear-gradient(to bottom, #6a5bc4, #4f47a6);
+	mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+	-webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+	-webkit-mask-composite: xor;
+	mask-composite: exclude;
+	pointer-events: none;
+	z-index: 0;
+}
+
+.title {
+	margin: 0 0 12px 0;
+	font-size: 32px;
+	color: #fff;
+	font-family: 'RussoOne', sans-serif;
+	-webkit-text-stroke: 1.5px #7050d5;
+	paint-order: stroke fill;
+	text-shadow: 0 2px 0 #7050d5;
+}
+
+.subtitle {
+	margin: 0 1rem 1.5rem;
+	font-size: 16px;
+	color: #eaeaff;
+}
+
+.big404 {
+	font-size: 88px;
+	font-weight: 900;
+	font-family: 'RussoOne', sans-serif;
+	color: #fff;
+	-webkit-text-stroke: 3px #7050d5;
+	text-shadow: 0 3px 0 #5a3fb5, 0 6px 10px rgba(0, 0, 0, 0.25);
+}
