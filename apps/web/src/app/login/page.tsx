@@ -60,8 +60,18 @@ function LoginInner() {
 		e.preventDefault()
 		setError(null)
 		try {
-			await api.login(email, password)
-			router.replace(next)
+			const res = await api.login(email, password)
+			// ожидаем ответ вида { mfa: 'email_code_sent', email }
+			if ((res as any)?.mfa === 'email_code_sent') {
+				const q = new URLSearchParams({
+					email,
+					next,
+				})
+				router.replace(`/login/verify?${q.toString()}`)
+			} else {
+				// fallback: если когда-то уберём MFA
+				router.replace(next)
+			}
 		} catch (err: any) {
 			setError(err?.message || 'Ошибка входа')
 		}
@@ -145,7 +155,6 @@ function LoginInner() {
 					</a>
 				</p>
 
-				{/* Показываем Google-блок ТОЛЬКО после монтирования, чтобы избежать hydration-рассинхрона */}
 				{mounted && googleEnabled && (
 					<>
 						<hr className={styles.divider} />

@@ -4,23 +4,46 @@ import { getCsrfToken } from './csrf'
 const API = process.env.NEXT_PUBLIC_API_BASE || 'https://api.stationeden.ru'
 const CSRF_NAME = process.env.NEXT_PUBLIC_CSRF_COOKIE_NAME || 'se_csrf'
 
-// --- внутренние утилиты ---
+// ===== ВНУТРЕННИЕ УТИЛИТЫ =====
 
-// Гарантируем наличие CSRF-куки и, по возможности, получаем токен
-async function ensureCsrf() {
-	const res = await fetch(`${API}/auth/csrf`, {
+/** Пингуем /auth/csrf, чтобы сервер выдал/продлил CSRF-куку */
+async function touchCsrf(): Promise<void> {
+	await fetch(`${API}/auth/csrf`, {
 		method: 'GET',
 		credentials: 'include',
-	})
-	// Ответ может содержать { csrf }, но нам достаточно факта установки куки
-	try {
-		await res.json()
-	} catch {}
+	}).catch(() => {})
+}
+
+/** Иногда браузер не сразу «видит» новую куку. Делаем короткий ретрай. */
+async function readCsrfWithRetry(
+	name = CSRF_NAME,
+	tries = 4,
+	delayMs = 50
+): Promise<string | null> {
+	for (let i = 0; i < tries; i++) {
+		const v = getCsrfToken(name)
+		if (v && v.length > 0) return v
+		await new Promise(r => setTimeout(r, delayMs))
+	}
+	return null
+}
+
+async function ensureCsrfToken(): Promise<string> {
+	// 1) пробуем сразу
+	let token = getCsrfToken(CSRF_NAME)
+	if (token) return token
+
+	// 2) дергаем /auth/csrf и читаем снова с ретраем
+	await touchCsrf()
+	token = await readCsrfWithRetry(CSRF_NAME)
+	if (!token) {
+		throw new Error('CSRF token not available')
+	}
+	return token
 }
 
 async function postJSON<T = any>(path: string, body?: unknown): Promise<T> {
-	await ensureCsrf()
-	const token = getCsrfToken(CSRF_NAME)
+	const token = await ensureCsrfToken()
 	const res = await fetch(`${API}${path}`, {
 		method: 'POST',
 		credentials: 'include',
@@ -36,8 +59,7 @@ async function postJSON<T = any>(path: string, body?: unknown): Promise<T> {
 }
 
 async function deleteJSON<T = any>(path: string): Promise<T> {
-	await ensureCsrf()
-	const token = getCsrfToken(CSRF_NAME)
+	const token = await ensureCsrfToken()
 	const res = await fetch(`${API}${path}`, {
 		method: 'DELETE',
 		credentials: 'include',
@@ -60,23 +82,7 @@ async function getJSON<T = any>(path: string): Promise<T> {
 	return data as T
 }
 
-// Возможный авто-рефреш, если понадобится.
-// Оставляем утилиту на будущее: можно заюзать в getJSON/postJSON при 401.
-/*
-async function getWithRefresh<T=any>(path: string): Promise<T> {
-  try {
-    return await getJSON<T>(path)
-  } catch (e: any) {
-    if (/HTTP 401/.test(e?.message)) {
-      try { await api.refresh() } catch {}
-      return await getJSON<T>(path)
-    }
-    throw e
-  }
-}
-*/
-
-// --- публичное API, которое импортируют страницы ---
+// ===== ПУБЛИЧНОЕ API ДЛЯ СТРАНИЦ =====
 
 export const api = {
 	// Аутентификация / MFA
@@ -92,11 +98,8 @@ export const api = {
 	logout: () => postJSON('/auth/logout', {}),
 	me: () => getJSON('/auth/me'),
 
-	// --- Админка пользователей (JwtAuthGuard + AdminGuard на бэке) ---
-	// Список пользователей
+	// Админка пользователей
 	users: () => getJSON('/users'),
-	// Пользователь по id
 	userById: (id: string) => getJSON(`/users/${encodeURIComponent(id)}`),
-	// Удаление пользователя
 	deleteUser: (id: string) => deleteJSON(`/users/${encodeURIComponent(id)}`),
 }
