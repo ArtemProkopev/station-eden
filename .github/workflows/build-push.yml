@@ -83,13 +83,11 @@ jobs:
             fi
 
             echo "==> Login to GHCR on server"
-            # прячем ввод секретов из логов
             set +x
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
             set -x
 
             echo "==> Load /etc/environment (server)"
-            # НЕ печатаем секреты из /etc/environment
             set +x
             set -a; [ -f /etc/environment ] && . /etc/environment || true; set +a
             set -x
@@ -100,7 +98,7 @@ jobs:
             export IMAGE_TAG="${{ github.sha }}"
             [ -n "$IMAGE_TAG" ] || IMAGE_TAG="latest"
 
-            # Выбираем compose CLI (без non-zero на проверках, важно для script_stop: true)
+            # Выбираем compose CLI
             HAS_V1="$(docker-compose version >/dev/null 2>&1 && echo yes || echo no)"
             HAS_V2="$(docker compose version  >/dev/null 2>&1 && echo yes || echo no)"
             if [ "$HAS_V1" = yes ]; then
@@ -113,8 +111,6 @@ jobs:
             fi
 
             echo "==> Effective image refs (resolved by compose)"
-            # Если вдруг на сервере ещё старый compose-файл с env_file, эта команда упадёт.
-            # Но мы только что сделали git reset --hard origin/main, так что всё ок.
             $COMP config | awk '/image:/{print}'
 
             echo "==> Sanity-check: GHCR manifests availability"
@@ -125,15 +121,20 @@ jobs:
             fi
 
             echo "==> Pull images"
-            ( $COMP pull --no-parallel ) || (
+            ( $COMP pull ) || (
               echo "First pull failed. Fallback to IMAGE_TAG=latest ..."
               export IMAGE_TAG="latest"
               $COMP config | awk '/image:/{print}'
-              $COMP pull --no-parallel
+              $COMP pull
             )
 
             echo "==> Up containers"
             $COMP up -d --force-recreate
+
+            echo "==> Run DB migrations"
+            API_CID=$($COMP ps -q api)
+            docker exec -i "$API_CID" \
+              node ./node_modules/typeorm/cli.js migration:run -d dist/db/data-source.js
 
             echo "==> Status"
             docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
