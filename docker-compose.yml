@@ -1,24 +1,26 @@
-version: "3.9"
+version: '3.9'
 
 services:
   api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
+    image: ghcr.io/artemprokopev/station-eden-api:latest
     env_file:
       - apps/api/.env.production
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:4000/auth/csrf',r=>process.exit(r.statusCode>=200&&r.statusCode<500?0:1)).on('error',()=>process.exit(1))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://127.0.0.1:4000/auth/csrf',r=>process.exit(r.statusCode>=200&&r.statusCode<500?0:1)).on('error',()=>process.exit(1))",
+        ]
       interval: 10s
       timeout: 3s
       retries: 10
     networks: [webnet]
 
   web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
+    image: ghcr.io/artemprokopev/station-eden-web:latest
     env_file:
       - apps/web/.env.production
     depends_on:
@@ -26,7 +28,13 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000',r=>process.exit(r.statusCode>=200&&r.statusCode<500?0:1)).on('error',()=>process.exit(1))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://127.0.0.1:3000',r=>process.exit(r.statusCode>=200&&r.statusCode<500?0:1)).on('error',()=>process.exit(1))",
+        ]
       interval: 10s
       timeout: 3s
       retries: 15
@@ -36,8 +44,8 @@ services:
     image: caddy:2
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -48,6 +56,14 @@ services:
       api:
         condition: service_healthy
     networks: [webnet]
+
+  watchtower:
+    image: containrrr/watchtower
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # проверяет обновления каждые 30 сек, удаляет старые образы
+    command: --interval 30 --cleanup --include-stopped
 
 networks:
   webnet:
