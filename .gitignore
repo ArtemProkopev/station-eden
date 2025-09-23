@@ -54,3 +54,4 @@ Thumbs.db
 
 # ========== Безопасность ==========
 .git-credentials
+docker-compose.override.yml
