@@ -1,8 +1,8 @@
-// apps/api/src/auth/auth.controller.ts
 import {
 	Body,
 	Controller,
 	Get,
+	InternalServerErrorException,
 	NotFoundException,
 	Post,
 	Req,
@@ -24,11 +24,24 @@ type GoogleMode = 'login' | 'register'
 
 @Controller('auth')
 export class AuthController {
-	constructor(private auth: AuthService, private jwt: JwtService) {}
+	constructor(
+		private auth: AuthService,
+		private jwt: JwtService
+	) {}
 
 	private cookieOpts() {
 		const secure = process.env.COOKIE_SECURE === 'true'
 		return { httpOnly: true, sameSite: 'lax' as const, secure, path: '/' }
+	}
+	private preauthCookieOpts() {
+		const secure = process.env.COOKIE_SECURE === 'true'
+		return {
+			httpOnly: true,
+			sameSite: 'lax' as const,
+			secure,
+			path: '/',
+			maxAge: 10 * 60 * 1000,
+		}
 	}
 
 	private googleEnabled() {
@@ -68,9 +81,28 @@ export class AuthController {
 		return { csrf: true }
 	}
 
+	// ===== Регистрация/логин (через шаг MFA) =====
+
 	@Post('register')
-	async register(@Body() dto: RegisterDto) {
-		return this.auth.register(dto.email.toLowerCase(), dto.password)
+	async register(
+		@Body() dto: RegisterDto,
+		@Res({ passthrough: true }) res: Response
+	) {
+		const { user } = await this.auth.register(
+			dto.email.toLowerCase(),
+			dto.password
+		)
+		const pre = this.auth.signPreauth(user.id, user.email)
+		res.cookie('preauth', pre, this.preauthCookieOpts())
+
+		try {
+			await this.auth.startEmailMfa(user.id, user.email)
+		} catch (e) {
+			console.error('[register] startEmailMfa failed', e)
+			// НЕ роняем регистрацию — дальше пользователь сможет переслать код с verify
+		}
+
+		return { mfa: 'email_code_sent', email: user.email }
 	}
 
 	@UseGuards(ThrottlerGuard)
@@ -80,18 +112,21 @@ export class AuthController {
 		@Body() dto: LoginDto,
 		@Res({ passthrough: true }) res: Response
 	) {
-		const { access, refreshToken, refreshExpires, user } =
-			await this.auth.login(dto.email.toLowerCase(), dto.password)
+		const { user } = await this.auth.login(
+			dto.email.toLowerCase(),
+			dto.password
+		)
+		const pre = this.auth.signPreauth(user.id, user.email)
+		res.cookie('preauth', pre, this.preauthCookieOpts())
 
-		res.cookie('access_token', access, {
-			...this.cookieOpts(),
-			maxAge: 15 * 60 * 1000,
-		})
-		res.cookie('refresh_token', refreshToken, {
-			...this.cookieOpts(),
-			maxAge: refreshExpires.getTime() - Date.now(),
-		})
-		return { user }
+		try {
+			await this.auth.startEmailMfa(user.id, user.email)
+		} catch (e) {
+			console.error('[login] startEmailMfa failed', e)
+			// Не валим 500 — код можно дослать с verify
+		}
+
+		return { mfa: 'email_code_sent', email: user.email }
 	}
 
 	@Post('refresh')
@@ -124,11 +159,10 @@ export class AuthController {
 		const payload = tryDecode(this.jwt, (req as any).cookies?.access_token)
 		const userId = (payload as any)?.sub
 		const rt = (req as any).cookies?.refresh_token
-
 		if (userId) await this.auth.logout(userId, rt)
-
 		res.clearCookie('access_token', this.cookieOpts())
 		res.clearCookie('refresh_token', this.cookieOpts())
+		res.clearCookie('preauth', this.preauthCookieOpts())
 		return { ok: true }
 	}
 
@@ -138,7 +172,72 @@ export class AuthController {
 		return { userId: (req.user as any).sub, email: (req.user as any).email }
 	}
 
-	// ---------- Google OAuth ----------
+	// ===== Подтверждение e-mail кодом =====
+
+	@UseGuards(ThrottlerGuard)
+	@Throttle({ default: { limit: 10, ttl: 300000 } })
+	@Post('verify-email-code')
+	async verifyEmailCode(
+		@Body() body: { code: string; email?: string },
+		@Req() req: Request,
+		@Res({ passthrough: true }) res: Response
+	) {
+		const pre = (req as any).cookies?.preauth
+		if (!pre) throw new UnauthorizedException('No preauth')
+
+		let payload: any
+		try {
+			payload = this.jwt.verify(pre, { secret: process.env.JWT_ACCESS_SECRET })
+		} catch {
+			throw new UnauthorizedException('Preauth expired')
+		}
+
+		const email = body.email?.toLowerCase() || payload.email
+		if (!email || email !== payload.email)
+			throw new UnauthorizedException('Email mismatch')
+
+		const { user, access, refreshToken, refreshExpires } =
+			await this.auth.verifyEmailCode(payload.sub, email, body.code)
+
+		res.cookie('access_token', access, {
+			...this.cookieOpts(),
+			maxAge: 15 * 60 * 1000,
+		})
+		res.cookie('refresh_token', refreshToken, {
+			...this.cookieOpts(),
+			maxAge: refreshExpires.getTime() - Date.now(),
+		})
+		res.clearCookie('preauth', this.preauthCookieOpts())
+
+		return { user }
+	}
+
+	// ---- Повторная отправка кода (по preauth), чтобы не застревать ----
+
+	@UseGuards(ThrottlerGuard)
+	@Throttle({ default: { limit: 6, ttl: 300000 } })
+	@Post('resend-email-code')
+	async resendEmailCode(@Req() req: Request) {
+		const pre = (req as any).cookies?.preauth
+		if (!pre) throw new UnauthorizedException('No preauth')
+
+		let payload: any
+		try {
+			payload = this.jwt.verify(pre, { secret: process.env.JWT_ACCESS_SECRET })
+		} catch {
+			throw new UnauthorizedException('Preauth expired')
+		}
+
+		try {
+			await this.auth.startEmailMfa(payload.sub, payload.email)
+			return { ok: true }
+		} catch (e) {
+			console.error('[resend] startEmailMfa failed', e)
+			throw new InternalServerErrorException('Failed to resend email')
+		}
+	}
+
+	// ---------- Google OAuth (через MFA) ----------
 
 	@Get('google')
 	async google(@Req() req: Request, @Res() res: Response) {
@@ -148,7 +247,6 @@ export class AuthController {
 		const q = req.query as any
 		const mode: GoogleMode = q?.mode === 'register' ? 'register' : 'login'
 
-		// Упакуем mode в state, чтобы вернуть и проверить его же
 		const nonce = this.makeState()
 		const packed = `${nonce}:${mode}`
 		this.setStateCookie(res, packed)
@@ -175,7 +273,6 @@ export class AuthController {
 			return
 		}
 
-		// Валидация state + извлечение режима
 		const { code, state } = req.query as { code?: string; state?: string }
 		const stateCookie = (req as any).cookies?.google_oauth_state as
 			| string
@@ -212,7 +309,7 @@ export class AuthController {
 			return
 		}
 
-		// Верификация id_token и email
+		// Верификация id_token
 		const ticket = await this.googleClient().verifyIdToken({
 			idToken: id_token,
 			audience: process.env.GOOGLE_CLIENT_ID!,
@@ -225,54 +322,42 @@ export class AuthController {
 			return
 		}
 
-		// Логика в зависимости от режима
+		// Логика login/register
 		let user = await this.auth['users'].findByEmail(email)
-
 		if (mode === 'login') {
 			if (!user) {
-				// аккаунта нет — отправим на логин с подсказкой
 				res.redirect(this.urlTo('/login?reason=google_no_account'))
 				return
 			}
 		} else {
-			// mode === 'register'
 			if (user) {
-				// аккаунт есть — отправим на логин с подсказкой
 				res.redirect(this.urlTo('/login?reason=google_exists'))
 				return
 			}
-			// создаём нового
-			user = await this.auth['users'].create({
-				email,
-				passwordHash: 'google',
-			})
+			user = await this.auth['users'].create({ email, passwordHash: 'google' })
 		}
 
-		// гарантия роли админа из allow-list
 		await this.auth['users'].ensureAdminRoleFor(email)
 
-		// Куки
-		const access = this.auth.signAccess(user!)
-		const { plain: refreshToken, expires: refreshExpires } =
-			await this.auth.issueRefresh(user!.id)
+		// preauth + (пытаемся отправить письмо) + всегда редиректим на verify
+		const pre = this.auth.signPreauth(user!.id, user!.email)
+		res.cookie('preauth', pre, this.preauthCookieOpts())
 
-		res.cookie('access_token', access, {
-			...this.cookieOpts(),
-			maxAge: 15 * 60 * 1000,
-		})
-		res.cookie('refresh_token', refreshToken, {
-			...this.cookieOpts(),
-			maxAge: refreshExpires.getTime() - Date.now(),
-		})
+		try {
+			await this.auth.startEmailMfa(user!.id, user!.email)
+		} catch (e) {
+			console.error('[google] startEmailMfa failed', e)
+			// не прерываем — на verify доступна повторная отправка
+		}
 
-		// Успешный вход — куда вести
-		const back =
-			process.env.WEB_AFTER_LOGIN_URL || 'http://localhost:3000/profile'
-		res.redirect(back)
+		const verifyUrl = this.urlTo(
+			`/login/verify?email=${encodeURIComponent(user!.email)}`
+		)
+		res.redirect(verifyUrl)
 		return
 	}
 
-	// --- Debug (оставь на время настройки) ---
+	// --- Debug ---
 	@Get('google/debug-env')
 	debugGoogleEnv() {
 		return {

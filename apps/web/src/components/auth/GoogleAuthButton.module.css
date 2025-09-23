@@ -1,16 +1,14 @@
-/* apps/web/src/components/auth/GoogleAuthButton.module.css */
 .wrap {
 	display: grid;
 	gap: 10px;
 	justify-items: center;
 }
 
-/* Белая кнопка Google с идеальным центрированием текста */
 .button {
 	position: relative;
 	display: inline-flex;
 	align-items: center;
-	justify-content: center; /* центрируем текст независимо от иконки */
+	justify-content: center;
 	gap: 10px;
 
 	background: #fff;
@@ -31,18 +29,26 @@
 
 	cursor: pointer;
 
-	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15), 0 10px 24px rgba(0, 0, 0, 0.1);
-	transition: transform 0.06s ease, box-shadow 0.12s ease;
+	box-shadow:
+		0 2px 6px rgba(0, 0, 0, 0.15),
+		0 10px 24px rgba(0, 0, 0, 0.1);
+	transition:
+		transform 0.06s ease,
+		box-shadow 0.12s ease;
 }
 
 .button:hover {
 	transform: translateY(-1px);
-	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18), 0 16px 32px rgba(0, 0, 0, 0.16);
+	box-shadow:
+		0 4px 12px rgba(0, 0, 0, 0.18),
+		0 16px 32px rgba(0, 0, 0, 0.16);
 }
 
 .button:active {
 	transform: translateY(0);
-	box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2), 0 6px 16px rgba(0, 0, 0, 0.14);
+	box-shadow:
+		inset 0 1px 3px rgba(0, 0, 0, 0.2),
+		0 6px 16px rgba(0, 0, 0, 0.14);
 }
 
 .button:focus {
@@ -55,7 +61,6 @@
 	cursor: default;
 }
 
-/* Иконка фиксирована слева — не влияет на центр текста */
 .icon {
 	position: absolute;
 	left: 14px;
@@ -66,14 +71,13 @@
 	display: block;
 }
 
-/* Невидимый «балансир» справа — чтобы текст был строго по центру */
 .button::after {
 	content: '';
 	position: absolute;
 	right: 14px;
 	top: 50%;
 	transform: translateY(-50%);
-	width: 18px; /* ширина как у .icon */
+	width: 18px;
 	height: 18px;
 	pointer-events: none;
 }

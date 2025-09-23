@@ -1,182 +1,88 @@
-// apps/web/src/app/login/page.tsx
 'use client'
 
-import GoogleAuthButton from '@/src/components/auth/GoogleAuthButton'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, Suspense } from 'react'
 import { api } from '@/src/lib/api'
 import { GOOGLE_ENABLED } from '@/src/lib/flags'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useEffect, useState } from 'react'
 import styles from './page.module.css'
 
-function EyeIcon() {
-	return (
-		<svg
-			viewBox='0 0 24 24'
-			aria-hidden='true'
-			fill='none'
-			stroke='currentColor'
-			strokeWidth='2.5'
-			strokeLinecap='round'
-			strokeLinejoin='round'
-		>
-			<path d='M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z' />
-			<circle cx='12' cy='12' r='3' />
-		</svg>
-	)
-}
-function EyeOffIcon() {
-	return (
-		<svg
-			viewBox='0 0 24 24'
-			aria-hidden='true'
-			fill='none'
-			stroke='currentColor'
-			strokeWidth='2.5'
-			strokeLinecap='round'
-			strokeLinejoin='round'
-		>
-			<path d='M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a21.8 21.8 0 0 1 4.22-4.92' />
-			<path d='M9.88 9.88a3 3 0 1 0 4.24 4.24' />
-			<path d='M10.58 4.1A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.77 21.77 0 0 1-3.12 3.91' />
-			<line x1='1' y1='1' x2='23' y2='23' />
-		</svg>
-	)
-}
+// если у тебя есть компонент кнопки Google в проекте:
+import GoogleAuthButton from '@/src/components/auth/GoogleAuthButton'
 
 function LoginInner() {
-	const [email, setEmail] = useState('')
-	const [password, setPassword] = useState('')
-	const [show, setShow] = useState(false)
-	const [error, setError] = useState<string | null>(null)
-	const [mounted, setMounted] = useState(false)
-	const router = useRouter()
-	const sp = useSearchParams()
-	const next = sp.get('next') || '/profile'
-	const reason = sp.get('reason')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
-	useEffect(() => setMounted(true), [])
+  const router = useRouter()
+  const sp = useSearchParams()
+  const next = sp.get('next') || '/profile'
 
-	async function onSubmit(e: React.FormEvent) {
-		e.preventDefault()
-		setError(null)
-		try {
-			await api.login(email, password)
-			router.replace(next)
-		} catch (err: any) {
-			setError(err?.message || 'Ошибка входа')
-		}
-	}
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+    try {
+      await api.login(email, password)
+      router.replace(next)
+    } catch (err: any) {
+      setError(err?.message || 'Ошибка входа')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-	const googleEnabled = GOOGLE_ENABLED
+  return (
+    <div className={styles.container}>
+      <div className={styles.bg} />
+      <div className={styles.card}>
+        <h2 className={styles.title}>Вход</h2>
 
-	return (
-		<div className={styles.container}>
-			<div className={styles.card}>
-				<h1 className={styles.title}>Вход</h1>
+        {error && <div className={`${styles.notice} ${styles.error}`}>{error}</div>}
 
-				{reason === 'google_exists' && (
-					<div className={`${styles.notice} ${styles.info}`} role='status'>
-						Аккаунт с этим Google-email уже существует — просто войдите.
-					</div>
-				)}
-				{reason === 'google_no_account' && (
-					<div className={`${styles.notice} ${styles.info}`} role='status'>
-						Похоже, такого аккаунта ещё нет. Вы можете зарегистрироваться.
-					</div>
-				)}
+        <form onSubmit={onSubmit} className={styles.form}>
+          <input
+            required
+            type="email"
+            placeholder="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            className={styles.input}
+          />
+          <input
+            required
+            type="password"
+            placeholder="пароль"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            className={styles.input}
+          />
+          <div className={styles.actions}>
+            <button className={styles.button} disabled={loading} type="submit">
+              {loading ? 'Входим…' : 'Войти'}
+            </button>
+          </div>
+        </form>
 
-				<form onSubmit={onSubmit} className={styles.form}>
-					<div className={styles.inputGroup}>
-						<label htmlFor='email' className={styles.label}>
-							Email
-						</label>
-						<input
-							id='email'
-							required
-							type='email'
-							autoComplete='email'
-							placeholder='Введите свой email'
-							value={email}
-							onChange={e => setEmail(e.target.value)}
-							className={styles.input}
-						/>
-					</div>
-
-					<div className={styles.inputGroup}>
-						<label htmlFor='password' className={styles.label}>
-							Пароль
-						</label>
-						<div className={styles.inputWrap}>
-							<input
-								id='password'
-								required
-								type={show ? 'text' : 'password'}
-								autoComplete='current-password'
-								minLength={8}
-								placeholder='Введите пароль (≥8)'
-								value={password}
-								onChange={e => setPassword(e.target.value)}
-								className={styles.input}
-							/>
-							<button
-								type='button'
-								className={styles.toggleBtn}
-								aria-label={show ? 'Скрыть пароль' : 'Показать пароль'}
-								aria-pressed={show}
-								onClick={() => setShow(s => !s)}
-								title={show ? 'Скрыть пароль' : 'Показать пароль'}
-							>
-								{show ? <EyeOffIcon /> : <EyeIcon />}
-							</button>
-						</div>
-					</div>
-
-					<button type='submit' className={styles.button}>
-						ВОЙТИ
-					</button>
-				</form>
-
-				{error && <p className={styles.error}>{error}</p>}
-
-				<p className={styles.signupText}>
-					Нет аккаунта?{' '}
-					<a href='/register' className={styles.signupLink}>
-						Зарегистрироваться
-					</a>
-				</p>
-
-				{/* Показываем Google-блок ТОЛЬКО после монтирования, чтобы избежать hydration-рассинхрона */}
-				{mounted && googleEnabled && (
-					<>
-						<hr className={styles.divider} />
-						<div className={styles.oauthBlock}>
-							<div className={styles.oauthCaption}>Или через Google</div>
-							<GoogleAuthButton label='Войти с Google' mode='login' />
-						</div>
-					</>
-				)}
-			</div>
-		</div>
-	)
+        {GOOGLE_ENABLED && (
+          <>
+            <div className={styles.oauthDivider}>или</div>
+            <div className={styles.oauth}>
+              <GoogleAuthButton />
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
 }
 
-export default function LoginPage() {
-	return (
-		<Suspense
-			fallback={
-				<>
-					<div className={styles.bg} aria-hidden />
-					<div className={styles.container}>
-						<div className={styles.card}>
-							<h1 className={styles.title}>Вход</h1>
-							<p>Loading…</p>
-						</div>
-					</div>
-				</>
-			}
-		>
-			<div className={styles.bg} aria-hidden />
-			<LoginInner />
-		</Suspense>
-	)
+export default function Page() {
+  // Suspense — для корректной работы useSearchParams в App Router
+  return (
+    <Suspense>
+      <LoginInner />
+    </Suspense>
+  )
 }
