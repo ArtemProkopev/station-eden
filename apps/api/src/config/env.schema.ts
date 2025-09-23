@@ -12,6 +12,7 @@ const RawEnvSchema = z.object({
 	// Cookies / CSRF
 	COOKIE_SECURE: z.enum(['true', 'false']).default('false'),
 	CSRF_COOKIE_NAME: z.string().default('csrf_token'),
+	CSRF_COOKIE_DOMAIN: z.string().optional(), // <-- добавили
 
 	// JWT
 	JWT_ACCESS_SECRET: z
@@ -43,7 +44,7 @@ const RawEnvSchema = z.object({
 	GOOGLE_REDIRECT_URL: z.string().url().optional(),
 	WEB_AFTER_LOGIN_URL: z.string().url().optional(),
 
-	// SMTP (legacy, больше не требуется, оставляем optional для обратной совместимости)
+	// SMTP (legacy)
 	SMTP_URL: z.string().optional(),
 	SMTP_HOST: z.string().optional(),
 	SMTP_PORT: z.coerce.number().optional(),
