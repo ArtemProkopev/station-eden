@@ -71,7 +71,16 @@ jobs:
           script: |
             set -euo pipefail
             set -x
-            cd ~/station-eden
+
+            # Переходим в рабочую директорию и подтягиваем последние изменения
+            cd ~/station-eden || mkdir -p ~/station-eden && cd ~/station-eden
+            if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+              git fetch --all --prune
+              git checkout main || true
+              git reset --hard origin/main
+            else
+              echo "Not a git repo. Skipping pull (используется текущее содержимое каталога)."
+            fi
 
             echo "==> Login to GHCR on server"
             # прячем ввод секретов из логов
@@ -104,6 +113,8 @@ jobs:
             fi
 
             echo "==> Effective image refs (resolved by compose)"
+            # Если вдруг на сервере ещё старый compose-файл с env_file, эта команда упадёт.
+            # Но мы только что сделали git reset --hard origin/main, так что всё ок.
             $COMP config | awk '/image:/{print}'
 
             echo "==> Sanity-check: GHCR manifests availability"
@@ -114,7 +125,6 @@ jobs:
             fi
 
             echo "==> Pull images"
-            # первая попытка pull; при неудаче — fallback на latest (строка завершится успехом)
             ( $COMP pull --no-parallel ) || (
               echo "First pull failed. Fallback to IMAGE_TAG=latest ..."
               export IMAGE_TAG="latest"
