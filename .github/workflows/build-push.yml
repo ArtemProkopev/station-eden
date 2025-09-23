@@ -74,45 +74,53 @@ jobs:
             cd ~/station-eden
 
             echo "==> Login to GHCR on server"
+            # прячем ввод секретов из логов
+            set +x
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
+            set -x
 
             echo "==> Load /etc/environment (server)"
+            # НЕ печатаем секреты из /etc/environment
+            set +x
             set -a; [ -f /etc/environment ] && . /etc/environment || true; set +a
+            set -x
 
-            # ==== образа (namespace/registry/tag) ====
+            # ==== образы (namespace/registry/tag) ====
             export GHCR_OWNER="${{ steps.owner.outputs.lc }}"
             export GHCR_REG="ghcr.io"
             export IMAGE_TAG="${{ github.sha }}"
             [ -n "$IMAGE_TAG" ] || IMAGE_TAG="latest"
 
-            # Выбираем compose CLI
-            if docker compose version >/dev/null 2>&1; then
+            # Выбираем compose CLI (без non-zero на проверках, важно для script_stop: true)
+            HAS_V1="$(docker-compose version >/dev/null 2>&1 && echo yes || echo no)"
+            HAS_V2="$(docker compose version  >/dev/null 2>&1 && echo yes || echo no)"
+            if [ "$HAS_V1" = yes ]; then
+              COMP="docker-compose -f docker-compose.yml"
+            elif [ "$HAS_V2" = yes ]; then
               COMP="docker compose -f docker-compose.yml"
             else
-              COMP="docker-compose -f docker-compose.yml"
+              echo "Neither 'docker-compose' nor 'docker compose' found on the server."
+              exit 1
             fi
 
             echo "==> Effective image refs (resolved by compose)"
             $COMP config | awk '/image:/{print}'
 
             echo "==> Sanity-check: GHCR manifests availability"
-            set +e
-            docker manifest inspect ${GHCR_REG}/${GHCR_OWNER}/station-eden-api:${IMAGE_TAG} >/dev/null
-            API_HAS_TAG=$?
-            docker manifest inspect ${GHCR_REG}/${GHCR_OWNER}/station-eden-web:${IMAGE_TAG} >/dev/null
-            WEB_HAS_TAG=$?
-            set -e
+            docker manifest inspect "${GHCR_REG}/${GHCR_OWNER}/station-eden-api:${IMAGE_TAG}" >/dev/null 2>&1; API_HAS_TAG=$?
+            docker manifest inspect "${GHCR_REG}/${GHCR_OWNER}/station-eden-web:${IMAGE_TAG}"  >/dev/null 2>&1; WEB_HAS_TAG=$?
             if [ $API_HAS_TAG -ne 0 ] || [ $WEB_HAS_TAG -ne 0 ]; then
               echo "Tag ${IMAGE_TAG} not found for at least one image. Will fallback to 'latest' if pull fails."
             fi
 
             echo "==> Pull images"
-            if ! $COMP pull --no-parallel; then
+            # первая попытка pull; при неудаче — fallback на latest (строка завершится успехом)
+            ( $COMP pull --no-parallel ) || (
               echo "First pull failed. Fallback to IMAGE_TAG=latest ..."
               export IMAGE_TAG="latest"
               $COMP config | awk '/image:/{print}'
               $COMP pull --no-parallel
-            fi
+            )
 
             echo "==> Up containers"
             $COMP up -d --force-recreate
