@@ -15,7 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # приведение owner к нижнему регистру (для ghcr тегов)
       - name: Owner lowercase
         id: owner
         shell: bash
@@ -41,9 +40,9 @@ jobs:
             ghcr.io/${{ steps.owner.outputs.lc }}/station-eden-api:latest
             ghcr.io/${{ steps.owner.outputs.lc }}/station-eden-api:${{ github.sha }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=max,ignore-error=true
 
-      # ===== WEB image (все публичные env как build-args) =====
+      # ===== WEB image =====
       - name: Build & Push WEB
         uses: docker/build-push-action@v6
         with:
@@ -58,7 +57,7 @@ jobs:
             NEXT_PUBLIC_ENABLE_TELEGRAM=${{ vars.NEXT_PUBLIC_ENABLE_TELEGRAM }}
             NEXT_PUBLIC_ENABLE_GOOGLE=${{ vars.NEXT_PUBLIC_ENABLE_GOOGLE }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=max,ignore-error=true
 
       # ===== Deploy to server via SSH =====
       - name: Deploy to server
@@ -72,19 +71,8 @@ jobs:
           script: |
             set -e
             cd ~/station-eden
-
-            # Логин на GHCR со стороны сервера (образы приватные)
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
-
-            # Подтягиваем /etc/environment в текущую сессию,
-            # чтобы docker-compose увидел ${VARS} из compose-файла
-            set -a
-            . /etc/environment
-            set +a
-
-            # Обновляем образы и пересоздаем контейнеры
+            set -a; . /etc/environment; set +a
             docker-compose pull
             docker-compose up -d --force-recreate
-
-            # Немного статуса
             docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
