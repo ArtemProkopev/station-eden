@@ -1,6 +1,5 @@
 services:
   api:
-    # Параметризованный namespace/registry/tag
     image: ${GHCR_REG:-ghcr.io}/${GHCR_OWNER}/station-eden-api:${IMAGE_TAG:-latest}
     environment:
       NODE_ENV: ${NODE_ENV}
@@ -27,7 +26,6 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY}
       EMAIL_FROM: ${EMAIL_FROM}
 
-      # пригодится, если API формирует публичные ссылки
       NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE}
     restart: unless-stopped
     healthcheck:
@@ -44,7 +42,6 @@ services:
     networks: [webnet]
 
   web:
-    # Параметризованный namespace/registry/tag
     image: ${GHCR_REG:-ghcr.io}/${GHCR_OWNER}/station-eden-web:${IMAGE_TAG:-latest}
     environment:
       NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE}
