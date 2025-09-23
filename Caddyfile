@@ -13,6 +13,13 @@ stationeden.ru, www.stationeden.ru {
 api.stationeden.ru {
   encode zstd gzip
   reverse_proxy api:4000
+
+  # анти-кэш именно для /auth/csrf, чтобы браузер всегда получал актуальный токен
+  @csrf path /auth/csrf
+  header @csrf Cache-Control "no-store, no-cache, must-revalidate"
+  header @csrf Pragma "no-cache"
+  header @csrf Expires "0"
+
   header {
     Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     X-Content-Type-Options "nosniff"
