@@ -11,8 +11,8 @@ const RawEnvSchema = z.object({
 
 	// Cookies / CSRF
 	COOKIE_SECURE: z.enum(['true', 'false']).default('false'),
-	CSRF_COOKIE_NAME: z.string().default('csrf_token'),
-	CSRF_COOKIE_DOMAIN: z.string().optional(), // <-- добавили
+	CSRF_COOKIE_NAME: z.string().default('se_csrf'),
+	CSRF_COOKIE_DOMAIN: z.string().optional(), // например ".stationeden.ru"
 
 	// JWT
 	JWT_ACCESS_SECRET: z

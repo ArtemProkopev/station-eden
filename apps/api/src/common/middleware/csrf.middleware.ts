@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from 'express'
 import crypto from 'node:crypto'
 
-const CSRF_COOKIE = process.env.CSRF_COOKIE_NAME || 'csrf_token'
+const CSRF_COOKIE = (process.env.CSRF_COOKIE_NAME || 'se_csrf').trim()
 const CSRF_DOMAIN = (process.env.CSRF_COOKIE_DOMAIN || '').trim() || undefined // напр. ".stationeden.ru"
 
 export function CsrfMiddleware(
@@ -9,19 +9,19 @@ export function CsrfMiddleware(
 	res: Response,
 	next: NextFunction
 ) {
-	// Выдать куку, если ещё нет
+	// если куки нет — выдаём новую
 	if (!req.cookies[CSRF_COOKIE]) {
 		const token = crypto.randomBytes(24).toString('hex')
 		res.cookie(CSRF_COOKIE, token, {
-			httpOnly: false, // читаем из JS на фронте
+			httpOnly: false, // читаем из JS
 			sameSite: 'lax',
 			secure: process.env.COOKIE_SECURE === 'true',
 			path: '/',
-			...(CSRF_DOMAIN ? { domain: CSRF_DOMAIN } : {}), // ключевое для поддоменов
+			...(CSRF_DOMAIN ? { domain: CSRF_DOMAIN } : {}),
 		})
 	}
 
-	// Проверяем только изменения на /auth*
+	// проверяем только мутационные запросы к /auth*
 	const needsCheck =
 		['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) &&
 		req.path.startsWith('/auth') &&

@@ -16,7 +16,8 @@ async function bootstrap() {
 	app.enableCors({
 		origin: process.env.API_CORS_ORIGIN?.split(',') ?? [],
 		credentials: true,
-		allowedHeaders: ['Content-Type', 'x-csrf-token'], // важно для CSRF
+		allowedHeaders: ['Content-Type', 'X-CSRF-Token'], // явно разрешим заголовок
+		methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 	})
 
 	app.useGlobalPipes(

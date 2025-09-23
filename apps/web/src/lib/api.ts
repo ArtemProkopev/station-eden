@@ -1,4 +1,5 @@
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+const CSRF_COOKIE_NAME = 'se_csrf' // синхронно с сервером
 
 function getCookie(name: string) {
 	if (typeof document === 'undefined') return null
@@ -24,7 +25,7 @@ async function fetchJSON<T>(
 ) {
 	const headers: Record<string, string> = { 'Content-Type': 'application/json' }
 	if (init?.csrf) {
-		const token = getCookie('csrf_token')
+		const token = getCookie(CSRF_COOKIE_NAME)
 		if (token) headers['x-csrf-token'] = token
 	}
 	const res = await fetch(`${API}${path}`, {
@@ -55,7 +56,7 @@ async function fetchJSON<T>(
 
 	const json = JSON.parse(text)
 	const data =
-		json && typeof json === 'object' && 'data' in json ? json.data : json
+		json && typeof json === 'object' && 'data' in json ? json['data'] : json
 	return data as T
 }
 
