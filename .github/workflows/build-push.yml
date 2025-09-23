@@ -69,14 +69,23 @@ jobs:
           password: ${{ secrets.SERVER_PASSWORD }}
           script_stop: true
           script: |
-            set -e
+            set -euo pipefail
             cd ~/station-eden
 
             echo "==> Login to GHCR on server"
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
 
-            echo "==> Load /etc/environment"
-            set -a; . /etc/environment; set +a
+            echo "==> Load /etc/environment (server)"
+            set -a; [ -f /etc/environment ] && . /etc/environment || true; set +a
+
+            # ===============================
+            # ВАЖНО: пробрасываем namespace и тег образов
+            # ===============================
+            export GHCR_OWNER="${{ steps.owner.outputs.lc }}"   # всегда нижний регистр
+            export GHCR_REG="ghcr.io"
+            # Выкатываем именно тот билд, что собрали:
+            export IMAGE_TAG="${GITHUB_SHA}"
+            # Хотите всегда latest — поменяйте на: export IMAGE_TAG="latest"
 
             echo "==> Pull images"
             if docker compose version >/dev/null 2>&1; then
