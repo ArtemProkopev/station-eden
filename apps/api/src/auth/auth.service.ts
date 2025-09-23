@@ -1,5 +1,5 @@
 // apps/api/src/auth/auth.service.ts
-import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common'
+import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { InjectRepository } from '@nestjs/typeorm'
 import * as bcrypt from 'bcryptjs'
@@ -7,6 +7,8 @@ import { randomBytes } from 'crypto'
 import { Repository } from 'typeorm'
 import { User } from '../users/user.entity'
 import { UsersService } from '../users/users.service'
+import { EmailCode } from './email-code.entity'
+import { EmailService } from './email.service'
 import { RefreshToken } from './refresh-token.entity'
 
 @Injectable()
@@ -15,7 +17,10 @@ export class AuthService {
 		private readonly users: UsersService,
 		private readonly jwt: JwtService,
 		@InjectRepository(RefreshToken)
-		private readonly rtRepo: Repository<RefreshToken>
+		private readonly rtRepo: Repository<RefreshToken>,
+		@InjectRepository(EmailCode)
+		private readonly emailCodeRepo: Repository<EmailCode>,
+		private readonly emailer: EmailService
 	) {}
 
 	/** Подписываем access JWT */
@@ -26,6 +31,14 @@ export class AuthService {
 				secret: process.env.JWT_ACCESS_SECRET!,
 				expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m',
 			}
+		)
+	}
+
+	/** Короткий JWT для шага preauth (10 минут) */
+	public signPreauth(userId: string, email: string) {
+		return this.jwt.sign(
+			{ sub: userId, email, kind: 'preauth' },
+			{ secret: process.env.JWT_ACCESS_SECRET!, expiresIn: '10m' }
 		)
 	}
 
@@ -74,10 +87,9 @@ export class AuthService {
 
 		const passwordHash = await bcrypt.hash(password, 10)
 		await this.users.create({ email, passwordHash, role: 'user' })
-
 		await this.users.ensureAdminRoleFor(email)
 
-		const fresh = await this.users.findByEmailOrFail(email) // Используем новую функцию
+		const fresh = await this.users.findByEmailOrFail(email)
 		const access = this.signAccess(fresh)
 		const { plain: refreshToken, expires: refreshExpires } =
 			await this.issueRefresh(fresh.id)
@@ -94,7 +106,7 @@ export class AuthService {
 		await this.validateUser(email, password)
 		await this.users.ensureAdminRoleFor(email)
 
-		const fresh = await this.users.findByEmailOrFail(email) // Используем новую функцию
+		const fresh = await this.users.findByEmailOrFail(email)
 		const access = this.signAccess(fresh)
 		const { plain: refreshToken, expires: refreshExpires } =
 			await this.issueRefresh(fresh.id)
@@ -119,9 +131,10 @@ export class AuthService {
 			throw new UnauthorizedException('Refresh token истек')
 		}
 
+		// отзываем предыдущий refresh и выдаём новый
 		await this.rtRepo.update(rec.id, { revoked: true })
 
-		const user = await this.users.findByIdOrFail(userId) // Используем новую функцию
+		const user = await this.users.findByIdOrFail(userId)
 
 		const access = this.signAccess(user)
 		const { plain: newRefresh, expires: refreshExpires } =
@@ -131,9 +144,9 @@ export class AuthService {
 	}
 
 	async logout(userId: string, refreshToken?: string) {
-		// Сначала проверим существование пользователя
+		// убедимся, что пользователь существует
 		await this.users.findByIdOrFail(userId)
-		
+
 		if (!refreshToken) {
 			await this.rtRepo.update({ userId, revoked: false }, { revoked: true })
 			return { ok: true }
@@ -151,5 +164,49 @@ export class AuthService {
 			}
 		}
 		return { ok: true }
+	}
+
+	// ===== Email MFA =====
+
+	private rand6(): string {
+		return Math.floor(100000 + Math.random() * 900000).toString()
+	}
+
+	/** Создаёт и отправляет одноразовый код на почту (10 минут) */
+	public async startEmailMfa(userId: string, email: string) {
+		const code = this.rand6()
+		const expires = new Date(Date.now() + 10 * 60 * 1000)
+		await this.emailCodeRepo.save(
+			this.emailCodeRepo.create({ userId, email, code, expiresAt: expires })
+		)
+		await this.emailer.sendLoginCode(email, code)
+		return { expires }
+	}
+
+	/** Проверка кода + выдача нормальных токенов */
+	public async verifyEmailCode(userId: string, email: string, code: string) {
+		const rec = await this.emailCodeRepo.findOne({
+			where: { userId, email, used: false },
+			order: { createdAt: 'DESC' },
+		})
+		if (!rec || rec.code !== code || rec.expiresAt < new Date()) {
+			throw new UnauthorizedException('Invalid or expired code')
+		}
+
+		rec.used = true
+		await this.emailCodeRepo.save(rec)
+
+		const user = await this.users.findByIdOrFail(userId)
+
+		const access = this.signAccess(user)
+		const { plain: refreshToken, expires: refreshExpires } =
+			await this.issueRefresh(user.id)
+
+		return {
+			user: { id: user.id, email: user.email, role: user.role },
+			access,
+			refreshToken,
+			refreshExpires,
+		}
 	}
 }
