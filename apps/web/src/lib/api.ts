@@ -1,149 +1,62 @@
-const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
-const CSRF_COOKIE_NAME = 'se_csrf' // синхронно с сервером
+// apps/web/src/lib/api.ts
+import { getCsrfToken } from './csrf'
 
-function getCookie(name: string) {
-	if (typeof document === 'undefined') return null
-	return (
-		document.cookie
-			.split('; ')
-			.find(c => c.startsWith(name + '='))
-			?.split('=')[1] ?? null
-	)
-}
+const API = process.env.NEXT_PUBLIC_API_BASE || 'https://api.stationeden.ru'
+const CSRF_NAME = process.env.NEXT_PUBLIC_CSRF_COOKIE_NAME || 'se_csrf'
 
-function emitSession(status: 'signed-in' | 'signed-out') {
-	if (typeof window !== 'undefined') {
-		window.dispatchEvent(
-			new CustomEvent('session-changed', { detail: { status } })
-		)
-	}
-}
-
-async function fetchJSON<T>(
-	path: string,
-	init?: RequestInit & { csrf?: boolean }
-) {
-	const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-	if (init?.csrf) {
-		const token = getCookie(CSRF_COOKIE_NAME)
-		if (token) headers['x-csrf-token'] = token
-	}
-	const res = await fetch(`${API}${path}`, {
-		...init,
-		headers,
+// Гарантируем наличие CSRF-куки и по возможности берём токен из ответа
+async function ensureCsrf() {
+	const res = await fetch(`${API}/auth/csrf`, {
+		method: 'GET',
 		credentials: 'include',
 	})
-
-	if (!res.ok) {
-		let msg = ''
-		try {
-			const txt = await res.text()
-			try {
-				const j = txt ? JSON.parse(txt) : {}
-				msg =
-					(j && (j.message || j.error)) ||
-					(typeof j === 'string' ? j : '') ||
-					txt
-			} catch {
-				msg = txt
-			}
-		} catch {}
-		throw new Error(msg || `HTTP ${res.status}`)
-	}
-
-	const text = await res.text()
-	if (!text) return {} as T
-
-	const json = JSON.parse(text)
-	const data =
-		json && typeof json === 'object' && 'data' in json ? json['data'] : json
-	return data as T
+	// ответ может содержать { csrf: "<token>" } — не обязателен
+	try {
+		await res.json()
+	} catch {}
 }
 
-export async function ensureCsrf() {
-	await fetchJSON('/auth/csrf', { method: 'GET' })
+async function postJSON(path: string, body?: any) {
+	await ensureCsrf()
+	const token = getCsrfToken(CSRF_NAME)
+	const res = await fetch(`${API}${path}`, {
+		method: 'POST',
+		credentials: 'include',
+		headers: {
+			'Content-Type': 'application/json',
+			'X-CSRF-Token': token,
+		},
+		body: body ? JSON.stringify(body) : undefined,
+	})
+	const data = await res.json().catch(() => ({}))
+	if (!res.ok) {
+		throw new Error(data?.message || `HTTP ${res.status}`)
+	}
+	return data
+}
+
+async function getJSON(path: string) {
+	const res = await fetch(`${API}${path}`, {
+		method: 'GET',
+		credentials: 'include',
+	})
+	const data = await res.json().catch(() => ({}))
+	if (!res.ok) {
+		throw new Error(data?.message || `HTTP ${res.status}`)
+	}
+	return data
 }
 
 export const api = {
-	register: async (email: string, password: string) => {
-		await ensureCsrf()
-		return fetchJSON<{ mfa: 'email_code_sent'; email: string }>(
-			'/auth/register',
-			{
-				method: 'POST',
-				csrf: true,
-				body: JSON.stringify({ email, password }),
-			}
-		)
-	},
-
-	login: async (email: string, password: string) => {
-		await ensureCsrf()
-		const r = await fetchJSON<{ mfa: 'email_code_sent'; email: string }>(
-			'/auth/login',
-			{
-				method: 'POST',
-				csrf: true,
-				body: JSON.stringify({ email, password }),
-			}
-		)
-		return r
-	},
-
-	verifyEmailCode: async (code: string, email?: string) => {
-		await ensureCsrf()
-		const r = await fetchJSON<{
-			user: { id: string; email: string; role: string }
-		}>('/auth/verify-email-code', {
-			method: 'POST',
-			csrf: true,
-			body: JSON.stringify({ code, email }),
-		})
-		emitSession('signed-in')
-		return r
-	},
-
-	resendEmailCode: async () => {
-		await ensureCsrf()
-		return fetchJSON<{ ok: true }>('/auth/resend-email-code', {
-			method: 'POST',
-			csrf: true,
-			body: '{}',
-		})
-	},
-
-	me: async () =>
-		fetchJSON<{ userId: string; email: string }>('/auth/me', { method: 'GET' }),
-
-	refresh: async () => {
-		await ensureCsrf()
-		const r = await fetchJSON('/auth/refresh', {
-			method: 'POST',
-			csrf: true,
-			body: '{}',
-		})
-		emitSession('signed-in')
-		return r
-	},
-
-	logout: async () => {
-		await ensureCsrf()
-		const r = await fetchJSON('/auth/logout', {
-			method: 'POST',
-			csrf: true,
-			body: '{}',
-		})
-		emitSession('signed-out')
-		return r
-	},
-
-	users: async () => fetchJSON('/users', { method: 'GET' }),
-	deleteUser: async (id: string) => {
-		await ensureCsrf()
-		return fetchJSON(`/users/${id}`, {
-			method: 'DELETE',
-			csrf: true,
-			body: '{}',
-		})
-	},
+	login: (email: string, password: string) =>
+		postJSON('/auth/login', { email, password }),
+	register: (email: string, password: string) =>
+		postJSON('/auth/register', { email, password }),
+	verifyEmailCode: (code: string, email?: string) =>
+		postJSON('/auth/verify-email-code', { code, email }),
+	resendEmailCode: () => postJSON('/auth/resend-email-code'),
+	refresh: (userId?: string) =>
+		postJSON('/auth/refresh', userId ? { userId } : undefined),
+	logout: () => postJSON('/auth/logout', {}),
+	me: () => getJSON('/auth/me'),
 }

@@ -16,6 +16,7 @@ import { randomBytes } from 'crypto'
 import type { Request, Response } from 'express'
 import { OAuth2Client } from 'google-auth-library'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
+import { ensureCsrfCookie } from '../common/middleware/csrf.middleware'
 import { AuthService } from './auth.service'
 import { LoginDto } from './dto/login.dto'
 import { RegisterDto } from './dto/register.dto'
@@ -76,34 +77,14 @@ export class AuthController {
 		return this.webOrigin() + path
 	}
 
+	/** Гарантирует наличие CSRF-куки и возвращает сам токен в ответе */
 	@Get('csrf')
-	csrf() {
-		return { csrf: true }
+	csrf(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+		const token = ensureCsrfCookie(req, res)
+		return { csrf: token }
 	}
 
 	// ===== Регистрация/логин (через шаг MFA) =====
-
-	@Post('register')
-	async register(
-		@Body() dto: RegisterDto,
-		@Res({ passthrough: true }) res: Response
-	) {
-		const { user } = await this.auth.register(
-			dto.email.toLowerCase(),
-			dto.password
-		)
-		const pre = this.auth.signPreauth(user.id, user.email)
-		res.cookie('preauth', pre, this.preauthCookieOpts())
-
-		try {
-			await this.auth.startEmailMfa(user.id, user.email)
-		} catch (e) {
-			console.error('[register] startEmailMfa failed', e)
-			// НЕ роняем регистрацию — дальше пользователь сможет переслать код с verify
-		}
-
-		return { mfa: 'email_code_sent', email: user.email }
-	}
 
 	@UseGuards(ThrottlerGuard)
 	@Throttle({ default: { limit: 5, ttl: 300000 } })
@@ -124,6 +105,28 @@ export class AuthController {
 		} catch (e) {
 			console.error('[login] startEmailMfa failed', e)
 			// Не валим 500 — код можно дослать с verify
+		}
+
+		return { mfa: 'email_code_sent', email: user.email }
+	}
+
+	@Post('register')
+	async register(
+		@Body() dto: RegisterDto,
+		@Res({ passthrough: true }) res: Response
+	) {
+		const { user } = await this.auth.register(
+			dto.email.toLowerCase(),
+			dto.password
+		)
+		const pre = this.auth.signPreauth(user.id, user.email)
+		res.cookie('preauth', pre, this.preauthCookieOpts())
+
+		try {
+			await this.auth.startEmailMfa(user.id, user.email)
+		} catch (e) {
+			console.error('[register] startEmailMfa failed', e)
+			// НЕ роняем регистрацию — дальше пользователь сможет переслать код с verify
 		}
 
 		return { mfa: 'email_code_sent', email: user.email }
@@ -211,8 +214,6 @@ export class AuthController {
 
 		return { user }
 	}
-
-	// ---- Повторная отправка кода (по preauth), чтобы не застревать ----
 
 	@UseGuards(ThrottlerGuard)
 	@Throttle({ default: { limit: 6, ttl: 300000 } })
