@@ -32,14 +32,31 @@ async function fetchJSON<T>(
 		headers,
 		credentials: 'include',
 	})
+
 	if (!res.ok) {
 		let msg = ''
 		try {
-			msg = await res.text()
+			const txt = await res.text()
+			try {
+				const j = txt ? JSON.parse(txt) : {}
+				msg =
+					(j && (j.message || j.error)) ||
+					(typeof j === 'string' ? j : '') ||
+					txt
+			} catch {
+				msg = txt
+			}
 		} catch {}
 		throw new Error(msg || `HTTP ${res.status}`)
 	}
-	return res.json() as Promise<T>
+
+	const text = await res.text()
+	if (!text) return {} as T
+
+	const json = JSON.parse(text)
+	const data =
+		json && typeof json === 'object' && 'data' in json ? json.data : json
+	return data as T
 }
 
 export async function ensureCsrf() {
@@ -49,23 +66,54 @@ export async function ensureCsrf() {
 export const api = {
 	register: async (email: string, password: string) => {
 		await ensureCsrf()
-		return fetchJSON('/auth/register', {
-			method: 'POST',
-			csrf: true,
-			body: JSON.stringify({ email, password }),
-		})
+		return fetchJSON<{ mfa: 'email_code_sent'; email: string }>(
+			'/auth/register',
+			{
+				method: 'POST',
+				csrf: true,
+				body: JSON.stringify({ email, password }),
+			}
+		)
 	},
+
 	login: async (email: string, password: string) => {
 		await ensureCsrf()
-		const r = await fetchJSON('/auth/login', {
-			method: 'POST',
-			csrf: true,
-			body: JSON.stringify({ email, password }),
-		})
-		emitSession('signed-in') // 🔔 сразу сообщаем Navbar
+		const r = await fetchJSON<{ mfa: 'email_code_sent'; email: string }>(
+			'/auth/login',
+			{
+				method: 'POST',
+				csrf: true,
+				body: JSON.stringify({ email, password }),
+			}
+		)
 		return r
 	},
-	me: async () => fetchJSON('/auth/me', { method: 'GET' }),
+
+	verifyEmailCode: async (code: string, email?: string) => {
+		await ensureCsrf()
+		const r = await fetchJSON<{
+			user: { id: string; email: string; role: string }
+		}>('/auth/verify-email-code', {
+			method: 'POST',
+			csrf: true,
+			body: JSON.stringify({ code, email }),
+		})
+		emitSession('signed-in')
+		return r
+	},
+
+	resendEmailCode: async () => {
+		await ensureCsrf()
+		return fetchJSON<{ ok: true }>('/auth/resend-email-code', {
+			method: 'POST',
+			csrf: true,
+			body: '{}',
+		})
+	},
+
+	me: async () =>
+		fetchJSON<{ userId: string; email: string }>('/auth/me', { method: 'GET' }),
+
 	refresh: async () => {
 		await ensureCsrf()
 		const r = await fetchJSON('/auth/refresh', {
@@ -73,9 +121,10 @@ export const api = {
 			csrf: true,
 			body: '{}',
 		})
-		emitSession('signed-in') // 🔔 сессия актуализирована
+		emitSession('signed-in')
 		return r
 	},
+
 	logout: async () => {
 		await ensureCsrf()
 		const r = await fetchJSON('/auth/logout', {
@@ -83,7 +132,7 @@ export const api = {
 			csrf: true,
 			body: '{}',
 		})
-		emitSession('signed-out') // 🔔 вышли
+		emitSession('signed-out')
 		return r
 	},
 

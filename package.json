@@ -1,19 +1,31 @@
 {
-  "name": "station-eden",
-  "private": true,
-  "packageManager": "pnpm@9.6.0",
-  "scripts": {
-    "dev:db": "docker compose up -d",
-    "dev:web": "pnpm --filter @station-eden/web dev",
-    "dev:api": "pnpm --filter @station-eden/api start:dev",
-    "dev": "run-p dev:db dev:api dev:web",
-    "build": "pnpm -r build",
-    "migrate:run": "pnpm --filter @station-eden/api typeorm migration:run -d apps/api/ormconfig.ts",
-    "migrate:revert": "pnpm --filter @station-eden/api typeorm migration:revert -d apps/api/ormconfig.ts"
-  },
-  "devDependencies": {
-    "npm-run-all": "^4.1.5",
-    "typescript": "^5.5.4"
-  },
-  "workspaces": ["apps/*"]
+	"name": "station-eden",
+	"private": true,
+	"packageManager": "pnpm@9.6.0",
+	"workspaces": [
+		"apps/*"
+	],
+	"scripts": {
+		"dev:web": "cross-env NEXT_PUBLIC_ENABLE_GOOGLE=true pnpm --filter @station-eden/web dev",
+		"dev:web:nocache": "cross-env NEXT_PUBLIC_ENABLE_GOOGLE=true NEXT_CACHE_DISABLED=1 pnpm --filter @station-eden/web dev:nocache",
+		"dev:api": "pnpm --filter @station-eden/api start:dev",
+		"dev": "run-p dev:api dev:web",
+		"dev:nocache": "run-p dev:api dev:web:nocache",
+		"build": "pnpm -r build",
+		"migrate:run": "pnpm --filter @station-eden/api typeorm migration:run -d apps/api/src/db/data-source.ts",
+		"migrate:revert": "pnpm --filter @station-eden/api typeorm migration:revert -d apps/api/src/db/data-source.ts",
+		"clean": "pnpm -r run clean && rimraf node_modules && pnpm store prune",
+		"clean:artifacts": "pnpm -r run clean",
+		"doctor": "node -e \"console.log('node',process.version);\" && pnpm -v && git rev-parse --short HEAD"
+	},
+	"devDependencies": {
+		"@types/dotenv": "^8.2.3",
+		"cross-env": "^10.0.0",
+		"npm-run-all": "^4.1.5",
+		"rimraf": "^3.0.2",
+		"typescript": "^5.5.4"
+	},
+	"dependencies": {
+		"nodemailer": "^7.0.6"
+	}
 }
