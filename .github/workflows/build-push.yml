@@ -15,7 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # приведение owner к нижнему регистру (для ghcr тегов)
       - name: Owner lowercase
         id: owner
         shell: bash
@@ -73,14 +72,20 @@ jobs:
             set -e
             cd ~/station-eden
 
-            # Логин на GHCR со стороны сервера (образы приватные)
+            # login to GHCR on server
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
 
-            # Экспортим переменные из /etc/environment
+            # export /etc/environment to this session
             set -a; . /etc/environment; set +a
 
-            # Явно игнорируем override и запускаем только основной compose-файл
-            docker compose -f docker-compose.yml pull
-            docker compose -f docker-compose.yml up -d --force-recreate
+            # choose proper compose CLI (docker compose vs docker-compose)
+            if docker compose version >/dev/null 2>&1; then
+              DC="docker compose -f docker-compose.yml"
+            else
+              DC="docker-compose -f docker-compose.yml"
+            fi
+
+            $DC pull
+            $DC up -d --force-recreate
 
             docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
