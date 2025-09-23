@@ -1,4 +1,4 @@
-/* Фон как на login */
+/* apps/web/src/app/home.module.css */
 .bg {
 	position: fixed;
 	inset: 0;
@@ -39,8 +39,12 @@
 	border-radius: 36px;
 	padding: 4px;
 	background: linear-gradient(to bottom, #6a5bc4, #4f47a6);
-	mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-	-webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+	mask:
+		linear-gradient(#000 0 0) content-box,
+		linear-gradient(#000 0 0);
+	-webkit-mask:
+		linear-gradient(#000 0 0) content-box,
+		linear-gradient(#000 0 0);
 	-webkit-mask-composite: xor;
 	mask-composite: exclude;
 	pointer-events: none;
@@ -63,11 +67,9 @@
 	color: #eaeaff;
 }
 
-.big404 {
-	font-size: 88px;
-	font-weight: 900;
-	font-family: 'RussoOne', sans-serif;
-	color: #fff;
-	-webkit-text-stroke: 3px #7050d5;
-	text-shadow: 0 3px 0 #5a3fb5, 0 6px 10px rgba(0, 0, 0, 0.25);
+.welcomeText {
+	margin: 1rem 0;
+	font-size: 14px;
+	color: #eaeaff;
+	line-height: 1.5;
 }

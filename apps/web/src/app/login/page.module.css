@@ -1,130 +1,264 @@
 /* Фон под навбаром и контентом */
 .bg {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background-image: url('/login-background.png'); /* если в /public только .jpg — замени на .jpg */
-  background-size: cover;
-  background-position: center;
+	position: fixed;
+	inset: 0;
+	z-index: 0;
+	background-image: url('/login-background.png');
+	background-size: cover;
+	background-position: center;
 }
 
 /* Контейнер контента поверх фона */
 .container {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  font-family: 'Nunito', sans-serif;
-  position: relative;
-  z-index: 1;
+	min-height: 100vh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
+	font-family: 'Nunito', sans-serif;
+	position: relative;
+	z-index: 1;
 }
 
 /* Карточка логина */
 .card {
-  --placeholder: rgba(255, 255, 255, 0.75);
-  background: #4740a8;
-  padding: 2.5rem;
-  border-radius: 36px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
-  backdrop-filter: blur(12px);
-  max-width: 440px;
-  width: 100%;
-  text-align: center;
-  border: 4px solid #201f5c;
-  position: relative;
-  overflow: hidden;
+	--placeholder: rgba(255, 255, 255, 0.75);
+	background: #4740a8;
+	padding: 2.5rem;
+	border-radius: 36px;
+	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+	backdrop-filter: blur(12px);
+	max-width: 440px;
+	width: 100%;
+	text-align: center;
+	border: 4px solid #201f5c;
+	position: relative;
+	overflow: hidden;
 }
 .card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 36px;
-  padding: 4px;
-  background: linear-gradient(to bottom, #6a5bc4, #4f47a6);
-  mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-  z-index: 0;
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: 36px;
+	padding: 4px;
+	background: linear-gradient(to bottom, #6a5bc4, #4f47a6);
+	mask:
+		linear-gradient(#000 0 0) content-box,
+		linear-gradient(#000 0 0);
+	-webkit-mask:
+		linear-gradient(#000 0 0) content-box,
+		linear-gradient(#000 0 0);
+	-webkit-mask-composite: xor;
+	mask-composite: exclude;
+	pointer-events: none;
+	z-index: 0;
 }
 
 /* Заголовок */
 .title {
-  margin: 0 0 12px 0;
-  font-size: 28px;
-  color: #fff;
-  font-family: 'RussoOne', sans-serif;
-  -webkit-text-stroke: 1.5px #7050d5;
-  paint-order: stroke fill;
-  text-shadow: 0 2px 0 #7050d5;
+	margin: 0 0 12px 0;
+	font-size: 28px;
+	color: #fff;
+	font-family: 'RussoOne', sans-serif;
+	-webkit-text-stroke: 1.5px #7050d5;
+	paint-order: stroke fill;
+	text-shadow: 0 2px 0 #7050d5;
 }
 
+/* дружелюбные уведомления */
 .notice {
-  text-align: left;
-  margin: 10px 0 16px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  font-size: 14px;
-  line-height: 1.45;
+	text-align: left;
+	margin: 10px 0 16px;
+	padding: 10px 12px;
+	border-radius: 12px;
+	font-size: 14px;
+	line-height: 1.45;
+}
+.success {
+	color: #cffad2;
+	background: rgba(80, 200, 120, 0.12);
+	border: 2px solid rgba(80, 200, 120, 0.45);
+}
+.info {
+	color: #d7ecff;
+	background: rgba(125, 249, 255, 0.1);
+	border: 2px solid rgba(125, 249, 255, 0.35);
 }
 
+/* Форма */
 .form {
-  display: grid;
-  gap: 12px;
-  margin-top: 8px;
+	display: grid;
+	gap: 1.5rem;
+}
+.inputGroup {
+	text-align: left;
+}
+.inputWrap {
+	position: relative;
 }
 
+/* Инпут */
 .input {
-  width: 100%;
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 2px solid #2b2970;
-  background: #342d86;
-  color: #fff;
-  outline: none;
+	padding: 14px 64px 14px 16px;
+	border: 4px solid #201f5c;
+	border-radius: 8px;
+	font-size: 16px;
+	width: 100%;
+	box-sizing: border-box;
+	transition:
+		border-color 0.2s,
+		box-shadow 0.2s;
+	background-color: #2c2b7b;
+	font-family: 'Nunito', sans-serif;
 }
-.input::placeholder { color: var(--placeholder); }
-
-.actions {
-  margin-top: 6px;
-  display: grid;
-  gap: 10px;
+.input::placeholder {
+	color: var(--placeholder);
+	opacity: 1;
+}
+.input:focus {
+	outline: none;
+	border-color: #6f59d6;
+	box-shadow: 0 0 0 3px rgba(205, 141, 238, 0.2);
 }
 
+/* Лейбл */
+.label {
+	display: block;
+	font-size: 14px;
+	font-weight: 600;
+	margin-bottom: 8px;
+	color: #ffffff;
+	font-family: 'RussoOne', sans-serif;
+}
+
+/* Кнопка-глаз — 40x40, SVG 28x28 */
+.toggleBtn {
+	position: absolute;
+	top: 50%;
+	right: 10px;
+	transform: translateY(-50%);
+	width: 40px;
+	height: 40px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 0;
+	background: transparent;
+	color: var(--placeholder);
+	opacity: 0.95;
+	cursor: pointer;
+	border-radius: 8px;
+	transition:
+		opacity 0.15s ease,
+		transform 0.08s ease,
+		background 0.12s ease;
+}
+.toggleBtn:hover {
+	opacity: 1;
+	background: rgba(255, 255, 255, 0.06);
+}
+.toggleBtn:active {
+	transform: translateY(-50%) scale(0.98);
+}
+.toggleBtn:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px rgba(205, 141, 238, 0.35);
+	border-radius: 8px;
+}
+.toggleBtn svg {
+	display: block;
+	width: 28px;
+	height: 28px;
+}
+
+/* Кнопка ВОЙТИ */
 .button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  font-weight: 600;
-  background: #00c2ff;
-  color: #0d0d2e;
-  border: none;
-  cursor: pointer;
+	padding: 14px;
+	background: #8b66e7;
+	color: white;
+	border: 2px solid #7050d5;
+	border-radius: 36px;
+	font-size: 36px;
+	font-weight: 600;
+	cursor: pointer;
+	width: 100%;
+	letter-spacing: 0.5px;
+	margin-top: 0.5rem;
+	font-family: 'RussoOne', sans-serif;
+	-webkit-text-stroke: 2px #7050d5;
+	paint-order: stroke fill;
+	text-shadow: 0 2px 0 #7050d5;
+	box-shadow:
+		0 6px 0 #5a3fb5,
+		0 8px 10px rgba(0, 0, 0, 0.2),
+		inset 0 6px 0 #cd8dee;
+	transition: all 0.1s ease;
+	position: relative;
+	top: 0;
 }
-.button:disabled { opacity: .6; cursor: default; }
+.button:hover {
+	background: #7a5ad6;
+	box-shadow:
+		0 4px 0 #5a3fb5,
+		0 6px 8px rgba(0, 0, 0, 0.15),
+		inset 0 6px 0 #cd8dee;
+	top: 2px;
+}
+.button:active {
+	background: #6a4ec5;
+	box-shadow:
+		0 2px 0 #5a3fb5,
+		0 4px 6px rgba(0, 0, 0, 0.1),
+		inset 0 6px 0 #cd8dee;
+	top: 4px;
+	transform: translateY(2px);
+}
 
+/* Статусы и ссылки */
 .error {
-  color: #ffd2d2;
-  background: #722b2b;
-  border: 2px solid #9e4242;
+	color: #e53e3e;
+	font-size: 14px;
+	margin: 1rem 0;
+	font-family: 'Nunito', sans-serif;
+}
+.signupText {
+	margin-top: 1.5rem;
+	font-size: 14px;
+	color: #ffffff;
+	font-family: 'Nunito', sans-serif;
+}
+.signupLink {
+	color: #cd8dee;
+	text-decoration: none;
+	font-weight: 600;
+	font-family: 'Nunito', sans-serif;
+}
+.signupLink:hover {
+	text-decoration: underline;
 }
 
-.oauthDivider {
-  margin: 4px 0;
-  color: #bfbfff;
-  opacity: .75;
+.divider {
+	margin: 16px 0;
+	height: 1px;
+	border: 0;
+	background: rgba(255, 255, 255, 0.2);
+}
+.telegramText {
+	font-size: 14px;
+	color: #666;
+	margin: 0;
+	font-family: 'Nunito', sans-serif;
 }
 
-.oauth {
-  display: grid;
-  gap: 8px;
+/* Блок для кнопки Google */
+.oauthBlock {
+	display: grid;
+	justify-items: center;
+	gap: 8px;
 }
+.oauthCaption {
+	font-size: 13px;
+	color: var(--muted);
+}
+
+/* старый .oauthBtn не используется */

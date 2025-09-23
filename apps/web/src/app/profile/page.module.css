@@ -1,24 +1,24 @@
 /* Сцена и панель */
 .scene {
-  min-height: calc(100vh - 120px);
-  display: grid;
-  place-items: start center;
-  padding: 28px 16px 40px;
-  contain: layout paint;
-  position: relative; /* Добавляем */
-  z-index: 1; /* Добавляем */
+	min-height: calc(100vh - 120px);
+	display: grid;
+	place-items: start center;
+	padding: 28px 16px 40px;
+	contain: layout paint;
+	position: relative; /* Добавляем */
+	z-index: 1; /* Добавляем */
 }
 
 .panel {
-  width: 100%;
-  max-width: 960px;
-  background: #4740a8;
-  border: 4px solid #201f5c;
-  border-radius: 36px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
-  position: relative;
-  overflow: hidden;
-  z-index: 1; /* Добавляем */
+	width: 100%;
+	max-width: 960px;
+	background: #4740a8;
+	border: 4px solid #201f5c;
+	border-radius: 36px;
+	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
+	position: relative;
+	overflow: hidden;
+	z-index: 1; /* Добавляем */
 }
 
 .panel::before {
@@ -30,8 +30,12 @@
 	background: linear-gradient(to bottom, #6a5bc4, #4f47a6);
 
 	/* Маска: стандарт + webkit */
-	mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-	-webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+	mask:
+		linear-gradient(#000 0 0) content-box,
+		linear-gradient(#000 0 0);
+	-webkit-mask:
+		linear-gradient(#000 0 0) content-box,
+		linear-gradient(#000 0 0);
 
 	/* Составление масок: стандарт + webkit */
 	mask-composite: exclude;
@@ -66,7 +70,8 @@
 	border-radius: 50%;
 	background: rgba(28, 22, 82, 0.55);
 	border: 4px solid #201f5c;
-	box-shadow: inset 0 8px 18px rgba(0, 0, 0, 0.25),
+	box-shadow:
+		inset 0 8px 18px rgba(0, 0, 0, 0.25),
 		0 10px 28px rgba(0, 0, 0, 0.18);
 }
 .emailBlock {
@@ -107,7 +112,9 @@
 	color: #c9c3ff;
 
 	opacity: 0.9;
-	transition: opacity 0.12s ease, transform 0.08s ease;
+	transition:
+		opacity 0.12s ease,
+		transform 0.08s ease;
 }
 .exitLink:hover {
 	opacity: 1;
@@ -162,7 +169,8 @@
 	border: 4px solid #201f5c;
 	border-radius: 18px;
 	padding: 16px;
-	box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22),
+	box-shadow:
+		0 8px 20px rgba(0, 0, 0, 0.22),
 		inset 0 6px 0 rgba(205, 141, 238, 0.28);
 }
 .cardContent {
@@ -198,8 +206,12 @@
 	letter-spacing: 0.5px;
 	cursor: pointer;
 	overflow: hidden;
-	box-shadow: 0 3px 0 #5a3fb5, 0 6px 10px rgba(0, 0, 0, 0.16);
-	transition: transform 0.08s ease, box-shadow 0.12s ease;
+	box-shadow:
+		0 3px 0 #5a3fb5,
+		0 6px 10px rgba(0, 0, 0, 0.16);
+	transition:
+		transform 0.08s ease,
+		box-shadow 0.12s ease;
 }
 .copyBtn:hover {
 	transform: translateY(-1px);
@@ -325,72 +337,73 @@
 }
 
 .editButton {
-  background: #6f59d6;
-  border: 2px solid #5b47c2;
-  border-radius: 14px;
-  color: #fff;
-  padding: 10px 16px;
-  font-family: 'RussoOne', sans-serif;
-  font-size: 14px;
-  cursor: pointer;
-  margin: 12px auto;
-  display: block;
-  transition: all 0.2s ease;
-  box-shadow: 0 3px 0 #5a3fb5;
+	background: #6f59d6;
+	border: 2px solid #5b47c2;
+	border-radius: 14px;
+	color: #fff;
+	padding: 10px 16px;
+	font-family: 'RussoOne', sans-serif;
+	font-size: 14px;
+	cursor: pointer;
+	margin: 12px auto;
+	display: block;
+	transition: all 0.2s ease;
+	box-shadow: 0 3px 0 #5a3fb5;
 }
 
 .editButton:hover {
-  transform: translateY(-1px);
-  background: #7f69e6;
+	transform: translateY(-1px);
+	background: #7f69e6;
 }
 
 .editButton:active {
-  transform: translateY(0);
+	transform: translateY(0);
 }
 
 /* Обновленный аватар */
 .avatarPlaceholder {
-  display: none;
+	display: none;
 }
 
 .avatarContainer {
-  position: relative;
-  width: 160px;
-  height: 160px;
-  margin: 6px auto 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+	position: relative;
+	width: 160px;
+	height: 160px;
+	margin: 6px auto 2px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .avatarImage {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 4px solid #201f5c;
-  box-shadow: inset 0 8px 18px rgba(0, 0, 0, 0.25),
-      0 10px 28px rgba(0, 0, 0, 0.18);
+	width: 120px;
+	height: 120px;
+	border-radius: 50%;
+	object-fit: cover;
+	border: 4px solid #201f5c;
+	box-shadow:
+		inset 0 8px 18px rgba(0, 0, 0, 0.25),
+		0 10px 28px rgba(0, 0, 0, 0.18);
 }
 
 .frameImage {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 160px;
-  height: 160px;
-  object-fit: contain;
-  pointer-events: none;
-  z-index: 2;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 160px;
+	height: 160px;
+	object-fit: contain;
+	pointer-events: none;
+	z-index: 2;
 }
 
 /* Заголовок с кнопкой */
 .headerRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 12px;
 }
 
 @keyframes shimmer {
@@ -416,7 +429,8 @@
 		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
 	}
 	.card {
-		box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2),
+		box-shadow:
+			0 6px 14px rgba(0, 0, 0, 0.2),
 			inset 0 4px 0 rgba(205, 141, 238, 0.26);
 	}
 }

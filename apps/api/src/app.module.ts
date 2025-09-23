@@ -1,6 +1,7 @@
 // apps/api/src/app.module.ts
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
+import { APP_FILTER } from '@nestjs/core'
 import { ThrottlerModule } from '@nestjs/throttler'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import * as fs from 'fs'
@@ -9,6 +10,7 @@ import * as path from 'path'
 import { AuthModule } from './auth/auth.module'
 import { EmailCode } from './auth/email-code.entity'
 import { RefreshToken } from './auth/refresh-token.entity'
+import { NotFoundExceptionFilter } from './common/filters/not-found.filter'
 import { EnvSchema } from './config/env.schema'
 import { User } from './users/user.entity'
 import { UsersModule } from './users/users.module'
@@ -78,6 +80,13 @@ function resolveEnvPaths(): string[] {
 		ThrottlerModule.forRoot([{ ttl: 300_000, limit: 100 }]),
 		AuthModule,
 		UsersModule,
+	],
+	providers: [
+		// глобальная обработка 404 ошибок
+		{
+			provide: APP_FILTER,
+			useClass: NotFoundExceptionFilter,
+		},
 	],
 })
 export class AppModule {}

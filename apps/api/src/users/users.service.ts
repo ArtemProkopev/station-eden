@@ -1,3 +1,4 @@
+// apps/api/src/users/users.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
@@ -49,6 +50,23 @@ export class UsersService {
 	async removeById(id: string) {
 		const res = await this.repo.delete(id)
 		if (!res.affected) throw new NotFoundException('User not found')
+	}
+
+	// ДОБАВИТЬ ЭТУ ФУНКЦИЮ для явной проверки существования пользователя
+	async findByIdOrFail(id: string): Promise<User> {
+		const user = await this.findById(id)
+		if (!user) {
+			throw new NotFoundException(`Пользователь с ID ${id} не найден`)
+		}
+		return user
+	}
+
+	async findByEmailOrFail(email: string): Promise<User> {
+		const user = await this.findByEmail(email)
+		if (!user) {
+			throw new NotFoundException(`Пользователь с email ${email} не найден`)
+		}
+		return user
 	}
 
 	/**

@@ -1,262 +1,262 @@
 .overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.7);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1000;
+	padding: 20px;
 }
 
 .modal {
-  background: #4740a8;
-  border: 4px solid #201f5c;
-  border-radius: 24px;
-  padding: 24px;
-  max-width: 800px;
-  width: 100%;
-  max-height: 80vh;
-  scrollbar-width: thin;
-  scrollbar-color: #6a5bc4 #3e37a1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+	background: #4740a8;
+	border: 4px solid #201f5c;
+	border-radius: 24px;
+	padding: 24px;
+	max-width: 800px;
+	width: 100%;
+	max-height: 80vh;
+	scrollbar-width: thin;
+	scrollbar-color: #6a5bc4 #3e37a1;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
 }
 
 .modal::-webkit-scrollbar {
-  width: 8px;
+	width: 8px;
 }
 
 .modal::-webkit-scrollbar-track {
-  background: #3e37a1;
-  border-radius: 4px;
+	background: #3e37a1;
+	border-radius: 4px;
 }
 
 .modal::-webkit-scrollbar-thumb {
-  background: #6a5bc4;
-  border-radius: 4px;
-  border: 2px solid #3e37a1;
+	background: #6a5bc4;
+	border-radius: 4px;
+	border: 2px solid #3e37a1;
 }
 
 .modal::-webkit-scrollbar-thumb:hover {
-  background: #7f69e6;
+	background: #7f69e6;
 }
 
 .modal::-webkit-scrollbar-corner {
-  background: #3e37a1;
+	background: #3e37a1;
 }
 
 .header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 24px;
 }
 
 .header h2 {
-  color: #fff;
-  font-family: 'RussoOne', sans-serif;
-  margin: 0;
+	color: #fff;
+	font-family: 'RussoOne', sans-serif;
+	margin: 0;
 }
 
 .closeButton {
-  background: none;
-  border: none;
-  color: #fff;
-  font-size: 24px;
-  cursor: pointer;
-  padding: 0;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+	background: none;
+	border: none;
+	color: #fff;
+	font-size: 24px;
+	cursor: pointer;
+	padding: 0;
+	width: 30px;
+	height: 30px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .closeButton:hover {
-  opacity: 0.8;
+	opacity: 0.8;
 }
 
 .content {
-  gap: 24px;
-  max-height: calc(90vh - 100px);
-  padding-right: 4px;
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+	gap: 24px;
+	max-height: calc(90vh - 100px);
+	padding-right: 4px;
+	flex: 1;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 24px;
 }
 
 .content::-webkit-scrollbar {
-  width: 6px;
+	width: 6px;
 }
 
 .content::-webkit-scrollbar-track {
-  background: rgba(62, 55, 161, 0.3);
-  border-radius: 3px;
+	background: rgba(62, 55, 161, 0.3);
+	border-radius: 3px;
 }
 
 .content::-webkit-scrollbar-thumb {
-  background: #6a5bc4;
-  border-radius: 3px;
+	background: #6a5bc4;
+	border-radius: 3px;
 }
 
 .content::-webkit-scrollbar-thumb:hover {
-  background: #7f69e6;
+	background: #7f69e6;
 }
 
 .preview {
-  display: flex;
-  justify-content: center;
+	display: flex;
+	justify-content: center;
 }
 
 .avatarPreview {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+	width: 120px;
+	height: 120px;
+	border-radius: 50%;
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .avatarImage {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  object-fit: cover;
+	width: 80px;
+	height: 80px;
+	border-radius: 50%;
+	object-fit: cover;
 }
 
 .section h3 {
-  color: #fff;
-  font-family: 'RussoOne', sans-serif;
-  margin-bottom: 12px;
-  font-size: 16px;
+	color: #fff;
+	font-family: 'RussoOne', sans-serif;
+	margin-bottom: 12px;
+	font-size: 16px;
 }
 
 .grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
+	display: grid;
+	grid-template-columns: repeat(5, 1fr);
+	gap: 12px;
 }
 
 .section {
-  margin-bottom: 20px;
+	margin-bottom: 20px;
 }
 
 .avatarOption,
 .frameOption {
-  background: #3e37a1;
-  border: 2px solid #201f5c;
-  border-radius: 8px;
-  padding: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+	background: #3e37a1;
+	border: 2px solid #201f5c;
+	border-radius: 8px;
+	padding: 8px;
+	cursor: pointer;
+	transition: all 0.2s ease;
 }
 
 .avatarOption:hover,
 .frameOption:hover {
-  transform: translateY(-2px);
-  border-color: #6a5bc4;
+	transform: translateY(-2px);
+	border-color: #6a5bc4;
 }
 
 .avatarOption.selected,
 .frameOption.selected {
-  border-color: #ffd34d;
-  box-shadow: 0 0 0 2px #ffd34d;
+	border-color: #ffd34d;
+	box-shadow: 0 0 0 2px #ffd34d;
 }
 
 .avatarOption img {
-  width: 100%;
-  height: 60px;
-  object-fit: cover;
-  border-radius: 4px;
+	width: 100%;
+	height: 60px;
+	object-fit: cover;
+	border-radius: 4px;
 }
 
 .frameOption img {
-  width: 100%;
-  height: 60px;
-  object-fit: contain;
+	width: 100%;
+	height: 60px;
+	object-fit: contain;
 }
 
 .actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  margin-top: 16px;
-  margin-top: auto;
-  padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+	display: flex;
+	gap: 12px;
+	justify-content: flex-end;
+	margin-top: 16px;
+	margin-top: auto;
+	padding-top: 16px;
+	border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .cancelButton,
 .saveButton {
-  padding: 12px 24px;
-  border: none;
-  border-radius: 12px;
-  font-family: 'RussoOne', sans-serif;
-  cursor: pointer;
-  transition: all 0.2s ease;
+	padding: 12px 24px;
+	border: none;
+	border-radius: 12px;
+	font-family: 'RussoOne', sans-serif;
+	cursor: pointer;
+	transition: all 0.2s ease;
 }
 
 .cancelButton {
-  background: #6a5bc4;
-  color: #fff;
+	background: #6a5bc4;
+	color: #fff;
 }
 
 .cancelButton:hover {
-  background: #5a4fb4;
+	background: #5a4fb4;
 }
 
 .saveButton {
-  background: #ffd34d;
-  color: #2c2b7b;
+	background: #ffd34d;
+	color: #2c2b7b;
 }
 
 .saveButton:hover {
-  background: #ffc72d;
+	background: #ffc72d;
 }
 
 .previewContainer {
-  position: relative;
-  width: 120px;
-  height: 120px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+	position: relative;
+	width: 120px;
+	height: 120px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .previewAvatar {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid #201f5c;
+	width: 80px;
+	height: 80px;
+	border-radius: 50%;
+	object-fit: cover;
+	border: 3px solid #201f5c;
 }
 
 .previewFrame {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 120px;
-  height: 120px;
-  object-fit: contain;
-  pointer-events: none;
-  z-index: 2;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 120px;
+	height: 120px;
+	object-fit: contain;
+	pointer-events: none;
+	z-index: 2;
 }
 
 @media (max-width: 480px) {
-  .grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .modal {
-    padding: 16px;
-  }
+	.grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+
+	.modal {
+		padding: 16px;
+	}
 }

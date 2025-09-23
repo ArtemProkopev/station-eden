@@ -3,7 +3,7 @@ import styles from './home.module.css'
 
 export const metadata = {
 	title: 'Station Eden — Главная',
-	description: 'Стартовая страница в разработке',
+	description: 'Добро пожаловать на Station Eden',
 }
 
 export default function HomePage() {
@@ -14,9 +14,11 @@ export default function HomePage() {
 				<section className={styles.card}>
 					<h1 className={styles.title}>Station Eden</h1>
 					<p className={styles.subtitle}>
-						Стартовая страница на этапе разработки
+						Добро пожаловать на главную страницу
 					</p>
-					<div className={styles.big404}>404</div>
+					<p className={styles.welcomeText}>
+						Сайт находится в разработке. Скоро здесь появится больше контента!
+					</p>
 				</section>
 			</div>
 		</>
