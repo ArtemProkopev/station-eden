@@ -72,20 +72,25 @@ jobs:
             set -e
             cd ~/station-eden
 
-            # login to GHCR on server
+            echo "==> Login to GHCR on server"
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
 
-            # export /etc/environment to this session
+            echo "==> Load /etc/environment"
             set -a; . /etc/environment; set +a
 
-            # choose proper compose CLI (docker compose vs docker-compose)
+            echo "==> Pull images"
             if docker compose version >/dev/null 2>&1; then
-              DC="docker compose -f docker-compose.yml"
+              docker compose -f docker-compose.yml pull
             else
-              DC="docker-compose -f docker-compose.yml"
+              docker-compose -f docker-compose.yml pull
             fi
 
-            $DC pull
-            $DC up -d --force-recreate
+            echo "==> Up containers"
+            if docker compose version >/dev/null 2>&1; then
+              docker compose -f docker-compose.yml up -d --force-recreate
+            else
+              docker-compose -f docker-compose.yml up -d --force-recreate
+            fi
 
+            echo "==> Status"
             docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
