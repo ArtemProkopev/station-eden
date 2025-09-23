@@ -23,7 +23,7 @@ export class AuthService {
 		private readonly emailer: EmailService
 	) {}
 
-	/** Подписываем access JWT */
+	/** Access JWT */
 	public signAccess(user: User) {
 		return this.jwt.sign(
 			{ sub: user.id, email: user.email, role: user.role },
@@ -72,24 +72,24 @@ export class AuthService {
 	private async validateUser(email: string, password: string) {
 		const user = await this.users.findByEmailWithHash(email)
 		if (!user || !user.passwordHash) {
-			throw new UnauthorizedException('Неверный email или пароль')
+			throw new UnauthorizedException('Invalid credentials')
 		}
 		const ok = await bcrypt.compare(password, user.passwordHash)
-		if (!ok) throw new UnauthorizedException('Неверный email или пароль')
+		if (!ok) throw new UnauthorizedException('Invalid credentials')
 		return user
 	}
 
-	// ===== API =====
+	// ===== Базовые операции (используются контроллером) =====
 
 	async register(email: string, password: string) {
 		const exists = await this.users.findByEmail(email)
-		if (exists) throw new UnauthorizedException('Email уже используется')
+		if (exists) throw new UnauthorizedException('Email already used')
 
 		const passwordHash = await bcrypt.hash(password, 10)
 		await this.users.create({ email, passwordHash, role: 'user' })
 		await this.users.ensureAdminRoleFor(email)
 
-		const fresh = await this.users.findByEmailOrFail(email)
+		const fresh = (await this.users.findByEmail(email))!
 		const access = this.signAccess(fresh)
 		const { plain: refreshToken, expires: refreshExpires } =
 			await this.issueRefresh(fresh.id)
@@ -106,7 +106,7 @@ export class AuthService {
 		await this.validateUser(email, password)
 		await this.users.ensureAdminRoleFor(email)
 
-		const fresh = await this.users.findByEmailOrFail(email)
+		const fresh = (await this.users.findByEmail(email))!
 		const access = this.signAccess(fresh)
 		const { plain: refreshToken, expires: refreshExpires } =
 			await this.issueRefresh(fresh.id)
@@ -124,17 +124,18 @@ export class AuthService {
 			where: { userId, revoked: false },
 			order: { createdAt: 'DESC' },
 		})
-		if (!rec) throw new UnauthorizedException('Refresh token не найден')
+		if (!rec) throw new UnauthorizedException('No refresh token')
 
 		const ok = await bcrypt.compare(refreshToken, rec.tokenHash)
 		if (!ok || rec.expiresAt < new Date()) {
-			throw new UnauthorizedException('Refresh token истек')
+			throw new UnauthorizedException('Refresh expired')
 		}
 
 		// отзываем предыдущий refresh и выдаём новый
 		await this.rtRepo.update(rec.id, { revoked: true })
 
-		const user = await this.users.findByIdOrFail(userId)
+		const user = await this.users.findById(userId)
+		if (!user) throw new UnauthorizedException('User not found')
 
 		const access = this.signAccess(user)
 		const { plain: newRefresh, expires: refreshExpires } =
@@ -144,9 +145,6 @@ export class AuthService {
 	}
 
 	async logout(userId: string, refreshToken?: string) {
-		// убедимся, что пользователь существует
-		await this.users.findByIdOrFail(userId)
-
 		if (!refreshToken) {
 			await this.rtRepo.update({ userId, revoked: false }, { revoked: true })
 			return { ok: true }
@@ -196,7 +194,8 @@ export class AuthService {
 		rec.used = true
 		await this.emailCodeRepo.save(rec)
 
-		const user = await this.users.findByIdOrFail(userId)
+		const user = await this.users.findById(userId)
+		if (!user) throw new UnauthorizedException('User not found')
 
 		const access = this.signAccess(user)
 		const { plain: refreshToken, expires: refreshExpires } =
