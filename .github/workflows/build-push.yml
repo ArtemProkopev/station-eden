@@ -70,6 +70,7 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
+            set -x
             cd ~/station-eden
 
             echo "==> Login to GHCR on server"
@@ -78,28 +79,43 @@ jobs:
             echo "==> Load /etc/environment (server)"
             set -a; [ -f /etc/environment ] && . /etc/environment || true; set +a
 
-            # ===============================
-            # ВАЖНО: подставляем owner и ТЕГ на стороне раннера
-            # ===============================
+            # ==== образа (namespace/registry/tag) ====
             export GHCR_OWNER="${{ steps.owner.outputs.lc }}"
             export GHCR_REG="ghcr.io"
             export IMAGE_TAG="${{ github.sha }}"
-            # fallback на latest, если вдруг пусто (напр., локальный запуск)
             [ -n "$IMAGE_TAG" ] || IMAGE_TAG="latest"
 
-            echo "==> Pull images"
+            # Выбираем compose CLI
             if docker compose version >/dev/null 2>&1; then
-              docker compose -f docker-compose.yml pull
+              COMP="docker compose -f docker-compose.yml"
             else
-              docker-compose -f docker-compose.yml pull
+              COMP="docker-compose -f docker-compose.yml"
+            fi
+
+            echo "==> Effective image refs (resolved by compose)"
+            $COMP config | awk '/image:/{print}'
+
+            echo "==> Sanity-check: GHCR manifests availability"
+            set +e
+            docker manifest inspect ${GHCR_REG}/${GHCR_OWNER}/station-eden-api:${IMAGE_TAG} >/dev/null
+            API_HAS_TAG=$?
+            docker manifest inspect ${GHCR_REG}/${GHCR_OWNER}/station-eden-web:${IMAGE_TAG} >/dev/null
+            WEB_HAS_TAG=$?
+            set -e
+            if [ $API_HAS_TAG -ne 0 ] || [ $WEB_HAS_TAG -ne 0 ]; then
+              echo "Tag ${IMAGE_TAG} not found for at least one image. Will fallback to 'latest' if pull fails."
+            fi
+
+            echo "==> Pull images"
+            if ! $COMP pull --no-parallel; then
+              echo "First pull failed. Fallback to IMAGE_TAG=latest ..."
+              export IMAGE_TAG="latest"
+              $COMP config | awk '/image:/{print}'
+              $COMP pull --no-parallel
             fi
 
             echo "==> Up containers"
-            if docker compose version >/dev/null 2>&1; then
-              docker compose -f docker-compose.yml up -d --force-recreate
-            else
-              docker-compose -f docker-compose.yml up -d --force-recreate
-            fi
+            $COMP up -d --force-recreate
 
             echo "==> Status"
             docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
