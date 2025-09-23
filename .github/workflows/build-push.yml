@@ -15,10 +15,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # вычисляем owner в нижнем регистре и пробрасываем как output
       - name: Owner lowercase
         id: owner
-        shell: bash
         run: echo "lc=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
@@ -30,7 +28,6 @@ jobs:
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      # API
       - name: Build & Push API
         uses: docker/build-push-action@v6
         with:
@@ -43,7 +40,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # WEB (с публичными build-args)
       - name: Build & Push WEB
         uses: docker/build-push-action@v6
         with:
@@ -59,3 +55,17 @@ jobs:
             NEXT_PUBLIC_ENABLE_GOOGLE=${{ vars.NEXT_PUBLIC_ENABLE_GOOGLE }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # --- Автодеплой на сервер ---
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: |
+            cd /root/station-eden
+            git pull origin main || true
+            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+            docker compose pull
+            docker compose up -d --force-recreate
