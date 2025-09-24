@@ -1,0 +1,235 @@
+/* Сцена и панель (общая стилистика) */
+.scene {
+	min-height: calc(100vh - 120px);
+	display: grid;
+	place-items: start center;
+	padding: 28px 16px 40px;
+	contain: layout paint;
+	position: relative;
+	z-index: 1;
+}
+.panel {
+	width: 100%;
+	max-width: 1060px;
+	background: #4740a8;
+	border: 4px solid #201f5c;
+	border-radius: 36px;
+	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
+	position: relative;
+	overflow: hidden;
+}
+.panel::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: 36px;
+	padding: 4px;
+	background: linear-gradient(to bottom, #6a5bc4, #4f47a6);
+
+	/* маска: стандарт + webkit для совместимости */
+	mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+	-webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+
+	/* композит: webkit + стандартный синтаксис */
+	-webkit-mask-composite: xor;
+	mask-composite: exclude;
+
+	pointer-events: none;
+}
+
+/* Внутренности панели */
+.inner {
+	padding: 18px;
+	display: grid;
+	gap: 14px;
+}
+
+/* Хедер: заголовок слева; справа — счетчик и поиск */
+.header {
+	display: flex;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+}
+.title {
+	margin: 2px 4px 0;
+	font-size: 22px;
+	color: #fff;
+	font-family: 'RussoOne', sans-serif;
+
+	/* поддерживаемая “обводка” + фолбэк */
+	-webkit-text-stroke: 1.5px #7050d5;
+	paint-order: stroke fill;
+	text-shadow: 0 2px 0 #7050d5;
+}
+.rightSide {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+}
+.counter {
+	font-family: 'RussoOne', sans-serif;
+	font-size: 14px;
+	color: #c9c3ff;
+	letter-spacing: 0.3px;
+	text-transform: uppercase;
+}
+
+/* Поиск */
+.searchWrap {
+	display: flex;
+	align-items: center;
+}
+.search {
+	width: 260px;
+	padding: 10px 14px;
+	border: 3px solid #201f5c;
+	border-radius: 10px;
+	background: #2c2b7b;
+	color: #fff;
+	font-family: 'Nunito', sans-serif;
+	font-size: 14px;
+	transition: border-color 0.2s, box-shadow 0.2s;
+}
+.search::placeholder {
+	color: rgba(255, 255, 255, 0.6);
+}
+.search:focus {
+	border-color: #6f59d6;
+	box-shadow: 0 0 0 3px rgba(205, 141, 238, 0.2);
+}
+
+/* Рамка вокруг таблицы */
+.cardLike {
+	background: #3e37a1;
+	border: 4px solid #201f5c;
+	border-radius: 18px;
+	padding: 12px;
+	box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22),
+		inset 0 6px 0 rgba(205, 141, 238, 0.28);
+}
+
+/* Таблица */
+.table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+	font-family: 'Nunito', sans-serif;
+}
+.table th,
+.table td {
+	padding: 12px 10px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.table th {
+	text-align: left;
+	color: #ffd34d;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+}
+.table tr:hover td {
+	background: rgba(0, 0, 0, 0.06);
+}
+
+/* Пустое состояние */
+.empty {
+	text-align: center;
+	padding: 18px 8px;
+	opacity: 0.8;
+}
+
+/* Ошибка/лоадер */
+.errorBox {
+	color: #ffd5d5;
+	background: rgba(255, 107, 107, 0.12);
+	border: 3px solid rgba(255, 107, 107, 0.45);
+	border-radius: 14px;
+	padding: 10px 12px;
+	font-family: 'Nunito', sans-serif;
+}
+.loader {
+	height: 72px;
+	border-radius: 14px;
+	border: 3px solid #201f5c;
+	background: linear-gradient(
+		90deg,
+		rgba(255, 255, 255, 0.06),
+		rgba(255, 255, 255, 0.02),
+		rgba(255, 255, 255, 0.06)
+	);
+	background-size: 200% 100%;
+	animation: shimmer 1.1s ease-in-out infinite;
+}
+@keyframes shimmer {
+	0% {
+		background-position: 200% 0;
+	}
+	100% {
+		background-position: -200% 0;
+	}
+}
+
+/* Кнопка-текст (как "Выйти") */
+.btnText {
+	background: none;
+	border: none;
+	color: #ffd5d5;
+	font-family: 'RussoOne', sans-serif;
+	font-size: 14px;
+	letter-spacing: 0.4px;
+	cursor: pointer;
+	text-transform: uppercase;
+	padding: 6px 8px;
+	transition: color 0.15s ease, transform 0.1s ease;
+}
+.btnText:hover {
+	color: #ff9090;
+	transform: translateY(-1px);
+}
+.btnText:active {
+	transform: translateY(0);
+	color: #ff6b6b;
+}
+
+/* Респонсив: карточки вместо таблицы */
+@media (max-width: 720px) {
+	.header {
+		gap: 10px;
+	}
+	.rightSide {
+		width: 100%;
+		justify-content: space-between;
+	}
+	.search {
+		width: 52%;
+	}
+
+	.table thead {
+		display: none;
+	}
+	.table,
+	.table tbody,
+	.table tr,
+	.table td {
+		display: block;
+		width: 100%;
+	}
+	.table tr {
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		border-radius: 12px;
+		margin-bottom: 10px;
+		overflow: hidden;
+	}
+	.table td {
+		border: 0;
+		padding: 10px 12px;
+	}
+	.table td[data-th]::before {
+		content: attr(data-th) ' — ';
+		color: #c9c3ff;
+		font-weight: 700;
+		margin-right: 6px;
+	}
+}

@@ -1,3 +1,4 @@
+// apps/api/src/common/filters/http-exception.filter.ts
 import {
 	ArgumentsHost,
 	Catch,
@@ -12,6 +13,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
 		const ctx = host.switchToHttp()
 		const response = ctx.getResponse()
 		const request = ctx.getRequest()
+
+		// Если уже отправили заголовки — выходим
+		if (response.headersSent) return
 
 		const status =
 			exception instanceof HttpException

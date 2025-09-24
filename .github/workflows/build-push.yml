@@ -1,0 +1,140 @@
+name: Build & Push Images (GHCR)
+
+on:
+  push:
+    branches: ['main']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Owner lowercase
+        id: owner
+        shell: bash
+        run: echo "lc=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR (build)
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      # ===== API image =====
+      - name: Build & Push API
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.owner.outputs.lc }}/station-eden-api:latest
+            ghcr.io/${{ steps.owner.outputs.lc }}/station-eden-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max,ignore-error=true
+
+      # ===== WEB image =====
+      - name: Build & Push WEB
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.owner.outputs.lc }}/station-eden-web:latest
+            ghcr.io/${{ steps.owner.outputs.lc }}/station-eden-web:${{ github.sha }}
+          build-args: |
+            NEXT_PUBLIC_API_BASE=${{ vars.NEXT_PUBLIC_API_BASE }}
+            NEXT_PUBLIC_ENABLE_TELEGRAM=${{ vars.NEXT_PUBLIC_ENABLE_TELEGRAM }}
+            NEXT_PUBLIC_ENABLE_GOOGLE=${{ vars.NEXT_PUBLIC_ENABLE_GOOGLE }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max,ignore-error=true
+
+      # ===== Deploy to server via SSH =====
+      - name: Deploy to server
+        if: ${{ github.ref == 'refs/heads/main' }}
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            set -x
+
+            # Переходим в рабочую директорию и подтягиваем последние изменения
+            cd ~/station-eden || mkdir -p ~/station-eden && cd ~/station-eden
+            if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+              git fetch --all --prune
+              git checkout main || true
+              git reset --hard origin/main
+            else
+              echo "Not a git repo. Skipping pull (используется текущее содержимое каталога)."
+            fi
+
+            echo "==> Login to GHCR on server"
+            set +x
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
+            set -x
+
+            echo "==> Load /etc/environment (server)"
+            set +x
+            set -a; [ -f /etc/environment ] && . /etc/environment || true; set +a
+            set -x
+
+            # ==== образы (namespace/registry/tag) ====
+            export GHCR_OWNER="${{ steps.owner.outputs.lc }}"
+            export GHCR_REG="ghcr.io"
+            export IMAGE_TAG="${{ github.sha }}"
+            [ -n "$IMAGE_TAG" ] || IMAGE_TAG="latest"
+
+            # Выбираем compose CLI
+            HAS_V1="$(docker-compose version >/dev/null 2>&1 && echo yes || echo no)"
+            HAS_V2="$(docker compose version  >/dev/null 2>&1 && echo yes || echo no)"
+            if [ "$HAS_V1" = yes ]; then
+              COMP="docker-compose -f docker-compose.yml"
+            elif [ "$HAS_V2" = yes ]; then
+              COMP="docker compose -f docker-compose.yml"
+            else
+              echo "Neither 'docker-compose' nor 'docker compose' found on the server."
+              exit 1
+            fi
+
+            echo "==> Effective image refs (resolved by compose)"
+            $COMP config | awk '/image:/{print}'
+
+            echo "==> Sanity-check: GHCR manifests availability"
+            docker manifest inspect "${GHCR_REG}/${GHCR_OWNER}/station-eden-api:${IMAGE_TAG}" >/dev/null 2>&1; API_HAS_TAG=$?
+            docker manifest inspect "${GHCR_REG}/${GHCR_OWNER}/station-eden-web:${IMAGE_TAG}"  >/dev/null 2>&1; WEB_HAS_TAG=$?
+            if [ $API_HAS_TAG -ne 0 ] || [ $WEB_HAS_TAG -ne 0 ]; then
+              echo "Tag ${IMAGE_TAG} not found for at least one image. Will fallback to 'latest' if pull fails."
+            fi
+
+            echo "==> Pull images"
+            ( $COMP pull ) || (
+              echo "First pull failed. Fallback to IMAGE_TAG=latest ..."
+              export IMAGE_TAG="latest"
+              $COMP config | awk '/image:/{print}'
+              $COMP pull
+            )
+
+            echo "==> Up containers"
+            $COMP up -d --force-recreate
+
+            echo "==> Run DB migrations"
+            API_CID=$($COMP ps -q api)
+            docker exec -i "$API_CID" \
+              node ./node_modules/typeorm/cli.js migration:run -d dist/db/data-source.js
+
+            echo "==> Status"
+            docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"

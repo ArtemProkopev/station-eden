@@ -1,13 +1,96 @@
 services:
-  db:
-    image: postgres:16
+  api:
+    image: ${GHCR_REG:-ghcr.io}/${GHCR_OWNER}/station-eden-api:${IMAGE_TAG:-latest}
     environment:
-      POSTGRES_USER: eden
-      POSTGRES_PASSWORD: edenpwd
-      POSTGRES_DB: eden
+      NODE_ENV: ${NODE_ENV}
+      API_PORT: ${API_PORT}
+      API_CORS_ORIGIN: ${API_CORS_ORIGIN}
+      COOKIE_SECURE: ${COOKIE_SECURE}
+
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ACCESS_EXPIRES: ${JWT_ACCESS_EXPIRES}
+      JWT_REFRESH_TTL_MS: ${JWT_REFRESH_TTL_MS}
+      ADMIN_EMAILS: ${ADMIN_EMAILS}
+
+      DATABASE_URL: ${DATABASE_URL}
+
+      ENABLE_GOOGLE_LOGIN: ${ENABLE_GOOGLE_LOGIN}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL}
+      WEB_AFTER_LOGIN_URL: ${WEB_AFTER_LOGIN_URL}
+
+      TELEGRAM_LOGIN_ENABLED: ${TELEGRAM_LOGIN_ENABLED}
+
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM: ${EMAIL_FROM}
+
+      NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE}
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://127.0.0.1:4000/auth/csrf',r=>process.exit(r.statusCode>=200&&r.statusCode<500?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [webnet]
+
+  web:
+    image: ${GHCR_REG:-ghcr.io}/${GHCR_OWNER}/station-eden-web:${IMAGE_TAG:-latest}
+    environment:
+      NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE}
+      NEXT_PUBLIC_ENABLE_TELEGRAM: ${NEXT_PUBLIC_ENABLE_TELEGRAM}
+      NEXT_PUBLIC_ENABLE_GOOGLE: ${NEXT_PUBLIC_ENABLE_GOOGLE}
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://127.0.0.1:3000',r=>process.exit(r.statusCode>=200&&r.statusCode<500?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 15
+    networks: [webnet]
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
     ports:
-      - "5432:5432"
+      - '80:80'
+      - '443:443'
     volumes:
-      - pgdata:/var/lib/postgresql/data:Z
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks: [webnet]
+
+  watchtower:
+    image: containrrr/watchtower
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 30 --cleanup --include-stopped
+
+networks:
+  webnet:
+
 volumes:
-  pgdata: {}
+  caddy_data:
+  caddy_config:

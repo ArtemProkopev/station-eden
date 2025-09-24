@@ -1,26 +1,27 @@
 // apps/api/src/app.module.ts
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
+import { APP_FILTER } from '@nestjs/core'
 import { ThrottlerModule } from '@nestjs/throttler'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import * as fs from 'fs'
 import * as path from 'path'
 
 import { AuthModule } from './auth/auth.module'
+import { EmailCode } from './auth/email-code.entity'
 import { RefreshToken } from './auth/refresh-token.entity'
+import { NotFoundExceptionFilter } from './common/filters/not-found.filter'
 import { EnvSchema } from './config/env.schema'
 import { User } from './users/user.entity'
 import { UsersModule } from './users/users.module'
 
 function resolveEnvPaths(): string[] {
-	// process.cwd() = apps/api при запуске из скриптов API
 	const rootEnv = path.resolve(process.cwd(), '../../.env')
 	const localEnv = path.resolve(process.cwd(), '.env')
 	const paths: string[] = []
 	if (fs.existsSync(rootEnv)) paths.push(rootEnv)
 	if (fs.existsSync(localEnv)) paths.push(localEnv)
 	if (paths.length === 0) {
-		// eslint-disable-next-line no-console
 		console.warn(
 			'[config] .env not found at:',
 			rootEnv,
@@ -29,7 +30,6 @@ function resolveEnvPaths(): string[] {
 			'— relying on process.env only'
 		)
 	} else {
-		// eslint-disable-next-line no-console
 		console.log('[config] loaded .env from:', paths.join(', '))
 	}
 	return paths
@@ -42,9 +42,8 @@ function resolveEnvPaths(): string[] {
 			envFilePath: resolveEnvPaths(),
 			validate: raw => {
 				const parsed = EnvSchema.safeParse(raw)
-				if (!parsed.success) {
+				if (!parsed.success)
 					throw new Error(JSON.stringify(parsed.error.format(), null, 2))
-				}
 				return parsed.data
 			},
 		}),
@@ -58,7 +57,7 @@ function resolveEnvPaths(): string[] {
 					return {
 						type: 'postgres' as const,
 						url: dbUrl,
-						entities: [User, RefreshToken],
+						entities: [User, RefreshToken, EmailCode],
 						synchronize: false,
 					}
 				}
@@ -72,7 +71,7 @@ function resolveEnvPaths(): string[] {
 						cfg.get<string>('POSTGRES_PASSWORD') ??
 						process.env.POSTGRES_PASSWORD,
 					database: cfg.get<string>('POSTGRES_DB') ?? process.env.POSTGRES_DB,
-					entities: [User, RefreshToken],
+					entities: [User, RefreshToken, EmailCode],
 					synchronize: false,
 				}
 			},
@@ -81,6 +80,13 @@ function resolveEnvPaths(): string[] {
 		ThrottlerModule.forRoot([{ ttl: 300_000, limit: 100 }]),
 		AuthModule,
 		UsersModule,
+	],
+	providers: [
+		// глобальная обработка 404 ошибок
+		{
+			provide: APP_FILTER,
+			useClass: NotFoundExceptionFilter,
+		},
 	],
 })
 export class AppModule {}

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 
 type Session =
@@ -28,9 +28,7 @@ async function getSession(): Promise<Session> {
 export default function Navbar() {
 	const [session, setSession] = useState<Session>({ status: 'loading' })
 	const pathname = usePathname()
-	const router = useRouter()
 
-	// 1) первичная загрузка
 	useEffect(() => {
 		let cancelled = false
 		;(async () => {
@@ -42,7 +40,6 @@ export default function Navbar() {
 		}
 	}, [])
 
-	// 2) слушаем глобальные сигналы о смене сессии (логин/логаут/рефреш)
 	useEffect(() => {
 		let alive = true
 		async function onChange() {
@@ -51,7 +48,6 @@ export default function Navbar() {
 			if (alive) setSession(s)
 		}
 		window.addEventListener('session-changed', onChange as EventListener)
-		// На всякий случай — обновление при возвращении на вкладку
 		document.addEventListener('visibilitychange', () => {
 			if (document.visibilityState === 'visible') onChange()
 		})
@@ -66,87 +62,91 @@ export default function Navbar() {
 		[pathname]
 	)
 
-	async function onLogout() {
-		try {
-			// прямой вызов бэка (чистит куки)
-			const csrf =
-				document.cookie
-					.split('; ')
-					.find(c => c.startsWith('csrf_token='))
-					?.split('=')[1] ?? ''
-			await fetch(
-				(process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000') +
-					'/auth/logout',
-				{
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrf },
-					credentials: 'include',
-					body: '{}',
-				}
-			)
-			// самостоятельно дёрнем обновление сессии и уйдём на /login
-			const s = await getSession()
-			setSession(s)
-		} finally {
-			router.replace('/login')
-		}
-	}
-
 	return (
-		<header className='topbar'>
-			<a className='brand' href='/'>
-				<img src='/logo.svg' alt='Station Eden' />
-			</a>
+		<header className='topbar' role='banner'>
+			<div className='shell'>
+				<Link className='brand' href='/' aria-label='На главную'>
+					<img src='/logo.svg' alt='' />
+				</Link>
 
-			<nav className='nav'>
-				{session.status === 'loading' && (
-					<>
-						<span className='ghost-link' aria-hidden>
-							…
-						</span>
-						<span className='ghost-link' aria-hidden>
-							…
-						</span>
-					</>
-				)}
+				<nav className='nav' aria-label='Основная навигация'>
+					<ul>
+						{session.status === 'loading' && (
+							<>
+								<li>
+									<span className='ghost-link' aria-hidden>
+										…
+									</span>
+								</li>
+								<li>
+									<span className='ghost-link' aria-hidden>
+										…
+									</span>
+								</li>
+							</>
+						)}
 
-				{session.status === 'signed-out' && (
-					<>
-						<Link
-							href='/register'
-							className={classNames(isActive('/register') && 'active')}
-						>
-							Регистрация
-						</Link>
-						<Link
-							href='/login'
-							className={classNames(isActive('/login') && 'active')}
-						>
-							Вход
-						</Link>
-					</>
-				)}
+						{session.status === 'signed-out' && (
+							<>
+								<li>
+									<Link
+										href='/register'
+										className={classNames(
+											'link',
+											isActive('/register') && 'active'
+										)}
+										aria-current={isActive('/register') ? 'page' : undefined}
+									>
+										Регистрация
+									</Link>
+								</li>
+								<li>
+									<Link
+										href='/login'
+										className={classNames(
+											'link',
+											isActive('/login') && 'active'
+										)}
+										aria-current={isActive('/login') ? 'page' : undefined}
+									>
+										Вход
+									</Link>
+								</li>
+							</>
+						)}
 
-				{session.status === 'signed-in' && (
-					<>
-						<Link
-							href='/profile'
-							className={classNames(isActive('/profile') && 'active')}
-						>
-							Профиль
-						</Link>
-						<Link
-							href='/admin/users'
-							className={classNames(isActive('/admin/users') && 'active')}
-						>
-							Участники
-						</Link>
-						<button className='btn' onClick={onLogout} title={session.email}>
-							Выйти
-						</button>
-					</>
-				)}
-			</nav>
+						{session.status === 'signed-in' && (
+							<>
+								<li>
+									<Link
+										href='/profile'
+										className={classNames(
+											'link',
+											isActive('/profile') && 'active'
+										)}
+										aria-current={isActive('/profile') ? 'page' : undefined}
+									>
+										Профиль
+									</Link>
+								</li>
+								<li>
+									<Link
+										href='/admin/users'
+										className={classNames(
+											'link',
+											isActive('/admin/users') && 'active'
+										)}
+										aria-current={isActive('/admin/users') ? 'page' : undefined}
+									>
+										Участники
+									</Link>
+								</li>
+								{/* Кнопка "Выйти" находится в /profile */}
+							</>
+						)}
+					</ul>
+				</nav>
+			</div>
 		</header>
 	)
 }

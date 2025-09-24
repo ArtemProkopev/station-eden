@@ -7,7 +7,6 @@ yarn-error.log*
 *.log
 
 # ========== Сборка / артефакты ==========
-# (глобально и в подпапках apps/*)
 dist/
 **/dist/
 build/
@@ -15,21 +14,20 @@ build/
 
 # Next.js
 .next/
-out/                  # next export (если используете)
-**/*.hot-update.*     # webpack/next HMR chunks
+out/
+**/*.hot-update.*
 
 # TypeScript инкрементальная компиляция
 *.tsbuildinfo
 **/*.tsbuildinfo
 
 # ========== Секреты / окружение ==========
-# игнорим env-файлы везде, но оставляем примеры
 .env
 .env.local
 **/.env
 **/.env.local
 **/.env.*.local
-.envrc                 # direnv
+.envrc
 !.env.example
 !**/.env.example
 
@@ -46,7 +44,7 @@ coverage/
 Thumbs.db
 .idea
 .vscode/*
-!.vscode/extensions.json  # разрешаем рекомендованные расширения
+!.vscode/extensions.json
 
 # ========== Временные файлы ==========
 *.tmp
@@ -56,3 +54,4 @@ Thumbs.db
 
 # ========== Безопасность ==========
 .git-credentials
+docker-compose.override.yml

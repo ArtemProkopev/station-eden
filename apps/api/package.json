@@ -1,8 +1,10 @@
 {
 	"name": "@station-eden/api",
 	"version": "0.1.0",
+	"private": true,
 	"scripts": {
 		"start:dev": "nest start --watch",
+		"clean": "rimraf dist",
 		"build": "nest build",
 		"typeorm": "ts-node -T ./node_modules/typeorm/cli.js",
 		"migration:generate": "cross-env TS_NODE_PROJECT=tsconfig.json ts-node -T ./node_modules/typeorm/cli.js migration:generate -d ./src/db/data-source.ts",
@@ -25,16 +27,18 @@
 		"cookie-parser": "^1.4.6",
 		"csurf": "^1.11.0",
 		"dotenv": "^17.2.2",
+		"google-auth-library": "^10.3.0",
 		"helmet": "^7.1.0",
 		"jsonwebtoken": "^9.0.2",
 		"passport": "^0.7.0",
 		"passport-jwt": "^4.0.1",
 		"pg": "^8.11.3",
 		"reflect-metadata": "^0.1.13",
-		"rimraf": "^5.0.5",
+		"rimraf": "^3.0.2",
 		"rxjs": "^7.8.2",
 		"typeorm": "^0.3.20",
-		"zod": "^3.23.8"
+		"zod": "^3.23.8",
+		"resend": "^4.0.0"
 	},
 	"devDependencies": {
 		"@nestjs/cli": "^10.4.5",
@@ -42,6 +46,7 @@
 		"@nestjs/testing": "^10.0.0",
 		"@types/bcryptjs": "^3.0.0",
 		"@types/cookie-parser": "^1.4.9",
+		"@types/dotenv": "^8.2.3",
 		"@types/express": "^5.0.3",
 		"@types/node": "^20.19.14",
 		"@types/passport-jwt": "^4.0.1",
