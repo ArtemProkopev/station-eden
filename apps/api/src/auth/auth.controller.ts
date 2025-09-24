@@ -87,7 +87,7 @@ export class AuthController {
 	// ===== Регистрация/логин (через шаг MFA) =====
 
 	@UseGuards(ThrottlerGuard)
-	@Throttle({ default: { limit: 5, ttl: 300000 } })
+	@Throttle({ default: { limit: 50, ttl: 300000 } }) // на период тестов поднят до 50, нужно потом опустить до 5
 	@Post('login')
 	async login(
 		@Body() dto: LoginDto,
