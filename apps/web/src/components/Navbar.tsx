@@ -37,6 +37,17 @@ export default function Navbar() {
 	const [session, setSession] = useState<Session>({ status: 'loading' })
 	const pathname = usePathname()
 
+	// На этих путях всегда показываем гостевое меню, независимо от сессии
+	const isAuthPage = useMemo(() => {
+		if (!pathname) return false
+		return (
+			pathname === '/login' ||
+			pathname.startsWith('/login') ||
+			pathname === '/register' ||
+			pathname.startsWith('/register')
+		)
+	}, [pathname])
+
 	useEffect(() => {
 		let cancelled = false
 		;(async () => {
@@ -76,6 +87,11 @@ export default function Navbar() {
 		[pathname]
 	)
 
+	// Если это /login или /register — принудительно гостевое меню
+	const effectiveSession: Session = isAuthPage
+		? { status: 'signed-out' }
+		: session
+
 	return (
 		<header className='topbar' role='banner'>
 			<div className='shell'>
@@ -85,7 +101,7 @@ export default function Navbar() {
 
 				<nav className='nav' aria-label='Основная навигация'>
 					<ul>
-						{session.status === 'loading' && (
+						{effectiveSession.status === 'loading' && (
 							<>
 								<li>
 									<span className='ghost-link' aria-hidden>
@@ -100,7 +116,7 @@ export default function Navbar() {
 							</>
 						)}
 
-						{session.status === 'signed-out' && (
+						{effectiveSession.status === 'signed-out' && (
 							<>
 								<li>
 									<Link
@@ -129,7 +145,7 @@ export default function Navbar() {
 							</>
 						)}
 
-						{session.status === 'signed-in' && (
+						{effectiveSession.status === 'signed-in' && (
 							<>
 								<li>
 									<Link
