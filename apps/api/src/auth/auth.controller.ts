@@ -93,23 +93,20 @@ export class AuthController {
 		@Body() dto: LoginDto,
 		@Res({ passthrough: true }) res: Response
 	) {
-		// Валидируем пользователя (без выдачи токенов)
-		const user = await this.auth.validateUser(
-			dto.email.toLowerCase(),
-			dto.password
-		)
-
+		// ИСПРАВЛЕНИЕ: используем метод login из сервиса, который возвращает user без токенов
+		const result = await this.auth.login(dto.email.toLowerCase(), dto.password)
+		
 		// Создаем preauth вместо полноценных токенов
-		const pre = this.auth.signPreauth(user.id, user.email)
+		const pre = this.auth.signPreauth(result.user.id, result.user.email)
 		res.cookie('preauth', pre, this.preauthCookieOpts())
 
 		try {
-			await this.auth.startEmailMfa(user.id, user.email)
+			await this.auth.startEmailMfa(result.user.id, result.user.email)
 		} catch (e) {
 			console.error('[login] startEmailMfa failed', e)
 		}
 
-		return { mfa: 'email_code_sent', email: user.email }
+		return { mfa: 'email_code_sent', email: result.user.email }
 	}
 
 	@Post('register')
@@ -117,20 +114,20 @@ export class AuthController {
 		@Body() dto: RegisterDto,
 		@Res({ passthrough: true }) res: Response
 	) {
-		const { user } = await this.auth.register(
+		const result = await this.auth.register(
 			dto.email.toLowerCase(),
 			dto.password
 		)
-		const pre = this.auth.signPreauth(user.id, user.email)
+		const pre = this.auth.signPreauth(result.user.id, result.user.email)
 		res.cookie('preauth', pre, this.preauthCookieOpts())
 
 		try {
-			await this.auth.startEmailMfa(user.id, user.email)
+			await this.auth.startEmailMfa(result.user.id, result.user.email)
 		} catch (e) {
 			console.error('[register] startEmailMfa failed', e)
 		}
 
-		return { mfa: 'email_code_sent', email: user.email }
+		return { mfa: 'email_code_sent', email: result.user.email }
 	}
 
 	@Post('refresh')

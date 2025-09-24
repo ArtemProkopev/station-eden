@@ -68,6 +68,34 @@ export class AuthService {
 		return { plain, expires }
 	}
 
+	// ===== Базовые операции (используются контроллером) =====
+
+	async register(email: string, password: string) {
+		const exists = await this.users.findByEmail(email)
+		if (exists) throw new UnauthorizedException('Email already used')
+
+		const passwordHash = await bcrypt.hash(password, 10)
+		await this.users.create({ email, passwordHash, role: 'user' })
+		await this.users.ensureAdminRoleFor(email)
+
+		const fresh = (await this.users.findByEmail(email))!
+		
+		// ИСПРАВЛЕНИЕ: возвращаем только пользователя, токены будут выданы после MFA
+		return {
+			user: { id: fresh.id, email: fresh.email, role: fresh.role }
+		}
+	}
+
+	async login(email: string, password: string) {
+		// ИСПРАВЛЕНИЕ: валидируем пользователя через отдельный метод
+		const user = await this.validateUser(email, password)
+		
+		// ИСПРАВЛЕНИЕ: возвращаем только пользователя, токены будут выданы после MFA
+		return {
+			user: { id: user.id, email: user.email, role: user.role }
+		}
+	}
+
 	/** Валидация пользователя без выдачи токенов (для MFA) */
 	public async validateUser(email: string, password: string): Promise<User> {
 		const user = await this.users.findByEmailWithHash(email)
@@ -82,34 +110,6 @@ export class AuthService {
 		
 		// Перезагружаем пользователя чтобы получить актуальные данные
 		return await this.users.findByEmailOrFail(email)
-	}
-
-	// ===== Базовые операции (используются контроллером) =====
-
-	async register(email: string, password: string) {
-		const exists = await this.users.findByEmail(email)
-		if (exists) throw new UnauthorizedException('Email already used')
-
-		const passwordHash = await bcrypt.hash(password, 10)
-		await this.users.create({ email, passwordHash, role: 'user' })
-		await this.users.ensureAdminRoleFor(email)
-
-		const fresh = (await this.users.findByEmail(email))!
-		
-		// Возвращаем только пользователя, токены будут выданы после MFA
-		return {
-			user: { id: fresh.id, email: fresh.email, role: fresh.role }
-		}
-	}
-
-	async login(email: string, password: string) {
-		// Валидируем и получаем пользователя (без выдачи токенов)
-		const user = await this.validateUser(email, password)
-		
-		// Возвращаем только пользователя, токены будут выданы после MFA
-		return {
-			user: { id: user.id, email: user.email, role: user.role }
-		}
 	}
 
 	async refresh(userId: string, refreshToken: string) {
