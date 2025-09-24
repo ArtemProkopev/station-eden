@@ -7,7 +7,7 @@ import LogoutButton from './LogoutButton'
 import styles from './page.module.css'
 
 interface ProfileData {
-	status: 'loading' | 'error' | 'ok'
+	status: 'loading' | 'error' | 'ok' | 'unauth'
 	userId?: string
 	email?: string
 	message?: string
@@ -26,10 +26,7 @@ const STORAGE_KEYS = {
 const DEFAULT_AVATAR = '/avatars/avatar1.png'
 const DEFAULT_FRAME = '/frames/frame1.png'
 
-// Добавляем дефолтные значения
-const DEFAULT_PROFILE_DATA: ProfileData = {
-	status: 'loading',
-}
+const DEFAULT_PROFILE_DATA: ProfileData = { status: 'loading' }
 
 export default function ProfilePage() {
 	const [me, setMe] = useState<ProfileData>(DEFAULT_PROFILE_DATA)
@@ -38,15 +35,24 @@ export default function ProfilePage() {
 	const [frame, setFrame] = useState(DEFAULT_FRAME)
 
 	useEffect(() => {
-		// Загружаем данные пользователя
 		const loadUserData = async () => {
 			try {
 				const API_BASE =
 					process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
 				const r = await fetch(`${API_BASE}/auth/me`, {
-					credentials: 'include', // важно для cookies
+					credentials: 'include',
 					cache: 'no-store',
 				})
+
+				// Красиво обрабатываем неавторизованного пользователя
+				if (r.status === 401) {
+					setMe({
+						status: 'unauth',
+						message:
+							'Вы не авторизованы. Войдите в аккаунт, чтобы открыть профиль.',
+					})
+					return
+				}
 
 				if (!r.ok) throw new Error(`HTTP ${r.status}`)
 
@@ -68,10 +74,9 @@ export default function ProfilePage() {
 			}
 		}
 
-		// Загружаем сохраненные аватарку и рамку из localStorage
+		// Подтягиваем локально сохранённые аватар/рамку
 		const savedAvatar = localStorage.getItem(STORAGE_KEYS.AVATAR)
 		const savedFrame = localStorage.getItem(STORAGE_KEYS.FRAME)
-
 		if (savedAvatar) setAvatar(savedAvatar)
 		if (savedFrame) setFrame(savedFrame)
 
@@ -81,19 +86,82 @@ export default function ProfilePage() {
 	const handleSaveProfile = (newAvatar: string, newFrame: string) => {
 		setAvatar(newAvatar)
 		setFrame(newFrame)
-
-		// Сохраняем в localStorage
 		localStorage.setItem(STORAGE_KEYS.AVATAR, newAvatar)
 		localStorage.setItem(STORAGE_KEYS.FRAME, newFrame)
 	}
 
-	// Добавляем проверку на загрузку
+	// Скелетон
 	if (me.status === 'loading') {
 		return (
 			<div className={styles.scene}>
 				<div className={styles.panel}>
 					<div className={styles.grid}>
 						<div className={styles.skel} aria-hidden />
+					</div>
+				</div>
+			</div>
+		)
+	}
+
+	// Экран для неавторизованного (401)
+	if (me.status === 'unauth') {
+		return (
+			<div className={styles.scene}>
+				<div className={styles.panel}>
+					<div className={styles.grid}>
+						<section className={styles.main}>
+							<div className={styles.headerRow}>
+								<h1 className={styles.title}>Профиль</h1>
+							</div>
+
+							<div className={styles.card}>
+								<div className={styles.cardContent}>
+									<div style={{ textAlign: 'center' }}>
+										<div
+											style={{
+												fontFamily: 'RussoOne, sans-serif',
+												fontSize: 64,
+												color: '#fff',
+												WebkitTextStroke: '3px #7050d5',
+												textShadow:
+													'0 3px 0 #5a3fb5, 0 6px 10px rgba(0,0,0,0.25)',
+												lineHeight: 1,
+												marginBottom: 8,
+											}}
+										>
+											401
+										</div>
+										<p
+											style={{
+												margin: '0 0 12px',
+												color: '#eaeaff',
+												fontFamily: 'Nunito, sans-serif',
+											}}
+										>
+											{me.message}
+										</p>
+
+										<div
+											style={{
+												display: 'grid',
+												gap: 10,
+												justifyItems: 'center',
+											}}
+										>
+											<a
+												className={styles.editButton}
+												href='/login?next=/profile'
+											>
+												Войти
+											</a>
+											<a href='/' className={styles.exitLink}>
+												На главную
+											</a>
+										</div>
+									</div>
+								</div>
+							</div>
+						</section>
 					</div>
 				</div>
 			</div>
@@ -107,13 +175,10 @@ export default function ProfilePage() {
 					{/* левая колонка */}
 					<aside className={styles.side}>
 						<div className={styles.avatarContainer}>
-							{/* Аватар */}
 							<img src={avatar} alt='Аватар' className={styles.avatarImage} />
-							{/* Рамка поверх аватара */}
 							<img src={frame} alt='Рамка' className={styles.frameImage} />
 						</div>
 
-						{/* Кнопка редактирования */}
 						<button
 							className={styles.editButton}
 							onClick={() => setIsEditModalOpen(true)}
