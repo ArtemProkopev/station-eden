@@ -87,16 +87,19 @@ export class AuthController {
 	// ===== Регистрация/логин (через шаг MFA) =====
 
 	@UseGuards(ThrottlerGuard)
-	@Throttle({ default: { limit: 50, ttl: 300000 } }) // на период тестов поднят до 50, нужно потом опустить до 5
+	@Throttle({ default: { limit: 50, ttl: 300000 } })
 	@Post('login')
 	async login(
 		@Body() dto: LoginDto,
 		@Res({ passthrough: true }) res: Response
 	) {
-		const { user } = await this.auth.login(
+		// Валидируем пользователя (без выдачи токенов)
+		const user = await this.auth.validateUser(
 			dto.email.toLowerCase(),
 			dto.password
 		)
+
+		// Создаем preauth вместо полноценных токенов
 		const pre = this.auth.signPreauth(user.id, user.email)
 		res.cookie('preauth', pre, this.preauthCookieOpts())
 
@@ -104,7 +107,6 @@ export class AuthController {
 			await this.auth.startEmailMfa(user.id, user.email)
 		} catch (e) {
 			console.error('[login] startEmailMfa failed', e)
-			// Не валим 500 — код можно дослать с verify
 		}
 
 		return { mfa: 'email_code_sent', email: user.email }
@@ -126,7 +128,6 @@ export class AuthController {
 			await this.auth.startEmailMfa(user.id, user.email)
 		} catch (e) {
 			console.error('[register] startEmailMfa failed', e)
-			// НЕ роняем регистрацию — дальше пользователь сможет переслать код с verify
 		}
 
 		return { mfa: 'email_code_sent', email: user.email }
@@ -348,7 +349,6 @@ export class AuthController {
 			await this.auth.startEmailMfa(user!.id, user!.email)
 		} catch (e) {
 			console.error('[google] startEmailMfa failed', e)
-			// не прерываем — на verify доступна повторная отправка
 		}
 
 		const verifyUrl = this.urlTo(

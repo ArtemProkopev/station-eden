@@ -68,14 +68,20 @@ export class AuthService {
 		return { plain, expires }
 	}
 
-	private async validateUser(email: string, password: string): Promise<User> {
+	/** Валидация пользователя без выдачи токенов (для MFA) */
+	public async validateUser(email: string, password: string): Promise<User> {
 		const user = await this.users.findByEmailWithHash(email)
 		if (!user || !user.passwordHash) {
 			throw new UnauthorizedException('Invalid credentials')
 		}
 		const ok = await bcrypt.compare(password, user.passwordHash)
 		if (!ok) throw new UnauthorizedException('Invalid credentials')
-		return user
+		
+		// Обновляем роль если нужно
+		await this.users.ensureAdminRoleFor(email)
+		
+		// Перезагружаем пользователя чтобы получить актуальные данные
+		return await this.users.findByEmailOrFail(email)
 	}
 
 	// ===== Базовые операции (используются контроллером) =====
@@ -89,37 +95,20 @@ export class AuthService {
 		await this.users.ensureAdminRoleFor(email)
 
 		const fresh = (await this.users.findByEmail(email))!
-		const access = this.signAccess(fresh)
-		const { plain: refreshToken, expires: refreshExpires } =
-			await this.issueRefresh(fresh.id)
-
+		
+		// Возвращаем только пользователя, токены будут выданы после MFA
 		return {
-			user: { id: fresh.id, email: fresh.email, role: fresh.role },
-			access,
-			refreshToken,
-			refreshExpires,
+			user: { id: fresh.id, email: fresh.email, role: fresh.role }
 		}
 	}
 
 	async login(email: string, password: string) {
-		// Валидируем и получаем пользователя ОДИН раз
+		// Валидируем и получаем пользователя (без выдачи токенов)
 		const user = await this.validateUser(email, password)
 		
-		// Обновляем роль если нужно
-		await this.users.ensureAdminRoleFor(email)
-
-		// Перезагружаем пользователя чтобы получить актуальные данные
-		const fresh = await this.users.findByEmailOrFail(email)
-		
-		const access = this.signAccess(fresh)
-		const { plain: refreshToken, expires: refreshExpires } =
-			await this.issueRefresh(fresh.id)
-
+		// Возвращаем только пользователя, токены будут выданы после MFA
 		return {
-			user: { id: fresh.id, email: fresh.email, role: fresh.role },
-			access,
-			refreshToken,
-			refreshExpires,
+			user: { id: user.id, email: user.email, role: user.role }
 		}
 	}
 
