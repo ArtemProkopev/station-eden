@@ -1,4 +1,3 @@
-// apps/api/src/auth/auth.service.ts
 import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { InjectRepository } from '@nestjs/typeorm'
@@ -69,7 +68,7 @@ export class AuthService {
 		return { plain, expires }
 	}
 
-	private async validateUser(email: string, password: string) {
+	private async validateUser(email: string, password: string): Promise<User> {
 		const user = await this.users.findByEmailWithHash(email)
 		if (!user || !user.passwordHash) {
 			throw new UnauthorizedException('Invalid credentials')
@@ -103,10 +102,15 @@ export class AuthService {
 	}
 
 	async login(email: string, password: string) {
-		await this.validateUser(email, password)
+		// Валидируем и получаем пользователя ОДИН раз
+		const user = await this.validateUser(email, password)
+		
+		// Обновляем роль если нужно
 		await this.users.ensureAdminRoleFor(email)
 
-		const fresh = (await this.users.findByEmail(email))!
+		// Перезагружаем пользователя чтобы получить актуальные данные
+		const fresh = await this.users.findByEmailOrFail(email)
+		
 		const access = this.signAccess(fresh)
 		const { plain: refreshToken, expires: refreshExpires } =
 			await this.issueRefresh(fresh.id)
