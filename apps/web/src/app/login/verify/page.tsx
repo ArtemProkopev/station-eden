@@ -30,6 +30,12 @@ export default function VerifyEmailCodePage() {
 				await api.me()
 			} catch {}
 			setOk(true)
+
+			// >>> добавлено: сразу оповещаем навбар, что сессия изменилась
+			if (typeof window !== 'undefined') {
+				window.dispatchEvent(new Event('session-changed'))
+			}
+
 			router.replace(next)
 		} catch (e: any) {
 			setErr(e?.message || 'Неверный или просроченный код')

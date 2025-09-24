@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 
+const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+
 type Session =
 	| { status: 'loading' }
 	| { status: 'signed-out' }
@@ -13,12 +15,18 @@ function classNames(...xs: Array<string | false | undefined>) {
 	return xs.filter(Boolean).join(' ')
 }
 
-async function getSession(): Promise<Session> {
+async function getSessionDirect(): Promise<Session> {
 	try {
-		const r = await fetch('/api/session', { cache: 'no-store' })
-		const data = await r.json()
-		if (data?.status === 'signed-in')
-			return { status: 'signed-in', email: data.email }
+		const r = await fetch(`${API}/auth/me`, {
+			method: 'GET',
+			credentials: 'include', // важно: браузер отправит httpOnly-куки на api.*
+			cache: 'no-store',
+		})
+		if (!r.ok) return { status: 'signed-out' }
+
+		const raw = await r.json()
+		const data = raw?.data ?? raw
+		if (data?.email) return { status: 'signed-in', email: data.email }
 		return { status: 'signed-out' }
 	} catch {
 		return { status: 'signed-out' }
@@ -32,7 +40,7 @@ export default function Navbar() {
 	useEffect(() => {
 		let cancelled = false
 		;(async () => {
-			const s = await getSession()
+			const s = await getSessionDirect()
 			if (!cancelled) setSession(s)
 		})()
 		return () => {
@@ -44,16 +52,22 @@ export default function Navbar() {
 		let alive = true
 		async function onChange() {
 			if (!alive) return
-			const s = await getSession()
+			const s = await getSessionDirect()
 			if (alive) setSession(s)
 		}
-		window.addEventListener('session-changed', onChange as EventListener)
-		document.addEventListener('visibilitychange', () => {
+		// обновлять при смене фокуса вкладки и наших кастомных событиях
+		const onVisibility = () => {
 			if (document.visibilityState === 'visible') onChange()
-		})
+		}
+		window.addEventListener('session-changed', onChange as EventListener)
+		document.addEventListener('visibilitychange', onVisibility)
+		window.addEventListener('focus', onChange)
+
 		return () => {
 			alive = false
 			window.removeEventListener('session-changed', onChange as EventListener)
+			document.removeEventListener('visibilitychange', onVisibility)
+			window.removeEventListener('focus', onChange)
 		}
 	}, [])
 
