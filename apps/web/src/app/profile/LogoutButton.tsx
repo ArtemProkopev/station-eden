@@ -1,17 +1,9 @@
 'use client'
 
+import { api } from '@/src/lib/api'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import styles from './page.module.css'
-
-function getCsrf() {
-	return (
-		document.cookie
-			.split('; ')
-			.find(c => c.startsWith('csrf_token='))
-			?.split('=')[1] ?? ''
-	)
-}
 
 /** Лёгкая “ссылка”-кнопка: вид — как у подписи “Входит как” */
 export default function LogoutButton() {
@@ -22,24 +14,25 @@ export default function LogoutButton() {
 		if (loading) return
 		setLoading(true)
 		try {
-			const csrf = getCsrf()
-			await fetch(
-				(process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000') +
-					'/auth/logout',
-				{
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						'x-csrf-token': csrf,
-					},
-					credentials: 'include',
-					body: '{}',
-					cache: 'no-store',
-				}
-			)
-			window.dispatchEvent(new Event('session-changed'))
-		} catch {}
-		router.replace('/login')
+			// ВАЖНО: используем общий клиент, там корректный CSRF (se_csrf) и /auth/csrf
+			await api.logout()
+
+			// Подскажем навбару обновиться
+			if (typeof window !== 'undefined') {
+				window.dispatchEvent(new Event('session-changed'))
+			}
+
+			// Жёсткий переход на страницу логина
+			router.replace('/login')
+		} catch (e) {
+			// В редких случаях можно попытаться “сбросить” вид навбара
+			if (typeof window !== 'undefined') {
+				window.dispatchEvent(new Event('session-changed'))
+			}
+			router.replace('/login')
+		} finally {
+			setLoading(false)
+		}
 	}
 
 	return (
