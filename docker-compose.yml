@@ -64,8 +64,9 @@ services:
       retries: 15
     networks: [webnet]
 
+  # Заменили Docker Hub -> ECR Public (официальное зеркало) — не требует логина
   caddy:
-    image: caddy:2
+    image: public.ecr.aws/docker/library/caddy:2
     restart: unless-stopped
     ports:
       - '80:80'
@@ -81,8 +82,9 @@ services:
         condition: service_healthy
     networks: [webnet]
 
+  # Заменили Docker Hub -> GHCR (публичный образ) — не требует логина на сервере
   watchtower:
-    image: containrrr/watchtower
+    image: ghcr.io/containrrr/watchtower:latest
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

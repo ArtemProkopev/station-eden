@@ -1,5 +1,5 @@
 # --- build stage ---
-FROM node:20-alpine AS build
+FROM public.ecr.aws/docker/library/node:20-alpine AS build
 WORKDIR /app
 ENV PNPM_HOME=/root/.local/share/pnpm
 RUN corepack enable
@@ -24,7 +24,7 @@ ENV NEXT_PUBLIC_ENABLE_GOOGLE=$NEXT_PUBLIC_ENABLE_GOOGLE
 RUN pnpm build
 
 # --- runtime stage ---
-FROM node:20-alpine AS runtime
+FROM public.ecr.aws/docker/library/node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
