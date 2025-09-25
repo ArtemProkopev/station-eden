@@ -1,5 +1,11 @@
-// apps/web/src/lib/api.ts - ИСПРАВЛЕННАЯ ВЕРСИЯ (распаковка { ok, data })
+// apps/web/src/lib/api.ts - ИСПРАВЛЕННАЯ ВЕРСИЯ (распаковка { ok, data } + дружелюбные ошибки)
 import { getCsrfToken } from './csrf'
+import {
+	ApiError,
+	ErrorContext,
+	getUserMessage,
+	mapToUserMessage,
+} from './errors'
 
 const API = process.env.NEXT_PUBLIC_API_BASE || 'https://api.stationeden.ru'
 const CSRF_NAME = process.env.NEXT_PUBLIC_CSRF_COOKIE_NAME || 'se_csrf'
@@ -12,9 +18,16 @@ function unwrap<T = any>(resp: any): T {
 	return resp as T
 }
 
-async function ensureCsrfToken(): Promise<string> {
-	console.log('[CSRF] ensureCsrfToken started')
+async function safeJson(text: string | null): Promise<any | undefined> {
+	if (!text) return undefined
+	try {
+		return JSON.parse(text)
+	} catch {
+		return undefined
+	}
+}
 
+async function ensureCsrfToken(): Promise<string> {
 	// Запрос чтобы установить куку и получить токен
 	const response = await fetch(`${API}/auth/csrf`, {
 		method: 'GET',
@@ -22,48 +35,65 @@ async function ensureCsrfToken(): Promise<string> {
 		cache: 'no-store',
 	})
 
-	console.log('[CSRF] Response status:', response.status)
-
 	// Дадим браузеру время записать куку
 	await new Promise(r => setTimeout(r, 100))
 	const tokenFromCookie = getCsrfToken(CSRF_NAME)
+	if (tokenFromCookie) return tokenFromCookie
 
-	if (tokenFromCookie) {
-		console.log('[CSRF] Using token from cookie')
-		return tokenFromCookie
-	}
-
-	// Если кука не установилась, читаем токен из тела ответа
+	// Если кука не установилась, читаем токен из тела ответа (возможна обёртка { ok, data: { csrf } })
 	try {
-		const data = await response.json()
-		console.log('[CSRF] Full response data:', data)
-
-		// Сервер оборачивает в { ok, data }, где data = { csrf }
-		const tokenFromBody = data?.data?.csrf
-
-		if (tokenFromBody && typeof tokenFromBody === 'string') {
-			console.log(
-				'[CSRF] Using token from response body:',
-				tokenFromBody.substring(0, 8) + '...'
-			)
-			return tokenFromBody
-		} else {
-			console.error('[CSRF] Token not found in response structure')
-			console.error('[CSRF] Expected path: data.data.csrf')
-			console.error('[CSRF] Actual data:', data)
-		}
-	} catch (e) {
-		console.error('[CSRF] JSON parse error:', e)
+		const data = (await response.json().catch(() => undefined)) as any
+		const tokenFromBody = data?.data?.csrf ?? data?.csrf
+		if (typeof tokenFromBody === 'string' && tokenFromBody) return tokenFromBody
+	} catch {
+		/* ignore */
 	}
 
 	throw new Error('CSRF token not available')
 }
 
-async function postJSON<T = any>(path: string, body?: unknown): Promise<T> {
-	console.log(`[API] POST ${path}`)
+/** Единая обработка ошибок HTTP -> ApiError с userMessage */
+async function throwHttpAsApiError(res: Response, context: ErrorContext) {
+	const contentType = res.headers.get('content-type') || ''
+	const raw = await res.text().catch(() => '')
+	const json = contentType.includes('application/json')
+		? await safeJson(raw)
+		: await safeJson(raw)
 
+	// Популярные форматы NestJS/вашего API:
+	// { ok:false, data?:..., message?, error?, statusCode?, code? }
+	// { message: 'Invalid credentials', error: 'Unauthorized', statusCode: 401 }
+	// Любая другая строка — тоже парсим и используем как serverMessage.
+
+	const serverMessage =
+		(Array.isArray(json?.message) ? json?.message?.[0] : json?.message) ??
+		json?.error ??
+		json?.detail ??
+		(typeof json === 'string' ? json : undefined) ??
+		(raw && !json ? raw : undefined)
+
+	const code = json?.code
+	const userMessage = mapToUserMessage(
+		res.status,
+		String(serverMessage ?? ''),
+		context
+	)
+
+	throw new ApiError({
+		status: res.status,
+		code,
+		serverMessage:
+			typeof serverMessage === 'string' ? serverMessage : undefined,
+		userMessage,
+	})
+}
+
+async function postJSON<T = any>(
+	path: string,
+	body?: unknown,
+	context: ErrorContext = 'default'
+): Promise<T> {
 	const token = await ensureCsrfToken()
-	console.log(`[API] CSRF Token: ${token.substring(0, 8)}...`)
 
 	const res = await fetch(`${API}${path}`, {
 		method: 'POST',
@@ -75,45 +105,37 @@ async function postJSON<T = any>(path: string, body?: unknown): Promise<T> {
 		body: body ? JSON.stringify(body) : undefined,
 	})
 
-	console.log(`[API] Response status: ${res.status}`)
-
 	if (!res.ok) {
-		const errorText = await res.text()
-		console.error(`[API] Error: ${errorText}`)
-		throw new Error(errorText || `HTTP ${res.status}`)
+		await throwHttpAsApiError(res, context)
 	}
 
-	const responseData = await res.json()
-	console.log('[API] Response data:', responseData)
+	const responseData = await res.json().catch(() => ({}))
 	return unwrap<T>(responseData)
 }
 
-async function getJSON<T = any>(path: string): Promise<T> {
-	console.log(`[API] GET ${path}`)
+async function getJSON<T = any>(
+	path: string,
+	context: ErrorContext = 'default'
+): Promise<T> {
 	const res = await fetch(`${API}${path}`, {
 		method: 'GET',
 		credentials: 'include',
 		cache: 'no-store',
 	})
 
-	console.log(`[API] Response status: ${res.status}`)
-
 	if (!res.ok) {
-		const errorText = await res.text()
-		console.error(`[API] Error: ${errorText}`)
-		throw new Error(errorText || `HTTP ${res.status}`)
+		await throwHttpAsApiError(res, context)
 	}
 
-	const responseData = await res.json()
-	console.log('[API] Response data:', responseData)
+	const responseData = await res.json().catch(() => ({}))
 	return unwrap<T>(responseData)
 }
 
-async function deleteJSON<T = any>(path: string): Promise<T> {
-	console.log(`[API] DELETE ${path}`)
-
+async function deleteJSON<T = any>(
+	path: string,
+	context: ErrorContext = 'default'
+): Promise<T> {
 	const token = await ensureCsrfToken()
-	console.log(`[API] CSRF Token: ${token.substring(0, 8)}...`)
 
 	const res = await fetch(`${API}${path}`, {
 		method: 'DELETE',
@@ -121,35 +143,48 @@ async function deleteJSON<T = any>(path: string): Promise<T> {
 		headers: { 'X-CSRF-Token': token },
 	})
 
-	console.log(`[API] Response status: ${res.status}`)
-
 	if (!res.ok) {
-		const errorText = await res.text()
-		console.error(`[API] Error: ${errorText}`)
-		throw new Error(errorText || `HTTP ${res.status}`)
+		await throwHttpAsApiError(res, context)
 	}
 
-	const responseData = await res.json()
-	console.log('[API] Response data:', responseData)
+	const responseData = await res.json().catch(() => ({}))
 	return unwrap<T>(responseData)
 }
 
 export const api = {
 	// Аутентификация / MFA
 	login: (email: string, password: string) =>
-		postJSON('/auth/login', { email, password }),
+		postJSON<{ mfa?: string; email?: string }>(
+			'/auth/login',
+			{ email, password },
+			'login'
+		),
+
 	register: (email: string, password: string) =>
-		postJSON('/auth/register', { email, password }),
+		postJSON<{ mfa?: string; email?: string }>(
+			'/auth/register',
+			{ email, password },
+			'register'
+		),
+
 	verifyEmailCode: (code: string, email?: string) =>
-		postJSON('/auth/verify-email-code', { code, email }),
-	resendEmailCode: () => postJSON('/auth/resend-email-code'),
+		postJSON('/auth/verify-email-code', { code, email }, 'login'),
+
+	resendEmailCode: () => postJSON('/auth/resend-email-code', {}, 'login'),
+
 	refresh: (userId?: string) =>
-		postJSON('/auth/refresh', userId ? { userId } : undefined),
-	logout: () => postJSON('/auth/logout', {}),
-	me: () => getJSON('/auth/me'),
+		postJSON('/auth/refresh', userId ? { userId } : undefined, 'default'),
+
+	logout: () => postJSON('/auth/logout', {}, 'default'),
+
+	me: () => getJSON('/auth/me', 'default'),
 
 	// Админка пользователей
-	users: () => getJSON('/users'),
-	userById: (id: string) => getJSON(`/users/${encodeURIComponent(id)}`),
-	deleteUser: (id: string) => deleteJSON(`/users/${encodeURIComponent(id)}`),
+	users: () => getJSON('/users', 'default'),
+	userById: (id: string) =>
+		getJSON(`/users/${encodeURIComponent(id)}`, 'default'),
+	deleteUser: (id: string) =>
+		deleteJSON(`/users/${encodeURIComponent(id)}`, 'default'),
 }
+
+export { getUserMessage } // чтобы удобно импортить на страницах

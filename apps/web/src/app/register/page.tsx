@@ -1,7 +1,7 @@
 'use client'
 
 import GoogleAuthButton from '@/src/components/auth/GoogleAuthButton'
-import { api } from '@/src/lib/api'
+import { api, getUserMessage } from '@/src/lib/api'
 import { GOOGLE_ENABLED } from '@/src/lib/flags'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -60,7 +60,7 @@ export default function RegisterPage() {
 		setError(null)
 		try {
 			const res = await api.register(email, password)
-			if (res?.mfa === 'email_code_sent') {
+			if ((res as any)?.mfa === 'email_code_sent') {
 				router.replace(
 					`/login/verify?email=${encodeURIComponent(
 						email
@@ -71,7 +71,7 @@ export default function RegisterPage() {
 			// если сервер внезапно не вернул mfa
 			throw new Error('Не удалось запустить подтверждение по почте')
 		} catch (err: any) {
-			setError(err?.message || 'Ошибка регистрации')
+			setError(getUserMessage(err, 'register'))
 		}
 	}
 

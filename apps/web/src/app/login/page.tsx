@@ -2,7 +2,7 @@
 'use client'
 
 import GoogleAuthButton from '@/src/components/auth/GoogleAuthButton'
-import { api } from '@/src/lib/api'
+import { api, getUserMessage } from '@/src/lib/api'
 import { GOOGLE_ENABLED } from '@/src/lib/flags'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useState } from 'react'
@@ -63,17 +63,14 @@ function LoginInner() {
 			const res = await api.login(email, password)
 			// ожидаем ответ вида { mfa: 'email_code_sent', email }
 			if ((res as any)?.mfa === 'email_code_sent') {
-				const q = new URLSearchParams({
-					email,
-					next,
-				})
+				const q = new URLSearchParams({ email, next })
 				router.replace(`/login/verify?${q.toString()}`)
 			} else {
 				// fallback: если когда-то уберём MFA
 				router.replace(next)
 			}
 		} catch (err: any) {
-			setError(err?.message || 'Ошибка входа')
+			setError(getUserMessage(err, 'login'))
 		}
 	}
 
