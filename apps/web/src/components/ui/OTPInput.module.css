@@ -1,0 +1,239 @@
+/* Design tokens (локальные переменные контейнера) */
+.root {
+	--slot-size: 56px;
+	--slot-gap: 10px;
+	--radius: 16px;
+	--bg: rgba(255, 255, 255, 0.06);
+	--stroke: rgba(255, 255, 255, 0.16);
+	--accent: #cd8dee; /* фирменные фиолетовые */
+	--accent-2: #7050d5; /* фирменные фиолетовые (тёмнее) */
+	--error: #ff4d4f;
+
+	position: relative;
+	width: 100%;
+	padding: 18px;
+	border-radius: var(--radius);
+	background: linear-gradient(
+		180deg,
+		rgba(255, 255, 255, 0.06),
+		rgba(255, 255, 255, 0.02)
+	);
+	border: 1px solid var(--stroke);
+	cursor: text;
+	transition:
+		border-color 200ms ease,
+		box-shadow 200ms ease,
+		transform 120ms ease;
+	backdrop-filter: blur(6px);
+}
+
+/* Состояния через data-* атрибуты */
+.root[data-focused] {
+	/* было бирюзовым — теперь фирменный фиолетовый */
+	border-color: #6f59d6;
+	box-shadow:
+		0 6px 30px rgba(112, 80, 213, 0.18),
+		inset 0 0 0 1px rgba(205, 141, 238, 0.25);
+}
+
+.root[data-error] {
+	animation: otp-shake 280ms ease;
+	border-color: var(--error);
+	box-shadow: 0 6px 26px rgba(255, 77, 79, 0.08);
+}
+
+.root[data-disabled] {
+	opacity: 0.6;
+	pointer-events: none;
+}
+
+.hiddenInput {
+	position: absolute;
+	inset: 0;
+	opacity: 0;
+	pointer-events: none;
+	width: 0;
+	height: 0;
+}
+
+/* Фоновая «жидкая» подложка на всю ширину */
+.liquid {
+	position: absolute;
+	inset: 0;
+	border-radius: calc(var(--radius) - 0.5px);
+	overflow: hidden;
+	z-index: 0;
+}
+
+.liquid::before,
+.liquid::after {
+	content: '';
+	position: absolute;
+	inset: -120%;
+	background:
+		radial-gradient(
+				60% 60% at 30% 40%,
+				rgba(124, 58, 237, 0.12),
+				transparent 60%
+			)
+			no-repeat,
+		radial-gradient(
+				50% 50% at 70% 60%,
+				/* заменили бирюзовый на фирменный розово-фиолетовый */
+					rgba(205, 141, 238, 0.12),
+				transparent 60%
+			)
+			no-repeat;
+	filter: blur(28px);
+	transform: translateZ(0);
+	animation: otp-flow 14s linear infinite;
+	opacity: 0;
+	transition: opacity 240ms ease;
+}
+.root:is([data-focused], :hover) .liquid::before {
+	opacity: 1;
+}
+.root[data-focused] .liquid::after {
+	opacity: 0.7;
+	animation-duration: 18s;
+	animation-direction: reverse;
+}
+
+/* Рельса ячеек. Колонки задаём через var(--len) из inline style */
+.track {
+	position: relative;
+	z-index: 1;
+	display: grid;
+	/* раньше было 1fr, теперь авторазмер — слоты сами центруются */
+	grid-template-columns: repeat(var(--len), auto);
+	gap: var(--slot-gap);
+	align-items: center;
+	justify-content: center; /* центрируем всю группу */
+}
+
+/* Слот */
+.slot {
+	position: relative;
+	aspect-ratio: 1 / 1;
+	height: var(--slot-size);
+	border-radius: 14px;
+	background: var(--bg);
+	border: 1px solid var(--stroke);
+	display: grid;
+	place-items: center;
+	transition:
+		transform 120ms ease,
+		border-color 200ms ease,
+		background 200ms ease;
+	overflow: hidden;
+}
+.slot::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		180deg,
+		rgba(255, 255, 255, 0.07),
+		rgba(255, 255, 255, 0)
+	);
+	opacity: 0.8;
+	pointer-events: none;
+}
+.slot[data-active] {
+	transform: translateY(-1px) scale(1.02);
+	/* было rgba(110, 231, 255, 0.55) */
+	border-color: #7050d5;
+}
+.slot[data-filled] {
+	/* было rgba(124, 58, 237, 0.4) */
+	border-color: #cd8dee;
+	animation: otp-pop 140ms ease;
+	background: linear-gradient(
+		180deg,
+		/* было rgba(124, 58, 237, 0.14) */ rgba(205, 141, 238, 0.14),
+		rgba(255, 255, 255, 0.02)
+	);
+}
+
+/* Символ */
+.char {
+	font-feature-settings:
+		'tnum' on,
+		'ss01' on;
+	font-variant-numeric: tabular-nums;
+	font-size: 28px;
+	line-height: 1;
+	letter-spacing: 0.04em;
+	color: #fff;
+	text-shadow: 0 0 18px rgba(124, 58, 237, 0.35);
+}
+
+/* Каретка */
+.caret {
+	position: absolute;
+	width: 2px;
+	height: 42%;
+	/* использует фирменный градиент */
+	background: linear-gradient(180deg, var(--accent), var(--accent-2));
+	border-radius: 2px;
+	animation: otp-caret 1s steps(1) infinite;
+}
+
+/* Анимации */
+@keyframes otp-caret {
+	0%,
+	49% {
+		opacity: 1;
+	}
+	50%,
+	100% {
+		opacity: 0;
+	}
+}
+@keyframes otp-pop {
+	0% {
+		transform: scale(0.94);
+	}
+	100% {
+		transform: scale(1);
+	}
+}
+@keyframes otp-shake {
+	0% {
+		transform: translateX(0);
+	}
+	25% {
+		transform: translateX(-6px);
+	}
+	50% {
+		transform: translateX(6px);
+	}
+	75% {
+		transform: translateX(-4px);
+	}
+	100% {
+		transform: translateX(0);
+	}
+}
+@keyframes otp-flow {
+	0% {
+		transform: translate3d(-4%, -2%, 0) rotate(0deg);
+	}
+	50% {
+		transform: translate3d(3%, 2%, 0) rotate(180deg);
+	}
+	100% {
+		transform: translate3d(-4%, -2%, 0) rotate(360deg);
+	}
+}
+
+/* Мобильная адаптация */
+@media (max-width: 520px) {
+	.root {
+		--slot-size: 48px;
+		--slot-gap: 8px;
+	}
+	.char {
+		font-size: 24px;
+	}
+}

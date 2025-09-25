@@ -1,8 +1,9 @@
 'use client'
 
+import OTPInput from '@/src/components/ui/OTPInput'
 import { api } from '@/src/lib/api'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import styles from '../page.module.css'
 
 export default function VerifyEmailCodePage() {
@@ -18,24 +19,20 @@ export default function VerifyEmailCodePage() {
 	const [resending, setResending] = useState(false)
 	const [resendMsg, setResendMsg] = useState<string | null>(null)
 
-	async function onSubmit(e: React.FormEvent) {
-		e.preventDefault()
+	async function onSubmit(e?: React.FormEvent) {
+		e?.preventDefault()
 		if (!code || code.length < 6) return
 		setErr(null)
 		setBusy(true)
 		try {
 			await api.verifyEmailCode(code, email)
-			// убеждаемся, что куки с токенами уже читаются сервером
 			try {
 				await api.me()
 			} catch {}
 			setOk(true)
-
-			// >>> добавлено: сразу оповещаем навбар, что сессия изменилась
 			if (typeof window !== 'undefined') {
 				window.dispatchEvent(new Event('session-changed'))
 			}
-
 			router.replace(next)
 		} catch (e: any) {
 			setErr(e?.message || 'Неверный или просроченный код')
@@ -58,6 +55,14 @@ export default function VerifyEmailCodePage() {
 		}
 	}
 
+	// Автосабмит сразу после ввода 6 цифр
+	useEffect(() => {
+		if (code.length === 6 && !busy) {
+			onSubmit()
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [code])
+
 	return (
 		<>
 			<div className={styles.bg} aria-hidden />
@@ -73,18 +78,29 @@ export default function VerifyEmailCodePage() {
 							<label htmlFor='code' className={styles.label}>
 								Код из письма
 							</label>
-							<input
+
+							{/* Новый красивый OTP-инпут */}
+							<OTPInput
 								id='code'
-								required
-								inputMode='numeric'
-								pattern='[0-9]*'
-								maxLength={6}
-								placeholder='______'
-								className={styles.input}
+								name='code'
+								length={6}
 								value={code}
-								onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
+								onChange={v => {
+									// сохраняем только цифры
+									setCode(v.replace(/\D/g, '').slice(0, 6))
+									if (err) setErr(null)
+								}}
+								onComplete={v => {
+									setCode(v)
+									// можно сразу отправлять, но оставим это в useEffect
+								}}
 								autoFocus
 								disabled={busy}
+								error={!!err}
+								ariaLabel='Код подтверждения из письма'
+								className={
+									styles.input /* чтобы не ломать вертикальные отступы */
+								}
 							/>
 						</div>
 
