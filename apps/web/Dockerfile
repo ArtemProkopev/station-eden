@@ -9,14 +9,12 @@ COPY apps/web/package.json apps/web/
 COPY apps/api/package.json apps/api/
 RUN pnpm install --frozen-lockfile
 
-# исходники фронта
 COPY apps/web apps/web
 WORKDIR /app/apps/web
 
-# билд-аргументы только для публичных переменных
-ARG NEXT_PUBLIC_API_BASE
-ARG NEXT_PUBLIC_ENABLE_TELEGRAM
-ARG NEXT_PUBLIC_ENABLE_GOOGLE
+ARG NEXT_PUBLIC_API_BASE=/api
+ARG NEXT_PUBLIC_ENABLE_TELEGRAM=false
+ARG NEXT_PUBLIC_ENABLE_GOOGLE=true
 ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
 ENV NEXT_PUBLIC_ENABLE_TELEGRAM=$NEXT_PUBLIC_ENABLE_TELEGRAM
 ENV NEXT_PUBLIC_ENABLE_GOOGLE=$NEXT_PUBLIC_ENABLE_GOOGLE

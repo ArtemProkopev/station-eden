@@ -1,6 +1,10 @@
 services:
   api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
     image: ${GHCR_REG:-ghcr.io}/${GHCR_OWNER}/station-eden-api:${IMAGE_TAG:-latest}
+    env_file: [.env]
     environment:
       NODE_ENV: ${NODE_ENV}
       API_PORT: ${API_PORT}
@@ -31,19 +35,28 @@ services:
     healthcheck:
       test:
         [
-          'CMD',
-          'node',
-          '-e',
+          "CMD",
+          "node",
+          "-e",
           "require('http').get('http://127.0.0.1:4000/auth/csrf',r=>process.exit(r.statusCode>=200&&r.statusCode<500?0:1)).on('error',()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 3s
-      retries: 10
+      retries: 15
     networks: [webnet]
 
   web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE}
+        NEXT_PUBLIC_ENABLE_TELEGRAM: ${NEXT_PUBLIC_ENABLE_TELEGRAM}
+        NEXT_PUBLIC_ENABLE_GOOGLE: ${NEXT_PUBLIC_ENABLE_GOOGLE}
     image: ${GHCR_REG:-ghcr.io}/${GHCR_OWNER}/station-eden-web:${IMAGE_TAG:-latest}
+    env_file: [.env]
     environment:
+      NODE_ENV: ${NODE_ENV}
       NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE}
       NEXT_PUBLIC_ENABLE_TELEGRAM: ${NEXT_PUBLIC_ENABLE_TELEGRAM}
       NEXT_PUBLIC_ENABLE_GOOGLE: ${NEXT_PUBLIC_ENABLE_GOOGLE}
@@ -54,9 +67,9 @@ services:
     healthcheck:
       test:
         [
-          'CMD',
-          'node',
-          '-e',
+          "CMD",
+          "node",
+          "-e",
           "require('http').get('http://127.0.0.1:3000',r=>process.exit(r.statusCode>=200&&r.statusCode<500?0:1)).on('error',()=>process.exit(1))",
         ]
       interval: 10s
@@ -64,17 +77,18 @@ services:
       retries: 15
     networks: [webnet]
 
-  # Заменили Docker Hub -> ECR Public (официальное зеркало) — не требует логина
   caddy:
     image: public.ecr.aws/docker/library/caddy:2
     restart: unless-stopped
     ports:
-      - '80:80'
-      - '443:443'
+      - "80:80"
+      - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    environment:
+      PUBLIC_BASE_HOST: ${PUBLIC_BASE_HOST}
     depends_on:
       web:
         condition: service_healthy
@@ -82,7 +96,6 @@ services:
         condition: service_healthy
     networks: [webnet]
 
-  # Заменили Docker Hub -> GHCR (публичный образ) — не требует логина на сервере
   watchtower:
     image: ghcr.io/containrrr/watchtower:latest
     restart: always

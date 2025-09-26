@@ -1,7 +1,32 @@
-# ====== Frontend (Next.js) ======
+# ==================== PROD: основной домен ====================
 stationeden.ru, www.stationeden.ru {
   encode zstd gzip
-  reverse_proxy web:3000
+
+  route {
+    # 1) /api/* → API (обрезаем /api)
+    handle_path /api/* {
+      reverse_proxy api:4000
+    }
+
+    # 2) /auth/* → API (без обрезки)
+    handle /auth* {
+      reverse_proxy api:4000
+    }
+
+    # 3) анти-кэш только для /auth/csrf
+    @csrf path /auth/csrf
+    header @csrf {
+      Cache-Control "no-store, no-cache, must-revalidate"
+      Pragma "no-cache"
+      Expires "0"
+    }
+
+    # 4) остальное → фронт
+    handle {
+      reverse_proxy web:3000
+    }
+  }
+
   header {
     Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     X-Content-Type-Options "nosniff"
@@ -9,19 +34,61 @@ stationeden.ru, www.stationeden.ru {
   }
 }
 
-# ====== Backend (NestJS API) ======
+# ==================== PROD: отдельный API-хост ====================
 api.stationeden.ru {
   encode zstd gzip
-  reverse_proxy api:4000
 
-  # анти-кэш именно для /auth/csrf, чтобы браузер всегда получал актуальный токен
-  @csrf path /auth/csrf
-  header @csrf Cache-Control "no-store, no-cache, must-revalidate"
-  header @csrf Pragma "no-cache"
-  header @csrf Expires "0"
+  route {
+    handle {
+      reverse_proxy api:4000
+    }
+
+    @csrf path /auth/csrf
+    header @csrf {
+      Cache-Control "no-store, no-cache, must-revalidate"
+      Pragma "no-cache"
+      Expires "0"
+    }
+  }
 
   header {
     Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+}
+
+# ==================== LOCAL: https://localhost ====================
+# (без HSTS, чтобы не «залипал» в браузере)
+http://localhost, https://localhost {
+  encode zstd gzip
+
+  route {
+    # 1) /api/* → API (обрезаем /api)
+    handle_path /api/* {
+      reverse_proxy api:4000
+    }
+
+    # 2) /auth/* → API (без обрезки)
+    handle /auth* {
+      reverse_proxy api:4000
+    }
+
+    # 3) анти-кэш только для /auth/csrf
+    @csrf path /auth/csrf
+    header @csrf {
+      Cache-Control "no-store, no-cache, must-revalidate"
+      Pragma "no-cache"
+      Expires "0"
+    }
+
+    # 4) остальное → фронт
+    handle {
+      reverse_proxy web:3000
+    }
+  }
+
+  header {
     X-Content-Type-Options "nosniff"
     Referrer-Policy "strict-origin-when-cross-origin"
   }
