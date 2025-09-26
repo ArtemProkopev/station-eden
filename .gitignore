@@ -22,14 +22,19 @@ out/
 **/*.tsbuildinfo
 
 # ========== Секреты / окружение ==========
+# Игнорируем вообще все .env-вариации во всех подпапках
+**/.env*
 .env
 .env.local
 **/.env
 **/.env.local
 **/.env.*.local
 .envrc
+
+# Разрешаем только примеры конфигов (их можно коммитить)
 !.env.example
 !**/.env.example
+!**/.env.*.example
 
 # ========== Кэши / инструменты ==========
 .cache/
@@ -52,6 +57,22 @@ Thumbs.db
 *.swp
 *.swo
 
-# ========== Безопасность ==========
+# ========== Безопасность / сертификаты / ключи ==========
 .git-credentials
+*.pem
+*.key
+*.crt
+*.p12
+
+# БД/дампы (на всякий случай)
+*.sqlite
+*.sqlite3
+*.db
+dump.sql
+*.dump
+
+# ========== Docker / локальные тома / оверрайды ==========
 docker-compose.override.yml
+caddy_data/
+caddy_config/
+.vercel/
