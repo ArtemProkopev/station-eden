@@ -30,19 +30,21 @@ export class AuthController {
 		private jwt: JwtService
 	) {}
 
-	private cookieOpts() {
+	/** Базовые опции для всех кук */
+	private baseCookieOpts() {
 		const secure = process.env.COOKIE_SECURE === 'true'
 		return { httpOnly: true, sameSite: 'lax' as const, secure, path: '/' }
 	}
+	/** Опции для access/refresh и прочих «долгих» auth-кук */
+	private authCookieOpts() {
+		const base = this.baseCookieOpts()
+		const domain = process.env.AUTH_COOKIE_DOMAIN?.trim()
+		return domain ? { ...base, domain } : base
+	}
+	/** Опции для короткоживущих preauth/state кук (10 минут) */
 	private preauthCookieOpts() {
-		const secure = process.env.COOKIE_SECURE === 'true'
-		return {
-			httpOnly: true,
-			sameSite: 'lax' as const,
-			secure,
-			path: '/',
-			maxAge: 10 * 60 * 1000,
-		}
+		const opts = this.authCookieOpts()
+		return { ...opts, maxAge: 10 * 60 * 1000 }
 	}
 
 	private googleEnabled() {
@@ -55,13 +57,11 @@ export class AuthController {
 		return randomBytes(len).toString('hex')
 	}
 	private setStateCookie(res: Response, raw: string) {
-		res.cookie('google_oauth_state', raw, {
-			...this.cookieOpts(),
-			maxAge: 10 * 60 * 1000,
-		})
+		// ВАЖНО: домен (.stationeden.ru в проде) берётся из AUTH_COOKIE_DOMAIN
+		res.cookie('google_oauth_state', raw, this.preauthCookieOpts())
 	}
 	private clearStateCookie(res: Response) {
-		res.clearCookie('google_oauth_state', this.cookieOpts())
+		res.clearCookie('google_oauth_state', this.preauthCookieOpts())
 	}
 
 	private webOrigin(): string {
@@ -93,10 +93,9 @@ export class AuthController {
 		@Body() dto: LoginDto,
 		@Res({ passthrough: true }) res: Response
 	) {
-		// ИСПРАВЛЕНИЕ: используем метод login из сервиса, который возвращает user без токенов
 		const result = await this.auth.login(dto.email.toLowerCase(), dto.password)
-		
-		// Создаем preauth вместо полноценных токенов
+
+		// preauth вместо полноценных токенов
 		const pre = this.auth.signPreauth(result.user.id, result.user.email)
 		res.cookie('preauth', pre, this.preauthCookieOpts())
 
@@ -145,11 +144,11 @@ export class AuthController {
 			rt
 		)
 		res.cookie('access_token', access, {
-			...this.cookieOpts(),
+			...this.authCookieOpts(),
 			maxAge: 15 * 60 * 1000,
 		})
 		res.cookie('refresh_token', refreshToken, {
-			...this.cookieOpts(),
+			...this.authCookieOpts(),
 			maxAge: refreshExpires.getTime() - Date.now(),
 		})
 		return { refreshed: true }
@@ -161,8 +160,8 @@ export class AuthController {
 		const userId = (payload as any)?.sub
 		const rt = (req as any).cookies?.refresh_token
 		if (userId) await this.auth.logout(userId, rt)
-		res.clearCookie('access_token', this.cookieOpts())
-		res.clearCookie('refresh_token', this.cookieOpts())
+		res.clearCookie('access_token', this.authCookieOpts())
+		res.clearCookie('refresh_token', this.authCookieOpts())
 		res.clearCookie('preauth', this.preauthCookieOpts())
 		return { ok: true }
 	}
@@ -201,11 +200,11 @@ export class AuthController {
 			await this.auth.verifyEmailCode(payload.sub, email, body.code)
 
 		res.cookie('access_token', access, {
-			...this.cookieOpts(),
+			...this.authCookieOpts(),
 			maxAge: 15 * 60 * 1000,
 		})
 		res.cookie('refresh_token', refreshToken, {
-			...this.cookieOpts(),
+			...this.authCookieOpts(),
 			maxAge: refreshExpires.getTime() - Date.now(),
 		})
 		res.clearCookie('preauth', this.preauthCookieOpts())
