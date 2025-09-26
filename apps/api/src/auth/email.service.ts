@@ -1,9 +1,15 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
-import { Resend } from 'resend'
+
+// === DEV support ===
+// Хранилище кодов в памяти (только для dev при MAIL_DEV_MODE=store)
+const devCodes = new Map<string, { code: string; ts: number }>()
+
+type DevMode = 'log' | 'store' | undefined
 
 @Injectable()
 export class EmailService {
-	private resend = new Resend(process.env.RESEND_API_KEY!)
+	private readonly isProd = process.env.NODE_ENV === 'production'
+	private readonly devMode: DevMode = process.env.MAIL_DEV_MODE as DevMode
 
 	private resolveFrom() {
 		const envFrom = process.env.EMAIL_FROM?.trim()
@@ -13,12 +19,27 @@ export class EmailService {
 	}
 
 	async sendLoginCode(to: string, code: string) {
+		// --- DEV режим: не отправляем реальную почту ---
+		if (!this.isProd && this.devMode) {
+			if (this.devMode === 'store') {
+				devCodes.set(to.toLowerCase(), { code, ts: Date.now() })
+			}
+			// eslint-disable-next-line no-console
+			console.warn(`[DEV][EmailService] MFA code for ${to}: ${code}`)
+			return
+		}
+
+		// --- PROD режим: реальная отправка через Resend ---
 		if (!process.env.RESEND_API_KEY) {
 			console.error('[email] RESEND_API_KEY is missing')
 			throw new InternalServerErrorException(
 				'Email disabled: RESEND_API_KEY missing'
 			)
 		}
+
+		// ленивый импорт, чтобы dev без resend тоже работал
+		const { Resend } = await import('resend')
+		const resend = new Resend(process.env.RESEND_API_KEY!)
 
 		const from = this.resolveFrom()
 		const year = new Date().getFullYear()
@@ -40,7 +61,7 @@ export class EmailService {
       </div>
     `
 
-		const { data, error } = await this.resend.emails.send({
+		const { data, error } = await resend.emails.send({
 			from,
 			to,
 			subject: 'Код для входа в Station Eden',
@@ -57,7 +78,14 @@ export class EmailService {
 			throw new InternalServerErrorException('Failed to send email')
 		}
 
+		// eslint-disable-next-line no-console
 		console.log('[email] sent', { to, id: data?.id })
 		return data
+	}
+
+	/** Только для dev (MAIL_DEV_MODE=store): достать последний код */
+	getLastDevCode(email: string) {
+		if (this.isProd) return undefined
+		return devCodes.get(email.toLowerCase())
 	}
 }

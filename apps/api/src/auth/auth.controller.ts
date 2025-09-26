@@ -15,8 +15,8 @@ import { Throttle, ThrottlerGuard } from '@nestjs/throttler'
 import { randomBytes } from 'crypto'
 import type { Request, Response } from 'express'
 import { OAuth2Client } from 'google-auth-library'
+import { ensureCsrfCookie, getCookieOptions } from '../common'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
-import { ensureCsrfCookie } from '../common/middleware/csrf.middleware'
 import { AuthService } from './auth.service'
 import { LoginDto } from './dto/login.dto'
 import { RegisterDto } from './dto/register.dto'
@@ -30,21 +30,24 @@ export class AuthController {
 		private jwt: JwtService
 	) {}
 
-	/** Базовые опции для всех кук */
-	private baseCookieOpts() {
-		const secure = process.env.COOKIE_SECURE === 'true'
-		return { httpOnly: true, sameSite: 'lax' as const, secure, path: '/' }
-	}
-	/** Опции для access/refresh и прочих «долгих» auth-кук */
+	/** Общие опции для auth-кук (access/refresh) */
 	private authCookieOpts() {
-		const base = this.baseCookieOpts()
-		const domain = process.env.AUTH_COOKIE_DOMAIN?.trim()
-		return domain ? { ...base, domain } : base
+		return getCookieOptions(true) // httpOnly=true, dev/prod атрибуты подтягиваются автоматически
 	}
-	/** Опции для короткоживущих preauth/state кук (10 минут) */
+
+	/** Короткоживущие куки (preauth/state), 10 минут */
 	private preauthCookieOpts() {
-		const opts = this.authCookieOpts()
-		return { ...opts, maxAge: 10 * 60 * 1000 }
+		return { ...getCookieOptions(true), maxAge: 10 * 60 * 1000 }
+	}
+
+	/** Express 5: очищаем cookie без maxAge, сохраняя остальные атрибуты */
+	private clearWithSameAttrs(
+		res: Response,
+		name: string,
+		opts: Record<string, any>
+	) {
+		const { maxAge, ...rest } = opts || {}
+		res.clearCookie(name, rest)
 	}
 
 	private googleEnabled() {
@@ -57,11 +60,10 @@ export class AuthController {
 		return randomBytes(len).toString('hex')
 	}
 	private setStateCookie(res: Response, raw: string) {
-		// ВАЖНО: домен (.stationeden.ru в проде) берётся из AUTH_COOKIE_DOMAIN
 		res.cookie('google_oauth_state', raw, this.preauthCookieOpts())
 	}
 	private clearStateCookie(res: Response) {
-		res.clearCookie('google_oauth_state', this.preauthCookieOpts())
+		this.clearWithSameAttrs(res, 'google_oauth_state', this.preauthCookieOpts())
 	}
 
 	private webOrigin(): string {
@@ -160,9 +162,10 @@ export class AuthController {
 		const userId = (payload as any)?.sub
 		const rt = (req as any).cookies?.refresh_token
 		if (userId) await this.auth.logout(userId, rt)
-		res.clearCookie('access_token', this.authCookieOpts())
-		res.clearCookie('refresh_token', this.authCookieOpts())
-		res.clearCookie('preauth', this.preauthCookieOpts())
+
+		this.clearWithSameAttrs(res, 'access_token', this.authCookieOpts())
+		this.clearWithSameAttrs(res, 'refresh_token', this.authCookieOpts())
+		this.clearWithSameAttrs(res, 'preauth', this.preauthCookieOpts())
 		return { ok: true }
 	}
 
@@ -193,8 +196,9 @@ export class AuthController {
 		}
 
 		const email = body.email?.toLowerCase() || payload.email
-		if (!email || email !== payload.email)
+		if (!email || email !== payload.email) {
 			throw new UnauthorizedException('Email mismatch')
+		}
 
 		const { user, access, refreshToken, refreshExpires } =
 			await this.auth.verifyEmailCode(payload.sub, email, body.code)
@@ -207,7 +211,7 @@ export class AuthController {
 			...this.authCookieOpts(),
 			maxAge: refreshExpires.getTime() - Date.now(),
 		})
-		res.clearCookie('preauth', this.preauthCookieOpts())
+		this.clearWithSameAttrs(res, 'preauth', this.preauthCookieOpts())
 
 		return { user }
 	}
@@ -354,29 +358,28 @@ export class AuthController {
 		return
 	}
 
-	// --- Debug ---
-	@Get('google/debug-env')
-	debugGoogleEnv() {
-		return {
-			ENABLE_GOOGLE_LOGIN: process.env.ENABLE_GOOGLE_LOGIN,
-			GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
-			GOOGLE_REDIRECT_URL: process.env.GOOGLE_REDIRECT_URL,
+	// --- DEV: удобно подсмотреть последний код (если MAIL_DEV_MODE=store) ---
+	@Get('dev/peek-email-code')
+	devPeek(@Req() req: Request) {
+		if (process.env.NODE_ENV === 'production') {
+			return { ok: false, reason: 'not-available-in-production' }
 		}
-	}
 
-	@Get('google/debug-url')
-	debugGoogleUrl() {
-		const params = new URLSearchParams({
-			client_id: process.env.GOOGLE_CLIENT_ID!,
-			redirect_uri: process.env.GOOGLE_REDIRECT_URL!,
-			response_type: 'code',
-			scope: 'openid email profile',
-			access_type: 'offline',
-			include_granted_scopes: 'true',
-			state: 'debug:login',
-			prompt: 'consent',
-		})
-		return { url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` }
+		// Доп. защита эндпоинта секретом
+		const required = (process.env.DEV_EMAIL_PEEK_SECRET || '').trim()
+		const provided = (req.get('x-dev-secret') || '').trim()
+		if (required && provided !== required) {
+			return { ok: false, reason: 'forbidden' }
+		}
+
+		const email = String((req.query as any)?.email || '')
+			.toLowerCase()
+			.trim()
+		if (!email) return { ok: false, reason: 'email-is-required' }
+		const rec = this.auth['emailer'].getLastDevCode?.(email)
+		return rec
+			? { ok: true, email, code: rec.code, at: rec.ts }
+			: { ok: false, reason: 'no-code' }
 	}
 }
 
