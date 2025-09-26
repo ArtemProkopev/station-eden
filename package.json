@@ -8,12 +8,12 @@
 	"scripts": {
 		"dev:web": "pnpm --filter @station-eden/web dev",
 		"dev:web:nocache": "pnpm --filter @station-eden/web dev:nocache",
-		"dev:api": "cross-env DOTENV_CONFIG_PATH=apps/api/.env.local node -r dotenv/config ./node_modules/.bin/nest start --watch",
+		"dev:api": "dotenv -e apps/api/.env.local -- pnpm --filter @station-eden/api start:dev",
 		"dev": "run-p dev:api dev:web",
 		"dev:nocache": "run-p dev:api dev:web:nocache",
 		"build": "pnpm -r build",
-		"migrate:run": "cross-env DOTENV_CONFIG_PATH=apps/api/.env.local node -r dotenv/config ./node_modules/.bin/ts-node -T apps/api/node_modules/typeorm/cli.js migration:run -d apps/api/src/db/data-source.ts",
-		"migrate:revert": "cross-env DOTENV_CONFIG_PATH=apps/api/.env.local node -r dotenv/config ./node_modules/.bin/ts-node -T apps/api/node_modules/typeorm/cli.js migration:revert -d apps/api/src/db/data-source.ts",
+		"migrate:run": "dotenv -e apps/api/.env.local -- pnpm --filter @station-eden/api run migration:run",
+		"migrate:revert": "dotenv -e apps/api/.env.local -- pnpm --filter @station-eden/api run migration:revert",
 		"clean": "pnpm -r run clean && rimraf node_modules && pnpm store prune",
 		"clean:artifacts": "pnpm -r run clean",
 		"doctor": "node -e \"console.log('node',process.version);\" && pnpm -v && git rev-parse --short HEAD"
@@ -22,6 +22,7 @@
 		"@types/dotenv": "^8.2.3",
 		"cross-env": "^10.0.0",
 		"dotenv": "^17.2.2",
+		"dotenv-cli": "^7.4.1",
 		"npm-run-all": "^4.1.5",
 		"rimraf": "^3.0.2",
 		"typescript": "^5.5.4"
