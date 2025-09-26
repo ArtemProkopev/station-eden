@@ -1,7 +1,0 @@
-Caddyfile merge=ours
-docker-compose.yml merge=ours
-apps/api/.env.production merge=ours
-apps/web/.env.production merge=ours
-apps/api/Dockerfile merge=ours
-apps/web/Dockerfile merge=ours
-apps/web/server.mjs merge=ours
