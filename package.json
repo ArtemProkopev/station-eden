@@ -6,9 +6,9 @@
 		"apps/*"
 	],
 	"scripts": {
-		"dev:web": "cross-env NEXT_PUBLIC_ENABLE_GOOGLE=true pnpm --filter @station-eden/web dev",
-		"dev:web:nocache": "cross-env NEXT_PUBLIC_ENABLE_GOOGLE=true NEXT_CACHE_DISABLED=1 pnpm --filter @station-eden/web dev:nocache",
-		"dev:api": "pnpm --filter @station-eden/api start:dev",
+		"dev:web": "cross-env NEXT_PUBLIC_API_BASE=http://localhost:4000 NEXT_PUBLIC_ENABLE_GOOGLE=true NEXT_PUBLIC_ENABLE_TELEGRAM=false pnpm --filter @station-eden/web dev",
+		"dev:web:nocache": "cross-env NEXT_PUBLIC_API_BASE=http://localhost:4000 NEXT_PUBLIC_ENABLE_GOOGLE=true NEXT_PUBLIC_ENABLE_TELEGRAM=false NEXT_CACHE_DISABLED=1 pnpm --filter @station-eden/web dev:nocache",
+		"dev:api": "cross-env NODE_ENV=development API_PORT=4000 API_CORS_ORIGIN=http://localhost:3000,http://127.0.0.1:3000 COOKIE_SECURE=false ENABLE_GOOGLE_LOGIN=true GOOGLE_REDIRECT_URL=http://localhost:4000/auth/google/callback WEB_AFTER_LOGIN_URL=http://localhost:3000/profile CSRF_COOKIE_DOMAIN= AUTH_COOKIE_DOMAIN= pnpm --filter @station-eden/api start:dev",
 		"dev": "run-p dev:api dev:web",
 		"dev:nocache": "run-p dev:api dev:web:nocache",
 		"build": "pnpm -r build",
