@@ -31,9 +31,6 @@ const RawEnvSchema = z.object({
 	POSTGRES_PASSWORD: z.string().optional(),
 	POSTGRES_DB: z.string().optional(),
 
-	// фронт
-	NEXT_PUBLIC_API_BASE: z.string().url().optional(),
-
 	// allow-list админов
 	ADMIN_EMAILS: z.string().optional().default(''),
 
