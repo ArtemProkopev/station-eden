@@ -1,32 +1,30 @@
-# ==================== PROD: основной домен ====================
+# ==================== PROD: основной домен (фронт + /api под одним origin) ====================
 stationeden.ru, www.stationeden.ru {
   encode zstd gzip
 
-  route {
-    # 1) /api/* → API (обрезаем /api)
-    handle_path /api/* {
-      reverse_proxy api:4000
-    }
-
-    # 2) /auth/* → API (без обрезки)
-    handle /auth* {
-      reverse_proxy api:4000
-    }
-
-    # 3) анти-кэш только для /auth/csrf
-    @csrf path /auth/csrf
-    header @csrf {
-      Cache-Control "no-store, no-cache, must-revalidate"
-      Pragma "no-cache"
-      Expires "0"
-    }
-
-    # 4) остальное → фронт
-    handle {
-      reverse_proxy web:3000
-    }
+  # /api/* → обрезаем префикс и шлём в api:4000
+  handle /api* {
+    uri strip_prefix /api
+    reverse_proxy api:4000
   }
 
+  # /auth/* → проксируем как есть (нужен для OAuth коллбэков)
+  handle /auth* {
+    reverse_proxy api:4000
+  }
+
+  # анти-кэш для CSRF
+  @csrf path /auth/csrf
+  header @csrf Cache-Control "no-store, no-cache, must-revalidate"
+  header @csrf Pragma "no-cache"
+  header @csrf Expires "0"
+
+  # остальное → фронт
+  handle {
+    reverse_proxy web:3000
+  }
+
+  # безопасные заголовки (HSTS только на проде)
   header {
     Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     X-Content-Type-Options "nosniff"
@@ -34,22 +32,15 @@ stationeden.ru, www.stationeden.ru {
   }
 }
 
-# ==================== PROD: отдельный API-хост ====================
+# ==================== PROD: отдельный API-хост (обратная совместимость) ====================
 api.stationeden.ru {
   encode zstd gzip
+  reverse_proxy api:4000
 
-  route {
-    handle {
-      reverse_proxy api:4000
-    }
-
-    @csrf path /auth/csrf
-    header @csrf {
-      Cache-Control "no-store, no-cache, must-revalidate"
-      Pragma "no-cache"
-      Expires "0"
-    }
-  }
+  @csrf path /auth/csrf
+  header @csrf Cache-Control "no-store, no-cache, must-revalidate"
+  header @csrf Pragma "no-cache"
+  header @csrf Expires "0"
 
   header {
     Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
@@ -58,34 +49,27 @@ api.stationeden.ru {
   }
 }
 
-# ==================== LOCAL: https://localhost ====================
-# (без HSTS, чтобы не «залипал» в браузере)
+# ==================== LOCAL: единый origin на https://localhost ====================
+# (без HSTS, чтобы не «залипал»)
 http://localhost, https://localhost {
   encode zstd gzip
 
-  route {
-    # 1) /api/* → API (обрезаем /api)
-    handle_path /api/* {
-      reverse_proxy api:4000
-    }
+  handle /api* {
+    uri strip_prefix /api
+    reverse_proxy api:4000
+  }
 
-    # 2) /auth/* → API (без обрезки)
-    handle /auth* {
-      reverse_proxy api:4000
-    }
+  handle /auth* {
+    reverse_proxy api:4000
+  }
 
-    # 3) анти-кэш только для /auth/csrf
-    @csrf path /auth/csrf
-    header @csrf {
-      Cache-Control "no-store, no-cache, must-revalidate"
-      Pragma "no-cache"
-      Expires "0"
-    }
+  @csrf path /auth/csrf
+  header @csrf Cache-Control "no-store, no-cache, must-revalidate"
+  header @csrf Pragma "no-cache"
+  header @csrf Expires "0"
 
-    # 4) остальное → фронт
-    handle {
-      reverse_proxy web:3000
-    }
+  handle {
+    reverse_proxy web:3000
   }
 
   header {
