@@ -11,6 +11,7 @@ import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 import { EmailCode } from './email-code.entity'
 import { EmailService } from './email.service'
+import { OAuthAccount } from './oauth-account.entity'
 import { RefreshToken } from './refresh-token.entity'
 import { JwtStrategy } from './strategies/jwt.strategy'
 
@@ -39,7 +40,7 @@ import { JwtStrategy } from './strategies/jwt.strategy'
 				return { secret, signOptions: { expiresIn } }
 			},
 		}),
-		TypeOrmModule.forFeature([User, RefreshToken, EmailCode]),
+		TypeOrmModule.forFeature([User, RefreshToken, EmailCode, OAuthAccount]),
 		UsersModule,
 	],
 	controllers: [AuthController],

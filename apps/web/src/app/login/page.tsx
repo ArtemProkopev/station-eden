@@ -61,14 +61,19 @@ function LoginInner() {
 		setError(null)
 		try {
 			const res = await api.login(email, password)
-			// ожидаем ответ вида { mfa: 'email_code_sent', email }
+			// 1) обычный кейс MFA
 			if ((res as any)?.mfa === 'email_code_sent') {
-				const q = new URLSearchParams({ email, next })
+				const needSet = (res as any)?.needSetPassword === true
+				const q = new URLSearchParams({
+					email,
+					next,
+					...(needSet ? { mode: 'set_password' } : {}),
+				})
 				router.replace(`/login/verify?${q.toString()}`)
-			} else {
-				// fallback: если когда-то уберём MFA
-				router.replace(next)
+				return
 			}
+			// fallback без MFA
+			router.replace(next)
 		} catch (err: any) {
 			setError(getUserMessage(err, 'login'))
 		}

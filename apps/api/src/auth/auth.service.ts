@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common'
+// apps/api/src/auth/auth.service.ts
+import {
+	BadRequestException,
+	Injectable,
+	UnauthorizedException,
+} from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { InjectRepository } from '@nestjs/typeorm'
 import * as bcrypt from 'bcryptjs'
@@ -8,6 +13,7 @@ import { User } from '../users/user.entity'
 import { UsersService } from '../users/users.service'
 import { EmailCode } from './email-code.entity'
 import { EmailService } from './email.service'
+import { OAuthAccount } from './oauth-account.entity'
 import { RefreshToken } from './refresh-token.entity'
 
 @Injectable()
@@ -19,6 +25,8 @@ export class AuthService {
 		private readonly rtRepo: Repository<RefreshToken>,
 		@InjectRepository(EmailCode)
 		private readonly emailCodeRepo: Repository<EmailCode>,
+		@InjectRepository(OAuthAccount)
+		private readonly oaRepo: Repository<OAuthAccount>,
 		private readonly emailer: EmailService
 	) {}
 
@@ -68,31 +76,46 @@ export class AuthService {
 		return { plain, expires }
 	}
 
-	// ===== Базовые операции (используются контроллером) =====
+	// ===== Регистрация/логин (используются контроллером) =====
 
 	async register(email: string, password: string) {
-		const exists = await this.users.findByEmail(email)
-		if (exists) throw new UnauthorizedException('Email already used')
+		const existing = await this.users.findByEmailWithHash(email)
 
+		if (existing) {
+			// Если учётка создана через Google (пароля нет) — задаём пароль.
+			if (!existing.passwordHash) {
+				existing.passwordHash = await bcrypt.hash(password, 10)
+				await this.users.save(existing)
+				await this.users.ensureAdminRoleFor(email)
+
+				const fresh = (await this.users.findByEmail(email))!
+				return {
+					user: { id: fresh.id, email: fresh.email, role: fresh.role },
+				}
+			}
+
+			// Иначе — обычный конфликт
+			throw new UnauthorizedException('Email already used')
+		}
+
+		// Обычная новая регистрация
 		const passwordHash = await bcrypt.hash(password, 10)
 		await this.users.create({ email, passwordHash, role: 'user' })
 		await this.users.ensureAdminRoleFor(email)
 
 		const fresh = (await this.users.findByEmail(email))!
-		
-		// ИСПРАВЛЕНИЕ: возвращаем только пользователя, токены будут выданы после MFA
+
+		// токены будут выданы после MFA
 		return {
-			user: { id: fresh.id, email: fresh.email, role: fresh.role }
+			user: { id: fresh.id, email: fresh.email, role: fresh.role },
 		}
 	}
 
 	async login(email: string, password: string) {
-		// ИСПРАВЛЕНИЕ: валидируем пользователя через отдельный метод
 		const user = await this.validateUser(email, password)
-		
-		// ИСПРАВЛЕНИЕ: возвращаем только пользователя, токены будут выданы после MFA
+
 		return {
-			user: { id: user.id, email: user.email, role: user.role }
+			user: { id: user.id, email: user.email, role: user.role },
 		}
 	}
 
@@ -100,15 +123,14 @@ export class AuthService {
 	public async validateUser(email: string, password: string): Promise<User> {
 		const user = await this.users.findByEmailWithHash(email)
 		if (!user || !user.passwordHash) {
+			// Не раскрываем факт существования учётки без пароля — это обрабатывает контроллер /auth/login
 			throw new UnauthorizedException('Invalid credentials')
 		}
 		const ok = await bcrypt.compare(password, user.passwordHash)
 		if (!ok) throw new UnauthorizedException('Invalid credentials')
-		
-		// Обновляем роль если нужно
+
 		await this.users.ensureAdminRoleFor(email)
-		
-		// Перезагружаем пользователя чтобы получить актуальные данные
+
 		return await this.users.findByEmailOrFail(email)
 	}
 
@@ -174,8 +196,13 @@ export class AuthService {
 		return { expires }
 	}
 
-	/** Проверка кода + выдача нормальных токенов */
-	public async verifyEmailCode(userId: string, email: string, code: string) {
+	/** Проверка кода + (опционально) установка пароля + выдача токенов */
+	public async verifyEmailCode(
+		userId: string,
+		email: string,
+		code: string,
+		newPassword?: string
+	) {
 		const rec = await this.emailCodeRepo.findOne({
 			where: { userId, email, used: false },
 			order: { createdAt: 'DESC' },
@@ -190,6 +217,15 @@ export class AuthService {
 		const user = await this.users.findById(userId)
 		if (!user) throw new UnauthorizedException('User not found')
 
+		// Если пароль ещё не задан — можно задать прямо сейчас
+		if (!user.passwordHash && newPassword) {
+			if (newPassword.length < 8) {
+				throw new BadRequestException('Password must be at least 8 characters')
+			}
+			user.passwordHash = await bcrypt.hash(newPassword, 10)
+			await this.users.save(user)
+		}
+
 		const access = this.signAccess(user)
 		const { plain: refreshToken, expires: refreshExpires } =
 			await this.issueRefresh(user.id)
@@ -200,5 +236,65 @@ export class AuthService {
 			refreshToken,
 			refreshExpires,
 		}
+	}
+
+	// ===== OAuth helpers =====
+
+	/** Найти привязку OAuth (provider+sub) */
+	private findOAuth(provider: 'google', providerUserId: string) {
+		return this.oaRepo.findOne({
+			where: { provider, providerUserId },
+		})
+	}
+
+	/** Создать/обновить привязку OAuth к userId (идемпотентно) */
+	public async linkGoogleAccount(userId: string, sub: string, email: string) {
+		const existing = await this.findOAuth('google', sub)
+		if (existing && existing.userId === userId) return existing
+		if (existing && existing.userId !== userId) {
+			// Защитимся от попытки «перехвата» чужого Google sub
+			throw new UnauthorizedException('This Google account is linked elsewhere')
+		}
+		const rec = this.oaRepo.create({
+			provider: 'google',
+			providerUserId: sub,
+			email: email.toLowerCase(),
+			userId,
+		})
+		return this.oaRepo.save(rec)
+	}
+
+	/**
+	 * Логика «find or create» по Google:
+	 * 1) если есть привязка по (provider, sub) — берём этого пользователя
+	 * 2) иначе, если есть пользователь по email — линкуем его
+	 * 3) иначе — создаём нового пользователя (без пароля) и линкуем
+	 */
+	public async findOrCreateUserByGoogle(
+		sub: string,
+		email: string
+	): Promise<User> {
+		const bySub = await this.findOAuth('google', sub)
+		if (bySub) {
+			const u = await this.users.findById(bySub.userId)
+			if (!u) throw new UnauthorizedException('Linked user not found')
+			// опционально можно синкать email
+			return u
+		}
+
+		const byEmail = await this.users.findByEmail(email)
+		if (byEmail) {
+			await this.linkGoogleAccount(byEmail.id, sub, email)
+			return byEmail
+		}
+
+		// создаём нового «oauth-only» пользователя
+		const created = await this.users.create({
+			email: email.toLowerCase(),
+			passwordHash: null,
+			role: 'user',
+		})
+		await this.linkGoogleAccount(created.id, sub, email)
+		return created
 	}
 }

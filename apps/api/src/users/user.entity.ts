@@ -1,3 +1,4 @@
+// apps/api/src/users/user.entity.ts
 import {
 	Column,
 	CreateDateColumn,
@@ -16,15 +17,18 @@ export class User {
 	@Column({ type: 'citext', unique: true })
 	email!: string
 
-	// в БД колонка password_hash
-	@Column({ name: 'password_hash', type: 'text', select: false })
-	passwordHash!: string
+	// может быть NULL для "oauth-only" учёток
+	@Column({
+		name: 'password_hash',
+		type: 'text',
+		select: false,
+		nullable: true,
+	})
+	passwordHash!: string | null
 
-	// в БД колонка telegram_id
 	@Column({ name: 'telegram_id', type: 'text', nullable: true })
 	telegramId!: string | null
 
-	// только две роли
 	@Column({ type: 'text', default: 'user' })
 	role!: 'user' | 'admin'
 

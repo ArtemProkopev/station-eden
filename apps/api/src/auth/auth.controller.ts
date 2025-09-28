@@ -21,7 +21,7 @@ import { AuthService } from './auth.service'
 import { LoginDto } from './dto/login.dto'
 import { RegisterDto } from './dto/register.dto'
 
-type GoogleMode = 'login' | 'register'
+type GoogleMode = 'login' | 'register' | 'link'
 
 @Controller('auth')
 export class AuthController {
@@ -32,7 +32,7 @@ export class AuthController {
 
 	/** Общие опции для auth-кук (access/refresh) */
 	private authCookieOpts() {
-		return getCookieOptions(true) // httpOnly=true, dev/prod атрибуты подтягиваются автоматически
+		return getCookieOptions(true)
 	}
 
 	/** Короткоживущие куки (preauth/state), 10 минут */
@@ -95,7 +95,32 @@ export class AuthController {
 		@Body() dto: LoginDto,
 		@Res({ passthrough: true }) res: Response
 	) {
-		const result = await this.auth.login(dto.email.toLowerCase(), dto.password)
+		const email = dto.email.toLowerCase()
+
+		// ⚠️ Новый кейс: учётка существует, но пароль ещё не задан (oauth-only).
+		// Тогда не ругаемся на «Invalid credentials», а предлагаем задать пароль:
+		const existing = await this.auth['users'].findByEmailWithHash(email)
+		if (existing && !existing.passwordHash) {
+			// preauth без проверки пароля
+			const pre = this.auth.signPreauth(existing.id, existing.email)
+			res.cookie('preauth', pre, this.preauthCookieOpts())
+
+			try {
+				await this.auth.startEmailMfa(existing.id, existing.email)
+			} catch (e) {
+				console.error('[login:oath-only] startEmailMfa failed', e)
+			}
+
+			// фронту сигнал: нужно подтвердить email-код и задать новый пароль
+			return {
+				mfa: 'email_code_sent',
+				email: existing.email,
+				needSetPassword: true,
+			}
+		}
+
+		// Обычный сценарий логина по паролю
+		const result = await this.auth.login(email, dto.password)
 
 		// preauth вместо полноценных токенов
 		const pre = this.auth.signPreauth(result.user.id, result.user.email)
@@ -175,13 +200,13 @@ export class AuthController {
 		return { userId: (req.user as any).sub, email: (req.user as any).email }
 	}
 
-	// ===== Подтверждение e-mail кодом =====
+	// ===== Подтверждение e-mail кодом (+ опциональная установка пароля) =====
 
 	@UseGuards(ThrottlerGuard)
 	@Throttle({ default: { limit: 10, ttl: 300000 } })
 	@Post('verify-email-code')
 	async verifyEmailCode(
-		@Body() body: { code: string; email?: string },
+		@Body() body: { code: string; email?: string; newPassword?: string },
 		@Req() req: Request,
 		@Res({ passthrough: true }) res: Response
 	) {
@@ -201,7 +226,12 @@ export class AuthController {
 		}
 
 		const { user, access, refreshToken, refreshExpires } =
-			await this.auth.verifyEmailCode(payload.sub, email, body.code)
+			await this.auth.verifyEmailCode(
+				payload.sub,
+				email,
+				body.code,
+				body.newPassword
+			)
 
 		res.cookie('access_token', access, {
 			...this.authCookieOpts(),
@@ -319,53 +349,40 @@ export class AuthController {
 		const payload = ticket.getPayload()
 		const email = payload?.email?.toLowerCase()
 		const emailVerified = payload?.email_verified
-		if (!email || !emailVerified) {
-			res.status(401).send('Google email not verified')
+		const sub = String(payload?.sub || '')
+		if (!email || !emailVerified || !sub) {
+			res.status(401).send('Google email not verified or sub missing')
 			return
 		}
 
-		// Логика login/register
-		let user = await this.auth['users'].findByEmail(email)
-		if (mode === 'login') {
-			if (!user) {
-				res.redirect(this.urlTo('/login?reason=google_no_account'))
-				return
-			}
-		} else {
-			if (user) {
-				res.redirect(this.urlTo('/login?reason=google_exists'))
-				return
-			}
-			user = await this.auth['users'].create({ email, passwordHash: 'google' })
-		}
+		// Логика find-or-create через таблицу oauth_accounts
+		const user = await this.auth.findOrCreateUserByGoogle(sub, email)
 
-		await this.auth['users'].ensureAdminRoleFor(email)
+		await this.auth['users'].ensureAdminRoleFor(user.email)
 
-		// preauth + (пытаемся отправить письмо) + всегда редиректим на verify
-		const pre = this.auth.signPreauth(user!.id, user!.email)
+		const pre = this.auth.signPreauth(user.id, user.email)
 		res.cookie('preauth', pre, this.preauthCookieOpts())
 
 		try {
-			await this.auth.startEmailMfa(user!.id, user!.email)
+			await this.auth.startEmailMfa(user.id, user.email)
 		} catch (e) {
 			console.error('[google] startEmailMfa failed', e)
 		}
 
 		const verifyUrl = this.urlTo(
-			`/login/verify?email=${encodeURIComponent(user!.email)}`
+			`/login/verify?email=${encodeURIComponent(user.email)}`
 		)
 		res.redirect(verifyUrl)
 		return
 	}
 
-	// --- DEV: удобно подсмотреть последний код (если MAIL_DEV_MODE=store) ---
+	// --- DEV helper ---
 	@Get('dev/peek-email-code')
 	devPeek(@Req() req: Request) {
 		if (process.env.NODE_ENV === 'production') {
 			return { ok: false, reason: 'not-available-in-production' }
 		}
 
-		// Доп. защита эндпоинта секретом
 		const required = (process.env.DEV_EMAIL_PEEK_SECRET || '').trim()
 		const provided = (req.get('x-dev-secret') || '').trim()
 		if (required && provided !== required) {

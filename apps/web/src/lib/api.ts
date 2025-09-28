@@ -1,4 +1,4 @@
-// apps/web/src/lib/api.ts - ИСПРАВЛЕННАЯ ВЕРСИЯ (распаковка { ok, data } + дружелюбные ошибки)
+// apps/web/src/lib/api.ts - обновлено: verifyEmailCode(newPassword?)
 import { getCsrfToken } from './csrf'
 import {
 	ApiError,
@@ -10,7 +10,6 @@ import {
 const API = process.env.NEXT_PUBLIC_API_BASE || 'https://api.stationeden.ru'
 const CSRF_NAME = process.env.NEXT_PUBLIC_CSRF_COOKIE_NAME || 'se_csrf'
 
-/** Унифицированная распаковка ответов: если есть оболочка { ok, data }, возвращаем data */
 function unwrap<T = any>(resp: any): T {
 	if (resp && typeof resp === 'object' && 'data' in resp) {
 		return (resp as any).data as T
@@ -28,42 +27,28 @@ async function safeJson(text: string | null): Promise<any | undefined> {
 }
 
 async function ensureCsrfToken(): Promise<string> {
-	// Запрос чтобы установить куку и получить токен
 	const response = await fetch(`${API}/auth/csrf`, {
 		method: 'GET',
 		credentials: 'include',
 		cache: 'no-store',
 	})
-
-	// Дадим браузеру время записать куку
 	await new Promise(r => setTimeout(r, 100))
 	const tokenFromCookie = getCsrfToken(CSRF_NAME)
 	if (tokenFromCookie) return tokenFromCookie
-
-	// Если кука не установилась, читаем токен из тела ответа (возможна обёртка { ok, data: { csrf } })
 	try {
 		const data = (await response.json().catch(() => undefined)) as any
 		const tokenFromBody = data?.data?.csrf ?? data?.csrf
 		if (typeof tokenFromBody === 'string' && tokenFromBody) return tokenFromBody
-	} catch {
-		/* ignore */
-	}
-
+	} catch {}
 	throw new Error('CSRF token not available')
 }
 
-/** Единая обработка ошибок HTTP -> ApiError с userMessage */
 async function throwHttpAsApiError(res: Response, context: ErrorContext) {
 	const contentType = res.headers.get('content-type') || ''
 	const raw = await res.text().catch(() => '')
 	const json = contentType.includes('application/json')
 		? await safeJson(raw)
 		: await safeJson(raw)
-
-	// Популярные форматы NestJS/вашего API:
-	// { ok:false, data?:..., message?, error?, statusCode?, code? }
-	// { message: 'Invalid credentials', error: 'Unauthorized', statusCode: 401 }
-	// Любая другая строка — тоже парсим и используем как serverMessage.
 
 	const serverMessage =
 		(Array.isArray(json?.message) ? json?.message?.[0] : json?.message) ??
@@ -154,7 +139,7 @@ async function deleteJSON<T = any>(
 export const api = {
 	// Аутентификация / MFA
 	login: (email: string, password: string) =>
-		postJSON<{ mfa?: string; email?: string }>(
+		postJSON<{ mfa?: string; email?: string; needSetPassword?: boolean }>(
 			'/auth/login',
 			{ email, password },
 			'login'
@@ -167,8 +152,13 @@ export const api = {
 			'register'
 		),
 
-	verifyEmailCode: (code: string, email?: string) =>
-		postJSON('/auth/verify-email-code', { code, email }, 'login'),
+	// ⬇️ теперь можно передать новый пароль
+	verifyEmailCode: (code: string, email?: string, newPassword?: string) =>
+		postJSON(
+			'/auth/verify-email-code',
+			{ code, email, ...(newPassword ? { newPassword } : {}) },
+			'login'
+		),
 
 	resendEmailCode: () => postJSON('/auth/resend-email-code', {}, 'login'),
 
@@ -187,4 +177,4 @@ export const api = {
 		deleteJSON(`/users/${encodeURIComponent(id)}`, 'default'),
 }
 
-export { getUserMessage } // чтобы удобно импортить на страницах
+export { getUserMessage }

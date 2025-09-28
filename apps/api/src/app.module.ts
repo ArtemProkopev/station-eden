@@ -9,6 +9,7 @@ import * as path from 'path'
 
 import { AuthModule } from './auth/auth.module'
 import { EmailCode } from './auth/email-code.entity'
+import { OAuthAccount } from './auth/oauth-account.entity'
 import { RefreshToken } from './auth/refresh-token.entity'
 import { NotFoundExceptionFilter } from './common/filters/not-found.filter'
 import { EnvSchema } from './config/env.schema'
@@ -57,7 +58,7 @@ function resolveEnvPaths(): string[] {
 					return {
 						type: 'postgres' as const,
 						url: dbUrl,
-						entities: [User, RefreshToken, EmailCode],
+						entities: [User, RefreshToken, EmailCode, OAuthAccount],
 						synchronize: false,
 					}
 				}
@@ -71,7 +72,7 @@ function resolveEnvPaths(): string[] {
 						cfg.get<string>('POSTGRES_PASSWORD') ??
 						process.env.POSTGRES_PASSWORD,
 					database: cfg.get<string>('POSTGRES_DB') ?? process.env.POSTGRES_DB,
-					entities: [User, RefreshToken, EmailCode],
+					entities: [User, RefreshToken, EmailCode, OAuthAccount],
 					synchronize: false,
 				}
 			},
@@ -81,12 +82,6 @@ function resolveEnvPaths(): string[] {
 		AuthModule,
 		UsersModule,
 	],
-	providers: [
-		// глобальная обработка 404 ошибок
-		{
-			provide: APP_FILTER,
-			useClass: NotFoundExceptionFilter,
-		},
-	],
+	providers: [{ provide: APP_FILTER, useClass: NotFoundExceptionFilter }],
 })
 export class AppModule {}

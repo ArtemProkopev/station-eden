@@ -6,6 +6,7 @@ import 'reflect-metadata'
 import { DataSource } from 'typeorm'
 
 import { EmailCode } from '../auth/email-code.entity'
+import { OAuthAccount } from '../auth/oauth-account.entity'
 import { RefreshToken } from '../auth/refresh-token.entity'
 import { EnvSchema } from '../config/env.schema'
 import { User } from '../users/user.entity'
@@ -23,7 +24,7 @@ const env = parsed.data
 
 const base = {
 	type: 'postgres' as const,
-	entities: [User, RefreshToken, EmailCode],
+	entities: [User, RefreshToken, EmailCode, OAuthAccount],
 	migrations: [path.join(__dirname, '../../migrations/*{.ts,.js}')],
 	synchronize: false,
 	extra: { connectionTimeoutMillis: 10_000, max: 10 },
@@ -34,7 +35,7 @@ const dataSource = env.DATABASE_URL
 			...base,
 			url: env.DATABASE_URL,
 			ssl: { rejectUnauthorized: false },
-	  })
+		})
 	: new DataSource({
 			...base,
 			host: env.POSTGRES_HOST!,
@@ -43,6 +44,6 @@ const dataSource = env.DATABASE_URL
 			password: env.POSTGRES_PASSWORD!,
 			database: env.POSTGRES_DB!,
 			ssl: false,
-	  })
+		})
 
 export default dataSource
