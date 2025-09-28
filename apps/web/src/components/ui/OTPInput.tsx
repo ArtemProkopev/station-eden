@@ -57,6 +57,7 @@ const OTPInput = forwardRef<OTPInputHandle, OTPInputProps>(function OTPInput(
 ) {
 	const rid = useId()
 	const inputId = id || `otp-${rid}`
+
 	const [internal, setInternal] = useState<string>(
 		clampDigits(value ?? '', length)
 	)
@@ -154,10 +155,8 @@ const OTPInput = forwardRef<OTPInputHandle, OTPInputProps>(function OTPInput(
 			onPaste={onPasteAny}
 			role='group'
 			aria-label={ariaLabel}
-			/* передаём количество слотов в CSS-переменную для grid */
-			style={{ ['--len' as any]: String(length) }}
+			style={{ ['--len' as any]: String(length) } as React.CSSProperties}
 		>
-			{/* Скрытое реальное поле ввода */}
 			<input
 				ref={inputRef}
 				id={inputId}
@@ -175,10 +174,9 @@ const OTPInput = forwardRef<OTPInputHandle, OTPInputProps>(function OTPInput(
 				aria-label={ariaLabel}
 			/>
 
-			{/* Фоновая анимация */}
 			<div className={styles.liquid} aria-hidden />
 
-			{/* Трек из слотов */}
+			{/* Горизонтальный ряд слотов */}
 			<div className={styles.track}>
 				{digitsArray.map((d, i) => {
 					const isActive = i === activeIndex && val.length < length

@@ -1,0 +1,342 @@
+/* sr-only */
+.sr-only {
+	position: absolute !important;
+	width: 1px !important;
+	height: 1px !important;
+	padding: 0 !important;
+	margin: -1px !important;
+	overflow: hidden !important;
+	clip: rect(0, 0, 0, 0) !important;
+	white-space: nowrap !important;
+	border: 0 !important;
+}
+
+/* фон */
+.bg {
+	position: fixed;
+	inset: 0;
+	z-index: 0;
+	background-image: url('/login-background.png');
+	background-size: cover;
+	background-position: center;
+}
+
+/* контейнер */
+.container {
+	min-height: 100vh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
+	font-family: 'Nunito', sans-serif;
+	position: relative;
+	z-index: 1;
+}
+
+/* карточка */
+.card {
+	--placeholder: rgba(255, 255, 255, 0.75);
+	background: #4740a8;
+	padding: 2.5rem;
+	border-radius: 36px;
+	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+	backdrop-filter: blur(12px);
+	max-width: 520px;
+	width: 100%;
+	text-align: center;
+	border: 4px solid #201f5c;
+	position: relative;
+	overflow: hidden;
+	animation: se-fade-in-up 320ms ease-out both;
+	animation-delay: 40ms;
+}
+.card::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: 36px;
+	padding: 4px;
+	background: linear-gradient(to bottom, #6a5bc4, #4f47a6);
+	mask:
+		linear-gradient(#000 0 0) content-box,
+		linear-gradient(#000 0 0);
+	-webkit-mask:
+		linear-gradient(#000 0 0) content-box,
+		linear-gradient(#000 0 0);
+	mask-composite: exclude;
+	-webkit-mask-composite: xor;
+	pointer-events: none;
+}
+
+/* заголовок */
+.title {
+	margin: 0 0 12px 0;
+	font-size: 28px;
+	color: #fff;
+	font-family: 'RussoOne', sans-serif;
+	-webkit-text-stroke: 1.5px #7050d5;
+	paint-order: stroke fill;
+	text-shadow: 0 2px 0 #7050d5;
+}
+
+/* лид */
+.lead {
+	margin: 6px 0 14px;
+	color: #fff;
+	opacity: 0.95;
+}
+
+/* форма */
+.form {
+	display: grid;
+	gap: 1.5rem;
+	animation: se-fade-in-up 320ms ease-out both;
+	animation-delay: 80ms;
+}
+.isShaking {
+	animation: se-shake-x 320ms ease-out;
+}
+.fieldset {
+	border: 0;
+	margin: 0;
+	padding: 0;
+	min-inline-size: 0;
+}
+.inputGroup {
+	text-align: left;
+	animation: se-fade-in-up 320ms ease-out both;
+}
+.inputGroup + .inputGroup {
+	margin-top: 4px;
+}
+
+/* обёртка и инпут пароля */
+.inputWrap {
+	position: relative;
+}
+.input {
+	padding: 14px 64px 14px 16px;
+	border: 4px solid #201f5c;
+	border-radius: 8px;
+	font-size: 16px;
+	width: 100%;
+	transition:
+		border-color 0.2s,
+		box-shadow 0.2s,
+		transform 0.12s ease;
+	background-color: #2c2b7b;
+	color: #fff;
+	font-family: 'Nunito', sans-serif;
+}
+.input::placeholder {
+	color: var(--placeholder);
+	opacity: 1;
+}
+.input:focus {
+	outline: none;
+	border-color: #6f59d6;
+	box-shadow: 0 0 0 3px rgba(205, 141, 238, 0.2);
+}
+
+/* метка */
+.label {
+	display: block;
+	font-size: 14px;
+	font-weight: 600;
+	margin-bottom: 8px;
+	color: #fff;
+	font-family: 'RussoOne', sans-serif;
+}
+
+/* кнопка-глаз */
+.toggleBtn {
+	position: absolute;
+	top: 50%;
+	right: 10px;
+	transform: translateY(-50%);
+	width: 40px;
+	height: 40px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 0;
+	background: transparent;
+	color: var(--placeholder);
+	opacity: 0.95;
+	cursor: pointer;
+	border-radius: 8px;
+	transition:
+		opacity 0.15s ease,
+		transform 0.08s ease,
+		background 0.12s ease;
+}
+.toggleBtn:hover {
+	opacity: 1;
+	background: rgba(255, 255, 255, 0.06);
+}
+.toggleBtn:active {
+	transform: translateY(-50%) scale(0.98);
+}
+.toggleBtn:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px rgba(205, 141, 238, 0.35);
+	border-radius: 8px;
+}
+
+/* ===== OTP =====
+   НИЧЕГО не переопределяем по layout у корня компонента.
+   Только переменные размеров + базовый блочный бокс. */
+.otp {
+	display: block; /* корневой див ведёт себя как обычный блок */
+	width: 100%;
+	/* тонкая настройка размеров слотов компонента */
+	--slot-size: clamp(36px, 6vw, 56px);
+	--slot-gap: 10px;
+}
+
+/* кнопка */
+.button {
+	padding: 14px;
+	background: #8b66e7;
+	color: #fff;
+	border: 2px solid #7050d5;
+	border-radius: 36px;
+	font-size: 20px;
+	font-weight: 700;
+	cursor: pointer;
+	width: 100%;
+	letter-spacing: 0.5px;
+	font-family: 'RussoOne', sans-serif;
+	-webkit-text-stroke: 1.5px #7050d5;
+	paint-order: stroke fill;
+	text-shadow: 0 2px 0 #7050d5;
+	box-shadow:
+		0 6px 0 #5a3fb5,
+		0 8px 10px rgba(0, 0, 0, 0.2),
+		inset 0 6px 0 #cd8dee;
+	transition: all 0.1s ease;
+	position: relative;
+	top: 0;
+	animation: se-fade-in-up 320ms ease-out both;
+	animation-delay: 240ms;
+}
+.button:hover {
+	background: #7a5ad6;
+	box-shadow:
+		0 4px 0 #5a3fb5,
+		0 6px 8px rgba(0, 0, 0, 0.15),
+		inset 0 6px 0 #cd8dee;
+	top: 2px;
+}
+.button:active {
+	background: #6a4ec5;
+	box-shadow:
+		0 2px 0 #5a3fb5,
+		0 4px 6px rgba(0, 0, 0, 0.1),
+		inset 0 6px 0 #cd8dee;
+	top: 4px;
+	transform: translateY(2px);
+}
+.button:disabled,
+.button[aria-disabled='true'],
+.button:disabled:hover,
+.button[aria-disabled='true']:hover,
+.button:disabled:active,
+.button[aria-disabled='true']:active {
+	opacity: 0.6;
+	cursor: not-allowed;
+	background: #8b66e7;
+	border: 2px solid #7050d5;
+	text-shadow: 0 2px 0 #7050d5;
+	box-shadow:
+		0 6px 0 #5a3fb5,
+		0 8px 10px rgba(0, 0, 0, 0.2),
+		inset 0 6px 0 #cd8dee;
+	top: 0;
+	transform: none;
+}
+
+/* сообщения */
+.ok {
+	color: #b5ffcf;
+	margin-top: 1rem;
+	font-family: 'Nunito', sans-serif;
+}
+.error {
+	color: #ffd5d5;
+	margin-top: 1rem;
+	font-family: 'Nunito', sans-serif;
+}
+.helper {
+	margin-top: 12px;
+	color: #fff;
+	opacity: 0.95;
+}
+
+/* линк-кнопка */
+.linkButton {
+	background: transparent;
+	border: 0;
+	padding: 0;
+	color: #cd8dee;
+	text-decoration: none;
+	font-weight: 600;
+	font-family: 'Nunito', sans-serif;
+	cursor: pointer;
+}
+.linkButton:hover {
+	text-decoration: underline;
+}
+
+/* motion-safe */
+@media (prefers-reduced-motion: no-preference) {
+	@keyframes se-fade-in-up {
+		from {
+			opacity: 0;
+			transform: translateY(8px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+	@keyframes se-shake-x {
+		0%,
+		100% {
+			transform: translateX(0);
+		}
+		20% {
+			transform: translateX(-4px);
+		}
+		40% {
+			transform: translateX(4px);
+		}
+		60% {
+			transform: translateX(-3px);
+		}
+		80% {
+			transform: translateX(2px);
+		}
+	}
+}
+
+/* адаптив */
+@media (max-width: 520px) {
+	.card {
+		padding: 2rem;
+	}
+	.title {
+		font-size: 24px;
+	}
+}
+@media (max-width: 360px) {
+	.card {
+		padding: 1.5rem;
+	}
+	.title {
+		font-size: 22px;
+	}
+	.button {
+		font-size: 18px;
+	}
+}
