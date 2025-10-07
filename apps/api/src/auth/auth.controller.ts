@@ -95,34 +95,48 @@ export class AuthController {
 		@Body() dto: LoginDto,
 		@Res({ passthrough: true }) res: Response
 	) {
-		const email = dto.email.toLowerCase()
+		const login = dto.login.trim().toLowerCase()
+		const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(login)
 
-		// ⚠️ Новый кейс: учётка существует, но пароль ещё не задан (oauth-only).
-		// Тогда не ругаемся на «Invalid credentials», а предлагаем задать пароль:
-		const existing = await this.auth['users'].findByEmailWithHash(email)
-		if (existing && !existing.passwordHash) {
-			// preauth без проверки пароля
-			const pre = this.auth.signPreauth(existing.id, existing.email)
-			res.cookie('preauth', pre, this.preauthCookieOpts())
-
-			try {
-				await this.auth.startEmailMfa(existing.id, existing.email)
-			} catch (e) {
-				console.error('[login:oath-only] startEmailMfa failed', e)
+		// ⚠️ oauth-only обработка для email
+		if (isEmail) {
+			const existing = await this.auth['users'].findByEmailWithHash(login)
+			if (existing && !existing.passwordHash) {
+				const pre = this.auth.signPreauth(existing.id, existing.email)
+				res.cookie('preauth', pre, this.preauthCookieOpts())
+				try {
+					await this.auth.startEmailMfa(existing.id, existing.email)
+				} catch (e) {
+					console.error('[login:oath-only] startEmailMfa failed', e)
+				}
+				return {
+					mfa: 'email_code_sent',
+					email: existing.email,
+					needSetPassword: true,
+				}
 			}
-
-			// фронту сигнал: нужно подтвердить email-код и задать новый пароль
-			return {
-				mfa: 'email_code_sent',
-				email: existing.email,
-				needSetPassword: true,
+		} else {
+			// ⬇️ аналогичная обработка для oauth-only при логине по username
+			const byUsername = await this.auth['users'].findByUsernameWithHash(login)
+			if (byUsername && !byUsername.passwordHash) {
+				const pre = this.auth.signPreauth(byUsername.id, byUsername.email)
+				res.cookie('preauth', pre, this.preauthCookieOpts())
+				try {
+					await this.auth.startEmailMfa(byUsername.id, byUsername.email)
+				} catch (e) {
+					console.error('[login:oath-only-username] startEmailMfa failed', e)
+				}
+				return {
+					mfa: 'email_code_sent',
+					email: byUsername.email,
+					needSetPassword: true,
+				}
 			}
 		}
 
-		// Обычный сценарий логина по паролю
-		const result = await this.auth.login(email, dto.password)
+		// Обычный сценарий логина по паролю (login = email ИЛИ username)
+		const result = await this.auth.login(login, dto.password)
 
-		// preauth вместо полноценных токенов
 		const pre = this.auth.signPreauth(result.user.id, result.user.email)
 		res.cookie('preauth', pre, this.preauthCookieOpts())
 
@@ -142,6 +156,7 @@ export class AuthController {
 	) {
 		const result = await this.auth.register(
 			dto.email.toLowerCase(),
+			dto.username,
 			dto.password
 		)
 		const pre = this.auth.signPreauth(result.user.id, result.user.email)
@@ -197,7 +212,11 @@ export class AuthController {
 	@UseGuards(JwtAuthGuard)
 	@Get('me')
 	me(@Req() req: Request & { user?: any }) {
-		return { userId: (req.user as any).sub, email: (req.user as any).email }
+		return {
+			userId: (req.user as any).sub,
+			email: (req.user as any).email,
+			username: (req.user as any).username,
+		}
 	}
 
 	// ===== Подтверждение e-mail кодом (+ опциональная установка пароля) =====

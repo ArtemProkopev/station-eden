@@ -1,4 +1,3 @@
-// apps/api/src/users/users.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
@@ -27,16 +26,59 @@ export class UsersService {
 		return this.repo.findOne({ where: { id } })
 	}
 
-	findByEmail(email: string) {
-		return this.repo.findOne({ where: { email } })
+	async findByIdOrFail(id: string): Promise<User> {
+		const user = await this.findById(id)
+		if (!user) {
+			throw new NotFoundException(`Пользователь с ID ${id} не найден`)
+		}
+		return user
 	}
 
+	findByEmail(email: string) {
+		return this.repo.findOne({ where: { email: email.toLowerCase() } })
+	}
+
+	async findByEmailOrFail(email: string): Promise<User> {
+		const user = await this.findByEmail(email)
+		if (!user) {
+			throw new NotFoundException(`Пользователь с email ${email} не найден`)
+		}
+		return user
+	}
+
+	// для логина по email: получить вместе с passwordHash
 	findByEmailWithHash(email: string) {
 		return this.repo
 			.createQueryBuilder('u')
 			.addSelect('u.passwordHash')
-			.where('u.email = :email', { email })
+			.where('u.email = :email', { email: email.toLowerCase() })
 			.getOne()
+	}
+
+	// === username ===
+	findByUsername(username: string) {
+		return this.repo.findOne({
+			where: { username: username.toLowerCase() },
+		})
+	}
+
+	// для логина по username: тоже забираем passwordHash (он select:false)
+	findByUsernameWithHash(username: string) {
+		return this.repo
+			.createQueryBuilder('u')
+			.addSelect('u.passwordHash')
+			.where('LOWER(u.username) = :username', {
+				username: username.toLowerCase(),
+			})
+			.getOne()
+	}
+
+	async findByUsernameOrFail(username: string): Promise<User> {
+		const user = await this.findByUsername(username)
+		if (!user) {
+			throw new NotFoundException(`Пользователь @${username} не найден`)
+		}
+		return user
 	}
 
 	async create(data: Partial<User>) {
@@ -50,23 +92,6 @@ export class UsersService {
 	async removeById(id: string) {
 		const res = await this.repo.delete(id)
 		if (!res.affected) throw new NotFoundException('User not found')
-	}
-
-	// ДОБАВИТЬ ЭТУ ФУНКЦИЮ для явной проверки существования пользователя
-	async findByIdOrFail(id: string): Promise<User> {
-		const user = await this.findById(id)
-		if (!user) {
-			throw new NotFoundException(`Пользователь с ID ${id} не найден`)
-		}
-		return user
-	}
-
-	async findByEmailOrFail(email: string): Promise<User> {
-		const user = await this.findByEmail(email)
-		if (!user) {
-			throw new NotFoundException(`Пользователь с email ${email} не найден`)
-		}
-		return user
 	}
 
 	/**

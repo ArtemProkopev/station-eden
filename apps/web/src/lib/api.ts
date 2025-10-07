@@ -1,4 +1,4 @@
-// apps/web/src/lib/api.ts - обновлено: verifyEmailCode(newPassword?)
+// apps/web/src/lib/api.ts - обновлено: login(login), register(email, username, password)
 import { getCsrfToken } from './csrf'
 import {
 	ApiError,
@@ -138,21 +138,23 @@ async function deleteJSON<T = any>(
 
 export const api = {
 	// Аутентификация / MFA
-	login: (email: string, password: string) =>
+	// login: теперь принимает login (email или username)
+	login: (login: string, password: string) =>
 		postJSON<{ mfa?: string; email?: string; needSetPassword?: boolean }>(
 			'/auth/login',
-			{ email, password },
+			{ login, password },
 			'login'
 		),
 
-	register: (email: string, password: string) =>
+	// register: добавить username
+	register: (email: string, username: string, password: string) =>
 		postJSON<{ mfa?: string; email?: string }>(
 			'/auth/register',
-			{ email, password },
+			{ email, username, password },
 			'register'
 		),
 
-	// ⬇️ теперь можно передать новый пароль
+	// ⬇️ verifyEmailCode(newPassword?) без изменений
 	verifyEmailCode: (code: string, email?: string, newPassword?: string) =>
 		postJSON(
 			'/auth/verify-email-code',

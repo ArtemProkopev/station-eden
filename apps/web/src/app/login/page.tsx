@@ -50,7 +50,7 @@ function EyeOffIcon() {
 }
 
 function LoginInner() {
-	const [email, setEmail] = useState('')
+	const [login, setLogin] = useState('') // email ИЛИ username
 	const [password, setPassword] = useState('')
 	const [show, setShow] = useState(false)
 
@@ -67,10 +67,13 @@ function LoginInner() {
 	useEffect(() => setMounted(true), [])
 
 	const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+	const userRe = /^[a-zA-Z0-9_]{3,20}$/
+	const isLoginValid = emailRe.test(login) || userRe.test(login)
+
 	const canSubmit = useMemo(() => {
 		if (busy) return false
-		return emailRe.test(email) && password.length >= 8
-	}, [busy, email, password.length])
+		return isLoginValid && password.length >= 8
+	}, [busy, isLoginValid, password.length])
 
 	async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
 		e.preventDefault()
@@ -82,11 +85,12 @@ function LoginInner() {
 		setError(null)
 		setBusy(true)
 		try {
-			const res = await api.login(email, password)
+			const res = await api.login(login, password)
 			if ((res as any)?.mfa === 'email_code_sent') {
 				const needSet = (res as any)?.needSetPassword === true
 				const q = new URLSearchParams({
-					email,
+					// если логин был username — бэкенд вернёт email в ответе
+					email: (res as any)?.email || '',
 					next,
 					...(needSet ? { mode: 'set_password' } : {}),
 				})
@@ -136,26 +140,23 @@ function LoginInner() {
 						aria-describedby={error ? 'login-error' : undefined}
 					>
 						<div className={styles.inputGroup}>
-							<label htmlFor='email' className={styles.label}>
-								Email
+							<label htmlFor='login' className={styles.label}>
+								Email или username
 							</label>
 							<input
-								id='email'
-								name='email'
+								id='login'
+								name='login'
 								required
-								type='email'
-								inputMode='email'
+								type='text'
 								spellCheck={false}
 								autoCorrect='off'
 								autoCapitalize='none'
-								autoComplete='email'
-								placeholder='Введите свой email'
-								value={email}
-								onChange={e => setEmail(e.target.value.trimStart())}
+								autoComplete='username email'
+								placeholder='Введите email или username'
+								value={login}
+								onChange={e => setLogin(e.target.value.trimStart())}
 								className={styles.input}
-								aria-invalid={
-									email.length > 0 ? !emailRe.test(email) : undefined
-								}
+								aria-invalid={login.length > 0 ? !isLoginValid : undefined}
 							/>
 						</div>
 
@@ -217,7 +218,6 @@ function LoginInner() {
 
 					{mounted && googleEnabled && (
 						<>
-							{/* Разделитель с текстом внутри линии */}
 							<div
 								className={styles.hr}
 								role='separator'

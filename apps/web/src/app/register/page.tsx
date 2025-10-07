@@ -46,6 +46,8 @@ function EyeOffIcon() {
 }
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const userRe = /^[a-zA-Z0-9_]{3,20}$/ // 3–20, латиница/цифры/_
+
 const hasLower = (s: string) => /[a-z]/.test(s)
 const hasUpper = (s: string) => /[A-Z]/.test(s)
 const hasDigit = (s: string) => /\d/.test(s)
@@ -61,7 +63,6 @@ function measureStrength(pw: string): number {
 	if (hasSpecial(pw)) score++
 	return Math.min(5, Math.max(0, score))
 }
-
 function strengthMeta(score: number) {
 	const steps = [0, 20, 40, 65, 85, 100]
 	const labels = [
@@ -78,11 +79,13 @@ function strengthMeta(score: number) {
 
 export default function RegisterPage() {
 	const [email, setEmail] = useState('')
+	const [username, setUsername] = useState('') // ⬅️ новенькое
 	const [password, setPassword] = useState('')
 	const [confirm, setConfirm] = useState('')
 
-	// touched-флаги для корректного UX
+	// touched-флаги
 	const [emailTouched, setEmailTouched] = useState(false)
+	const [userTouched, setUserTouched] = useState(false)
 	const [pwTouched, setPwTouched] = useState(false)
 	const [confirmTouched, setConfirmTouched] = useState(false)
 
@@ -97,7 +100,6 @@ export default function RegisterPage() {
 
 	const sp = useSearchParams()
 	const reason = sp.get('reason')
-
 	const router = useRouter()
 
 	useEffect(() => setMounted(true), [])
@@ -105,11 +107,13 @@ export default function RegisterPage() {
 	const strength = useMemo(() => measureStrength(password), [password])
 	const { percent, label } = useMemo(() => strengthMeta(strength), [strength])
 
-	// минимальные правила для валидности, остальное — рекомендация
+	// валидации
 	const isEmailValid = emailRe.test(email)
+	const isUserValid = userRe.test(username)
 	const isPwValid = password.length >= 8
 	const match = confirm.length > 0 && confirm === password
-	const canSubmit = isEmailValid && isPwValid && match && !busy
+
+	const canSubmit = isEmailValid && isUserValid && isPwValid && match && !busy
 
 	function handleCapsLock(e: React.KeyboardEvent<HTMLInputElement>) {
 		const on =
@@ -129,18 +133,17 @@ export default function RegisterPage() {
 		setError(null)
 		setBusy(true)
 		try {
-			const res = await api.register(email, password)
+			// ⬇️ теперь передаём username
+			const res = await api.register(email, username, password)
 			if ((res as any)?.mfa === 'email_code_sent') {
 				router.replace(
-					`/login/verify?email=${encodeURIComponent(
-						email
-					)}&next=${encodeURIComponent('/profile')}`
+					`/login/verify?email=${encodeURIComponent(email)}&next=${encodeURIComponent('/profile')}`
 				)
 				return
 			}
 			throw new Error('Не удалось запустить подтверждение по почте')
 		} catch (err: any) {
-			setError(getUserMessage(err, 'register'))
+			setError(getUserMessage(err, 'register')) // сервер вернёт "Email already used"/"Username already used"
 			setShake(true)
 			setTimeout(() => setShake(false), 340)
 		} finally {
@@ -176,6 +179,7 @@ export default function RegisterPage() {
 						autoComplete='on'
 						aria-describedby={error ? 'form-error' : undefined}
 					>
+						{/* Email */}
 						<div className={styles.inputGroup}>
 							<label htmlFor='email' className={styles.label}>
 								Email
@@ -196,17 +200,42 @@ export default function RegisterPage() {
 									if (!emailTouched) setEmailTouched(true)
 									setEmail(e.target.value.trimStart())
 								}}
-								className={`${styles.input} ${
-									emailTouched
-										? isEmailValid
-											? styles.valid
-											: styles.invalid
-										: ''
-								}`}
+								className={`${styles.input} ${emailTouched ? (isEmailValid ? styles.valid : styles.invalid) : ''}`}
 								aria-invalid={emailTouched ? !isEmailValid : undefined}
 							/>
 						</div>
 
+						{/* Username */}
+						<div className={styles.inputGroup}>
+							<label htmlFor='username' className={styles.label}>
+								Username
+							</label>
+							<input
+								id='username'
+								name='username'
+								required
+								type='text'
+								inputMode='text'
+								spellCheck={false}
+								autoCorrect='off'
+								autoCapitalize='none'
+								autoComplete='username'
+								placeholder='Придумайте ник (3–20, a–Z, 0–9, _ )'
+								value={username}
+								onChange={e => {
+									if (!userTouched) setUserTouched(true)
+									setUsername(e.target.value.trim())
+								}}
+								className={`${styles.input} ${userTouched ? (isUserValid ? styles.valid : styles.invalid) : ''}`}
+								aria-invalid={userTouched ? !isUserValid : undefined}
+								aria-describedby='user-hint'
+							/>
+							<p id='user-hint' className={styles.pwHint}>
+								Доступны латиница, цифры и подчёркивание. Длина — 3–20 символов.
+							</p>
+						</div>
+
+						{/* Пароль */}
 						<div className={styles.inputGroup}>
 							<label htmlFor='password' className={styles.label}>
 								Пароль
@@ -227,9 +256,7 @@ export default function RegisterPage() {
 									}}
 									onKeyDown={handleCapsLock}
 									onKeyUp={handleCapsLock}
-									className={`${styles.input} ${
-										pwTouched ? (isPwValid ? styles.valid : styles.invalid) : ''
-									}`}
+									className={`${styles.input} ${pwTouched ? (isPwValid ? styles.valid : styles.invalid) : ''}`}
 									aria-invalid={pwTouched ? !isPwValid : undefined}
 									aria-describedby='pw-hint'
 								/>
@@ -245,7 +272,7 @@ export default function RegisterPage() {
 								</button>
 							</div>
 
-							{/* Индикатор силы — только когда есть ввод */}
+							{/* Индикатор силы */}
 							{pwTouched && password.length > 0 && (
 								<>
 									<div
@@ -264,7 +291,6 @@ export default function RegisterPage() {
 								</>
 							)}
 
-							{/* Короткая рекомендация */}
 							<p id='pw-hint' className={styles.pwHint}>
 								Рекомендуем 8+ символов и комбинацию букв разного регистра, цифр
 								и спецсимволов.
@@ -275,6 +301,7 @@ export default function RegisterPage() {
 							)}
 						</div>
 
+						{/* Повтор пароля */}
 						<div className={styles.inputGroup}>
 							<label htmlFor='confirm' className={styles.label}>
 								Подтвердите пароль
@@ -295,13 +322,7 @@ export default function RegisterPage() {
 									}}
 									onKeyDown={handleCapsLock}
 									onKeyUp={handleCapsLock}
-									className={`${styles.input} ${
-										confirmTouched
-											? confirm.length > 0 && confirm === password
-												? styles.valid
-												: styles.invalid
-											: ''
-									}`}
+									className={`${styles.input} ${confirmTouched ? (confirm.length > 0 && confirm === password ? styles.valid : styles.invalid) : ''}`}
 									aria-invalid={
 										confirmTouched
 											? !(confirm.length > 0 && confirm === password)
@@ -322,9 +343,7 @@ export default function RegisterPage() {
 
 							{confirmTouched && confirm.length > 0 && (
 								<div
-									className={`${styles.matchBadge} ${
-										confirm === password ? styles.show : ''
-									}`}
+									className={`${styles.matchBadge} ${confirm === password ? styles.show : ''}`}
 									role='status'
 									aria-live='polite'
 								>
@@ -360,7 +379,6 @@ export default function RegisterPage() {
 
 					{mounted && googleEnabled && (
 						<>
-							{/* Разделитель с текстом внутри линии */}
 							<div
 								className={styles.hr}
 								role='separator'
@@ -368,7 +386,6 @@ export default function RegisterPage() {
 							>
 								<span>Или через Google</span>
 							</div>
-
 							<div className={styles.oauthBlock}>
 								<GoogleAuthButton mode='register' label='Продолжить с Google' />
 							</div>

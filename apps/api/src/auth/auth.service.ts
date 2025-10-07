@@ -1,4 +1,3 @@
-// apps/api/src/auth/auth.service.ts
 import {
 	BadRequestException,
 	Injectable,
@@ -15,6 +14,10 @@ import { EmailCode } from './email-code.entity'
 import { EmailService } from './email.service'
 import { OAuthAccount } from './oauth-account.entity'
 import { RefreshToken } from './refresh-token.entity'
+
+function isEmailLike(s: string) {
+	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
+}
 
 @Injectable()
 export class AuthService {
@@ -33,7 +36,12 @@ export class AuthService {
 	/** Access JWT */
 	public signAccess(user: User) {
 		return this.jwt.sign(
-			{ sub: user.id, email: user.email, role: user.role },
+			{
+				sub: user.id,
+				email: user.email,
+				role: user.role,
+				username: user.username,
+			},
 			{
 				secret: process.env.JWT_ACCESS_SECRET!,
 				expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m',
@@ -78,60 +86,67 @@ export class AuthService {
 
 	// ===== Регистрация/логин (используются контроллером) =====
 
-	async register(email: string, password: string) {
-		const existing = await this.users.findByEmailWithHash(email)
+	async register(email: string, username: string, password: string) {
+		email = email.toLowerCase()
+		username = username.toLowerCase()
 
-		if (existing) {
-			// Если учётка создана через Google (пароля нет) — задаём пароль.
-			if (!existing.passwordHash) {
-				existing.passwordHash = await bcrypt.hash(password, 10)
-				await this.users.save(existing)
-				await this.users.ensureAdminRoleFor(email)
+		const [byEmail, byName] = await Promise.all([
+			this.users.findByEmail(email),
+			this.users.findByUsername(username),
+		])
 
-				const fresh = (await this.users.findByEmail(email))!
-				return {
-					user: { id: fresh.id, email: fresh.email, role: fresh.role },
-				}
-			}
+		if (byEmail) throw new UnauthorizedException('Email already used')
+		if (byName) throw new UnauthorizedException('Username already used')
 
-			// Иначе — обычный конфликт
-			throw new UnauthorizedException('Email already used')
-		}
-
-		// Обычная новая регистрация
 		const passwordHash = await bcrypt.hash(password, 10)
-		await this.users.create({ email, passwordHash, role: 'user' })
+		await this.users.create({ email, username, passwordHash, role: 'user' })
 		await this.users.ensureAdminRoleFor(email)
 
 		const fresh = (await this.users.findByEmail(email))!
-
-		// токены будут выданы после MFA
 		return {
-			user: { id: fresh.id, email: fresh.email, role: fresh.role },
+			user: {
+				id: fresh.id,
+				email: fresh.email,
+				role: fresh.role,
+				username: fresh.username,
+			},
 		}
 	}
 
-	async login(email: string, password: string) {
-		const user = await this.validateUser(email, password)
-
+	async login(login: string, password: string) {
+		const user = await this.validateUserByLogin(login, password)
 		return {
-			user: { id: user.id, email: user.email, role: user.role },
+			user: {
+				id: user.id,
+				email: user.email,
+				role: user.role,
+				username: user.username,
+			},
 		}
 	}
 
 	/** Валидация пользователя без выдачи токенов (для MFA) */
-	public async validateUser(email: string, password: string): Promise<User> {
-		const user = await this.users.findByEmailWithHash(email)
-		if (!user || !user.passwordHash) {
-			// Не раскрываем факт существования учётки без пароля — это обрабатывает контроллер /auth/login
+	public async validateUserByLogin(
+		login: string,
+		password: string
+	): Promise<User> {
+		const identifier = login.toLowerCase()
+		const candidate = isEmailLike(identifier)
+			? await this.users.findByEmailWithHash(identifier)
+			: await this.users.findByUsernameWithHash(identifier)
+
+		if (!candidate || !candidate.passwordHash) {
+			// Не раскрываем факт существования учётки без пароля — такой кейс обрабатывает контроллер
 			throw new UnauthorizedException('Invalid credentials')
 		}
-		const ok = await bcrypt.compare(password, user.passwordHash)
+		const ok = await bcrypt.compare(password, candidate.passwordHash)
 		if (!ok) throw new UnauthorizedException('Invalid credentials')
 
-		await this.users.ensureAdminRoleFor(email)
+		await this.users.ensureAdminRoleFor(candidate.email)
 
-		return await this.users.findByEmailOrFail(email)
+		const fresh = await this.users.findById(candidate.id)
+		if (!fresh) throw new UnauthorizedException('User not found')
+		return fresh
 	}
 
 	async refresh(userId: string, refreshToken: string) {
@@ -231,7 +246,12 @@ export class AuthService {
 			await this.issueRefresh(user.id)
 
 		return {
-			user: { id: user.id, email: user.email, role: user.role },
+			user: {
+				id: user.id,
+				email: user.email,
+				role: user.role,
+				username: user.username,
+			},
 			access,
 			refreshToken,
 			refreshExpires,
@@ -278,7 +298,6 @@ export class AuthService {
 		if (bySub) {
 			const u = await this.users.findById(bySub.userId)
 			if (!u) throw new UnauthorizedException('Linked user not found')
-			// опционально можно синкать email
 			return u
 		}
 
@@ -288,10 +307,11 @@ export class AuthService {
 			return byEmail
 		}
 
-		// создаём нового «oauth-only» пользователя
+		// создаём нового «oauth-only» пользователя (username оставим NULL)
 		const created = await this.users.create({
 			email: email.toLowerCase(),
 			passwordHash: null,
+			username: null,
 			role: 'user',
 		})
 		await this.linkGoogleAccount(created.id, sub, email)
