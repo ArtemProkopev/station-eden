@@ -1,4 +1,3 @@
-// SEO для приватной страницы
 export async function generateMetadata() {
 	return {
 		title: 'Профиль',

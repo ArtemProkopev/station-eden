@@ -40,7 +40,6 @@ export default function CopyButton({ value }: { value: string }) {
 				<span className={styles.sp2} aria-hidden />
 				<span className={styles.sp3} aria-hidden />
 			</button>
-			{/* скрытый статус для screen reader */}
 			<span className='sr-only' aria-live='polite'>
 				{copied ? 'ID скопирован в буфер обмена' : ''}
 			</span>

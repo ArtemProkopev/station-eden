@@ -1,4 +1,3 @@
-// apps/web/src/app/profile/error.tsx
 'use client'
 import styles from './page.module.css'
 

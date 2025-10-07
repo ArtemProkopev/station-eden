@@ -10,6 +10,7 @@ interface ProfileData {
 	status: 'loading' | 'error' | 'ok' | 'unauth'
 	userId?: string
 	email?: string
+	username?: string | null
 	message?: string
 }
 
@@ -17,15 +18,9 @@ function formatId(id: string) {
 	return id.replace(/-/g, '\u2009–\u2009')
 }
 
-// Локальное хранилище для аватарок и рамок
-const STORAGE_KEYS = {
-	AVATAR: 'profile_avatar',
-	FRAME: 'profile_frame',
-}
-
+const STORAGE_KEYS = { AVATAR: 'profile_avatar', FRAME: 'profile_frame' }
 const DEFAULT_AVATAR = '/avatars/avatar1.png'
 const DEFAULT_FRAME = '/frames/frame1.png'
-
 const DEFAULT_PROFILE_DATA: ProfileData = { status: 'loading' }
 
 export default function ProfilePage() {
@@ -44,7 +39,6 @@ export default function ProfilePage() {
 					cache: 'no-store',
 				})
 
-				// Красиво обрабатываем неавторизованного пользователя
 				if (r.status === 401) {
 					setMe({
 						status: 'unauth',
@@ -60,9 +54,10 @@ export default function ProfilePage() {
 				const payload = raw?.data ?? raw
 				const userId = payload?.userId
 				const email = payload?.email
+				const username = payload?.username ?? null
 
 				if (typeof userId === 'string' && typeof email === 'string') {
-					setMe({ status: 'ok', userId, email })
+					setMe({ status: 'ok', userId, email, username })
 				} else {
 					throw new Error('Malformed response')
 				}
@@ -74,7 +69,6 @@ export default function ProfilePage() {
 			}
 		}
 
-		// Подтягиваем локально сохранённые аватар/рамку
 		const savedAvatar = localStorage.getItem(STORAGE_KEYS.AVATAR)
 		const savedFrame = localStorage.getItem(STORAGE_KEYS.FRAME)
 		if (savedAvatar) setAvatar(savedAvatar)
@@ -90,7 +84,6 @@ export default function ProfilePage() {
 		localStorage.setItem(STORAGE_KEYS.FRAME, newFrame)
 	}
 
-	// Скелетон
 	if (me.status === 'loading') {
 		return (
 			<div className={styles.scene}>
@@ -103,7 +96,6 @@ export default function ProfilePage() {
 		)
 	}
 
-	// Экран для неавторизованного (401)
 	if (me.status === 'unauth') {
 		return (
 			<div className={styles.scene}>
@@ -115,49 +107,43 @@ export default function ProfilePage() {
 							</div>
 
 							<div className={styles.card}>
-								<div className={styles.cardContent}>
-									<div style={{ textAlign: 'center' }}>
-										<div
-											style={{
-												fontFamily: 'RussoOne, sans-serif',
-												fontSize: 64,
-												color: '#fff',
-												WebkitTextStroke: '3px #7050d5',
-												textShadow:
-													'0 3px 0 #5a3fb5, 0 6px 10px rgba(0,0,0,0.25)',
-												lineHeight: 1,
-												marginBottom: 8,
-											}}
-										>
-											401
-										</div>
-										<p
-											style={{
-												margin: '0 0 12px',
-												color: '#eaeaff',
-												fontFamily: 'Nunito, sans-serif',
-											}}
-										>
-											{me.message}
-										</p>
+								<div style={{ textAlign: 'center' }}>
+									<div
+										style={{
+											fontFamily: 'RussoOne, sans-serif',
+											fontSize: 64,
+											color: '#fff',
+											WebkitTextStroke: '3px #7050d5',
+											textShadow:
+												'0 3px 0 #5a3fb5, 0 6px 10px rgba(0,0,0,0.25)',
+											lineHeight: 1,
+											marginBottom: 8,
+										}}
+									>
+										401
+									</div>
+									<p
+										style={{
+											margin: '0 0 12px',
+											color: '#eaeaff',
+											fontFamily: 'Nunito, sans-serif',
+										}}
+									>
+										{me.message}
+									</p>
 
-										<div
-											style={{
-												display: 'grid',
-												gap: 10,
-												justifyItems: 'center',
-											}}
+									<div
+										style={{ display: 'grid', gap: 10, justifyItems: 'center' }}
+									>
+										<a
+											className={styles.editButton}
+											href='/login?next=/profile'
 										>
-											<a
-												className={styles.editButton}
-												href='/login?next=/profile'
-											>
-												Войти
-											</a>
-											<a href='/' className={styles.exitLink}>
-												На главную
-											</a>
-										</div>
+											Войти
+										</a>
+										<a href='/' className={styles.exitLink}>
+											На главную
+										</a>
 									</div>
 								</div>
 							</div>
@@ -189,11 +175,44 @@ export default function ProfilePage() {
 						{me.status === 'ok' ? (
 							<div className={styles.emailBlock} title={me.email}>
 								<div className={styles.emailCaption}>Входит как</div>
-								<div className={styles.emailValue}>{me.email}</div>
+
+								<div className={styles.emailRow}>
+									<div className={styles.emailChip}>
+										<svg
+											className={styles.emailIcon}
+											viewBox='0 0 24 24'
+											fill='none'
+											stroke='currentColor'
+											strokeWidth='2'
+										>
+											<path d='M4 4h16v16H4z' />
+											<path d='M22 6l-10 7L2 6' />
+										</svg>
+										<span className={styles.emailValue}>{me.email}</span>
+									</div>
+
+									<div className={styles.verifyPill} title='Email подтверждён'>
+										<svg
+											className={styles.verifyIcon}
+											viewBox='0 0 24 24'
+											fill='none'
+											stroke='currentColor'
+											strokeWidth='3'
+											strokeLinecap='round'
+											strokeLinejoin='round'
+											aria-hidden
+										>
+											<circle cx='12' cy='12' r='9' />
+											<path d='M8 12l2.5 2.5L16 9' />
+										</svg>
+										ПОДТВЕРЖДЁН
+									</div>
+								</div>
+
 								<LogoutButton />
 							</div>
 						) : (
-							<div className={styles.errorMini}>{me.message}</div>
+							<div className={styles.error}>{me.message}</div>
 						)}
 					</aside>
 
@@ -201,6 +220,13 @@ export default function ProfilePage() {
 					<section className={styles.main}>
 						<div className={styles.headerRow}>
 							<h1 className={styles.title}>Профиль</h1>
+
+							{me.username && (
+								<div className={styles.usernameChip} title='Ваш никнейм'>
+									<span className={styles.at}>@</span>
+									<span>{me.username}</span>
+								</div>
+							)}
 						</div>
 
 						{me.status === 'error' && (

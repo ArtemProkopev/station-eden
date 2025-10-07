@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import styles from './page.module.css'
 
-/** Лёгкая “ссылка”-кнопка: вид — как у подписи “Входит как” */
 export default function LogoutButton() {
 	const [loading, setLoading] = useState(false)
 	const router = useRouter()
@@ -14,18 +13,12 @@ export default function LogoutButton() {
 		if (loading) return
 		setLoading(true)
 		try {
-			// ВАЖНО: используем общий клиент, там корректный CSRF (se_csrf) и /auth/csrf
 			await api.logout()
-
-			// Подскажем навбару обновиться
 			if (typeof window !== 'undefined') {
 				window.dispatchEvent(new Event('session-changed'))
 			}
-
-			// Жёсткий переход на страницу логина
 			router.replace('/login')
-		} catch (e) {
-			// В редких случаях можно попытаться “сбросить” вид навбара
+		} catch {
 			if (typeof window !== 'undefined') {
 				window.dispatchEvent(new Event('session-changed'))
 			}

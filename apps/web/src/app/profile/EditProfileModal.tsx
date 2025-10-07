@@ -11,7 +11,6 @@ interface EditProfileModalProps {
 	currentFrame?: string
 }
 
-// Список доступных аватарок
 const AVATARS = [
 	'/avatars/avatar1.png',
 	'/avatars/avatar2.png',
@@ -26,7 +25,6 @@ const AVATARS = [
 	'/avatars/avatar11.png',
 ]
 
-// Список доступных рамок
 const FRAMES = [
 	'/frames/frame1.png',
 	'/frames/frame2.png',
@@ -67,7 +65,6 @@ export default function EditProfileModal({
 				</div>
 
 				<div className={styles.content}>
-					{/* Предпросмотр */}
 					<div className={styles.preview}>
 						<div className={styles.previewContainer}>
 							<img
@@ -83,16 +80,13 @@ export default function EditProfileModal({
 						</div>
 					</div>
 
-					{/* Выбор аватарки */}
 					<div className={styles.section}>
 						<h3>Выберите аватарку</h3>
 						<div className={styles.grid}>
 							{AVATARS.map(avatar => (
 								<button
 									key={avatar}
-									className={`${styles.avatarOption} ${
-										selectedAvatar === avatar ? styles.selected : ''
-									}`}
+									className={`${styles.avatarOption} ${selectedAvatar === avatar ? styles.selected : ''}`}
 									onClick={() => setSelectedAvatar(avatar)}
 								>
 									<img src={avatar} alt='Аватар' />
@@ -101,16 +95,13 @@ export default function EditProfileModal({
 						</div>
 					</div>
 
-					{/* Выбор рамки */}
 					<div className={styles.section}>
 						<h3>Выберите рамку</h3>
 						<div className={styles.grid}>
 							{FRAMES.map(frame => (
 								<button
 									key={frame}
-									className={`${styles.frameOption} ${
-										selectedFrame === frame ? styles.selected : ''
-									}`}
+									className={`${styles.frameOption} ${selectedFrame === frame ? styles.selected : ''}`}
 									onClick={() => setSelectedFrame(frame)}
 								>
 									<img src={frame} alt='Рамка' />
@@ -119,7 +110,6 @@ export default function EditProfileModal({
 						</div>
 					</div>
 
-					{/* Кнопки действий */}
 					<div className={styles.actions}>
 						<button className={styles.cancelButton} onClick={onClose}>
 							Отмена

@@ -1,4 +1,3 @@
-// apps/web/src/app/profile/loading.tsx
 import styles from './page.module.css'
 
 export default function Loading() {
