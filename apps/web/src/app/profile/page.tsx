@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import ImgCdn from '../../components/ImgCdn'
+import { asset } from '../../lib/asset'
 import CopyButton from './CopyButton'
 import EditProfileModal from './EditProfileModal'
 import LogoutButton from './LogoutButton'
@@ -19,8 +21,8 @@ function formatId(id: string) {
 }
 
 const STORAGE_KEYS = { AVATAR: 'profile_avatar', FRAME: 'profile_frame' }
-const DEFAULT_AVATAR = '/avatars/avatar1.png'
-const DEFAULT_FRAME = '/frames/frame1.png'
+const DEFAULT_AVATAR = asset('/avatars/avatar1.png')
+const DEFAULT_FRAME = asset('/frames/frame1.png')
 const DEFAULT_PROFILE_DATA: ProfileData = { status: 'loading' }
 
 export default function ProfilePage() {
@@ -69,10 +71,24 @@ export default function ProfilePage() {
 			}
 		}
 
+		// ---- миграция старых значений в localStorage ----
 		const savedAvatar = localStorage.getItem(STORAGE_KEYS.AVATAR)
 		const savedFrame = localStorage.getItem(STORAGE_KEYS.FRAME)
-		if (savedAvatar) setAvatar(savedAvatar)
-		if (savedFrame) setFrame(savedFrame)
+
+		const toAbs = (val?: string | null) =>
+			val && !/^https?:\/\//.test(val) ? asset(val) : val || undefined
+
+		const migAvatar = toAbs(savedAvatar)
+		const migFrame = toAbs(savedFrame)
+
+		if (migAvatar) {
+			setAvatar(migAvatar)
+			localStorage.setItem(STORAGE_KEYS.AVATAR, migAvatar)
+		}
+		if (migFrame) {
+			setFrame(migFrame)
+			localStorage.setItem(STORAGE_KEYS.FRAME, migFrame)
+		}
 
 		loadUserData()
 	}, [])
@@ -161,8 +177,12 @@ export default function ProfilePage() {
 					{/* левая колонка */}
 					<aside className={styles.side}>
 						<div className={styles.avatarContainer}>
-							<img src={avatar} alt='Аватар' className={styles.avatarImage} />
-							<img src={frame} alt='Рамка' className={styles.frameImage} />
+							<ImgCdn
+								src={avatar}
+								alt='Аватар'
+								className={styles.avatarImage}
+							/>
+							<ImgCdn src={frame} alt='Рамка' className={styles.frameImage} />
 						</div>
 
 						<button

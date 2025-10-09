@@ -1,6 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import ImgCdn from '../../components/ImgCdn'
+import { asset } from '../../lib/asset' // относительный импорт от /app/profile
 import styles from './EditProfileModal.module.css'
 
 interface EditProfileModalProps {
@@ -11,46 +13,64 @@ interface EditProfileModalProps {
 	currentFrame?: string
 }
 
+// Наборы доступных картинок сразу как абсолютные CDN/S3-URL
 const AVATARS = [
-	'/avatars/avatar1.png',
-	'/avatars/avatar2.png',
-	'/avatars/avatar3.png',
-	'/avatars/avatar4.png',
-	'/avatars/avatar5.png',
-	'/avatars/avatar6.png',
-	'/avatars/avatar7.png',
-	'/avatars/avatar8.png',
-	'/avatars/avatar9.png',
-	'/avatars/avatar10.png',
-	'/avatars/avatar11.png',
+	asset('/avatars/avatar1.png'),
+	asset('/avatars/avatar2.png'),
+	asset('/avatars/avatar3.png'),
+	asset('/avatars/avatar4.png'),
+	asset('/avatars/avatar5.png'),
+	asset('/avatars/avatar6.png'),
+	asset('/avatars/avatar7.png'),
+	asset('/avatars/avatar8.png'),
+	asset('/avatars/avatar9.png'),
+	asset('/avatars/avatar10.png'),
+	asset('/avatars/avatar11.png'),
 ]
 
 const FRAMES = [
-	'/frames/frame1.png',
-	'/frames/frame2.png',
-	'/frames/frame3.png',
-	'/frames/frame4.png',
-	'/frames/frame5.png',
-	'/frames/frame6.png',
-	'/frames/frame7.png',
-	'/frames/frame8.png',
-	'/frames/frame9.png',
+	asset('/frames/frame1.png'),
+	asset('/frames/frame2.png'),
+	asset('/frames/frame3.png'),
+	asset('/frames/frame4.png'),
+	asset('/frames/frame5.png'),
+	asset('/frames/frame6.png'),
+	asset('/frames/frame7.png'),
+	asset('/frames/frame8.png'),
+	asset('/frames/frame9.png'),
 ]
+
+// Нормализуем входящее значение к абсолютному URL
+function toAbsolute(url?: string) {
+	if (!url) return undefined
+	return /^https?:\/\//.test(url) ? url : asset(url)
+}
 
 export default function EditProfileModal({
 	isOpen,
 	onClose,
 	onSave,
-	currentAvatar = AVATARS[0],
-	currentFrame = FRAMES[0],
+	currentAvatar,
+	currentFrame,
 }: EditProfileModalProps) {
-	const [selectedAvatar, setSelectedAvatar] = useState(currentAvatar)
-	const [selectedFrame, setSelectedFrame] = useState(currentFrame)
+	// Дефолты + миграция старых относительных значений к абсолютным
+	const initialAvatar = useMemo(
+		() => toAbsolute(currentAvatar) ?? AVATARS[0],
+		[currentAvatar]
+	)
+	const initialFrame = useMemo(
+		() => toAbsolute(currentFrame) ?? FRAMES[0],
+		[currentFrame]
+	)
+
+	const [selectedAvatar, setSelectedAvatar] = useState(initialAvatar)
+	const [selectedFrame, setSelectedFrame] = useState(initialFrame)
 
 	if (!isOpen) return null
 
 	const handleSave = () => {
-		onSave(selectedAvatar, selectedFrame)
+		// Всегда сохраняем абсолютные ссылки (у нас уже так)
+		onSave(selectedAvatar!, selectedFrame!)
 		onClose()
 	}
 
@@ -67,13 +87,13 @@ export default function EditProfileModal({
 				<div className={styles.content}>
 					<div className={styles.preview}>
 						<div className={styles.previewContainer}>
-							<img
-								src={selectedAvatar}
+							<ImgCdn
+								src={selectedAvatar!}
 								alt='Аватар'
 								className={styles.previewAvatar}
 							/>
-							<img
-								src={selectedFrame}
+							<ImgCdn
+								src={selectedFrame!}
 								alt='Рамка'
 								className={styles.previewFrame}
 							/>
@@ -83,13 +103,13 @@ export default function EditProfileModal({
 					<div className={styles.section}>
 						<h3>Выберите аватарку</h3>
 						<div className={styles.grid}>
-							{AVATARS.map(avatar => (
+							{AVATARS.map(a => (
 								<button
-									key={avatar}
-									className={`${styles.avatarOption} ${selectedAvatar === avatar ? styles.selected : ''}`}
-									onClick={() => setSelectedAvatar(avatar)}
+									key={a}
+									className={`${styles.avatarOption} ${selectedAvatar === a ? styles.selected : ''}`}
+									onClick={() => setSelectedAvatar(a)}
 								>
-									<img src={avatar} alt='Аватар' />
+									<ImgCdn src={a} alt='Аватар' />
 								</button>
 							))}
 						</div>
@@ -98,13 +118,13 @@ export default function EditProfileModal({
 					<div className={styles.section}>
 						<h3>Выберите рамку</h3>
 						<div className={styles.grid}>
-							{FRAMES.map(frame => (
+							{FRAMES.map(f => (
 								<button
-									key={frame}
-									className={`${styles.frameOption} ${selectedFrame === frame ? styles.selected : ''}`}
-									onClick={() => setSelectedFrame(frame)}
+									key={f}
+									className={`${styles.frameOption} ${selectedFrame === f ? styles.selected : ''}`}
+									onClick={() => setSelectedFrame(f)}
 								>
-									<img src={frame} alt='Рамка' />
+									<ImgCdn src={f} alt='Рамка' />
 								</button>
 							))}
 						</div>
