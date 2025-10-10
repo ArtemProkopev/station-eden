@@ -1,7 +1,7 @@
 'use client'
 
 import type { ImgHTMLAttributes } from 'react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { asset, toFallback } from '../lib/asset'
 
 type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> & {
@@ -18,6 +18,11 @@ export default function ImgCdn({ src, ...rest }: Props) {
 	const fallback = isRel ? asset(src, true) : toFallback(src)
 
 	const [cur, setCur] = useState(primary)
+
+	// ДОБАВЛЕНО: синхронизация с пропсом src
+	useEffect(() => {
+		setCur(primary)
+	}, [primary]) // primary зависит от src
 
 	return (
 		<img

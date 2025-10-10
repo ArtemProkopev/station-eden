@@ -21,6 +21,18 @@ import { AuthService } from './auth.service'
 import { LoginDto } from './dto/login.dto'
 import { RegisterDto } from './dto/register.dto'
 
+// Добавляем интерфейс для типизации
+interface AuthenticatedRequest extends Request {
+  user?: {
+    sub: string;
+    email: string;
+    username?: string;
+    avatar?: string;
+    frame?: string;
+    // другие поля JWT payload
+  };
+}
+
 type GoogleMode = 'login' | 'register' | 'link'
 
 @Controller('auth')
@@ -211,11 +223,17 @@ export class AuthController {
 
 	@UseGuards(JwtAuthGuard)
 	@Get('me')
-	me(@Req() req: Request & { user?: any }) {
+	me(@Req() req: AuthenticatedRequest) {
+		if (!req.user) {
+			throw new UnauthorizedException('User not found in request');
+		}
+
 		return {
-			userId: (req.user as any).sub,
-			email: (req.user as any).email,
-			username: (req.user as any).username,
+			userId: req.user.sub,
+			email: req.user.email,
+			username: req.user.username,
+			avatar: req.user.avatar,    // ДОБАВЛЕНО
+			frame: req.user.frame,      // ДОБАВЛЕНО
 		}
 	}
 
