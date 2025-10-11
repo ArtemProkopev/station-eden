@@ -1,4 +1,4 @@
-// apps/web/src/lib/api.ts - обновлено: login(login), register(email, username, password)
+// apps/web/src/lib/api.ts
 import { getCsrfToken } from './csrf'
 import {
 	ApiError,
@@ -46,9 +46,10 @@ async function ensureCsrfToken(): Promise<string> {
 async function throwHttpAsApiError(res: Response, context: ErrorContext) {
 	const contentType = res.headers.get('content-type') || ''
 	const raw = await res.text().catch(() => '')
-	const json = contentType.includes('application/json')
-		? await safeJson(raw)
-		: await safeJson(raw)
+	const json =
+		contentType.includes('application/json') || contentType.includes('json')
+			? await safeJson(raw)
+			: await safeJson(raw)
 
 	const serverMessage =
 		(Array.isArray(json?.message) ? json?.message?.[0] : json?.message) ??
@@ -70,6 +71,7 @@ async function throwHttpAsApiError(res: Response, context: ErrorContext) {
 		serverMessage:
 			typeof serverMessage === 'string' ? serverMessage : undefined,
 		userMessage,
+		payload: json,
 	})
 }
 
@@ -138,7 +140,6 @@ async function deleteJSON<T = any>(
 
 export const api = {
 	// Аутентификация / MFA
-	// login: теперь принимает login (email или username)
 	login: (login: string, password: string) =>
 		postJSON<{ mfa?: string; email?: string; needSetPassword?: boolean }>(
 			'/auth/login',
@@ -146,7 +147,6 @@ export const api = {
 			'login'
 		),
 
-	// register: добавить username
 	register: (email: string, username: string, password: string) =>
 		postJSON<{ mfa?: string; email?: string }>(
 			'/auth/register',
@@ -154,7 +154,6 @@ export const api = {
 			'register'
 		),
 
-	// ⬇️ verifyEmailCode(newPassword?) без изменений
 	verifyEmailCode: (code: string, email?: string, newPassword?: string) =>
 		postJSON(
 			'/auth/verify-email-code',

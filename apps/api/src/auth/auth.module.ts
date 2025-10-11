@@ -1,4 +1,3 @@
-// apps/api/src/auth/auth.module.ts
 import { Module } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JwtModule } from '@nestjs/jwt'
@@ -9,8 +8,10 @@ import { User } from '../users/user.entity'
 import { UsersModule } from '../users/users.module'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
+import { BruteForceService } from './brute-force.service'
 import { EmailCode } from './email-code.entity'
 import { EmailService } from './email.service'
+import { LoginAttempt } from './login-attempt.entity'
 import { OAuthAccount } from './oauth-account.entity'
 import { RefreshToken } from './refresh-token.entity'
 import { JwtStrategy } from './strategies/jwt.strategy'
@@ -40,11 +41,17 @@ import { JwtStrategy } from './strategies/jwt.strategy'
 				return { secret, signOptions: { expiresIn } }
 			},
 		}),
-		TypeOrmModule.forFeature([User, RefreshToken, EmailCode, OAuthAccount]),
+		TypeOrmModule.forFeature([
+			User,
+			RefreshToken,
+			EmailCode,
+			OAuthAccount,
+			LoginAttempt,
+		]),
 		UsersModule,
 	],
 	controllers: [AuthController],
-	providers: [AuthService, JwtStrategy, EmailService],
-	exports: [AuthService, JwtModule],
+	providers: [AuthService, JwtStrategy, EmailService, BruteForceService],
+	exports: [AuthService, JwtModule, TypeOrmModule, BruteForceService],
 })
 export class AuthModule {}

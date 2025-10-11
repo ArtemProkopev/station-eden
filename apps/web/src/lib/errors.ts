@@ -1,5 +1,3 @@
-// apps/web/src/lib/errors.ts
-
 export type ErrorContext = 'login' | 'register' | 'default'
 
 export class ApiError extends Error {
@@ -8,6 +6,8 @@ export class ApiError extends Error {
 	serverMessage?: string
 	userMessage: string
 	cause?: unknown
+	/** Оригинальный JSON от сервера (чтобы фронт мог достать attemptsLeft/minutesLeft/lockedUntil). */
+	payload?: unknown
 
 	constructor(init: {
 		userMessage: string
@@ -15,6 +15,7 @@ export class ApiError extends Error {
 		code?: string
 		serverMessage?: string
 		cause?: unknown
+		payload?: unknown
 	}) {
 		super(init.userMessage)
 		Object.setPrototypeOf(this, new.target.prototype)
@@ -24,6 +25,7 @@ export class ApiError extends Error {
 		this.code = init.code
 		this.serverMessage = init.serverMessage
 		this.cause = init.cause
+		this.payload = init.payload
 	}
 }
 
@@ -40,7 +42,8 @@ export function mapToUserMessage(
 	}
 
 	if (status === 401) {
-		if (context === 'login') return 'Неверный email или пароль.'
+		// Для логина сообщаем нейтрально: мог быть неверен и пароль, и логин.
+		if (context === 'login') return 'Неверный логин или пароль.'
 		return 'Не авторизован. Пожалуйста, войдите в аккаунт.'
 	}
 
@@ -65,7 +68,7 @@ export function mapToUserMessage(
 	}
 	if (msg.includes('invalid credentials')) {
 		return context === 'login'
-			? 'Неверный email или пароль.'
+			? 'Неверный логин или пароль.'
 			: 'Сессия истекла или нет доступа.'
 	}
 
@@ -81,7 +84,6 @@ export function getUserMessage(
 		const anyErr = err as any
 		if (typeof anyErr.userMessage === 'string') return anyErr.userMessage
 		if (typeof anyErr.message === 'string') {
-			// сетевые/Fetch сообщения
 			if (/failed to fetch|network/i.test(anyErr.message)) {
 				return mapToUserMessage(undefined, undefined, context)
 			}

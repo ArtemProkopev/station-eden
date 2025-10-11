@@ -9,6 +9,7 @@ import * as path from 'path'
 
 import { AuthModule } from './auth/auth.module'
 import { EmailCode } from './auth/email-code.entity'
+import { LoginAttempt } from './auth/login-attempt.entity'
 import { OAuthAccount } from './auth/oauth-account.entity'
 import { RefreshToken } from './auth/refresh-token.entity'
 import { NotFoundExceptionFilter } from './common/filters/not-found.filter'
@@ -54,16 +55,15 @@ function resolveEnvPaths(): string[] {
 			useFactory: async (cfg: ConfigService) => {
 				const dbUrl =
 					cfg.get<string>('DATABASE_URL') ?? process.env.DATABASE_URL
+				const common = {
+					type: 'postgres' as const,
+					entities: [User, RefreshToken, EmailCode, OAuthAccount, LoginAttempt],
+					synchronize: false,
+				}
 				if (dbUrl) {
-					return {
-						type: 'postgres' as const,
-						url: dbUrl,
-						entities: [User, RefreshToken, EmailCode, OAuthAccount],
-						synchronize: false,
-					}
+					return { url: dbUrl, ...common }
 				}
 				return {
-					type: 'postgres' as const,
 					host: cfg.get<string>('POSTGRES_HOST') ?? process.env.POSTGRES_HOST,
 					port: cfg.get<number>('POSTGRES_PORT', 5432),
 					username:
@@ -72,8 +72,7 @@ function resolveEnvPaths(): string[] {
 						cfg.get<string>('POSTGRES_PASSWORD') ??
 						process.env.POSTGRES_PASSWORD,
 					database: cfg.get<string>('POSTGRES_DB') ?? process.env.POSTGRES_DB,
-					entities: [User, RefreshToken, EmailCode, OAuthAccount],
-					synchronize: false,
+					...common,
 				}
 			},
 		}),

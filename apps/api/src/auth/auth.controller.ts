@@ -1,3 +1,4 @@
+// apps/api/src/auth/auth.controller.ts
 import {
 	Body,
 	Controller,
@@ -18,19 +19,18 @@ import { OAuth2Client } from 'google-auth-library'
 import { ensureCsrfCookie, getCookieOptions } from '../common'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { AuthService } from './auth.service'
+import { BruteForceService } from './brute-force.service'
 import { LoginDto } from './dto/login.dto'
 import { RegisterDto } from './dto/register.dto'
 
-// Добавляем интерфейс для типизации
 interface AuthenticatedRequest extends Request {
-  user?: {
-    sub: string;
-    email: string;
-    username?: string;
-    avatar?: string;
-    frame?: string;
-    // другие поля JWT payload
-  };
+	user?: {
+		sub: string
+		email: string
+		username?: string
+		avatar?: string
+		frame?: string
+	}
 }
 
 type GoogleMode = 'login' | 'register' | 'link'
@@ -39,20 +39,16 @@ type GoogleMode = 'login' | 'register' | 'link'
 export class AuthController {
 	constructor(
 		private auth: AuthService,
-		private jwt: JwtService
+		private jwt: JwtService,
+		private brute: BruteForceService
 	) {}
 
-	/** Общие опции для auth-кук (access/refresh) */
 	private authCookieOpts() {
 		return getCookieOptions(true)
 	}
-
-	/** Короткоживущие куки (preauth/state), 10 минут */
 	private preauthCookieOpts() {
 		return { ...getCookieOptions(true), maxAge: 10 * 60 * 1000 }
 	}
-
-	/** Express 5: очищаем cookie без maxAge, сохраняя остальные атрибуты */
 	private clearWithSameAttrs(
 		res: Response,
 		name: string,
@@ -77,7 +73,6 @@ export class AuthController {
 	private clearStateCookie(res: Response) {
 		this.clearWithSameAttrs(res, 'google_oauth_state', this.preauthCookieOpts())
 	}
-
 	private webOrigin(): string {
 		const after =
 			process.env.WEB_AFTER_LOGIN_URL || 'http://localhost:3000/profile'
@@ -91,26 +86,34 @@ export class AuthController {
 		return this.webOrigin() + path
 	}
 
-	/** Гарантирует наличие CSRF-куки и возвращает сам токен в ответе */
 	@Get('csrf')
 	csrf(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
 		const token = ensureCsrfCookie(req, res)
 		return { csrf: token }
 	}
 
-	// ===== Регистрация/логин (через шаг MFA) =====
-
 	@UseGuards(ThrottlerGuard)
 	@Throttle({ default: { limit: 50, ttl: 300000 } })
 	@Post('login')
 	async login(
 		@Body() dto: LoginDto,
+		@Req() req: Request,
 		@Res({ passthrough: true }) res: Response
 	) {
 		const login = dto.login.trim().toLowerCase()
 		const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(login)
 
-		// ⚠️ oauth-only обработка для email
+		// активная блокировка?
+		const block = await this.brute.isBlocked(login)
+		if (block.blocked) {
+			throw new UnauthorizedException({
+				message: `Account temporarily locked.`,
+				minutesLeft: block.minutesLeft,
+				lockedUntil: block.lockedUntil?.toISOString?.() ?? undefined,
+			})
+		}
+
+		// спец-кейс: пользователи без пароля — сразу MFA по email
 		if (isEmail) {
 			const existing = await this.auth['users'].findByEmailWithHash(login)
 			if (existing && !existing.passwordHash) {
@@ -118,9 +121,7 @@ export class AuthController {
 				res.cookie('preauth', pre, this.preauthCookieOpts())
 				try {
 					await this.auth.startEmailMfa(existing.id, existing.email)
-				} catch (e) {
-					console.error('[login:oath-only] startEmailMfa failed', e)
-				}
+				} catch {}
 				return {
 					mfa: 'email_code_sent',
 					email: existing.email,
@@ -128,16 +129,13 @@ export class AuthController {
 				}
 			}
 		} else {
-			// ⬇️ аналогичная обработка для oauth-only при логине по username
 			const byUsername = await this.auth['users'].findByUsernameWithHash(login)
 			if (byUsername && !byUsername.passwordHash) {
 				const pre = this.auth.signPreauth(byUsername.id, byUsername.email)
 				res.cookie('preauth', pre, this.preauthCookieOpts())
 				try {
 					await this.auth.startEmailMfa(byUsername.id, byUsername.email)
-				} catch (e) {
-					console.error('[login:oath-only-username] startEmailMfa failed', e)
-				}
+				} catch {}
 				return {
 					mfa: 'email_code_sent',
 					email: byUsername.email,
@@ -146,19 +144,30 @@ export class AuthController {
 			}
 		}
 
-		// Обычный сценарий логина по паролю (login = email ИЛИ username)
-		const result = await this.auth.login(login, dto.password)
-
-		const pre = this.auth.signPreauth(result.user.id, result.user.email)
-		res.cookie('preauth', pre, this.preauthCookieOpts())
-
 		try {
-			await this.auth.startEmailMfa(result.user.id, result.user.email)
-		} catch (e) {
-			console.error('[login] startEmailMfa failed', e)
+			const result = await this.auth.login(login, dto.password)
+			await this.brute.registerSuccess(login)
+			const pre = this.auth.signPreauth(result.user.id, result.user.email)
+			res.cookie('preauth', pre, this.preauthCookieOpts())
+			try {
+				await this.auth.startEmailMfa(result.user.id, result.user.email)
+			} catch {}
+			return { mfa: 'email_code_sent', email: result.user.email }
+		} catch {
+			const info = await this.brute.registerFail(login)
+			if (info.blocked) {
+				throw new UnauthorizedException({
+					message: 'Too many attempts.',
+					minutesLeft: info.minutesLeft,
+					lockedUntil: info.lockedUntil?.toISOString?.() ?? undefined,
+					attemptsLeft: 0,
+				})
+			}
+			throw new UnauthorizedException({
+				message: 'Invalid credentials.',
+				attemptsLeft: info.attemptsLeft,
+			})
 		}
-
-		return { mfa: 'email_code_sent', email: result.user.email }
 	}
 
 	@Post('register')
@@ -173,13 +182,9 @@ export class AuthController {
 		)
 		const pre = this.auth.signPreauth(result.user.id, result.user.email)
 		res.cookie('preauth', pre, this.preauthCookieOpts())
-
 		try {
 			await this.auth.startEmailMfa(result.user.id, result.user.email)
-		} catch (e) {
-			console.error('[register] startEmailMfa failed', e)
-		}
-
+		} catch {}
 		return { mfa: 'email_code_sent', email: result.user.email }
 	}
 
@@ -192,7 +197,6 @@ export class AuthController {
 		const userId = (payload as any)?.sub || (req.body as any)?.userId
 		const rt = (req as any).cookies?.refresh_token
 		if (!userId || !rt) throw new UnauthorizedException('No refresh')
-
 		const { access, refreshToken, refreshExpires } = await this.auth.refresh(
 			userId,
 			rt
@@ -214,7 +218,6 @@ export class AuthController {
 		const userId = (payload as any)?.sub
 		const rt = (req as any).cookies?.refresh_token
 		if (userId) await this.auth.logout(userId, rt)
-
 		this.clearWithSameAttrs(res, 'access_token', this.authCookieOpts())
 		this.clearWithSameAttrs(res, 'refresh_token', this.authCookieOpts())
 		this.clearWithSameAttrs(res, 'preauth', this.preauthCookieOpts())
@@ -224,20 +227,15 @@ export class AuthController {
 	@UseGuards(JwtAuthGuard)
 	@Get('me')
 	me(@Req() req: AuthenticatedRequest) {
-		if (!req.user) {
-			throw new UnauthorizedException('User not found in request');
-		}
-
+		if (!req.user) throw new UnauthorizedException('User not found in request')
 		return {
 			userId: req.user.sub,
 			email: req.user.email,
 			username: req.user.username,
-			avatar: req.user.avatar,    // ДОБАВЛЕНО
-			frame: req.user.frame,      // ДОБАВЛЕНО
+			avatar: req.user.avatar,
+			frame: req.user.frame,
 		}
 	}
-
-	// ===== Подтверждение e-mail кодом (+ опциональная установка пароля) =====
 
 	@UseGuards(ThrottlerGuard)
 	@Throttle({ default: { limit: 10, ttl: 300000 } })
@@ -249,19 +247,15 @@ export class AuthController {
 	) {
 		const pre = (req as any).cookies?.preauth
 		if (!pre) throw new UnauthorizedException('No preauth')
-
 		let payload: any
 		try {
 			payload = this.jwt.verify(pre, { secret: process.env.JWT_ACCESS_SECRET })
 		} catch {
 			throw new UnauthorizedException('Preauth expired')
 		}
-
 		const email = body.email?.toLowerCase() || payload.email
-		if (!email || email !== payload.email) {
+		if (!email || email !== payload.email)
 			throw new UnauthorizedException('Email mismatch')
-		}
-
 		const { user, access, refreshToken, refreshExpires } =
 			await this.auth.verifyEmailCode(
 				payload.sub,
@@ -269,7 +263,6 @@ export class AuthController {
 				body.code,
 				body.newPassword
 			)
-
 		res.cookie('access_token', access, {
 			...this.authCookieOpts(),
 			maxAge: 15 * 60 * 1000,
@@ -279,7 +272,6 @@ export class AuthController {
 			maxAge: refreshExpires.getTime() - Date.now(),
 		})
 		this.clearWithSameAttrs(res, 'preauth', this.preauthCookieOpts())
-
 		return { user }
 	}
 
@@ -289,37 +281,29 @@ export class AuthController {
 	async resendEmailCode(@Req() req: Request) {
 		const pre = (req as any).cookies?.preauth
 		if (!pre) throw new UnauthorizedException('No preauth')
-
 		let payload: any
 		try {
 			payload = this.jwt.verify(pre, { secret: process.env.JWT_ACCESS_SECRET })
 		} catch {
 			throw new UnauthorizedException('Preauth expired')
 		}
-
 		try {
 			await this.auth.startEmailMfa(payload.sub, payload.email)
 			return { ok: true }
-		} catch (e) {
-			console.error('[resend] startEmailMfa failed', e)
+		} catch {
 			throw new InternalServerErrorException('Failed to resend email')
 		}
 	}
-
-	// ---------- Google OAuth (через MFA) ----------
 
 	@Get('google')
 	async google(@Req() req: Request, @Res() res: Response) {
 		if (!this.googleEnabled())
 			throw new NotFoundException('Google login disabled')
-
 		const q = req.query as any
 		const mode: GoogleMode = q?.mode === 'register' ? 'register' : 'login'
-
 		const nonce = this.makeState()
 		const packed = `${nonce}:${mode}`
 		this.setStateCookie(res, packed)
-
 		const params = new URLSearchParams({
 			client_id: process.env.GOOGLE_CLIENT_ID!,
 			redirect_uri: process.env.GOOGLE_REDIRECT_URL!,
@@ -330,7 +314,6 @@ export class AuthController {
 			state: packed,
 			prompt: 'consent',
 		})
-
 		res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`)
 		return
 	}
@@ -341,7 +324,6 @@ export class AuthController {
 			res.status(404).send('Google login disabled')
 			return
 		}
-
 		const { code, state } = req.query as { code?: string; state?: string }
 		const stateCookie = (req as any).cookies?.google_oauth_state as
 			| string
@@ -353,9 +335,6 @@ export class AuthController {
 		}
 		this.clearStateCookie(res)
 		const [, modeRaw] = String(state).split(':')
-		const mode: GoogleMode = modeRaw === 'register' ? 'register' : 'login'
-
-		// Обмен кода на токены
 		const tokenResp = await fetch('https://oauth2.googleapis.com/token', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -377,8 +356,6 @@ export class AuthController {
 			res.status(401).send('No id_token')
 			return
 		}
-
-		// Верификация id_token
 		const ticket = await this.googleClient().verifyIdToken({
 			idToken: id_token,
 			audience: process.env.GOOGLE_CLIENT_ID!,
@@ -391,21 +368,13 @@ export class AuthController {
 			res.status(401).send('Google email not verified or sub missing')
 			return
 		}
-
-		// Логика find-or-create через таблицу oauth_accounts
 		const user = await this.auth.findOrCreateUserByGoogle(sub, email)
-
 		await this.auth['users'].ensureAdminRoleFor(user.email)
-
 		const pre = this.auth.signPreauth(user.id, user.email)
 		res.cookie('preauth', pre, this.preauthCookieOpts())
-
 		try {
 			await this.auth.startEmailMfa(user.id, user.email)
-		} catch (e) {
-			console.error('[google] startEmailMfa failed', e)
-		}
-
+		} catch {}
 		const verifyUrl = this.urlTo(
 			`/login/verify?email=${encodeURIComponent(user.email)}`
 		)
@@ -413,19 +382,14 @@ export class AuthController {
 		return
 	}
 
-	// --- DEV helper ---
 	@Get('dev/peek-email-code')
 	devPeek(@Req() req: Request) {
-		if (process.env.NODE_ENV === 'production') {
+		if (process.env.NODE_ENV === 'production')
 			return { ok: false, reason: 'not-available-in-production' }
-		}
-
 		const required = (process.env.DEV_EMAIL_PEEK_SECRET || '').trim()
 		const provided = (req.get('x-dev-secret') || '').trim()
-		if (required && provided !== required) {
+		if (required && provided !== required)
 			return { ok: false, reason: 'forbidden' }
-		}
-
 		const email = String((req.query as any)?.email || '')
 			.toLowerCase()
 			.trim()
