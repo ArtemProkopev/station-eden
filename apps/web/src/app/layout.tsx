@@ -1,6 +1,7 @@
 // apps/web/src/app/layout.tsx
 import Footer from '@/src/components/Footer'
 import Navbar from '@/src/components/Navbar'
+import CdnWarning from '@/src/components/CdnWarning'
 import { cookies } from 'next/headers'
 import './globals.css'
 
@@ -20,6 +21,7 @@ export default function RootLayout({
 				<Navbar />
 				<main className='container'>{children}</main>
 				<Footer />
+				<CdnWarning />
 			</body>
 		</html>
 	)
