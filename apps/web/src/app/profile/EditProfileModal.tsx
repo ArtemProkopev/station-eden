@@ -26,6 +26,7 @@ const AVATARS = [
 	asset('/avatars/avatar9.png'),
 	asset('/avatars/avatar10.png'),
 	asset('/avatars/avatar11.png'),
+	asset('/avatars/testavatar.png'),
 ]
 
 const FRAMES = [
@@ -38,6 +39,7 @@ const FRAMES = [
 	asset('/frames/frame7.png'),
 	asset('/frames/frame8.png'),
 	asset('/frames/frame9.png'),
+	asset('/frames/testframe.png'),
 ]
 
 // Нормализуем входящее значение к абсолютному URL

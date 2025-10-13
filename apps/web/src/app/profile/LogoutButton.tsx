@@ -36,7 +36,7 @@ export default function LogoutButton() {
 			disabled={loading}
 			aria-label='Выйти из профиля'
 		>
-			{loading ? 'Выход…' : 'Выйти'}
+			{loading ? 'покидаем станцию...' : 'покинуть станцию'}
 		</button>
 	)
 }

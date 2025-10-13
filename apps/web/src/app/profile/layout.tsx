@@ -23,7 +23,7 @@ export default async function Layout({
 					position: 'fixed',
 					inset: 0,
 					zIndex: 0,
-					backgroundImage: 'url("/profile-background.png")',
+					backgroundImage: 'url("/profile-backrground.jpg")',
 					backgroundSize: 'cover',
 					backgroundPosition: 'center',
 				}}

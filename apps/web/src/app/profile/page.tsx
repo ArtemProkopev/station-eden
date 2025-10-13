@@ -1,23 +1,25 @@
+// =====================
+// apps/web/src/app/profile/page.tsx
+// =====================
 'use client'
 
 import { useEffect, useState } from 'react'
 import ImgCdn from '../../components/ImgCdn'
+import TopHUD from '../../components/TopHUD/TopHUD'
 import { asset } from '../../lib/asset'
 import CopyButton from './CopyButton'
 import EditProfileModal from './EditProfileModal'
 import LogoutButton from './LogoutButton'
 import styles from './page.module.css'
+import { FirefliesProfile } from '../../components/ui/Fireflies/FirefliesProfile'
+import { TwinklingStars } from '../../components/ui/TwinklingStars/TwinklingStars'
 
 interface ProfileData {
-	status: 'loading' | 'error' | 'ok' | 'unauth'
-	userId?: string
-	email?: string
-	username?: string | null
-	message?: string
-}
-
-function formatId(id: string) {
-	return id.replace(/-/g, '\u2009–\u2009')
+  status: 'loading' | 'error' | 'ok' | 'unauth'
+  userId?: string
+  email?: string
+  username?: string | null
+  message?: string
 }
 
 const STORAGE_KEYS = { AVATAR: 'profile_avatar', FRAME: 'profile_frame' }
@@ -25,264 +27,222 @@ const DEFAULT_AVATAR = asset('/avatars/avatar1.png')
 const DEFAULT_FRAME = asset('/frames/frame1.png')
 const DEFAULT_PROFILE_DATA: ProfileData = { status: 'loading' }
 
+const ICONS = {
+  planet: '/icons/planet.svg',
+  polygon: '/icons/polygon.svg',
+  copy: '/icons/copy.svg'
+}
+
+const FALLBACKS = {
+  planet: (
+    <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden>
+      <circle cx="12" cy="12" r="10" fill="#63EFFF" opacity="0.8"/>
+      <ellipse cx="8" cy="9" rx="3" ry="2" fill="#4A90E2"/>
+      <path d="M5 15c2-1 4-1 6 0 2 1 4 1 6 0" stroke="#4A90E2" strokeWidth="1.5" fill="none"/>
+    </svg>
+  ),
+  polygon: (
+    <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden>
+      <polygon 
+        points="12,2 22,8 22,16 12,22 2,16 2,8" 
+        fill="#63EFFF" 
+        opacity="0.8"
+        stroke="#4A90E2"
+        strokeWidth="1.5"
+      />
+    </svg>
+  ),
+}
+
+function formatId(id: string) {
+  return id.replace(/-/g, '\u2009–\u2009')
+}
+
 export default function ProfilePage() {
-	const [me, setMe] = useState<ProfileData>(DEFAULT_PROFILE_DATA)
-	const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-	const [avatar, setAvatar] = useState(DEFAULT_AVATAR)
-	const [frame, setFrame] = useState(DEFAULT_FRAME)
+  const [me, setMe] = useState<ProfileData>(DEFAULT_PROFILE_DATA)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [avatar, setAvatar] = useState(DEFAULT_AVATAR)
+  const [frame, setFrame] = useState(DEFAULT_FRAME)
+  const [iconsOk, setIconsOk] = useState<{[k: string]: boolean}>({})
 
-	useEffect(() => {
-		const loadUserData = async () => {
-			try {
-				const API_BASE =
-					process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
-				const r = await fetch(`${API_BASE}/auth/me`, {
-					credentials: 'include',
-					cache: 'no-store',
-				})
+  useEffect(() => {
+    // Проверка иконок
+    Object.entries(ICONS).forEach(([key, url]) => {
+      fetch(url, { method: 'HEAD' })
+        .then(res => {
+          setIconsOk(prev => ({ ...prev, [key]: res.ok }))
+        })
+        .catch(err => {
+          console.error('[ProfilePage] fetch error for', url, err)
+          setIconsOk(prev => ({ ...prev, [key]: false }))
+        })
+    })
 
-				if (r.status === 401) {
-					setMe({
-						status: 'unauth',
-						message:
-							'Вы не авторизованы. Войдите в аккаунт, чтобы открыть профиль.',
-					})
-					return
-				}
+    const loadUserData = async () => {
+      try {
+        const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+        const r = await fetch(`${API_BASE}/auth/me`, {
+          credentials: 'include',
+          cache: 'no-store',
+        })
+        if (r.status === 401) {
+          setMe({
+            status: 'unauth',
+            message: 'Вы не авторизованы. Войдите в аккаунт, чтобы открыть профиль.',
+          })
+          return
+        }
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        const raw = await r.json()
+        const payload = raw?.data ?? raw
+        const userId = payload?.userId
+        const email = payload?.email
+        const username = payload?.username ?? null
+        if (typeof userId === 'string' && typeof email === 'string') {
+          setMe({ status: 'ok', userId, email, username })
+        } else {
+          throw new Error('Malformed response')
+        }
+      } catch (e: any) {
+        setMe({ status: 'error', message: e?.message || 'Не удалось загрузить профиль' })
+      }
+    }
 
-				if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    // migrate LS values to absolute urls
+    const savedAvatar = localStorage.getItem(STORAGE_KEYS.AVATAR)
+    const savedFrame = localStorage.getItem(STORAGE_KEYS.FRAME)
+    const toAbs = (val?: string | null) => (val && !/^https?:\/\//.test(val) ? asset(val) : val || undefined)
+    const migAvatar = toAbs(savedAvatar)
+    const migFrame = toAbs(savedFrame)
+    if (migAvatar) {
+      setAvatar(migAvatar)
+      localStorage.setItem(STORAGE_KEYS.AVATAR, migAvatar)
+    }
+    if (migFrame) {
+      setFrame(migFrame)
+      localStorage.setItem(STORAGE_KEYS.FRAME, migFrame)
+    }
+    loadUserData()
+  }, [])
 
-				const raw = await r.json()
-				const payload = raw?.data ?? raw
-				const userId = payload?.userId
-				const email = payload?.email
-				const username = payload?.username ?? null
+  const handleSaveProfile = (newAvatar: string, newFrame: string) => {
+    setAvatar(newAvatar)
+    setFrame(newFrame)
+    localStorage.setItem(STORAGE_KEYS.AVATAR, newAvatar)
+    localStorage.setItem(STORAGE_KEYS.FRAME, newFrame)
+  }
 
-				if (typeof userId === 'string' && typeof email === 'string') {
-					setMe({ status: 'ok', userId, email, username })
-				} else {
-					throw new Error('Malformed response')
-				}
-			} catch (e: any) {
-				setMe({
-					status: 'error',
-					message: e?.message || 'Не удалось загрузить профиль',
-				})
-			}
-		}
+  return (
+    <div className={styles.root}>
+      {/* Фон со светлячками */}
+      <FirefliesProfile />
+      {/* Фон со звездами */}
+      <TwinklingStars />
 
-		// ---- миграция старых значений в localStorage ----
-		const savedAvatar = localStorage.getItem(STORAGE_KEYS.AVATAR)
-		const savedFrame = localStorage.getItem(STORAGE_KEYS.FRAME)
+      {/* top HUD */}
+      <TopHUD />
 
-		const toAbs = (val?: string | null) =>
-			val && !/^https?:\/\//.test(val) ? asset(val) : val || undefined
+      {/* header section with profile title and planet */}
+      <section className={styles.headerSection}>
+        <header className={styles.header}>ПРОФИЛЬ</header>
+        <div className={styles.hexagonPlanet}>
+          {iconsOk.polygon ? (
+            <img
+              className={styles.polygonIcon}
+              src={ICONS.polygon}
+              alt="Шестиугольник"
+              onError={(e) => {
+                console.error('img onError', (e.target as HTMLImageElement).src)
+                setIconsOk(prev => ({ ...prev, polygon: false }))
+              }}
+            />
+          ) : (
+            FALLBACKS.polygon
+          )}
+          <div className={styles.planetCenter}>
+            {iconsOk.planet ? (
+              <img
+                className={styles.planetIcon}
+                src={ICONS.planet}
+                alt="Планета"
+                onError={(e) => {
+                  console.error('img onError', (e.target as HTMLImageElement).src)
+                  setIconsOk(prev => ({ ...prev, planet: false }))
+                }}
+              />
+            ) : (
+              FALLBACKS.planet
+            )}
+          </div>
+        </div>
+        <button className={styles.editBtn} onClick={() => setIsEditModalOpen(true)}>редактировать</button>
+      </section>
 
-		const migAvatar = toAbs(savedAvatar)
-		const migFrame = toAbs(savedFrame)
+      {/* main panel */}
+      <section className={styles.panel}>
+        <div className={styles.contentGrid}>
+          {/* avatar column */}
+          <aside className={styles.side}>
+            {/* Объединенный контейнер для листьев, аватара и рамки */}
+            <div className={styles.avatarSection}>
+              <div className={styles.leavesWrapper}>
+                <img 
+                  src="/decor/leaves.png" 
+                  alt="Листья" 
+                  className={styles.leavesImage}
+                />
+              </div>
+              <div className={styles.avatarContainer}>
+                <ImgCdn src={avatar} alt='Аватар' className={styles.avatar} />
+                <ImgCdn src={frame} alt='Рамка' className={styles.frame} />
+              </div>
+            </div>
+            
+            <div className={styles.handle}>@{me.username ?? 'Никнейм'}</div>
+            {me.status === 'ok' ? <LogoutButton /> : null}
+          </aside>
 
-		if (migAvatar) {
-			setAvatar(migAvatar)
-			localStorage.setItem(STORAGE_KEYS.AVATAR, migAvatar)
-		}
-		if (migFrame) {
-			setFrame(migFrame)
-			localStorage.setItem(STORAGE_KEYS.FRAME, migFrame)
-		}
+          {/* info column */}
+          <div className={styles.info}>
 
-		loadUserData()
-	}, [])
+            <div className={styles.loginCard}>
+              <div className={styles.loginCaption}>Входит как</div>
+              <div className={styles.loginRow}>
+                <span className={styles.loginEmail}>{me.email ?? 'example@mail.ru'}</span>
+              </div>
+              <div className={styles.idRow}>
+                <div className={styles.idLabel}>Игровой ID:</div>
+                {me.status === 'ok' && <CopyButton value={me.userId!} />}
+              </div>
+              {me.status === 'ok' && (
+                <div className={styles.idBadge} title={me.userId} aria-describedby='id-hint'>
+                  {formatId(me.userId!)}
+                </div>
+              )}
+              <p id='id-hint' className={styles.hint}>Используйте ID для поддержки и входа в игровые лобби.</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
-	const handleSaveProfile = (newAvatar: string, newFrame: string) => {
-		setAvatar(newAvatar)
-		setFrame(newFrame)
-		localStorage.setItem(STORAGE_KEYS.AVATAR, newAvatar)
-		localStorage.setItem(STORAGE_KEYS.FRAME, newFrame)
-	}
+      <div className={styles.statsRow}>
+              <div className={styles.statBox}>
+                <div className={styles.statLabel}>завершено миссий</div>
+                <div className={styles.statValue}>47</div>
+              </div>
+              <div className={styles.statBox}>
+                <div className={styles.statLabel}>время на станции</div>
+                <div className={styles.statValue}>134 ч</div>
+              </div>
+      </div>
 
-	if (me.status === 'loading') {
-		return (
-			<div className={styles.scene}>
-				<div className={styles.panel}>
-					<div className={styles.grid}>
-						<div className={styles.skel} aria-hidden />
-					</div>
-				</div>
-			</div>
-		)
-	}
-
-	if (me.status === 'unauth') {
-		return (
-			<div className={styles.scene}>
-				<div className={styles.panel}>
-					<div className={styles.grid}>
-						<section className={styles.main}>
-							<div className={styles.headerRow}>
-								<h1 className={styles.title}>Профиль</h1>
-							</div>
-
-							<div className={styles.card}>
-								<div style={{ textAlign: 'center' }}>
-									<div
-										style={{
-											fontFamily: 'RussoOne, sans-serif',
-											fontSize: 64,
-											color: '#fff',
-											WebkitTextStroke: '3px #7050d5',
-											textShadow:
-												'0 3px 0 #5a3fb5, 0 6px 10px rgba(0,0,0,0.25)',
-											lineHeight: 1,
-											marginBottom: 8,
-										}}
-									>
-										401
-									</div>
-									<p
-										style={{
-											margin: '0 0 12px',
-											color: '#eaeaff',
-											fontFamily: 'Nunito, sans-serif',
-										}}
-									>
-										{me.message}
-									</p>
-
-									<div
-										style={{ display: 'grid', gap: 10, justifyItems: 'center' }}
-									>
-										<a
-											className={styles.editButton}
-											href='/login?next=/profile'
-										>
-											Войти
-										</a>
-										<a href='/' className={styles.exitLink}>
-											На главную
-										</a>
-									</div>
-								</div>
-							</div>
-						</section>
-					</div>
-				</div>
-			</div>
-		)
-	}
-
-	return (
-		<div className={styles.scene}>
-			<div className={styles.panel}>
-				<div className={styles.grid}>
-					{/* левая колонка */}
-					<aside className={styles.side}>
-						<div className={styles.avatarContainer}>
-							<ImgCdn
-								src={avatar}
-								alt='Аватар'
-								className={styles.avatarImage}
-							/>
-							<ImgCdn src={frame} alt='Рамка' className={styles.frameImage} />
-						</div>
-
-						<button
-							className={styles.editButton}
-							onClick={() => setIsEditModalOpen(true)}
-						>
-							Редактировать профиль
-						</button>
-
-						{me.status === 'ok' ? (
-							<div className={styles.emailBlock} title={me.email}>
-								<div className={styles.emailCaption}>Входит как</div>
-
-								<div className={styles.emailRow}>
-									<div className={styles.emailChip}>
-										<svg
-											className={styles.emailIcon}
-											viewBox='0 0 24 24'
-											fill='none'
-											stroke='currentColor'
-											strokeWidth='2'
-										>
-											<path d='M4 4h16v16H4z' />
-											<path d='M22 6l-10 7L2 6' />
-										</svg>
-										<span className={styles.emailValue}>{me.email}</span>
-									</div>
-
-									<div className={styles.verifyPill} title='Email подтверждён'>
-										<svg
-											className={styles.verifyIcon}
-											viewBox='0 0 24 24'
-											fill='none'
-											stroke='currentColor'
-											strokeWidth='3'
-											strokeLinecap='round'
-											strokeLinejoin='round'
-											aria-hidden
-										>
-											<circle cx='12' cy='12' r='9' />
-											<path d='M8 12l2.5 2.5L16 9' />
-										</svg>
-										ПОДТВЕРЖДЁН
-									</div>
-								</div>
-
-								<LogoutButton />
-							</div>
-						) : (
-							<div className={styles.error}>{me.message}</div>
-						)}
-					</aside>
-
-					{/* правая колонка */}
-					<section className={styles.main}>
-						<div className={styles.headerRow}>
-							<h1 className={styles.title}>Профиль</h1>
-
-							{me.username && (
-								<div className={styles.usernameChip} title='Ваш никнейм'>
-									<span className={styles.at}>@</span>
-									<span>{me.username}</span>
-								</div>
-							)}
-						</div>
-
-						{me.status === 'error' && (
-							<div className={styles.error}>{me.message}</div>
-						)}
-
-						{me.status === 'ok' && (
-							<div className={styles.card}>
-								<div className={styles.row}>
-									<div className={styles.label}>Игровой ID</div>
-									<CopyButton value={me.userId!} />
-								</div>
-
-								<code
-									className={styles.idBadge}
-									title={me.userId}
-									aria-describedby='id-hint'
-								>
-									{formatId(me.userId!)}
-								</code>
-								<p id='id-hint' className={styles.hint}>
-									Используйте ID для поддержки и входа в игровые лобби.
-								</p>
-							</div>
-						)}
-					</section>
-				</div>
-			</div>
-
-			<EditProfileModal
-				isOpen={isEditModalOpen}
-				onClose={() => setIsEditModalOpen(false)}
-				onSave={handleSaveProfile}
-				currentAvatar={avatar}
-				currentFrame={frame}
-			/>
-		</div>
-	)
+      <EditProfileModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSave={handleSaveProfile}
+        currentAvatar={avatar}
+        currentFrame={frame}
+      />
+    </div>
+  )
 }

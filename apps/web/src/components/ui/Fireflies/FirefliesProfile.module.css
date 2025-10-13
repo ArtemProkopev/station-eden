@@ -1,0 +1,423 @@
+/* apps/web/src/components/ui/FirefliesProfile/FirefliesProfile.module.css */
+.background {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Общие стили для групп */
+.leftGroup,
+.rightGroup {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 35%; /* Немного шире для большего количества светлячков */
+}
+
+.leftGroup {
+  left: 0;
+}
+
+.rightGroup {
+  right: 0;
+}
+
+/* Базовые стили светлячка */
+.firefly {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  background: #28d8ff;
+  border-radius: 50%;
+  filter: blur(1.5px);
+  box-shadow: 
+    0 0 12px #28d8ff,
+    0 0 18px #28d8ff,
+    0 0 30px rgba(40, 216, 255, 0.6);
+  opacity: 0;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); /* Более плавные кривые */
+}
+
+/* === ЛЕВАЯ ГРУППА === */
+
+/* Левый светлячок 1-10 */
+.leftGroup .firefly:nth-child(1) {
+  top: 10%;
+  left: 15%;
+  animation: leftFly1 18s infinite ease-in-out, glow1 5s infinite ease-in-out;
+}
+
+.leftGroup .firefly:nth-child(2) {
+  top: 25%;
+  left: 8%;
+  animation: leftFly2 22s infinite ease-in-out, glow2 6s infinite ease-in-out;
+}
+
+.leftGroup .firefly:nth-child(3) {
+  top: 45%;
+  left: 12%;
+  animation: leftFly3 16s infinite ease-in-out, glow3 4.5s infinite ease-in-out;
+}
+
+.leftGroup .firefly:nth-child(4) {
+  top: 65%;
+  left: 18%;
+  animation: leftFly4 20s infinite ease-in-out, glow1 5.5s infinite ease-in-out;
+}
+
+.leftGroup .firefly:nth-child(5) {
+  top: 80%;
+  left: 10%;
+  animation: leftFly5 24s infinite ease-in-out, glow2 7s infinite ease-in-out;
+}
+
+.leftGroup .firefly:nth-child(6) {
+  top: 35%;
+  left: 25%;
+  animation: leftFly6 19s infinite ease-in-out, glow3 4.8s infinite ease-in-out;
+}
+
+.leftGroup .firefly:nth-child(7) {
+  top: 55%;
+  left: 35%;
+  animation: leftFly7 21s infinite ease-in-out, glow1 6.2s infinite ease-in-out;
+}
+
+.leftGroup .firefly:nth-child(8) {
+  top: 15%;
+  left: 32%;
+  animation: leftFly8 17s infinite ease-in-out, glow2 5.8s infinite ease-in-out;
+}
+
+.leftGroup .firefly:nth-child(9) {
+  top: 75%;
+  left: 40%;
+  animation: leftFly9 23s infinite ease-in-out, glow3 6.5s infinite ease-in-out;
+}
+
+.leftGroup .firefly:nth-child(10) {
+  top: 50%;
+  left: 50%;
+  animation: leftFly10 25s infinite ease-in-out, glow1 7.5s infinite ease-in-out;
+}
+
+/* === ПРАВАЯ ГРУППА === */
+
+/* Правый светлячок 1-10 */
+.rightGroup .firefly:nth-child(1) {
+  top: 12%;
+  right: 20%;
+  animation: rightFly1 19s infinite ease-in-out, glow1 5.2s infinite ease-in-out;
+}
+
+.rightGroup .firefly:nth-child(2) {
+  top: 28%;
+  right: 12%;
+  animation: rightFly2 21s infinite ease-in-out, glow2 6.3s infinite ease-in-out;
+}
+
+.rightGroup .firefly:nth-child(3) {
+  top: 48%;
+  right: 8%;
+  animation: rightFly3 17s infinite ease-in-out, glow3 4.7s infinite ease-in-out;
+}
+
+.rightGroup .firefly:nth-child(4) {
+  top: 68%;
+  right: 15%;
+  animation: rightFly4 23s infinite ease-in-out, glow1 5.8s infinite ease-in-out;
+}
+
+.rightGroup .firefly:nth-child(5) {
+  top: 82%;
+  right: 22%;
+  animation: rightFly5 20s infinite ease-in-out, glow2 7.2s infinite ease-in-out;
+}
+
+.rightGroup .firefly:nth-child(6) {
+  top: 38%;
+  right: 45%;
+  animation: rightFly6 18s infinite ease-in-out, glow3 5.1s infinite ease-in-out;
+}
+
+.rightGroup .firefly:nth-child(7) {
+  top: 58%;
+  right: 25%;
+  animation: rightFly7 22s infinite ease-in-out, glow1 6.4s infinite ease-in-out;
+}
+
+.rightGroup .firefly:nth-child(8) {
+  top: 18%;
+  right: 35%;
+  animation: rightFly8 16s infinite ease-in-out, glow2 5.9s infinite ease-in-out;
+}
+
+.rightGroup .firefly:nth-child(9) {
+  top: 72%;
+  right: 18%;
+  animation: rightFly9 24s infinite ease-in-out, glow3 6.8s infinite ease-in-out;
+}
+
+.rightGroup .firefly:nth-child(10) {
+  top: 42%;
+  right: 5%;
+  animation: rightFly10 26s infinite ease-in-out, glow1 7.8s infinite ease-in-out;
+}
+
+/* === БОЛЕЕ ПЛАВНЫЕ АНИМАЦИИ ПОЛЕТА ДЛЯ ЛЕВОЙ ГРУППЫ === */
+
+@keyframes leftFly1 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  10% { transform: translate(15px, -10px) scale(1.1); opacity: 0.3; }
+  25% { transform: translate(25px, -18px) scale(1.3); opacity: 0.8; }
+  40% { transform: translate(20px, 12px) scale(0.9); opacity: 0.6; }
+  60% { transform: translate(12px, 22px) scale(0.8); opacity: 0.4; }
+  75% { transform: translate(-15px, 8px) scale(1.2); opacity: 0.9; }
+  90% { transform: translate(-8px, -5px) scale(1.1); opacity: 0.5; }
+}
+
+@keyframes leftFly2 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  15% { transform: translate(-20px, 12px) scale(1.2); opacity: 0.4; }
+  30% { transform: translate(-28px, 18px) scale(1.4); opacity: 0.9; }
+  45% { transform: translate(-15px, -8px) scale(0.8); opacity: 0.5; }
+  65% { transform: translate(18px, -12px) scale(0.7); opacity: 0.3; }
+  80% { transform: translate(22px, 15px) scale(1.1); opacity: 0.7; }
+  95% { transform: translate(10px, 5px) scale(1.0); opacity: 0.4; }
+}
+
+@keyframes leftFly3 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  12% { transform: translate(18px, 25px) scale(1.3); opacity: 0.5; }
+  28% { transform: translate(30px, 35px) scale(1.5); opacity: 1; }
+  42% { transform: translate(22px, -15px) scale(0.7); opacity: 0.4; }
+  58% { transform: translate(-12px, -22px) scale(0.6); opacity: 0.2; }
+  72% { transform: translate(-25px, 18px) scale(1.2); opacity: 0.8; }
+  88% { transform: translate(-18px, 10px) scale(1.1); opacity: 0.6; }
+}
+
+@keyframes leftFly4 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  8% { transform: translate(-18px, -8px) scale(1.1); opacity: 0.3; }
+  22% { transform: translate(-25px, -12px) scale(1.2); opacity: 0.7; }
+  38% { transform: translate(-15px, 18px) scale(0.9); opacity: 0.5; }
+  52% { transform: translate(12px, 22px) scale(0.8); opacity: 0.4; }
+  68% { transform: translate(20px, -15px) scale(1.3); opacity: 0.9; }
+  84% { transform: translate(15px, -8px) scale(1.1); opacity: 0.6; }
+}
+
+@keyframes leftFly5 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  11% { transform: translate(22px, 6px) scale(1.2); opacity: 0.4; }
+  26% { transform: translate(32px, 10px) scale(1.4); opacity: 0.8; }
+  41% { transform: translate(18px, -18px) scale(0.8); opacity: 0.5; }
+  59% { transform: translate(-18px, 12px) scale(0.7); opacity: 0.3; }
+  76% { transform: translate(-25px, -20px) scale(1.3); opacity: 0.9; }
+  91% { transform: translate(-12px, -10px) scale(1.0); opacity: 0.5; }
+}
+
+@keyframes leftFly6 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  14% { transform: translate(-15px, 22px) scale(1.3); opacity: 0.5; }
+  32% { transform: translate(-22px, 30px) scale(1.5); opacity: 1; }
+  46% { transform: translate(-18px, -12px) scale(0.7); opacity: 0.4; }
+  62% { transform: translate(20px, -8px) scale(0.6); opacity: 0.2; }
+  78% { transform: translate(25px, 15px) scale(1.2); opacity: 0.8; }
+  94% { transform: translate(18px, 8px) scale(1.1); opacity: 0.6; }
+}
+
+@keyframes leftFly7 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  9% { transform: translate(12px, -15px) scale(1.4); opacity: 0.6; }
+  24% { transform: translate(18px, -22px) scale(1.6); opacity: 1; }
+  39% { transform: translate(10px, 25px) scale(0.6); opacity: 0.3; }
+  55% { transform: translate(-28px, 8px) scale(0.5); opacity: 0.1; }
+  71% { transform: translate(-20px, 20px) scale(1.2); opacity: 0.7; }
+  87% { transform: translate(-12px, 12px) scale(1.0); opacity: 0.4; }
+}
+
+@keyframes leftFly8 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  13% { transform: translate(-12px, -20px) scale(1.1); opacity: 0.4; }
+  29% { transform: translate(-18px, -28px) scale(1.3); opacity: 0.8; }
+  44% { transform: translate(-10px, 15px) scale(0.9); opacity: 0.5; }
+  61% { transform: translate(15px, 18px) scale(0.8); opacity: 0.3; }
+  77% { transform: translate(22px, -12px) scale(1.4); opacity: 0.9; }
+  93% { transform: translate(14px, -6px) scale(1.1); opacity: 0.5; }
+}
+
+@keyframes leftFly9 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  16% { transform: translate(20px, 18px) scale(1.2); opacity: 0.5; }
+  34% { transform: translate(28px, 25px) scale(1.4); opacity: 0.9; }
+  48% { transform: translate(15px, -20px) scale(0.7); opacity: 0.4; }
+  64% { transform: translate(-22px, -15px) scale(0.6); opacity: 0.2; }
+  80% { transform: translate(-30px, 22px) scale(1.3); opacity: 0.8; }
+  96% { transform: translate(-18px, 14px) scale(1.0); opacity: 0.5; }
+}
+
+@keyframes leftFly10 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  7% { transform: translate(8px, 12px) scale(1.1); opacity: 0.3; }
+  20% { transform: translate(12px, 18px) scale(1.2); opacity: 0.6; }
+  36% { transform: translate(6px, -10px) scale(0.9); opacity: 0.4; }
+  53% { transform: translate(-10px, -15px) scale(0.8); opacity: 0.2; }
+  70% { transform: translate(-15px, 8px) scale(1.3); opacity: 0.7; }
+  86% { transform: translate(-8px, 4px) scale(1.0); opacity: 0.4; }
+}
+
+/* === БОЛЕЕ ПЛАВНЫЕ АНИМАЦИИ ПОЛЕТА ДЛЯ ПРАВОЙ ГРУППЫ === */
+
+@keyframes rightFly1 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  10% { transform: translate(-18px, -12px) scale(1.1); opacity: 0.3; }
+  25% { transform: translate(-28px, -20px) scale(1.3); opacity: 0.8; }
+  40% { transform: translate(-22px, 15px) scale(0.9); opacity: 0.6; }
+  60% { transform: translate(-15px, 25px) scale(0.8); opacity: 0.4; }
+  75% { transform: translate(18px, 10px) scale(1.2); opacity: 0.9; }
+  90% { transform: translate(10px, -8px) scale(1.1); opacity: 0.5; }
+}
+
+@keyframes rightFly2 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  15% { transform: translate(22px, 15px) scale(1.2); opacity: 0.4; }
+  30% { transform: translate(32px, 22px) scale(1.4); opacity: 0.9; }
+  45% { transform: translate(18px, -10px) scale(0.8); opacity: 0.5; }
+  65% { transform: translate(-20px, -15px) scale(0.7); opacity: 0.3; }
+  80% { transform: translate(-25px, 18px) scale(1.1); opacity: 0.7; }
+  95% { transform: translate(-12px, 8px) scale(1.0); opacity: 0.4; }
+}
+
+@keyframes rightFly3 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  12% { transform: translate(-20px, 28px) scale(1.3); opacity: 0.5; }
+  28% { transform: translate(-32px, 38px) scale(1.5); opacity: 1; }
+  42% { transform: translate(-25px, -18px) scale(0.7); opacity: 0.4; }
+  58% { transform: translate(15px, -25px) scale(0.6); opacity: 0.2; }
+  72% { transform: translate(28px, 22px) scale(1.2); opacity: 0.8; }
+  88% { transform: translate(20px, 12px) scale(1.1); opacity: 0.6; }
+}
+
+@keyframes rightFly4 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  8% { transform: translate(20px, -10px) scale(1.1); opacity: 0.3; }
+  22% { transform: translate(28px, -15px) scale(1.2); opacity: 0.7; }
+  38% { transform: translate(18px, 22px) scale(0.9); opacity: 0.5; }
+  52% { transform: translate(-15px, 25px) scale(0.8); opacity: 0.4; }
+  68% { transform: translate(-22px, -18px) scale(1.3); opacity: 0.9; }
+  84% { transform: translate(-18px, -10px) scale(1.1); opacity: 0.6; }
+}
+
+@keyframes rightFly5 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  11% { transform: translate(-25px, 8px) scale(1.2); opacity: 0.4; }
+  26% { transform: translate(-35px, 12px) scale(1.4); opacity: 0.8; }
+  41% { transform: translate(-20px, -22px) scale(0.8); opacity: 0.5; }
+  59% { transform: translate(20px, 15px) scale(0.7); opacity: 0.3; }
+  76% { transform: translate(28px, -25px) scale(1.3); opacity: 0.9; }
+  91% { transform: translate(15px, -12px) scale(1.0); opacity: 0.5; }
+}
+
+@keyframes rightFly6 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  14% { transform: translate(18px, 25px) scale(1.3); opacity: 0.5; }
+  32% { transform: translate(25px, 35px) scale(1.5); opacity: 1; }
+  46% { transform: translate(20px, -15px) scale(0.7); opacity: 0.4; }
+  62% { transform: translate(-22px, -10px) scale(0.6); opacity: 0.2; }
+  78% { transform: translate(-28px, 18px) scale(1.2); opacity: 0.8; }
+  94% { transform: translate(-20px, 10px) scale(1.1); opacity: 0.6; }
+}
+
+@keyframes rightFly7 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  9% { transform: translate(-15px, -18px) scale(1.4); opacity: 0.6; }
+  24% { transform: translate(-22px, -25px) scale(1.6); opacity: 1; }
+  39% { transform: translate(-12px, 28px) scale(0.6); opacity: 0.3; }
+  55% { transform: translate(30px, 10px) scale(0.5); opacity: 0.1; }
+  71% { transform: translate(22px, 25px) scale(1.2); opacity: 0.7; }
+  87% { transform: translate(15px, 15px) scale(1.0); opacity: 0.4; }
+}
+
+@keyframes rightFly8 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  13% { transform: translate(15px, -22px) scale(1.1); opacity: 0.4; }
+  29% { transform: translate(22px, -30px) scale(1.3); opacity: 0.8; }
+  44% { transform: translate(12px, 18px) scale(0.9); opacity: 0.5; }
+  61% { transform: translate(-18px, 22px) scale(0.8); opacity: 0.3; }
+  77% { transform: translate(-25px, -15px) scale(1.4); opacity: 0.9; }
+  93% { transform: translate(-16px, -8px) scale(1.1); opacity: 0.5; }
+}
+
+@keyframes rightFly9 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  16% { transform: translate(-22px, 20px) scale(1.2); opacity: 0.5; }
+  34% { transform: translate(-30px, 28px) scale(1.4); opacity: 0.9; }
+  48% { transform: translate(-18px, -22px) scale(0.7); opacity: 0.4; }
+  64% { transform: translate(25px, -18px) scale(0.6); opacity: 0.2; }
+  80% { transform: translate(32px, 25px) scale(1.3); opacity: 0.8; }
+  96% { transform: translate(20px, 16px) scale(1.0); opacity: 0.5; }
+}
+
+@keyframes rightFly10 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  7% { transform: translate(-10px, 15px) scale(1.1); opacity: 0.3; }
+  20% { transform: translate(-15px, 22px) scale(1.2); opacity: 0.6; }
+  36% { transform: translate(-8px, -12px) scale(0.9); opacity: 0.4; }
+  53% { transform: translate(12px, -18px) scale(0.8); opacity: 0.2; }
+  70% { transform: translate(18px, 10px) scale(1.3); opacity: 0.7; }
+  86% { transform: translate(10px, 6px) scale(1.0); opacity: 0.4; }
+}
+
+/* === ОБЩИЕ АНИМАЦИИ СВЕЧЕНИЯ === */
+
+@keyframes glow1 {
+  0%, 100% { opacity: 0; }
+  15%, 85% { opacity: 1; }
+  50% { opacity: 0.8; }
+  70% { opacity: 0.6; }
+}
+
+@keyframes glow2 {
+  0%, 20% { opacity: 0; }
+  30%, 90% { opacity: 1; }
+  45% { opacity: 0.7; }
+  65% { opacity: 0.5; }
+  80% { opacity: 0.9; }
+}
+
+@keyframes glow3 {
+  0%, 25% { opacity: 0; }
+  35%, 95% { opacity: 1; }
+  50% { opacity: 0.6; }
+  70% { opacity: 0.4; }
+  85% { opacity: 0.8; }
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .leftGroup,
+  .rightGroup {
+    width: 40%;
+  }
+  
+  /* Уменьшаем количество светлячков на мобильных */
+  .leftGroup .firefly:nth-child(n+6),
+  .rightGroup .firefly:nth-child(n+6) {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .leftGroup,
+  .rightGroup {
+    width: 45%;
+  }
+  
+  /* Еще меньше светлячков на маленьких экранах */
+  .leftGroup .firefly:nth-child(n+4),
+  .rightGroup .firefly:nth-child(n+4) {
+    display: none;
+  }
+}
