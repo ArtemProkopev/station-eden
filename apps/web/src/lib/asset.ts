@@ -1,10 +1,13 @@
 // apps/web/src/lib/asset.ts
 
 // Основной красивый домен для ассетов (может быть пустым на раннем этапе деплоя)
-export const PRIMARY = (process.env.NEXT_PUBLIC_ASSETS_BASE || '').replace(/\/+$/, '')
+export const PRIMARY = (process.env.NEXT_PUBLIC_ASSETS_BASE || '').replace(
+	/\/+$/,
+	''
+)
 
-// UUID-домен Selectel, который всегда работает
-export const FALLBACK = 'https://c8e8acb0-0b53-453b-95d1-9fdda82e2a5a.selstorage.ru'
+// ВАЖНО: домен БАКЕТА (vhost), а не project endpoint
+export const FALLBACK = 'https://station-eden-media.s3.ru-1.storage.selcloud.ru'
 
 /**
  * Делает абсолютный URL к ассету на CDN/S3.
