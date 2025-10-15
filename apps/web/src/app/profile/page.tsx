@@ -1,324 +1,147 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useMemo, useState } from 'react'
 import ImgCdn from '../../components/ImgCdn'
-import TopHUD from '../../components/TopHUD/TopHUD'
-import { ScaleContainer } from '../../components/ui/ScaleContainer/ScaleContainer'
-import { asset } from '../../lib/asset'
-import CopyButton from './CopyButton'
-import EditProfileModal from './EditProfileModal'
-import LogoutButton from './LogoutButton'
-import styles from './page.module.css'
-import { FirefliesProfile } from '../../components/ui/Fireflies/FirefliesProfile'
-import { TwinklingStars } from '../../components/ui/TwinklingStars/TwinklingStars'
+import { asset } from '../../lib/asset' // относительный импорт от /app/profile
+import styles from './EditProfileModal.module.css'
 
-interface ProfileData {
-  status: 'loading' | 'error' | 'ok' | 'unauth'
-  userId?: string
-  email?: string
-  username?: string | null
-  message?: string
+interface EditProfileModalProps {
+	isOpen: boolean
+	onClose: () => void
+	onSave: (avatar: string, frame: string) => void
+	currentAvatar?: string
+	currentFrame?: string
 }
 
-const PROFILE_CONFIG = {
-  STORAGE_KEYS: {
-    AVATAR: 'profile_avatar',
-    FRAME: 'profile_frame'
-  } as const,
-  DEFAULT: {
-    AVATAR: asset('/avatars/avatar1.png'),
-    FRAME: asset('/frames/frame1.png'),
-    PROFILE_DATA: { status: 'loading' } as ProfileData
-  },
-  ICONS: {
-    planet: '/icons/planet.svg',
-    polygon: '/icons/polygon.svg',
-    copy: '/icons/copy.svg'
-  } as const
-} as const
+// Наборы доступных картинок сразу как абсолютные CDN/S3-URL
+const AVATARS = [
+	asset('/avatars/avatar1.png'),
+	asset('/avatars/avatar2.png'),
+	asset('/avatars/avatar3.png'),
+	asset('/avatars/avatar4.png'),
+	asset('/avatars/avatar5.png'),
+	asset('/avatars/avatar6.png'),
+	asset('/avatars/avatar7.png'),
+	asset('/avatars/avatar8.png'),
+	asset('/avatars/avatar9.png'),
+	asset('/avatars/avatar10.png'),
+	asset('/avatars/avatar11.png'),
+	asset('/avatars/testavatar.png'),
+]
 
-const PlanetIcon = () => (
-  <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true">
-    <circle cx="12" cy="12" r="10" fill="#63EFFF" opacity="0.8"/>
-    <ellipse cx="8" cy="9" rx="3" ry="2" fill="#4A90E2"/>
-    <path d="M5 15c2-1 4-1 6 0 2 1 4 1 6 0" stroke="#4A90E2" strokeWidth="1.5" fill="none"/>
-  </svg>
-)
+const FRAMES = [
+	asset('/frames/frame1.png'),
+	asset('/frames/frame2.png'),
+	asset('/frames/frame3.png'),
+	asset('/frames/frame4.png'),
+	asset('/frames/frame5.png'),
+	asset('/frames/frame6.png'),
+	asset('/frames/frame7.png'),
+	asset('/frames/frame8.png'),
+	asset('/frames/frame9.png'),
+	asset('/frames/testframe.png'),
+]
 
-const PolygonIcon = () => (
-  <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true">
-    <polygon 
-      points="12,2 22,8 22,16 12,22 2,16 2,8" 
-      fill="#63EFFF" 
-      opacity="0.8"
-      stroke="#4A90E2"
-      strokeWidth="1.5"
-    />
-  </svg>
-)
-
-const formatId = (id: string): string => 
-  id.replace(/-/g, '\u2009–\u2009')
-
-const migrateToAbsoluteUrl = (url: string | null): string | undefined => {
-  if (!url) return undefined
-  return url.startsWith('http') ? url : asset(url)
+// Нормализуем входящее значение к абсолютному URL
+function toAbsolute(url?: string) {
+	if (!url) return undefined
+	return /^https?:\/\//.test(url) ? url : asset(url)
 }
 
-export default function ProfilePage() {
-  const [profile, setProfile] = useState<ProfileData>(PROFILE_CONFIG.DEFAULT.PROFILE_DATA)
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [avatar, setAvatar] = useState(PROFILE_CONFIG.DEFAULT.AVATAR)
-  const [frame, setFrame] = useState(PROFILE_CONFIG.DEFAULT.FRAME)
-  const [iconsStatus, setIconsStatus] = useState<Record<string, boolean>>({})
+export default function EditProfileModal({
+	isOpen,
+	onClose,
+	onSave,
+	currentAvatar,
+	currentFrame,
+}: EditProfileModalProps) {
+	// Дефолты + миграция старых относительных значений к абсолютным
+	const initialAvatar = useMemo(
+		() => toAbsolute(currentAvatar) ?? AVATARS[0],
+		[currentAvatar]
+	)
+	const initialFrame = useMemo(
+		() => toAbsolute(currentFrame) ?? FRAMES[0],
+		[currentFrame]
+	)
 
-  // Предотвращение прокрутки
-  useEffect(() => {
-    const preventDefault = (e: Event) => {
-      e.preventDefault();
-    };
+	const [selectedAvatar, setSelectedAvatar] = useState(initialAvatar)
+	const [selectedFrame, setSelectedFrame] = useState(initialFrame)
 
-    // Блокируем различные типы прокрутки
-    const options = { passive: false };
-    
-    document.addEventListener('wheel', preventDefault, options);
-    document.addEventListener('touchmove', preventDefault, options);
-    
-    // Также блокируем скролл на body
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
-    
-    return () => {
-      document.removeEventListener('wheel', preventDefault);
-      document.removeEventListener('touchmove', preventDefault);
-      document.body.style.overflow = '';
-      document.documentElement.style.overflow = '';
-    };
-  }, []);
+	if (!isOpen) return null
 
-  const checkIconsAvailability = useCallback(async () => {
-    const statusUpdates: Record<string, boolean> = {}
-    
-    await Promise.allSettled(
-      Object.entries(PROFILE_CONFIG.ICONS).map(async ([key, url]) => {
-        try {
-          const response = await fetch(url, { method: 'HEAD' })
-          statusUpdates[key] = response.ok
-        } catch {
-          statusUpdates[key] = false
-        }
-      })
-    )
-    
-    setIconsStatus(prev => ({ ...prev, ...statusUpdates }))
-  }, [])
+	const handleSave = () => {
+		// Всегда сохраняем абсолютные ссылки (у нас уже так)
+		onSave(selectedAvatar!, selectedFrame!)
+		onClose()
+	}
 
-  const loadUserData = useCallback(async () => {
-    try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
-      const response = await fetch(`${API_BASE}/auth/me`, {
-        credentials: 'include',
-        cache: 'no-store',
-      })
+	return (
+		<div className={styles.overlay}>
+			<div className={styles.modal}>
+				<div className={styles.header}>
+					<h2>Редактировать профиль</h2>
+					<button className={styles.closeButton} onClick={onClose}>
+						×
+					</button>
+				</div>
 
-      if (response.status === 401) {
-        setProfile({
-          status: 'unauth',
-          message: 'Вы не авторизованы. Войдите в аккаунт, чтобы открыть профиль.',
-        })
-        return
-      }
+				<div className={styles.content}>
+					<div className={styles.preview}>
+						<div className={styles.previewContainer}>
+							<ImgCdn
+								src={selectedAvatar!}
+								alt='Аватар'
+								className={styles.previewAvatar}
+							/>
+							<ImgCdn
+								src={selectedFrame!}
+								alt='Рамка'
+								className={styles.previewFrame}
+							/>
+						</div>
+					</div>
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
+					<div className={styles.section}>
+						<h3>Выберите аватарку</h3>
+						<div className={styles.grid}>
+							{AVATARS.map(a => (
+								<button
+									key={a}
+									className={`${styles.avatarOption} ${selectedAvatar === a ? styles.selected : ''}`}
+									onClick={() => setSelectedAvatar(a)}
+								>
+									<ImgCdn src={a} alt='Аватар' />
+								</button>
+							))}
+						</div>
+					</div>
 
-      const data = await response.json()
-      const payload = data?.data ?? data
-      const { userId, email, username = null } = payload
+					<div className={styles.section}>
+						<h3>Выберите рамку</h3>
+						<div className={styles.grid}>
+							{FRAMES.map(f => (
+								<button
+									key={f}
+									className={`${styles.frameOption} ${selectedFrame === f ? styles.selected : ''}`}
+									onClick={() => setSelectedFrame(f)}
+								>
+									<ImgCdn src={f} alt='Рамка' />
+								</button>
+							))}
+						</div>
+					</div>
 
-      if (typeof userId === 'string' && typeof email === 'string') {
-        setProfile({ status: 'ok', userId, email, username })
-      } else {
-        throw new Error('Некорректный формат ответа сервера')
-      }
-    } catch (error) {
-      console.error('Profile data loading error:', error)
-      setProfile({ 
-        status: 'error', 
-        message: error instanceof Error ? error.message : 'Не удалось загрузить профиль' 
-      })
-    }
-  }, [])
-
-  useEffect(() => {
-    const initializeProfile = async () => {
-      const savedAvatar = localStorage.getItem(PROFILE_CONFIG.STORAGE_KEYS.AVATAR)
-      const savedFrame = localStorage.getItem(PROFILE_CONFIG.STORAGE_KEYS.FRAME)
-      
-      const migratedAvatar = migrateToAbsoluteUrl(savedAvatar)
-      const migratedFrame = migrateToAbsoluteUrl(savedFrame)
-
-      if (migratedAvatar) {
-        setAvatar(migratedAvatar)
-        localStorage.setItem(PROFILE_CONFIG.STORAGE_KEYS.AVATAR, migratedAvatar)
-      }
-
-      if (migratedFrame) {
-        setFrame(migratedFrame)
-        localStorage.setItem(PROFILE_CONFIG.STORAGE_KEYS.FRAME, migratedFrame)
-      }
-
-      await Promise.all([
-        checkIconsAvailability(),
-        loadUserData()
-      ])
-    }
-
-    initializeProfile()
-  }, [checkIconsAvailability, loadUserData])
-
-  const handleSaveProfile = useCallback((newAvatar: string, newFrame: string) => {
-    setAvatar(newAvatar)
-    setFrame(newFrame)
-    localStorage.setItem(PROFILE_CONFIG.STORAGE_KEYS.AVATAR, newAvatar)
-    localStorage.setItem(PROFILE_CONFIG.STORAGE_KEYS.FRAME, newFrame)
-  }, [])
-
-  const handleEditModalOpen = useCallback(() => setIsEditModalOpen(true), [])
-  const handleEditModalClose = useCallback(() => setIsEditModalOpen(false), [])
-
-  return (
-    <main className={styles.root}>
-      <FirefliesProfile />
-      <TwinklingStars />
-      
-      <TopHUD />
-
-      <ScaleContainer 
-        baseWidth={1200}
-        baseHeight={800}
-        minScale={0.5}
-        maxScale={1}
-      >
-        <header className={styles.headerSection}>
-          <div className={styles.headerContent}>
-            <h1 className={styles.header}>ПРОФИЛЬ</h1>
-            <figure className={styles.hexagonPlanet} aria-label="Декоративный элемент профиля">
-              {iconsStatus.polygon ? (
-                <img
-                  className={styles.polygonIcon}
-                  src={PROFILE_CONFIG.ICONS.polygon}
-                  alt=""
-                  role="presentation"
-                  onError={() => setIconsStatus(prev => ({ ...prev, polygon: false }))}
-                />
-              ) : (
-                <PolygonIcon />
-              )}
-              <div className={styles.planetCenter}>
-                {iconsStatus.planet ? (
-                  <img
-                    className={styles.planetIcon}
-                    src={PROFILE_CONFIG.ICONS.planet}
-                    alt=""
-                    role="presentation"
-                    onError={() => setIconsStatus(prev => ({ ...prev, planet: false }))}
-                  />
-                ) : (
-                  <PlanetIcon />
-                )}
-              </div>
-            </figure>
-          </div>
-          <button className={styles.editBtn} onClick={handleEditModalOpen} aria-label="Редактировать профиль">
-            редактировать
-          </button>
-        </header>
-
-        <article className={styles.panel}>
-          <div className={styles.contentGrid}>
-            <section className={styles.avatarSection} aria-labelledby="user-handle">
-              <div className={styles.avatarWrapper}>
-                <div className={styles.leavesWrapper}>
-                  <img 
-                    src="/decor/leaves.png" 
-                    alt="" 
-                    role="presentation"
-                    className={styles.leavesImage}
-                  />
-                </div>
-                <div className={styles.avatarContainer}>
-                  <ImgCdn 
-                    src={avatar} 
-                    alt={`Аватар пользователя ${profile.username || ''}`} 
-                    className={styles.avatar} 
-                  />
-                  <ImgCdn 
-                    src={frame} 
-                    alt="Рамка профиля" 
-                    className={styles.frame} 
-                  />
-                </div>
-              </div>
-              
-              <h2 id="user-handle" className={styles.handle}>
-                @{profile.username ?? 'Никнейм'}
-              </h2>
-              {profile.status === 'ok' && <LogoutButton />}
-            </section>
-
-            <section className={styles.infoSection} aria-labelledby="profile-info">
-              <h3 id="profile-info" className={styles.visuallyHidden}>Информация профиля</h3>
-              
-              <div className={styles.loginCard}>
-                <p className={styles.loginCaption}>Входит как</p>
-                <p className={styles.loginEmail}>{profile.email ?? 'example@mail.ru'}</p>
-                
-                <div className={styles.idSection}>
-                  <div className={styles.idHeader}>
-                    <span className={styles.idLabel}>Игровой ID:</span>
-                    {profile.status === 'ok' && profile.userId && (
-                      <CopyButton value={profile.userId} />
-                    )}
-                  </div>
-                  {profile.status === 'ok' && profile.userId && (
-                    <output className={styles.idBadge} htmlFor="user-id">
-                      {formatId(profile.userId)}
-                    </output>
-                  )}
-                </div>
-                
-                <p className={styles.hint}>
-                  Используйте ID для поддержки и входа в игровые лобби.
-                </p>
-              </div>
-            </section>
-          </div>
-        </article>
-
-        <section className={styles.statsSection} aria-labelledby="user-stats">
-          <h3 id="user-stats" className={styles.visuallyHidden}>Статистика пользователя</h3>
-          <div className={styles.statsGrid}>
-            <article className={styles.statCard}>
-              <h4 className={styles.statLabel}>завершено миссий</h4>
-              <p className={styles.statValue}>47</p>
-            </article>
-            <article className={styles.statCard}>
-              <h4 className={styles.statLabel}>время на станции</h4>
-              <p className={styles.statValue}>134 ч</p>
-            </article>
-          </div>
-        </section>
-
-        <EditProfileModal
-          isOpen={isEditModalOpen}
-          onClose={handleEditModalClose}
-          onSave={handleSaveProfile}
-          currentAvatar={avatar}
-          currentFrame={frame}
-        />
-      </ScaleContainer>
-    </main>
-  )
+					<div className={styles.actions}>
+						<button className={styles.cancelButton} onClick={onClose}>
+							Отмена
+						</button>
+						<button className={styles.saveButton} onClick={handleSave}>
+							Сохранить
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	)
 }

@@ -93,6 +93,7 @@ async function sanityChecks() {
 	try {
 		await s3.send(new GetBucketLocationCommand({ Bucket: BUCKET }))
 	} catch (e) {
+		// не критично для загрузки — просто лог
 		console.warn('GetBucketLocation failed (не критично):', (e as any)?.message)
 	}
 }
@@ -137,15 +138,17 @@ async function main() {
 	const roots = [
 		{ dir: 'apps/web/public/avatars', prefix: 'web/avatars/' },
 		{ dir: 'apps/web/public/frames', prefix: 'web/frames/' },
-		{ dir: 'apps/web/public/icons', prefix: 'web/icons/' }, // NEW
-		{ dir: 'apps/web/public/fonts', prefix: 'web/fonts/' }, // NEW (если есть)
+		{ dir: 'apps/web/public/icons', prefix: 'web/icons/' },
+		{ dir: 'apps/web/public/fonts', prefix: 'web/fonts/' },
+		{ dir: 'apps/web/public/decor', prefix: 'web/decor/' }, // <-- ВОТ ЭТА СТРОКА
 	]
 
-	// Одиночные файлы
+	// Одиночные файлы (используем реальные имена из /public)
 	const singles = [
+		// У тебя в дереве: public/profile-backrground.jpg (с опечаткой)
 		{
-			path: 'apps/web/public/profile-background.png',
-			key: 'web/profile-background.png',
+			path: 'apps/web/public/profile-backrground.jpg',
+			key: 'web/profile-backrground.jpg',
 		},
 		{ path: 'apps/web/public/logo.svg', key: 'web/logo.svg' },
 		{
