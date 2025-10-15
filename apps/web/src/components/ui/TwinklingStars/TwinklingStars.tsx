@@ -1,10 +1,21 @@
 // apps/web/src/components/ui/TwinklingStars/TwinklingStars.tsx
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import styles from './TwinklingStars.module.css';
 
 export const TwinklingStars: React.FC = () => {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // Не рендерим звезды на сервере
+  if (!isClient) {
+    return null;
+  }
+
   return (
     <div className={styles.starsContainer} aria-hidden="true">
       {/* Мелкие звезды */}
