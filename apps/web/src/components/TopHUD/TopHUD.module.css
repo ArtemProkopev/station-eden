@@ -7,7 +7,7 @@
   padding: 30px 80px 0 80px;
   width: 100%;
   box-sizing: border-box;
-  font-family: 'Russo One', sans-serif;
+  font-family: 'RussoOne', sans-serif;
   transition: transform 0.3s ease;
   /* transform и transformOrigin задаются через style */
 }

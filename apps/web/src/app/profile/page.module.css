@@ -23,19 +23,6 @@
   box-sizing: border-box;
 }
 
-/* Контейнер для всего контента с масштабированием */
-.contentWrapper {
-  width: 100%;
-  max-width: 1200px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  transition: transform 0.3s ease;
-  transform-origin: center top;
-  flex: 1;
-  overflow: visible;
-}
-
 /* Утилитарные классы */
 .visuallyHidden {
   position: absolute;

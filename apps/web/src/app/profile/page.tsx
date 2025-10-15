@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import ImgCdn from '../../components/ImgCdn'
 import TopHUD from '../../components/TopHUD/TopHUD'
+import { ScaleContainer } from '../../components/ui/ScaleContainer/ScaleContainer'
 import { asset } from '../../lib/asset'
 import CopyButton from './CopyButton'
 import EditProfileModal from './EditProfileModal'
@@ -63,50 +64,6 @@ const migrateToAbsoluteUrl = (url: string | null): string | undefined => {
   if (!url) return undefined
   return url.startsWith('http') ? url : asset(url)
 }
-
-// Компонент для масштабирования контента - ОБНОВЛЕННАЯ ВЕРСИЯ
-const ScaleContainer = ({ children }: { children: React.ReactNode }) => {
-  const [scale, setScale] = useState(1);
-  
-  useEffect(() => {
-    const updateScale = () => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      
-      // Базовые размеры для десктопного вида
-      const baseWidth = 1200;
-      const baseHeight = 800;
-      
-      const widthScale = (width - 40) / baseWidth; // Учитываем padding
-      const heightScale = (height - 40) / baseHeight;
-      
-      // Используем минимальный масштаб, чтобы вместить по обеим осям
-      const newScale = Math.min(widthScale, heightScale);
-      
-      // Ограничиваем масштаб разумными пределами
-      const minScale = 0.5;
-      const maxScale = 1;
-      setScale(Math.max(minScale, Math.min(newScale, maxScale)));
-    };
-    
-    updateScale();
-    window.addEventListener('resize', updateScale);
-    
-    return () => window.removeEventListener('resize', updateScale);
-  }, []);
-  
-  return (
-    <div 
-      className={styles.contentWrapper}
-      style={{ 
-        transform: `scale(${scale})`,
-        transformOrigin: 'center top'
-      }}
-    >
-      {children}
-    </div>
-  );
-};
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData>(PROFILE_CONFIG.DEFAULT.PROFILE_DATA)
@@ -238,7 +195,12 @@ export default function ProfilePage() {
       
       <TopHUD />
 
-      <ScaleContainer>
+      <ScaleContainer 
+        baseWidth={1200}
+        baseHeight={800}
+        minScale={0.5}
+        maxScale={1}
+      >
         <header className={styles.headerSection}>
           <div className={styles.headerContent}>
             <h1 className={styles.header}>ПРОФИЛЬ</h1>
