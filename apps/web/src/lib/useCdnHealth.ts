@@ -72,7 +72,6 @@ async function checkPrimaryCdnHealth(): Promise<boolean> {
 	if (!PRIMARY) return true
 
 	try {
-		// Пробуем загрузить тестовый ресурс через primary CDN
 		// Используем GET + no-cors, чтобы не падать на CORS/HEAD
 		const testUrl = `${PRIMARY}/web/favicon.ico?health-check=${Date.now()}`
 		await fetch(testUrl, {
@@ -83,7 +82,7 @@ async function checkPrimaryCdnHealth(): Promise<boolean> {
 				'Cache-Control': 'no-cache',
 			},
 		})
-		// Если исключения не было — считаем CDN здоровым (ответ opaque ок)
+		// Если исключения не было — считаем CDN здоровым (opaque ответ допустим)
 		return true
 	} catch {
 		return false

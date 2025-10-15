@@ -11,7 +11,7 @@ import {
 	S3Client,
 } from '@aws-sdk/client-s3'
 import 'dotenv/config'
-import { readdirSync, readFileSync, statSync } from 'fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
 import { join } from 'path'
 
 const {
@@ -70,6 +70,9 @@ function contentTypeByKey(key: string): string {
 	if (k.endsWith('.jpg') || k.endsWith('.jpeg')) return 'image/jpeg'
 	if (k.endsWith('.webp')) return 'image/webp'
 	if (k.endsWith('.gif')) return 'image/gif'
+	if (k.endsWith('.woff2')) return 'font/woff2'
+	if (k.endsWith('.woff')) return 'font/woff'
+	if (k.endsWith('.ttf')) return 'font/ttf'
 	return 'application/octet-stream'
 }
 
@@ -90,7 +93,6 @@ async function sanityChecks() {
 	try {
 		await s3.send(new GetBucketLocationCommand({ Bucket: BUCKET }))
 	} catch (e) {
-		// не критично для загрузки — просто лог
 		console.warn('GetBucketLocation failed (не критично):', (e as any)?.message)
 	}
 }
@@ -131,11 +133,15 @@ async function put(localPath: string, key: string) {
 async function main() {
 	await sanityChecks()
 
+	// Каталоги, уходящие под /web/*
 	const roots = [
 		{ dir: 'apps/web/public/avatars', prefix: 'web/avatars/' },
 		{ dir: 'apps/web/public/frames', prefix: 'web/frames/' },
+		{ dir: 'apps/web/public/icons', prefix: 'web/icons/' }, // NEW
+		{ dir: 'apps/web/public/fonts', prefix: 'web/fonts/' }, // NEW (если есть)
 	]
 
+	// Одиночные файлы
 	const singles = [
 		{
 			path: 'apps/web/public/profile-background.png',
@@ -151,12 +157,21 @@ async function main() {
 
 	let count = 0
 	for (const r of roots) {
+		if (!existsSync(r.dir)) {
+			console.warn('skip dir (not found):', r.dir)
+			continue
+		}
 		for (const f of walk(r.dir)) {
 			await put(f.path, r.prefix + f.key)
 			count++
 		}
 	}
+
 	for (const s of singles) {
+		if (!existsSync(s.path)) {
+			console.warn('skip (not found):', s.path)
+			continue
+		}
 		await put(s.path, s.key)
 		count++
 	}

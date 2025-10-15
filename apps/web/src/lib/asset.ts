@@ -17,7 +17,7 @@ const IS_PROD = process.env.NODE_ENV === 'production'
 export function asset(rel: string): string {
 	if (!rel) return rel as unknown as string
 	if (!rel.startsWith('/')) rel = '/' + rel
-	const base = PRIMARY || FALLBACK // в проде PRIMARY обязан быть; FALLBACK только как сетевой запасной путь
+	const base = PRIMARY || FALLBACK
 	return `${base}/web${rel}`
 }
 
@@ -56,7 +56,6 @@ export function onImgErrorSwapToFallback(
 // (опционально) сигнализировать о неверной конфигурации в проде
 export function assertPrimaryInProd() {
 	if (IS_PROD && !PRIMARY) {
-		// можно подключить метрику/логгер/сентри
 		// eslint-disable-next-line no-console
 		console.error('[asset] NEXT_PUBLIC_ASSETS_BASE is empty in production!')
 	}
