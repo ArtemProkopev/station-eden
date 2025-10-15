@@ -1,11 +1,16 @@
+// apps/web/src/lib/asset.ts
 // Единая нормализация публичных ссылок на ассеты
 
-export const PRIMARY = (process.env.NEXT_PUBLIC_ASSETS_BASE || '').replace(
-	/\/+$/,
-	''
-)
+// Безопасный дефолт на CDN (если переменная не попала на этапе сборки)
+const CDN_DEFAULT = 'https://cdn.assets.stationeden.ru'
+
+export const PRIMARY = (
+	process.env.NEXT_PUBLIC_ASSETS_BASE || CDN_DEFAULT
+).replace(/\/+$/, '')
+
 export const FALLBACK =
 	'https://c8e8acb0-0b53-453b-95d1-9fdda82e2a5a.selstorage.ru'
+
 const IS_PROD = process.env.NODE_ENV === 'production'
 
 /** Абсолютный CDN-URL по ключу/относительному пути */

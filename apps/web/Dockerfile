@@ -34,7 +34,8 @@ WORKDIR /app/apps/web
 ARG NEXT_PUBLIC_API_BASE=/api
 ARG NEXT_PUBLIC_ENABLE_TELEGRAM=false
 ARG NEXT_PUBLIC_ENABLE_GOOGLE=true
-ARG NEXT_PUBLIC_ASSETS_BASE
+# Дефолт на CDN, если не передали build-arg
+ARG NEXT_PUBLIC_ASSETS_BASE=https://cdn.assets.stationeden.ru
 
 ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
 ENV NEXT_PUBLIC_ENABLE_TELEGRAM=$NEXT_PUBLIC_ENABLE_TELEGRAM
@@ -53,8 +54,8 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-# продублировать env для SSR-процесса
-ARG NEXT_PUBLIC_ASSETS_BASE
+# продублировать env для SSR-процесса (с тем же дефолтом)
+ARG NEXT_PUBLIC_ASSETS_BASE=https://cdn.assets.stationeden.ru
 ENV NEXT_PUBLIC_ASSETS_BASE=$NEXT_PUBLIC_ASSETS_BASE
 
 COPY --from=build /app/apps/web/.next/standalone ./
