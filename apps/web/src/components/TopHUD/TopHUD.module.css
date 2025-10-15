@@ -8,6 +8,8 @@
   width: 100%;
   box-sizing: border-box;
   font-family: 'Russo One', sans-serif;
+  transition: transform 0.3s ease;
+  /* transform и transformOrigin задаются через style */
 }
 
 .backLink{
@@ -17,12 +19,14 @@
   text-decoration: none;
   cursor: pointer;
   user-select: none;
+  transition: all 0.3s ease;
 }
 
 .icon{
   width: 69px;
   height: 69px;
   filter: drop-shadow(0 0 6px rgba(99,239,255,0.9));
+  transition: all 0.3s ease;
 }
 
 .backText{
@@ -36,12 +40,14 @@
     0 0 8px rgba(99,239,255,0.35),
     0 0 20px rgba(99,239,255,0.12);
   transform: translateY(1px);
+  transition: all 0.3s ease;
 }
 
 .hudRight{
   display: inline-flex;
   align-items: center;
   gap: 80px;
+  transition: all 0.3s ease;
 }
 
 .currency {
@@ -53,19 +59,21 @@
   border: 2px solid #204C72;
   box-shadow: 0 0 10px #63efff59;
   gap: 10px;
-   /* Добавьте свечение для контраста */
+  transition: all 0.3s ease;
 }
 
 .currencyContent {
   display: flex;
   align-items: center;
   gap: 28px;
+  transition: all 0.3s ease;
 }
 
 .star {
   width: 33px;
   height: 33px;
   filter: drop-shadow(0 0 6px rgba(99,239,255,0.9));
+  transition: all 0.3s ease;
 }
 
 .gearIcon{
@@ -76,6 +84,7 @@
   height: 66px;
   cursor: pointer;
   filter: drop-shadow(0 0 6px rgba(99,239,255,0.9));
+  transition: all 0.3s ease;
 }
 
 .plusButton {
@@ -96,6 +105,7 @@
   padding: 0;
   margin: 0;
   position: relative;
+  transition: all 0.3s ease;
 }
 
 .plusButton::before {
@@ -115,13 +125,207 @@
   min-width: 30px;
 }
 
-@media (max-width: 640px) {
-  .backText { font-size: 14px }
-  .icon { width: 28px; height: 28px }
-  .currencyValue { font-size: 14px }
-  .plusButton { 
-    width: 22px; 
-    height: 22px; 
+/* Адаптив через медиа-запросы как резервная система */
+@media (max-width: 1200px) {
+  .hud {
+    padding: 25px 60px 0 60px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .hud {
+    padding: 20px 40px 0 40px;
+  }
+  
+  .backLink {
+    gap: 20px;
+  }
+  
+  .hudRight {
+    gap: 60px;
+  }
+}
+
+@media (max-width: 800px) {
+  .hud {
+    padding: 15px 30px 0 30px;
+  }
+  
+  .icon {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .backText {
+    font-size: 24px;
+  }
+  
+  .gearIcon {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .star {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .plusButton {
+    width: 35px;
+    height: 35px;
+    font-size: 30px;
+  }
+  
+  .hudRight {
+    gap: 40px;
+  }
+  
+  .currency {
+    padding: 4px 15px;
+  }
+  
+  .currencyContent {
+    gap: 20px;
+  }
+}
+
+@media (max-width: 600px) {
+  .hud {
+    padding: 12px 20px 0 20px;
+    gap: 8px;
+  }
+  
+  .backLink {
+    gap: 15px;
+  }
+  
+  .icon {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .backText {
+    font-size: 20px;
+    letter-spacing: 0.5px;
+  }
+  
+  .gearIcon {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .star {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .plusButton {
+    width: 30px;
+    height: 30px;
+    font-size: 24px;
+  }
+  
+  .hudRight {
+    gap: 30px;
+  }
+  
+  .currency {
+    padding: 3px 12px;
+    gap: 8px;
+  }
+  
+  .currencyContent {
+    gap: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hud {
+    padding: 10px 15px 0 15px;
+    gap: 6px;
+  }
+  
+  .backLink {
+    gap: 12px;
+  }
+  
+  .icon {
+    width: 35px;
+    height: 35px;
+  }
+  
+  .backText {
+    font-size: 18px;
+  }
+  
+  .gearIcon {
+    width: 35px;
+    height: 35px;
+  }
+  
+  .hudRight {
+    gap: 20px;
+  }
+  
+  .currency {
+    padding: 2px 10px;
+  }
+  
+  .currencyContent {
+    gap: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .hud {
+    padding: 8px 12px 0 12px;
+  }
+  
+  .backText {
     font-size: 16px;
+  }
+  
+  .icon {
+    width: 30px;
+    height: 30px;
+  }
+  
+  .gearIcon {
+    width: 30px;
+    height: 30px;
+  }
+  
+  .star {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .plusButton {
+    width: 25px;
+    height: 25px;
+    font-size: 20px;
+  }
+}
+
+/* Для вертикальной ориентации на мобильных */
+@media (max-height: 600px) and (max-width: 900px) {
+  .hud {
+    padding-top: 15px;
+  }
+}
+
+@media (max-height: 500px) and (max-width: 900px) {
+  .hud {
+    padding-top: 10px;
+  }
+  
+  .icon {
+    width: 35px;
+    height: 35px;
+  }
+  
+  .gearIcon {
+    width: 35px;
+    height: 35px;
   }
 }

@@ -1,7 +1,9 @@
-/* apps/web/src/app/profile/page.module.css */
 .root {
-  min-height: 100vh;
-  position: relative;
+  height: 100vh;
+  width: 100vw;
+  position: fixed;
+  top: 0;
+  left: 0;
   overflow: hidden;
   font-family: 'RussoOne', sans-serif;
   
@@ -11,6 +13,27 @@
   --neon-glow-light: rgba(99,239,255,0.3);
   --neon-glow-medium: rgba(99,239,255,0.5);
   --neon-glow-strong: rgba(99,239,255,0.7);
+  
+  /* Центрирование контента */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* Контейнер для всего контента с масштабированием */
+.contentWrapper {
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.3s ease;
+  transform-origin: center top;
+  flex: 1;
+  overflow: visible;
 }
 
 /* Утилитарные классы */
@@ -50,8 +73,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 90px auto 0;
+  width: 100%;
   max-width: 1060px;
+  margin: 70px 0 0 0;
   padding-bottom: 10px;
 }
 
@@ -158,7 +182,8 @@
 .panel {
   position: relative;
   z-index: 2;
-  margin: 28px auto 48px;
+  margin: 28px 0 48px;
+  width: 100%;
   max-width: 1060px;
   border-radius: 36px;
   padding: 28px 28px 16px;
@@ -332,6 +357,7 @@
 
 /* Stats section */
 .statsSection {
+  width: 100%;
   max-width: 800px;
   margin: 0 auto;
 }
@@ -441,21 +467,17 @@
   }
 }
 
-/* Responsive */
-@media (max-width: 980px) {
+/* Упрощенные медиа-запросы */
+@media (max-width: 768px) {
   .contentGrid {
     grid-template-columns: 1fr;
-  }
-  
-  .statsGrid {
-    grid-template-columns: 1fr;
-    gap: 12px;
+    gap: 20px;
   }
   
   .headerSection {
     flex-direction: column;
     gap: 20px;
-    margin-top: 110px;
+    margin-top: 30px;
     text-align: center;
   }
   
@@ -464,31 +486,19 @@
     gap: 20px;
   }
   
-  .header {
-    font-size: 48px;
-  }
-  
   .leavesWrapper {
-    width: 240px;
+    width: 400px;
   }
   
   .avatarContainer {
-    width: 200px;
-    height: 200px;
-  }
-  
-  .loginEmail {
-    font-size: 24px;
-  }
-  
-  .statValue {
-    font-size: 28px;
+    width: 220px;
+    height: 220px;
   }
 }
 
 @media (max-width: 480px) {
   .header {
-    font-size: 36px;
+    font-size: 48px;
   }
   
   .editBtn {
@@ -496,21 +506,28 @@
     padding: 10px 16px;
   }
   
-  .avatarContainer {
-    width: 160px;
-    height: 160px;
-  }
-  
-  .handle {
+  .loginEmail {
     font-size: 24px;
   }
   
-  .loginEmail {
-    font-size: 20px;
+  .leavesWrapper {
+    width: 320px;
   }
   
   .idBadge {
     font-size: 14px;
     padding: 10px 8px;
+  }
+  
+  .statValue {
+    font-size: 28px;
+  }
+}
+
+/* Touch-friendly для мобильных */
+@media (hover: none) and (pointer: coarse) {
+  .editBtn, .copyBtn {
+    min-height: 44px;
+    min-width: 44px;
   }
 }

@@ -30,6 +30,33 @@ const FALLBACKS = {
 
 export default function TopHUD() {
   const [ok, setOk] = useState<{[k: string]: boolean}>({})
+  const [scale, setScale] = useState(1)
+
+  useEffect(() => {
+    // Функция для вычисления масштаба на основе ширины экрана
+    const updateScale = () => {
+      const width = window.innerWidth
+      
+      if (width >= 1200) {
+        setScale(1)
+      } else if (width >= 1000) {
+        setScale(0.9)
+      } else if (width >= 800) {
+        setScale(0.8)
+      } else if (width >= 600) {
+        setScale(0.7)
+      } else if (width >= 400) {
+        setScale(0.6)
+      } else {
+        setScale(0.5)
+      }
+    }
+
+    updateScale()
+    window.addEventListener('resize', updateScale)
+    
+    return () => window.removeEventListener('resize', updateScale)
+  }, [])
 
   useEffect(() => {
     Object.entries(ICONS).forEach(([key, url]) => {
@@ -45,8 +72,16 @@ export default function TopHUD() {
     })
   }, [])
 
+  // Вычисляемые стили для масштабирования
+  const hudStyle = {
+    transform: `scale(${scale})`,
+    transformOrigin: 'top center',
+    width: scale < 1 ? `${100 / scale}%` : '100%',
+    height: scale < 1 ? 'auto' : '100%'
+  } as React.CSSProperties
+
   return (
-    <div className={styles.hud}>
+    <div className={styles.hud} style={hudStyle}>
       <a href="/" className={styles.backLink} aria-label="На главную">
         {ok.rocket ? (
           <img

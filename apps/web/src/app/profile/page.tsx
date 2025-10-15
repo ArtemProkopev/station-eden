@@ -1,4 +1,3 @@
-// apps/web/src/app/profile/page.tsx
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
@@ -65,12 +64,80 @@ const migrateToAbsoluteUrl = (url: string | null): string | undefined => {
   return url.startsWith('http') ? url : asset(url)
 }
 
+// Компонент для масштабирования контента - ОБНОВЛЕННАЯ ВЕРСИЯ
+const ScaleContainer = ({ children }: { children: React.ReactNode }) => {
+  const [scale, setScale] = useState(1);
+  
+  useEffect(() => {
+    const updateScale = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      
+      // Базовые размеры для десктопного вида
+      const baseWidth = 1200;
+      const baseHeight = 800;
+      
+      const widthScale = (width - 40) / baseWidth; // Учитываем padding
+      const heightScale = (height - 40) / baseHeight;
+      
+      // Используем минимальный масштаб, чтобы вместить по обеим осям
+      const newScale = Math.min(widthScale, heightScale);
+      
+      // Ограничиваем масштаб разумными пределами
+      const minScale = 0.5;
+      const maxScale = 1;
+      setScale(Math.max(minScale, Math.min(newScale, maxScale)));
+    };
+    
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    
+    return () => window.removeEventListener('resize', updateScale);
+  }, []);
+  
+  return (
+    <div 
+      className={styles.contentWrapper}
+      style={{ 
+        transform: `scale(${scale})`,
+        transformOrigin: 'center top'
+      }}
+    >
+      {children}
+    </div>
+  );
+};
+
 export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData>(PROFILE_CONFIG.DEFAULT.PROFILE_DATA)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [avatar, setAvatar] = useState(PROFILE_CONFIG.DEFAULT.AVATAR)
   const [frame, setFrame] = useState(PROFILE_CONFIG.DEFAULT.FRAME)
   const [iconsStatus, setIconsStatus] = useState<Record<string, boolean>>({})
+
+  // Предотвращение прокрутки
+  useEffect(() => {
+    const preventDefault = (e: Event) => {
+      e.preventDefault();
+    };
+
+    // Блокируем различные типы прокрутки
+    const options = { passive: false };
+    
+    document.addEventListener('wheel', preventDefault, options);
+    document.addEventListener('touchmove', preventDefault, options);
+    
+    // Также блокируем скролл на body
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    
+    return () => {
+      document.removeEventListener('wheel', preventDefault);
+      document.removeEventListener('touchmove', preventDefault);
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    };
+  }, []);
 
   const checkIconsAvailability = useCallback(async () => {
     const statusUpdates: Record<string, boolean> = {}
@@ -171,123 +238,125 @@ export default function ProfilePage() {
       
       <TopHUD />
 
-      <header className={styles.headerSection}>
-        <div className={styles.headerContent}>
-          <h1 className={styles.header}>ПРОФИЛЬ</h1>
-          <figure className={styles.hexagonPlanet} aria-label="Декоративный элемент профиля">
-            {iconsStatus.polygon ? (
-              <img
-                className={styles.polygonIcon}
-                src={PROFILE_CONFIG.ICONS.polygon}
-                alt=""
-                role="presentation"
-                onError={() => setIconsStatus(prev => ({ ...prev, polygon: false }))}
-              />
-            ) : (
-              <PolygonIcon />
-            )}
-            <div className={styles.planetCenter}>
-              {iconsStatus.planet ? (
+      <ScaleContainer>
+        <header className={styles.headerSection}>
+          <div className={styles.headerContent}>
+            <h1 className={styles.header}>ПРОФИЛЬ</h1>
+            <figure className={styles.hexagonPlanet} aria-label="Декоративный элемент профиля">
+              {iconsStatus.polygon ? (
                 <img
-                  className={styles.planetIcon}
-                  src={PROFILE_CONFIG.ICONS.planet}
+                  className={styles.polygonIcon}
+                  src={PROFILE_CONFIG.ICONS.polygon}
                   alt=""
                   role="presentation"
-                  onError={() => setIconsStatus(prev => ({ ...prev, planet: false }))}
+                  onError={() => setIconsStatus(prev => ({ ...prev, polygon: false }))}
                 />
               ) : (
-                <PlanetIcon />
+                <PolygonIcon />
               )}
-            </div>
-          </figure>
-        </div>
-        <button className={styles.editBtn} onClick={handleEditModalOpen} aria-label="Редактировать профиль">
-          редактировать
-        </button>
-      </header>
-
-      <article className={styles.panel}>
-        <div className={styles.contentGrid}>
-          <section className={styles.avatarSection} aria-labelledby="user-handle">
-            <div className={styles.avatarWrapper}>
-              <div className={styles.leavesWrapper}>
-                <img 
-                  src="/decor/leaves.png" 
-                  alt="" 
-                  role="presentation"
-                  className={styles.leavesImage}
-                />
-              </div>
-              <div className={styles.avatarContainer}>
-                <ImgCdn 
-                  src={avatar} 
-                  alt={`Аватар пользователя ${profile.username || ''}`} 
-                  className={styles.avatar} 
-                />
-                <ImgCdn 
-                  src={frame} 
-                  alt="Рамка профиля" 
-                  className={styles.frame} 
-                />
-              </div>
-            </div>
-            
-            <h2 id="user-handle" className={styles.handle}>
-              @{profile.username ?? 'Никнейм'}
-            </h2>
-            {profile.status === 'ok' && <LogoutButton />}
-          </section>
-
-          <section className={styles.infoSection} aria-labelledby="profile-info">
-            <h3 id="profile-info" className={styles.visuallyHidden}>Информация профиля</h3>
-            
-            <div className={styles.loginCard}>
-              <p className={styles.loginCaption}>Входит как</p>
-              <p className={styles.loginEmail}>{profile.email ?? 'example@mail.ru'}</p>
-              
-              <div className={styles.idSection}>
-                <div className={styles.idHeader}>
-                  <span className={styles.idLabel}>Игровой ID:</span>
-                  {profile.status === 'ok' && profile.userId && (
-                    <CopyButton value={profile.userId} />
-                  )}
-                </div>
-                {profile.status === 'ok' && profile.userId && (
-                  <output className={styles.idBadge} htmlFor="user-id">
-                    {formatId(profile.userId)}
-                  </output>
+              <div className={styles.planetCenter}>
+                {iconsStatus.planet ? (
+                  <img
+                    className={styles.planetIcon}
+                    src={PROFILE_CONFIG.ICONS.planet}
+                    alt=""
+                    role="presentation"
+                    onError={() => setIconsStatus(prev => ({ ...prev, planet: false }))}
+                  />
+                ) : (
+                  <PlanetIcon />
                 )}
               </div>
+            </figure>
+          </div>
+          <button className={styles.editBtn} onClick={handleEditModalOpen} aria-label="Редактировать профиль">
+            редактировать
+          </button>
+        </header>
+
+        <article className={styles.panel}>
+          <div className={styles.contentGrid}>
+            <section className={styles.avatarSection} aria-labelledby="user-handle">
+              <div className={styles.avatarWrapper}>
+                <div className={styles.leavesWrapper}>
+                  <img 
+                    src="/decor/leaves.png" 
+                    alt="" 
+                    role="presentation"
+                    className={styles.leavesImage}
+                  />
+                </div>
+                <div className={styles.avatarContainer}>
+                  <ImgCdn 
+                    src={avatar} 
+                    alt={`Аватар пользователя ${profile.username || ''}`} 
+                    className={styles.avatar} 
+                  />
+                  <ImgCdn 
+                    src={frame} 
+                    alt="Рамка профиля" 
+                    className={styles.frame} 
+                  />
+                </div>
+              </div>
               
-              <p className={styles.hint}>
-                Используйте ID для поддержки и входа в игровые лобби.
-              </p>
-            </div>
-          </section>
-        </div>
-      </article>
+              <h2 id="user-handle" className={styles.handle}>
+                @{profile.username ?? 'Никнейм'}
+              </h2>
+              {profile.status === 'ok' && <LogoutButton />}
+            </section>
 
-      <section className={styles.statsSection} aria-labelledby="user-stats">
-        <h3 id="user-stats" className={styles.visuallyHidden}>Статистика пользователя</h3>
-        <div className={styles.statsGrid}>
-          <article className={styles.statCard}>
-            <h4 className={styles.statLabel}>завершено миссий</h4>
-            <p className={styles.statValue}>47</p>
-          </article>
-          <article className={styles.statCard}>
-            <h4 className={styles.statLabel}>время на станции</h4>
-            <p className={styles.statValue}>134 ч</p>
-          </article>
-        </div>
-      </section>
+            <section className={styles.infoSection} aria-labelledby="profile-info">
+              <h3 id="profile-info" className={styles.visuallyHidden}>Информация профиля</h3>
+              
+              <div className={styles.loginCard}>
+                <p className={styles.loginCaption}>Входит как</p>
+                <p className={styles.loginEmail}>{profile.email ?? 'example@mail.ru'}</p>
+                
+                <div className={styles.idSection}>
+                  <div className={styles.idHeader}>
+                    <span className={styles.idLabel}>Игровой ID:</span>
+                    {profile.status === 'ok' && profile.userId && (
+                      <CopyButton value={profile.userId} />
+                    )}
+                  </div>
+                  {profile.status === 'ok' && profile.userId && (
+                    <output className={styles.idBadge} htmlFor="user-id">
+                      {formatId(profile.userId)}
+                    </output>
+                  )}
+                </div>
+                
+                <p className={styles.hint}>
+                  Используйте ID для поддержки и входа в игровые лобби.
+                </p>
+              </div>
+            </section>
+          </div>
+        </article>
 
-      <EditProfileModal
-        isOpen={isEditModalOpen}
-        onClose={handleEditModalClose}
-        onSave={handleSaveProfile}
-        currentAvatar={avatar}
-        currentFrame={frame}
-      />
+        <section className={styles.statsSection} aria-labelledby="user-stats">
+          <h3 id="user-stats" className={styles.visuallyHidden}>Статистика пользователя</h3>
+          <div className={styles.statsGrid}>
+            <article className={styles.statCard}>
+              <h4 className={styles.statLabel}>завершено миссий</h4>
+              <p className={styles.statValue}>47</p>
+            </article>
+            <article className={styles.statCard}>
+              <h4 className={styles.statLabel}>время на станции</h4>
+              <p className={styles.statValue}>134 ч</p>
+            </article>
+          </div>
+        </section>
+
+        <EditProfileModal
+          isOpen={isEditModalOpen}
+          onClose={handleEditModalClose}
+          onSave={handleSaveProfile}
+          currentAvatar={avatar}
+          currentFrame={frame}
+        />
+      </ScaleContainer>
     </main>
   )
 }
