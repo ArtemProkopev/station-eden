@@ -3,11 +3,23 @@
 
 import React, { useEffect, useState, useRef } from 'react'
 import styles from './TopHUD.module.css'
+import LogoutButton from '../../components/TopHUD/LogoutButton'
+
+interface TopHUDProps {
+  profile?: {
+    status: 'loading' | 'error' | 'ok' | 'unauth';
+    userId?: string;
+    email?: string;
+    username?: string | null;
+    message?: string;
+  };
+  avatar?: string; 
+}
 
 const ICONS = {
   rocket: '/icons/rocket.svg',
   star:   '/icons/star.svg',
-  avatar: '/icons/avatar-placeholder.svg', // Добавляем иконку для аватара
+  avatar: '/icons/avatar-placeholder.svg',
 }
 
 const FALLBACKS = {
@@ -30,7 +42,7 @@ const FALLBACKS = {
   ),
 }
 
-export default function TopHUD() {
+export default function TopHUD({ profile, avatar }: TopHUDProps) {
   const [ok, setOk] = useState<{[k: string]: boolean}>({})
   const [scale, setScale] = useState(1)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -95,10 +107,16 @@ export default function TopHUD() {
   const handleMenuItemClick = (action: string) => {
     console.log(`Selected: ${action}`)
     setIsDropdownOpen(false)
-    // Здесь можно добавить логику для каждого пункта меню
+    
+    // Добавляем навигацию по страницам
+    if (action === 'profile') {
+      window.location.href = '/profile'
+    } else if (action === 'settings') {
+      window.location.href = '/settings'
+    }
+    // Можно добавить другие действия по необходимости
   }
 
-  // Вычисляемые стили для масштабирования
   const hudStyle = {
     transform: `scale(${scale})`,
     transformOrigin: 'top center',
@@ -147,7 +165,21 @@ export default function TopHUD() {
             aria-expanded={isDropdownOpen}
           >
             <div className={styles.avatarContainer}>
-              {ok.avatar ? (
+              {/* Показываем кастомный аватар если он передан, иначе стандартный */}
+              {avatar ? (
+                <img 
+                  className={styles.avatarIcon} 
+                  src={avatar} 
+                  alt="Аватар пользователя" 
+                  onError={(e) => {
+                    console.error('Custom avatar failed, falling back to default')
+                    // Если кастомный аватар не загрузился, показываем стандартный
+                    if (ok.avatar) {
+                      (e.target as HTMLImageElement).src = ICONS.avatar
+                    }
+                  }}
+                />
+              ) : ok.avatar ? (
                 <img 
                   className={styles.avatarIcon} 
                   src={ICONS.avatar} 
@@ -182,12 +214,7 @@ export default function TopHUD() {
               >
                 Настройки
               </button>
-              <button 
-                className={styles.menuItem}
-                onClick={() => handleMenuItemClick('logout')}
-              >
-                Выйти
-              </button>
+              {profile?.status === 'ok' && <LogoutButton />}
             </div>
           )}
         </div>

@@ -10,7 +10,7 @@ import { TwinklingStars } from '../../components/ui/TwinklingStars/TwinklingStar
 import { asset } from '../../lib/asset'
 import CopyButton from './CopyButton'
 import EditProfileModal from './EditProfileModal'
-import LogoutButton from './LogoutButton'
+import LogoutButton from '../../components/TopHUD/LogoutButton'
 import styles from './page.module.css'
 
 interface ProfileData {
@@ -212,7 +212,8 @@ export default function ProfilePage() {
 			<FirefliesProfile />
 			<TwinklingStars />
 
-			<TopHUD />
+			{/* Передаем profile и avatar в TopHUD */}
+			<TopHUD profile={profile} avatar={avatar} />
 
 			<ScaleContainer
 				baseWidth={1200}
@@ -298,7 +299,7 @@ export default function ProfilePage() {
 							<h2 id='user-handle' className={styles.handle}>
 								@{profile.username ?? 'Никнейм'}
 							</h2>
-							{profile.status === 'ok' && <LogoutButton />}
+							{/* Убираем отсюда LogoutButton, так как он теперь в TopHUD */}
 						</section>
 
 						<section

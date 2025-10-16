@@ -3,7 +3,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import styles from './page.module.css'
+import styles from './TopHUD.module.css'
 
 export default function LogoutButton() {
   const [loading, setLoading] = useState(false)
@@ -35,12 +35,12 @@ export default function LogoutButton() {
 
   return (
     <button
-      className={styles.leaveBtn}
+      className={styles.menuItem}
       onClick={handleLogout}
       disabled={loading}
       aria-label="Выйти из аккаунта"
     >
-      {loading ? 'выход...' : 'выйти'}
+      {loading ? 'Покидаем станцию...' : 'Покинуть станцию'}
     </button>
   )
 }
