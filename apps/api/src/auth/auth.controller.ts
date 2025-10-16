@@ -224,6 +224,29 @@ export class AuthController {
 		return { ok: true }
 	}
 
+	// ДОБАВЛЕННЫЙ МЕТОД - GET logout для обхода CSRF
+	@Get('logout-get')
+	async logoutGet(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+		console.log('=== GET LOGOUT CALLED ===')
+		
+		const payload = tryDecode(this.jwt, (req as any).cookies?.access_token)
+		const userId = (payload as any)?.sub
+		const rt = (req as any).cookies?.refresh_token
+		
+		console.log('User ID from token:', userId)
+		
+		if (userId) {
+			await this.auth.logout(userId, rt)
+		}
+		
+		// Очищаем куки
+		this.clearWithSameAttrs(res, 'access_token', this.authCookieOpts())
+		this.clearWithSameAttrs(res, 'refresh_token', this.authCookieOpts())
+		this.clearWithSameAttrs(res, 'preauth', this.preauthCookieOpts())
+		
+		return { ok: true }
+	}
+
 	@UseGuards(JwtAuthGuard)
 	@Get('me')
 	me(@Req() req: AuthenticatedRequest) {

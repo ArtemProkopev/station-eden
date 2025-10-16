@@ -13,8 +13,10 @@ export default function LogoutButton() {
     setLoading(true)
     try {
       const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
-      const response = await fetch(`${API_BASE}/auth/logout`, {
-        method: 'POST',
+      
+      // Используем GET endpoint вместо POST
+      const response = await fetch(`${API_BASE}/auth/logout-get`, {
+        method: 'GET',
         credentials: 'include',
       })
 
@@ -22,7 +24,7 @@ export default function LogoutButton() {
         router.push('/')
         router.refresh()
       } else {
-        console.error('Logout failed')
+        console.error('Logout failed', response.status, response.statusText)
       }
     } catch (error) {
       console.error('Logout error:', error)

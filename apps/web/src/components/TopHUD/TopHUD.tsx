@@ -1,13 +1,13 @@
 // apps/web/src/components/TopHUD/TopHUD.tsx
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import styles from './TopHUD.module.css'
 
 const ICONS = {
   rocket: '/icons/rocket.svg',
   star:   '/icons/star.svg',
-  gear:   '/icons/settings.svg',
+  avatar: '/icons/avatar-placeholder.svg', // Добавляем иконку для аватара
 }
 
 const FALLBACKS = {
@@ -16,9 +16,11 @@ const FALLBACKS = {
       <path fill="#63EFFF" d="M12 2s4 1 6 3 3 6 3 6-3 0-6-2-6-6-6-6z" opacity="0.95"/>
     </svg>
   ),
-  gear: (
-    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
-      <circle cx="12" cy="12" r="3" fill="#63EFFF"/>
+  avatar: (
+    <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden>
+      <circle cx="12" cy="12" r="10" fill="#63EFFF" opacity="0.8"/>
+      <circle cx="12" cy="9" r="3" fill="#204C72"/>
+      <path fill="#204C72" d="M12 14c-3 0-6 1.5-6 4.5v1h12v-1c0-3-3-4.5-6-4.5z"/>
     </svg>
   ),
   star: (
@@ -31,6 +33,20 @@ const FALLBACKS = {
 export default function TopHUD() {
   const [ok, setOk] = useState<{[k: string]: boolean}>({})
   const [scale, setScale] = useState(1)
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Закрытие dropdown при клике вне его области
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   useEffect(() => {
     // Функция для вычисления масштаба на основе ширины экрана
@@ -71,6 +87,16 @@ export default function TopHUD() {
         })
     })
   }, [])
+
+  const toggleDropdown = () => {
+    setIsDropdownOpen(!isDropdownOpen)
+  }
+
+  const handleMenuItemClick = (action: string) => {
+    console.log(`Selected: ${action}`)
+    setIsDropdownOpen(false)
+    // Здесь можно добавить логику для каждого пункта меню
+  }
 
   // Вычисляемые стили для масштабирования
   const hudStyle = {
@@ -113,11 +139,58 @@ export default function TopHUD() {
           </div>
         </div>
 
-        {ok.gear ? (
-          <img className={styles.gearIcon} src={ICONS.gear} alt="Настройки" />
-        ) : (
-          FALLBACKS.gear
-        )}
+        <div className={styles.avatarDropdown} ref={dropdownRef}>
+          <button 
+            className={styles.avatarButton}
+            onClick={toggleDropdown}
+            aria-label="Меню пользователя"
+            aria-expanded={isDropdownOpen}
+          >
+            <div className={styles.avatarContainer}>
+              {ok.avatar ? (
+                <img 
+                  className={styles.avatarIcon} 
+                  src={ICONS.avatar} 
+                  alt="Аватар" 
+                  onError={(e) => {
+                    console.error('img onError', (e.target as HTMLImageElement).src)
+                    setOk(prev => ({ ...prev, avatar: false }))
+                  }}
+                />
+              ) : (
+                FALLBACKS.avatar
+              )}
+            </div>
+            <div className={`${styles.arrow} ${isDropdownOpen ? styles.arrowUp : ''}`}>
+              <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
+                <path d="M1 1.5L6 6.5L11 1.5" stroke="#63EFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+          </button>
+
+          {isDropdownOpen && (
+            <div className={styles.dropdownMenu}>
+              <button 
+                className={styles.menuItem}
+                onClick={() => handleMenuItemClick('profile')}
+              >
+                Профиль
+              </button>
+              <button 
+                className={styles.menuItem}
+                onClick={() => handleMenuItemClick('settings')}
+              >
+                Настройки
+              </button>
+              <button 
+                className={styles.menuItem}
+                onClick={() => handleMenuItemClick('logout')}
+              >
+                Выйти
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

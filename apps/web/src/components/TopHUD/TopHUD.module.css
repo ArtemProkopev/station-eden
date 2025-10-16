@@ -76,15 +76,112 @@
   transition: all 0.3s ease;
 }
 
-.gearIcon{
-  display: inline-flex;
+/* Стили для аватара и выпадающего меню */
+.avatarDropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.avatarButton {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 24px;
+  transition: all 0.3s ease;
+  background: rgba(99,239,255,0.04);
+  border: 2px solid #204C72;
+  box-shadow: 0 0 10px #63efff59;
+}
+
+.avatarButton:hover {
+  background: rgba(99,239,255,0.08);
+  box-shadow: 0 0 15px #63efff80;
+}
+
+.avatarContainer {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 66px;
-  height: 66px;
+  background: rgba(99,239,255,0.1);
+  border: 2px solid #63EFFF;
+}
+
+.avatarIcon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: drop-shadow(0 0 4px rgba(99,239,255,0.7));
+}
+
+.arrow {
+  transition: transform 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.arrowUp {
+  transform: rotate(180deg);
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: rgba(32, 76, 114, 0.95);
+  backdrop-filter: blur(10px);
+  border: 2px solid #63EFFF;
+  border-radius: 12px;
+  padding: 8px;
+  min-width: 160px;
+  box-shadow: 0 8px 25px rgba(99, 239, 255, 0.2);
+  z-index: 1000;
+  animation: dropdownFade 0.2s ease;
+}
+
+@keyframes dropdownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.menuItem {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  color: #63EFFF;
+  font-family: 'RussoOne', sans-serif;
+  font-size: 16px;
+  text-align: left;
   cursor: pointer;
-  filter: drop-shadow(0 0 6px rgba(99,239,255,0.9));
+  border-radius: 6px;
   transition: all 0.3s ease;
+  text-shadow: 0 0 2px rgba(99,239,255,0.9);
+}
+
+.menuItem:hover {
+  background: rgba(99, 239, 255, 0.1);
+  box-shadow: 0 0 8px rgba(99, 239, 255, 0.3);
+}
+
+.menuItem:not(:last-child) {
+  margin-bottom: 4px;
 }
 
 .plusButton {
@@ -160,9 +257,14 @@
     font-size: 24px;
   }
   
-  .gearIcon {
-    width: 50px;
-    height: 50px;
+  .avatarContainer {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .avatarButton {
+    gap: 8px;
+    padding: 6px;
   }
   
   .star {
@@ -187,6 +289,15 @@
   .currencyContent {
     gap: 20px;
   }
+  
+  .dropdownMenu {
+    min-width: 140px;
+  }
+  
+  .menuItem {
+    font-size: 14px;
+    padding: 10px 14px;
+  }
 }
 
 @media (max-width: 600px) {
@@ -209,9 +320,14 @@
     letter-spacing: 0.5px;
   }
   
-  .gearIcon {
-    width: 40px;
-    height: 40px;
+  .avatarContainer {
+    width: 35px;
+    height: 35px;
+  }
+  
+  .avatarButton {
+    gap: 6px;
+    padding: 4px;
   }
   
   .star {
@@ -237,6 +353,15 @@
   .currencyContent {
     gap: 15px;
   }
+  
+  .dropdownMenu {
+    min-width: 120px;
+  }
+  
+  .menuItem {
+    font-size: 13px;
+    padding: 8px 12px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -258,9 +383,9 @@
     font-size: 18px;
   }
   
-  .gearIcon {
-    width: 35px;
-    height: 35px;
+  .avatarContainer {
+    width: 30px;
+    height: 30px;
   }
   
   .hudRight {
@@ -273,6 +398,11 @@
   
   .currencyContent {
     gap: 12px;
+  }
+  
+  .dropdownMenu {
+    min-width: 110px;
+    right: -10px;
   }
 }
 
@@ -290,9 +420,18 @@
     height: 30px;
   }
   
-  .gearIcon {
-    width: 30px;
-    height: 30px;
+  .avatarContainer {
+    width: 25px;
+    height: 25px;
+  }
+  
+  .avatarButton {
+    gap: 4px;
+  }
+  
+  .arrow svg {
+    width: 10px;
+    height: 6px;
   }
   
   .star {
@@ -304,6 +443,15 @@
     width: 25px;
     height: 25px;
     font-size: 20px;
+  }
+  
+  .dropdownMenu {
+    min-width: 100px;
+  }
+  
+  .menuItem {
+    font-size: 12px;
+    padding: 6px 10px;
   }
 }
 
@@ -324,8 +472,8 @@
     height: 35px;
   }
   
-  .gearIcon {
-    width: 35px;
-    height: 35px;
+  .avatarContainer {
+    width: 30px;
+    height: 30px;
   }
 }
