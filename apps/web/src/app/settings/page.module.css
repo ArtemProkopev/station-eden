@@ -3,11 +3,9 @@
 
 .root {
   min-height: 100vh;
-  background: url("/settings-background.jpg");
+  background: url("/settings-background.jpg") center/cover;
   position: relative;
   overflow: hidden;
-  background-size: cover;
-  background-position: center;
   font-family: 'Russo One', sans-serif;
 }
 

@@ -3,9 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import TopHUD from '../../components/TopHUD/TopHUD'
-import { FirefliesProfile } from '../../components/ui/Fireflies/FirefliesProfile'
 import { ScaleContainer } from '../../components/ui/ScaleContainer/ScaleContainer'
-import { TwinklingStars } from '../../components/ui/TwinklingStars/TwinklingStars'
 import styles from './page.module.css'
 
 interface SettingsData {

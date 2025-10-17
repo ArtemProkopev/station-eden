@@ -45,7 +45,6 @@ function collectPublicRedirects(CDN) {
 const nextConfig = {
 	output: 'standalone',
 	experimental: { serverActions: { bodySizeLimit: '2mb' } },
-<<<<<<< HEAD
 
 	async redirects() {
 		const CDN = process.env.NEXT_PUBLIC_ASSETS_BASE || ''
@@ -54,14 +53,4 @@ const nextConfig = {
 	},
 }
 
-=======
-	images: {
-		remotePatterns: [
-			{ protocol: 'https', hostname: 'cdn.assets.stationeden.ru' },
-			{ protocol: 'https', hostname: '*.selstorage.ru' }, // временно, пока чистите данные/старые ссылки
-			{ protocol: 'https', hostname: 'stationeden.ru' }, // если где-то попадается origin
-		],
-	},
-}
->>>>>>> features/frontend
 export default nextConfig

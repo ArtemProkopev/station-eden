@@ -1,4 +1,11 @@
 /* TopHUD.module.css */
+.root > :first-child {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: transparent;
+}
+
 .hud{
   display: flex;
   align-items: center;

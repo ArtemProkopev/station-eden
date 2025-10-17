@@ -120,8 +120,6 @@ export default function TopHUD({ profile, avatar }: TopHUDProps) {
   const hudStyle = {
     transform: `scale(${scale})`,
     transformOrigin: 'top center',
-    width: scale < 1 ? `${100 / scale}%` : '100%',
-    height: scale < 1 ? 'auto' : '100%'
   } as React.CSSProperties
 
   return (
