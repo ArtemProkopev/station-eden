@@ -1,0 +1,7 @@
+/* apps/web/src/app/settings/components/sections/PurchasesSettings/PurchasesSettings.module.css */
+.purchasesSettings {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}

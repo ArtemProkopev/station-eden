@@ -1,0 +1,53 @@
+.toggleLabel {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.toggleInput {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggleSlider {
+  position: relative;
+  display: inline-block;
+  width: 100px;
+  height: 40px;
+  background: rgba(99, 239, 255, 0.09);
+  border: 1px solid #63EFFF;
+  border-radius: 20px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toggleInput:checked + .toggleSlider {
+  background: rgba(99, 239, 255, 0.2);
+}
+
+.toggleText {
+  font-family: 'Russo One', sans-serif;
+  font-size: 1rem;
+  font-weight: 400;
+  color: #63EFFF;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .toggleSlider {
+    width: 90px;
+    height: 35px;
+  }
+  
+  .toggleText {
+    font-size: 0.9rem;
+  }
+}

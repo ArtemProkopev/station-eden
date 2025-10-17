@@ -1,0 +1,43 @@
+/* apps/web/src/app/settings/components/SettingsLayout/SettingsLayout.module.css */
+.layout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4rem; /* ← Увеличили gap до 4rem */
+  align-items: start;
+  justify-content: center;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Адаптивность */
+@media (max-width: 1600px) {
+  .layout {
+    gap: 3.5rem;
+  }
+}
+
+@media (max-width: 1400px) {
+  .layout {
+    gap: 3rem;
+  }
+}
+
+@media (max-width: 1200px) {
+  .layout {
+    gap: 2.5rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  .layout {
+    gap: 2rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    justify-items: center;
+  }
+}

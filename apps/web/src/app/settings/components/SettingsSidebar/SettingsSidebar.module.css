@@ -1,0 +1,121 @@
+/* apps/web/src/app/settings/components/SettingsSidebar/SettingsSidebar.module.css */
+.sidebar {
+  background: transparent;
+  padding: 0;
+  width: 300px; /* ← Уменьшили до 300px */
+  height: fit-content;
+}
+
+.menu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.menuItem {
+  margin: 0;
+}
+
+.menuButton {
+  width: 100%;
+  padding: 0.8rem 0;
+  background: transparent;
+  border: none;
+  color: #63EFFF;
+  font-family: 'Russo One', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  letter-spacing: 0.05em;
+  position: relative;
+  display: block;
+}
+
+.menuButton:hover {
+  opacity: 0.8;
+}
+
+.menuButtonActive::after {
+  content: '';
+  position: absolute;
+  bottom: 0.3rem;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: #63EFFF;
+  box-shadow: 0 0 10px rgba(99, 239, 255, 0.8);
+}
+
+/* Адаптивность */
+@media (max-width: 1600px) {
+  .sidebar {
+    width: 280px;
+  }
+}
+
+@media (max-width: 1400px) {
+  .sidebar {
+    width: 250px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .sidebar {
+    width: 220px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 200px;
+  }
+  
+  .menuButton {
+    font-size: 1.5rem;
+    padding: 0.7rem 0;
+  }
+}
+
+/* Мобильная версия оставляем как есть */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100%;
+    max-width: 400px;
+  }
+  
+  .menu {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  
+  .menuButton {
+    text-align: center;
+    padding: 0.5rem 1rem;
+    font-size: 1.1rem;
+    white-space: nowrap;
+  }
+  
+  .menuButtonActive::after {
+    bottom: 0.2rem;
+    width: 80%;
+    left: 10%;
+  }
+}
+
+@media (max-width: 480px) {
+  .sidebar {
+    width: 100%;
+  }
+  
+  .menuButton {
+    font-size: 1rem;
+    padding: 0.5rem 0.75rem;
+  }
+}

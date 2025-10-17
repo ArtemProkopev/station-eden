@@ -16,333 +16,43 @@
   transform: translate(-30%, 30%);
   padding: 1rem;
   width: 100%;
-  max-width: 1400px;
+  max-width: 1800px; /* ← Увеличили до 1800px */
 }
 
-/* Основной grid контейнер */
-.layout {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 2rem;
-  align-items: start;
-  justify-content: center;
-  width: 100%;
-  margin: 0 auto;
+/* Адаптивность для контейнера */
+@media (max-width: 2000px) {
+  .container {
+    max-width: 1700px;
+  }
 }
 
-/* Сайдбар */
-.sidebar {
-  background: transparent;
-  padding: 0;
-  width: 400px;
-  height: fit-content;
+@media (max-width: 1800px) {
+  .container {
+    max-width: 1600px;
+  }
 }
 
-.menu {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+@media (max-width: 1600px) {
+  .container {
+    max-width: 1500px;
+  }
 }
 
-.menuItem {
-  margin: 0;
-}
-
-.menuButton {
-  width: 100%;
-  padding: 0.8rem 0;
-  background: transparent;
-  border: none;
-  color: #63EFFF;
-  font-family: 'Russo One', sans-serif;
-  font-size: 1.8rem;
-  font-weight: 400;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  letter-spacing: 0.05em;
-  position: relative;
-  display: block;
-}
-
-.menuButton:hover {
-  opacity: 0.8;
-}
-
-.menuButtonActive::after {
-  content: '';
-  position: absolute;
-  bottom: 0.3rem;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: #63EFFF;
-  box-shadow: 0 0 10px rgba(99, 239, 255, 0.8);
-}
-
-/* Контент - центрируем содержимое */
-.content {
-  background: rgba(99, 239, 255, 0.09);
-  border: 1px solid #63EFFF;
-  border-radius: 12px;
-  padding: 2rem 3rem;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 0 30px rgba(99, 239, 255, 0.2);
-  height: fit-content;
-  min-height: 400px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.contentSection {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  width: 100%;
-}
-
-/* Строка настройки */
-.settingRow {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
-  gap: 2rem;
-  padding: 1rem 1.5rem;
-  background: rgba(99, 239, 255, 0.09);
-  border: 1px solid #63EFFF;
-  border-radius: 8px;
-  min-height: 60px;
-  width: 100%;
-}
-
-.settingName {
-  font-family: 'Russo One', sans-serif;
-  font-size: 1.3rem;
-  color: #63EFFF;
-  font-weight: 400;
-  text-align: left;
-}
-
-.settingValue {
-  font-family: 'Russo One', sans-serif;
-  font-size: 1.3rem;
-  color: #63EFFF;
-  font-weight: 400;
-  min-width: 40px;
-  text-align: center;
-}
-
-/* Контейнер для слайдера */
-.sliderContainer {
-  display: flex;
-  align-items: center;
-  min-width: 250px;
-  max-width: 350px;
-}
-
-/* Стили для бегунка */
-.slider {
-  width: 100%;
-  height: 18px;
-  border-radius: 9px;
-  background: rgba(0, 0, 0, 0.19);
-  border: 1px solid #63EFFF;
-  outline: none;
-  appearance: none;
-  position: relative;
-  margin: 0 1rem;
-}
-
-.slider::-webkit-slider-thumb {
-  appearance: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #49C7D5;
-  cursor: pointer;
-  box-shadow: 
-    -4px 4px 0 rgba(0, 0, 0, 0.28),
-    0 0 10px rgba(99, 239, 255, 0.8);
-  border: 2px solid #63EFFF;
-}
-
-.slider::-moz-range-thumb {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #49C7D5;
-  cursor: pointer;
-  border: 2px solid #63EFFF;
-  box-shadow: 
-    -4px 4px 0 rgba(0, 0, 0, 0.28),
-    0 0 10px rgba(99, 239, 255, 0.8);
-}
-
-/* Стили для выпадающего списка */
-.select {
-  width: 250px;
-  padding: 0.8rem 1.2rem;
-  background: rgba(99, 239, 255, 0.09);
-  border: 1px solid #63EFFF;
-  border-radius: 8px;
-  color: #63EFFF;
-  font-family: 'Russo One', sans-serif;
-  font-size: 1.3rem;
-  outline: none;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2363EFFF' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 1.2rem center;
-  background-size: 12px;
-}
-
-.select:focus {
-  box-shadow: 0 0 15px rgba(99, 239, 255, 0.5);
-}
-
-.select option {
-  background: #0a141e;
-  color: #63EFFF;
-  font-family: 'Russo One', sans-serif;
-  font-size: 1.1rem;
-}
-
-/* Стили для переключателя Вкл/Выкл */
-.toggleLabel {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  cursor: pointer;
-}
-
-.toggleInput {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.toggleSlider {
-  position: relative;
-  display: inline-block;
-  width: 100px;
-  height: 40px;
-  background: rgba(99, 239, 255, 0.09);
-  border: 1px solid #63EFFF;
-  border-radius: 20px;
-  transition: all 0.3s ease;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.toggleInput:checked + .toggleSlider {
-  background: rgba(99, 239, 255, 0.2);
-}
-
-.toggleText {
-  font-family: 'Russo One', sans-serif;
-  font-size: 1rem;
-  font-weight: 400;
-  color: #63EFFF;
-  text-transform: uppercase;
-  transition: all 0.3s ease;
-}
-
-/* Для строк с выпадающим списком и переключателем */
-.settingRow:has(.select),
-.settingRow:has(.toggleLabel) {
-  grid-template-columns: 1fr auto;
-  justify-content: space-between;
-}
-
-/* Адаптивность */
 @media (max-width: 1400px) {
   .container {
-    max-width: 1200px;
-  }
-  
-  .layout {
-    gap: 2rem;
-  }
-  
-  .content {
-    max-width: 700px;
-    padding: 2rem;
-  }
-  
-  .sidebar {
-    width: 160px;
+    max-width: 1400px;
   }
 }
 
 @media (max-width: 1200px) {
   .container {
-    max-width: 1000px;
-  }
-  
-  .layout {
-    gap: 1.5rem;
-  }
-  
-  .content {
-    max-width: 650px;
-    padding: 1.5rem 2rem;
-  }
-  
-  .sidebar {
-    width: 150px;
-  }
-  
-  .settingName {
-    font-size: 1.2rem;
-  }
-  
-  .select {
-    width: 220px;
+    max-width: 1200px;
   }
 }
 
 @media (max-width: 1024px) {
   .container {
-    max-width: 900px;
-  }
-  
-  .layout {
-    gap: 1rem;
-  }
-  
-  .content {
-    max-width: 600px;
-    padding: 1.5rem;
-  }
-  
-  .sidebar {
-    width: 140px;
-  }
-  
-  .menuButton {
-    font-size: 1.1rem;
-    padding: 0.7rem 0;
-  }
-  
-  .settingName {
-    font-size: 1.1rem;
-  }
-  
-  .select {
-    width: 200px;
-    font-size: 1.1rem;
+    max-width: 1000px;
   }
 }
 
@@ -355,121 +65,10 @@
     padding: 1rem;
     max-width: 100%;
   }
-  
-  .layout {
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-    justify-items: center;
-  }
-  
-  .sidebar {
-    width: 100%;
-    max-width: 400px;
-  }
-  
-  .content {
-    width: 100%;
-    max-width: 100%;
-    min-height: 350px;
-    padding: 1.5rem;
-  }
-  
-  .menu {
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.5rem;
-  }
-  
-  .menuButton {
-    text-align: center;
-    padding: 0.5rem 1rem;
-    font-size: 1.1rem;
-    white-space: nowrap;
-  }
-  
-  .menuButtonActive::after {
-    bottom: 0.2rem;
-    width: 80%;
-    left: 10%;
-  }
-  
-  .settingRow {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-    text-align: center;
-  }
-  
-  .settingName,
-  .settingValue {
-    font-size: 1.1rem;
-    text-align: center;
-  }
-  
-  .sliderContainer {
-    min-width: auto;
-    max-width: none;
-    order: 2;
-  }
-  
-  .settingValue {
-    order: 3;
-  }
-  
-  .select {
-    width: 100%;
-    font-size: 1.1rem;
-  }
-  
-  /* Переупорядочиваем элементы для мобильных */
-  .settingRow:has(.slider) {
-    grid-template-columns: 1fr;
-  }
-  
-  .settingRow:has(.select),
-  .settingRow:has(.toggleLabel) {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
 }
 
 @media (max-width: 480px) {
   .container {
     padding: 0.5rem;
-  }
-  
-  .layout {
-    gap: 1rem;
-  }
-  
-  .sidebar {
-    width: 100%;
-  }
-  
-  .content {
-    padding: 1rem;
-  }
-  
-  .menuButton {
-    font-size: 1rem;
-    padding: 0.5rem 0.75rem;
-  }
-  
-  .settingName,
-  .settingValue {
-    font-size: 1rem;
-  }
-  
-  .toggleSlider {
-    width: 90px;
-    height: 35px;
-  }
-  
-  .toggleText {
-    font-size: 0.9rem;
-  }
-  
-  .sliderContainer {
-    min-width: auto;
   }
 }

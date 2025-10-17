@@ -5,21 +5,9 @@ import { useState, useCallback } from 'react'
 import { ProfileData } from '../../profile/types'
 import { asset } from '@/lib/asset'
 import { PROFILE_CONFIG } from '../../profile/config'
+import { SettingsType, SoundSettingsType } from '../types'
 
-interface SettingsData {
-  sound: {
-    masterVolume: number
-    musicVolume: number
-    effectsVolume: number
-    outputDevice: string
-    muteWhenMinimized: boolean
-  }
-  language: string
-  sessionHistory: boolean
-  purchaseHistory: boolean
-}
-
-const DEFAULT_SETTINGS: SettingsData = {
+const DEFAULT_SETTINGS: SettingsType = {
   sound: {
     masterVolume: 63,
     musicVolume: 63,
@@ -38,26 +26,18 @@ const migrateToAbsoluteUrl = (url: string | null): string | undefined => {
 };
 
 export function useSettings() {
-  const [settings, setSettings] = useState<SettingsData>(DEFAULT_SETTINGS)
+  const [settings, setSettings] = useState<SettingsType>(DEFAULT_SETTINGS)
   const [profile, setProfile] = useState<ProfileData>({ status: 'loading' })
   const [avatar, setAvatar] = useState<string>('/icons/avatar-placeholder.svg')
 
   const loadSavedAvatar = useCallback(() => {
-    console.log('🔄 START loadSavedAvatar')
     try {
       const savedAvatar = localStorage.getItem(PROFILE_CONFIG.STORAGE_KEYS.AVATAR)
       const userAvatar = localStorage.getItem('user_avatar')
-      
-      console.log('📁 Avatar sources:', {
-        profileStorage: savedAvatar,
-        userStorage: userAvatar
-      })
 
       let finalAvatar = migrateToAbsoluteUrl(savedAvatar) || 
                        migrateToAbsoluteUrl(userAvatar) || 
                        asset(PROFILE_CONFIG.DEFAULT.AVATAR)
-
-      console.log('✅ Final avatar URL:', finalAvatar)
       setAvatar(finalAvatar)
 
       fetch(finalAvatar, { method: 'HEAD' })
@@ -79,19 +59,14 @@ export function useSettings() {
     }
   }, [])
 
-  // Загрузка пользовательских данных
   const loadUserData = useCallback(async () => {
-    console.log('🔄 START loadUserData')
     try {
       const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
-      console.log('🌐 Fetching from:', `${API_BASE}/auth/me`)
       
       const response = await fetch(`${API_BASE}/auth/me`, {
         credentials: 'include',
         cache: 'no-store',
       })
-
-      console.log('📡 Response status:', response.status)
 
       if (response.status === 401) {
         console.warn('Unauthorized')
@@ -105,16 +80,12 @@ export function useSettings() {
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
       const data = await response.json()
-      console.log('Response data:', data)
       
       const payload = data?.data ?? data
       const { userId, email, username = null } = payload
 
-      console.log('User data:', { userId, email, username })
-
       if (typeof userId === 'string' && typeof email === 'string') {
         setProfile({ status: 'ok', userId, email, username })
-        console.log('User data loaded successfully')
         
         loadSavedAvatar()
       } else {
@@ -134,14 +105,22 @@ export function useSettings() {
     try {
       const saved = localStorage.getItem('user_settings')
       if (saved) {
-        setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(saved) })
+        const parsedSettings = JSON.parse(saved)
+        setSettings({ 
+          ...DEFAULT_SETTINGS, 
+          ...parsedSettings,
+          sound: {
+            ...DEFAULT_SETTINGS.sound,
+            ...parsedSettings.sound
+          }
+        })
       }
     } catch (error) {
       console.error('Failed to load settings:', error)
     }
   }, [])
 
-  const saveSettings = useCallback((newSettings: SettingsData) => {
+  const saveSettings = useCallback((newSettings: SettingsType) => {
     try {
       localStorage.setItem('user_settings', JSON.stringify(newSettings))
     } catch (error) {
@@ -149,7 +128,7 @@ export function useSettings() {
     }
   }, [])
 
-  const updateSettings = useCallback((updates: Partial<SettingsData>) => {
+  const updateSettings = useCallback((updates: Partial<SettingsType>) => {
     setSettings(prev => {
       const newSettings = { ...prev, ...updates }
       saveSettings(newSettings)
@@ -157,7 +136,7 @@ export function useSettings() {
     })
   }, [saveSettings])
 
-  const updateSoundSettings = useCallback((updates: Partial<SettingsData['sound']>) => {
+  const updateSoundSettings = useCallback((updates: Partial<SoundSettingsType>) => {
     setSettings(prev => {
       const newSoundSettings = { ...prev.sound, ...updates }
       const newSettings = { ...prev, sound: newSoundSettings }
