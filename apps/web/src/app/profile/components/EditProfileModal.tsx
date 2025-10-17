@@ -1,8 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import ImgCdn from '../../components/ImgCdn'
-import { asset } from '../../lib/asset' // относительный импорт от /app/profile
+import ImgCdn from '../../../components/ImgCdn'
+import { asset } from '../../../lib/asset'
 import styles from './EditProfileModal.module.css'
 
 interface EditProfileModalProps {
