@@ -3,7 +3,8 @@
 
 import React, { useEffect, useState, useRef } from 'react'
 import styles from './TopHUD.module.css'
-import LogoutButton from '../../components/TopHUD/LogoutButton'
+import LogoutButton from './LogoutButton'
+import { useUserData } from '../../hooks/useUserData'
 
 interface TopHUDProps {
   profile?: {
@@ -13,7 +14,7 @@ interface TopHUDProps {
     username?: string | null;
     message?: string;
   };
-  avatar?: string; 
+  avatar?: string;
 }
 
 const ICONS = {
@@ -47,8 +48,23 @@ export default function TopHUD({ profile, avatar }: TopHUDProps) {
   const [scale, setScale] = useState(1)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  
+  const userData = useUserData()
+  
+  const finalAvatar = avatar || userData.avatar
+  const finalProfile = profile || {
+    status: userData.status === 'ok' ? 'ok' : 
+            userData.status === 'error' ? 'error' : 'loading',
+    username: userData.username,
+    email: userData.email,
+    userId: userData.userId
+  }
+  
+  console.log('finalAvatar:', finalAvatar)
+  console.log('finalProfile:', finalProfile)
+  console.log('finalProfile.username:', finalProfile.username)
+  console.log('================')
 
-  // Закрытие dropdown при клике вне его области
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -61,7 +77,6 @@ export default function TopHUD({ profile, avatar }: TopHUDProps) {
   }, [])
 
   useEffect(() => {
-    // Функция для вычисления масштаба на основе ширины экрана
     const updateScale = () => {
       const width = window.innerWidth
       
@@ -108,13 +123,11 @@ export default function TopHUD({ profile, avatar }: TopHUDProps) {
     console.log(`Selected: ${action}`)
     setIsDropdownOpen(false)
     
-    // Добавляем навигацию по страницам
     if (action === 'profile') {
       window.location.href = '/profile'
     } else if (action === 'settings') {
       window.location.href = '/settings'
     }
-    // Можно добавить другие действия по необходимости
   }
 
   const hudStyle = {
@@ -163,17 +176,18 @@ export default function TopHUD({ profile, avatar }: TopHUDProps) {
             aria-expanded={isDropdownOpen}
           >
             <div className={styles.avatarContainer}>
-              {/* Показываем кастомный аватар если он передан, иначе стандартный */}
-              {avatar ? (
+              {finalAvatar && finalAvatar !== '/icons/avatar-placeholder.svg' ? (
                 <img 
                   className={styles.avatarIcon} 
-                  src={avatar} 
-                  alt="Аватар пользователя" 
+                  src={finalAvatar} 
+                  alt={`Аватар ${finalProfile.username || ''}`}
                   onError={(e) => {
-                    console.error('Custom avatar failed, falling back to default')
-                    // Если кастомный аватар не загрузился, показываем стандартный
+                    console.error('Avatar failed to load, using fallback')
+                    const target = e.target as HTMLImageElement
                     if (ok.avatar) {
-                      (e.target as HTMLImageElement).src = ICONS.avatar
+                      target.src = ICONS.avatar
+                    } else {
+                      target.style.display = 'none'
                     }
                   }}
                 />
@@ -183,8 +197,9 @@ export default function TopHUD({ profile, avatar }: TopHUDProps) {
                   src={ICONS.avatar} 
                   alt="Аватар" 
                   onError={(e) => {
-                    console.error('img onError', (e.target as HTMLImageElement).src)
+                    console.error('Fallback avatar failed to load')
                     setOk(prev => ({ ...prev, avatar: false }))
+                    ;(e.target as HTMLImageElement).style.display = 'none'
                   }}
                 />
               ) : (
@@ -200,6 +215,11 @@ export default function TopHUD({ profile, avatar }: TopHUDProps) {
 
           {isDropdownOpen && (
             <div className={styles.dropdownMenu}>
+              {finalProfile.username && (
+                <div className={styles.userInfo}>
+                  {finalProfile.username}
+                </div>
+              )}
               <button 
                 className={styles.menuItem}
                 onClick={() => handleMenuItemClick('profile')}
@@ -212,7 +232,7 @@ export default function TopHUD({ profile, avatar }: TopHUDProps) {
               >
                 Настройки
               </button>
-              {profile?.status === 'ok' && <LogoutButton />}
+              <LogoutButton />
             </div>
           )}
         </div>

@@ -1,38 +1,14 @@
 // apps/web/src/app/settings/page.tsx
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import TopHUD from '../../components/TopHUD/TopHUD'
 import { ScaleContainer } from '../../components/ui/ScaleContainer/ScaleContainer'
+import { useSettings } from './hooks/useSettings'
+import { useScrollPrevention } from './hooks/useScrollPrevention'
 import styles from './page.module.css'
 
-interface SettingsData {
-  sound: {
-    masterVolume: number
-    musicVolume: number
-    effectsVolume: number
-    outputDevice: string
-    muteWhenMinimized: boolean
-  }
-  language: string
-  sessionHistory: boolean
-  purchaseHistory: boolean
-}
-
 type SettingsSection = 'sound' | 'language' | 'sessions' | 'purchases'
-
-const DEFAULT_SETTINGS: SettingsData = {
-  sound: {
-    masterVolume: 63,
-    musicVolume: 63,
-    effectsVolume: 63,
-    outputDevice: 'headphones',
-    muteWhenMinimized: true
-  },
-  language: 'russian',
-  sessionHistory: true,
-  purchaseHistory: true
-}
 
 const MENU_ITEMS: { id: SettingsSection; label: string }[] = [
   { id: 'sound', label: 'Звук' },
@@ -42,71 +18,39 @@ const MENU_ITEMS: { id: SettingsSection; label: string }[] = [
 ]
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<SettingsData>(DEFAULT_SETTINGS)
   const [activeSection, setActiveSection] = useState<SettingsSection>('sound')
-  const [profile, setProfile] = useState({ status: 'loading' as const })
+  
+  const {
+    profile,
+    avatar,
+    settings,
+    loadUserData,
+    loadSettings,
+    updateSettings,
+    updateSoundSettings
+  } = useSettings()
 
-  // Загрузка настроек из localStorage
+  useScrollPrevention()
+
+  // Инициализация данных
   useEffect(() => {
-    const loadSettings = () => {
-      try {
-        const saved = localStorage.getItem('user_settings')
-        if (saved) {
-          setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(saved) })
-        }
-      } catch (error) {
-        console.error('Failed to load settings:', error)
-      }
+    console.log('🎯 SettingsPage mounted - starting initialization')
+    const initializeData = async () => {
+      await loadUserData()
+      loadSettings()
     }
+    initializeData()
+  }, [loadUserData, loadSettings])
 
-    loadSettings()
-  }, [])
+  console.log('🎯 SettingsPage render:', {
+    profile,
+    avatar,
+    profileStatus: profile.status,
+    profileUsername: profile.username,
+    avatarUrl: avatar
+  })
 
-  // Сохранение настроек в localStorage
-  const saveSettings = useCallback((newSettings: SettingsData) => {
-    try {
-      localStorage.setItem('user_settings', JSON.stringify(newSettings))
-    } catch (error) {
-      console.error('Failed to save settings:', error)
-    }
-  }, [])
-
-  const updateSettings = useCallback((updates: Partial<SettingsData>) => {
-    setSettings(prev => {
-      const newSettings = { ...prev, ...updates }
-      saveSettings(newSettings)
-      return newSettings
-    })
-  }, [saveSettings])
-
-  const updateSoundSettings = useCallback((updates: Partial<SettingsData['sound']>) => {
-    setSettings(prev => {
-      const newSoundSettings = { ...prev.sound, ...updates }
-      const newSettings = { ...prev, sound: newSoundSettings }
-      saveSettings(newSettings)
-      return newSettings
-    })
-  }, [saveSettings])
-
-  // Предотвращение прокрутки
-  useEffect(() => {
-    const preventDefault = (e: Event) => {
-      e.preventDefault()
-    }
-    const options = { passive: false }
-    document.addEventListener('wheel', preventDefault, options)
-    document.addEventListener('touchmove', preventDefault, options)
-    document.body.style.overflow = 'hidden'
-    document.documentElement.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('wheel', preventDefault)
-      document.removeEventListener('touchmove', preventDefault)
-      document.body.style.overflow = ''
-      document.documentElement.style.overflow = ''
-    }
-  }, [])
-
-  const handleVolumeChange = (type: keyof SettingsData['sound'], value: number) => {
+  const handleVolumeChange = (type: keyof typeof settings.sound, value: number) => {
     updateSoundSettings({ [type]: value })
   }
 
@@ -114,10 +58,10 @@ export default function SettingsPage() {
     updateSoundSettings({ outputDevice: device })
   }
 
-  const handleToggleChange = (setting: keyof SettingsData['sound'] | keyof SettingsData, value: boolean) => {
+  const handleToggleChange = (setting: keyof typeof settings | keyof typeof settings.sound, value: boolean) => {
     if (setting === 'muteWhenMinimized') {
       updateSoundSettings({ muteWhenMinimized: value })
-    } else {
+    } else if (setting === 'sessionHistory' || setting === 'purchaseHistory') {
       updateSettings({ [setting]: value })
     }
   }
@@ -257,7 +201,7 @@ export default function SettingsPage() {
                 <span className={styles.toggleSlider}>
                   <span className={styles.toggleText}>
                     {settings.purchaseHistory ? 'Вкл' : 'Выкл'}
-                  </span>
+                 </span>
                 </span>
               </label>
             </div>
@@ -271,8 +215,9 @@ export default function SettingsPage() {
 
   return (
     <main className={styles.root}>
-      <TopHUD profile={profile} />
-
+      {/* ✅ Передаем профиль и аватар с отладкой */}
+      <TopHUD profile={profile} avatar={avatar} />
+      
       <ScaleContainer
         baseWidth={1200}
         baseHeight={800}

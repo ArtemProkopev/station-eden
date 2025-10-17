@@ -1,4 +1,4 @@
-// apps/web/src/app/profile/components/LogoutButton.tsx
+// apps/web/src/components/LogoutButton/LogoutButton.tsx
 'use client'
 
 import { useRouter } from 'next/navigation'
