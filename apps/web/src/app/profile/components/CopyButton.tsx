@@ -2,7 +2,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import styles from './page.module.css'
+import styles from '../page.module.css';
 
 const ICONS = {
   copy: '/icons/copy.svg'

@@ -3,7 +3,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import styles from './page.module.css'
+import styles from './TopHUD.module.css'
 
 export default function LogoutButton() {
   const [loading, setLoading] = useState(false)
@@ -13,8 +13,10 @@ export default function LogoutButton() {
     setLoading(true)
     try {
       const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
-      const response = await fetch(`${API_BASE}/auth/logout`, {
-        method: 'POST',
+      
+      // Используем GET endpoint вместо POST
+      const response = await fetch(`${API_BASE}/auth/logout-get`, {
+        method: 'GET',
         credentials: 'include',
       })
 
@@ -22,7 +24,7 @@ export default function LogoutButton() {
         router.push('/')
         router.refresh()
       } else {
-        console.error('Logout failed')
+        console.error('Logout failed', response.status, response.statusText)
       }
     } catch (error) {
       console.error('Logout error:', error)
@@ -33,12 +35,12 @@ export default function LogoutButton() {
 
   return (
     <button
-      className={styles.leaveBtn}
+      className={styles.menuItem}
       onClick={handleLogout}
       disabled={loading}
       aria-label="Выйти из аккаунта"
     >
-      {loading ? 'выход...' : 'выйти'}
+      {loading ? 'Покидаем станцию...' : 'Покинуть станцию'}
     </button>
   )
 }

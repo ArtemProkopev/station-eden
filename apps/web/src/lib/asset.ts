@@ -1,5 +1,7 @@
 // apps/web/src/lib/asset.ts
+// Единая нормализация публичных ссылок на ассеты
 
+<<<<<<< HEAD
 // Основной красивый домен для ассетов (может быть пустым на раннем этапе деплоя)
 export const PRIMARY = (process.env.NEXT_PUBLIC_ASSETS_BASE || '').replace(
 	/\/+$/,
@@ -8,32 +10,64 @@ export const PRIMARY = (process.env.NEXT_PUBLIC_ASSETS_BASE || '').replace(
 
 // ВАЖНО: домен БАКЕТА (vhost), а не project endpoint
 export const FALLBACK = 'https://station-eden-media.s3.ru-1.storage.selcloud.ru'
+=======
+// Безопасный дефолт на CDN (если переменная не попала на этапе сборки)
+const CDN_DEFAULT = 'https://cdn.assets.stationeden.ru'
 
-/**
- * Делает абсолютный URL к ассету на CDN/S3.
- * Пример: asset('/avatars/a.png') -> "<BASE>/web/avatars/a.png"
- * Если useFallback=true или PRIMARY пуст — вернёт FALLBACK-базу.
- */
-export function asset(rel: string, useFallback = false): string {
+export const PRIMARY = (
+	process.env.NEXT_PUBLIC_ASSETS_BASE || CDN_DEFAULT
+).replace(/\/+$/, '')
+>>>>>>> features/frontend
+
+export const FALLBACK =
+	'https://c8e8acb0-0b53-453b-95d1-9fdda82e2a5a.selstorage.ru'
+
+const IS_PROD = process.env.NODE_ENV === 'production'
+
+/** Абсолютный CDN-URL по ключу/относительному пути */
+export function asset(rel: string): string {
+	if (!rel) return rel as unknown as string
 	if (!rel.startsWith('/')) rel = '/' + rel
-	const base = useFallback || !PRIMARY ? FALLBACK : PRIMARY
+	const base = PRIMARY || FALLBACK
 	return `${base}/web${rel}`
 }
 
-/**
- * Если на входе абсолютный URL на PRIMARY — вернёт такой же на FALLBACK.
- * Нужен, если в состоянии уже лежит абсолютный URL (PRIMARY), но загрузка упала.
- */
-export function toFallback(u: string): string {
-	if (!PRIMARY) return u
+/** Любой наш путь /web/* → CDN (перепишет selstorage/origin/относительные) */
+export function toCdn(u: string): string {
 	try {
-		const p = new URL(u)
-		const primaryBase = new URL(PRIMARY)
-		if (p.origin === primaryBase.origin) {
-			return u.replace(primaryBase.origin, FALLBACK)
+		const url = new URL(u, 'https://stationeden.ru') // base для относительных
+		if (url.pathname.startsWith('/web/')) {
+			return new URL(url.pathname, PRIMARY || FALLBACK).toString()
 		}
 	} catch {
-		// no-op
+		// строка без протокола — возможно, ключ
+	}
+	if (/^\/?web\//.test(u)) {
+		const path = u.startsWith('/') ? u : `/${u}`
+		return new URL(path, PRIMARY || FALLBACK).toString()
 	}
 	return u
+}
+
+/** Переключиться на селстор только если CDN не загрузился (onError) */
+export function onImgErrorSwapToFallback(
+	e: React.SyntheticEvent<HTMLImageElement>
+) {
+	const img = e.currentTarget
+	if (PRIMARY) {
+		try {
+			const primaryOrigin = new URL(PRIMARY).origin
+			img.src = img.src.replace(primaryOrigin, FALLBACK)
+		} catch {
+			/* ignore */
+		}
+	}
+}
+
+// (опционально) сигнализировать о неверной конфигурации в проде
+export function assertPrimaryInProd() {
+	if (IS_PROD && !PRIMARY) {
+		// eslint-disable-next-line no-console
+		console.error('[asset] NEXT_PUBLIC_ASSETS_BASE is empty in production!')
+	}
 }

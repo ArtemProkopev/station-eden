@@ -53,14 +53,14 @@ services:
         NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE}
         NEXT_PUBLIC_ENABLE_TELEGRAM: ${NEXT_PUBLIC_ENABLE_TELEGRAM}
         NEXT_PUBLIC_ENABLE_GOOGLE: ${NEXT_PUBLIC_ENABLE_GOOGLE}
-        NEXT_PUBLIC_ASSETS_BASE: ${NEXT_PUBLIC_ASSETS_BASE} # ← добавлено, чтобы пробрасывалось на билд
+        NEXT_PUBLIC_ASSETS_BASE: ${NEXT_PUBLIC_ASSETS_BASE}
     image: ${GHCR_REG:-ghcr.io}/${GHCR_OWNER}/station-eden-web:${IMAGE_TAG:-latest}
     environment:
       NODE_ENV: ${NODE_ENV}
       NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE}
       NEXT_PUBLIC_ENABLE_TELEGRAM: ${NEXT_PUBLIC_ENABLE_TELEGRAM}
       NEXT_PUBLIC_ENABLE_GOOGLE: ${NEXT_PUBLIC_ENABLE_GOOGLE}
-      NEXT_PUBLIC_ASSETS_BASE: ${NEXT_PUBLIC_ASSETS_BASE} # ← добавлено, чтобы было доступно в рантайме
+      NEXT_PUBLIC_ASSETS_BASE: ${NEXT_PUBLIC_ASSETS_BASE}
     depends_on:
       api:
         condition: service_healthy

@@ -1,3 +1,4 @@
+// apps/api/src/main.ts
 import { ValidationPipe } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import cookieParser from 'cookie-parser'
@@ -16,7 +17,12 @@ async function bootstrap() {
 	app.enableCors({
 		origin: process.env.API_CORS_ORIGIN?.split(',') ?? [],
 		credentials: true,
-		allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
+		allowedHeaders: [
+			'Content-Type', 
+			'X-CSRF-Token',
+			'csrf-token', 
+			'x-csrf-token' 
+		],
 		methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 	})
 
