@@ -34,7 +34,6 @@ export default function SettingsPage() {
 
   // Инициализация данных
   useEffect(() => {
-    console.log('🎯 SettingsPage mounted - starting initialization')
     const initializeData = async () => {
       await loadUserData()
       loadSettings()
@@ -42,13 +41,6 @@ export default function SettingsPage() {
     initializeData()
   }, [loadUserData, loadSettings])
 
-  console.log('🎯 SettingsPage render:', {
-    profile,
-    avatar,
-    profileStatus: profile.status,
-    profileUsername: profile.username,
-    avatarUrl: avatar
-  })
 
   const handleVolumeChange = (type: keyof typeof settings.sound, value: number) => {
     updateSoundSettings({ [type]: value })
@@ -215,7 +207,6 @@ export default function SettingsPage() {
 
   return (
     <main className={styles.root}>
-      {/* ✅ Передаем профиль и аватар с отладкой */}
       <TopHUD profile={profile} avatar={avatar} />
       
       <ScaleContainer
@@ -226,7 +217,6 @@ export default function SettingsPage() {
       >
         <div className={styles.container}>
           <div className={styles.layout}>
-            {/* Левое меню */}
             <nav className={styles.sidebar}>
               <ul className={styles.menu}>
                 {MENU_ITEMS.map((item) => (
@@ -244,7 +234,6 @@ export default function SettingsPage() {
               </ul>
             </nav>
 
-            {/* Правая часть с контентом */}
             <div className={styles.content}>
               {renderContent()}
             </div>

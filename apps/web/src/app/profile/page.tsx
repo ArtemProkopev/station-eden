@@ -1,6 +1,7 @@
+// apps/web/src/app/profile/page.tsx
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useProfile } from './hooks/useProfile';
 import { useScrollPrevention } from './hooks/useScrollPrevention';
 import { ProfileHeader } from './components/ProfileHeader';
@@ -28,13 +29,31 @@ export default function ProfilePage() {
     setIsEditModalOpen
   } = useProfile();
 
+  const [isLoading, setIsLoading] = useState(true);
+
   useScrollPrevention();
 
   useEffect(() => {
     const initializeProfile = async () => {
-      loadSavedAssets();
-      await Promise.all([checkIconsAvailability(), loadUserData()]);
+      console.log('🔄 Starting profile initialization...');
+      setIsLoading(true);
+      
+      try {
+        loadSavedAssets();
+        
+        await Promise.all([
+          checkIconsAvailability(), 
+          loadUserData()
+        ]);
+        
+        console.log('Profile initialization complete');
+      } catch (error) {
+        console.error('Profile initialization failed:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
+    
     initializeProfile();
   }, [loadSavedAssets, checkIconsAvailability, loadUserData]);
 
@@ -43,6 +62,23 @@ export default function ProfilePage() {
   const handleIconError = useCallback((iconName: string) => {
     setIconsStatus(prev => ({ ...prev, [iconName]: false }));
   }, []);
+
+  // Показываем лоадер пока данные не загружены
+  if (isLoading) {
+    return (
+      <main className={styles.root}>
+        <FirefliesProfile />
+        <TwinklingStars />
+        <TopHUD />
+        <ScaleContainer baseWidth={1200} baseHeight={800} minScale={0.5} maxScale={1}>
+          <div className={styles.loadingContainer}>
+            <div className={styles.loadingSpinner}></div>
+            <p>Загрузка профиля...</p>
+          </div>
+        </ScaleContainer>
+      </main>
+    );
+  }
 
   return (
     <main className={styles.root}>

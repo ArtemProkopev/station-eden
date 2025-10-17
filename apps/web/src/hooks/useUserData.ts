@@ -11,6 +11,13 @@ export interface UserData {
   status: 'loading' | 'ok' | 'error'
 }
 
+const MOCK_USER_DATA = {
+  avatar: '/icons/avatar-placeholder.svg',
+  username: 'Космонавт',
+  email: 'cosmonaut@example.com',
+  userId: 'user-12345'
+}
+
 export function useUserData(): UserData {
   const [userData, setUserData] = useState<UserData>({
     avatar: '',
@@ -19,102 +26,43 @@ export function useUserData(): UserData {
   })
 
   useEffect(() => {
-    const loadUserData = async () => {
+    const loadUserData = () => {
       try {
-        console.log('🔄 Loading user data...')
-        
-        // 1. Сначала пробуем получить из localStorage
         const savedAvatar = localStorage.getItem('user_avatar')
         const savedUsername = localStorage.getItem('username')
         const savedEmail = localStorage.getItem('user_email')
         const savedUserId = localStorage.getItem('user_id')
 
-        console.log('📁 LocalStorage data:', { savedAvatar, savedUsername })
-
-        // 2. Если есть данные в localStorage - используем их сразу
         if (savedAvatar || savedUsername) {
-          console.log('✅ Using cached user data')
           setUserData({
-            avatar: savedAvatar || '/icons/avatar-placeholder.svg',
-            username: savedUsername || 'Игрок',
+            avatar: savedAvatar || MOCK_USER_DATA.avatar,
+            username: savedUsername || MOCK_USER_DATA.username,
             email: savedEmail || undefined,
             userId: savedUserId || undefined,
             status: 'ok'
           })
-          return // Прерываем если нашли кешированные данные
-        }
-
-        // 3. Если нет данных в localStorage, пробуем API
-        console.log('🌐 Trying to fetch from API...')
-        const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
-        
-        // Создаем таймаут для запроса
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 сек таймаут
-
-        try {
-          const response = await fetch(`${API_BASE}/auth/profile`, {
-            method: 'GET',
-            credentials: 'include',
-            signal: controller.signal
+        } else {
+          localStorage.setItem('user_avatar', MOCK_USER_DATA.avatar)
+          localStorage.setItem('username', MOCK_USER_DATA.username)
+          localStorage.setItem('user_email', MOCK_USER_DATA.email || '')
+          localStorage.setItem('user_id', MOCK_USER_DATA.userId || '')
+          
+          setUserData({
+            ...MOCK_USER_DATA,
+            status: 'ok'
           })
-
-          clearTimeout(timeoutId)
-
-          if (response.ok) {
-            const userProfile = await response.json()
-            console.log('✅ API user data:', userProfile)
-            
-            // Сохраняем в localStorage
-            if (userProfile.avatar) {
-              localStorage.setItem('user_avatar', userProfile.avatar)
-            }
-            if (userProfile.username) {
-              localStorage.setItem('username', userProfile.username)
-            }
-            if (userProfile.email) {
-              localStorage.setItem('user_email', userProfile.email)
-            }
-            if (userProfile.id) {
-              localStorage.setItem('user_id', userProfile.id)
-            }
-
-            setUserData({
-              avatar: userProfile.avatar || '/icons/avatar-placeholder.svg',
-              username: userProfile.username || 'Игрок',
-              email: userProfile.email,
-              userId: userProfile.id,
-              status: 'ok'
-            })
-          } else {
-            console.warn('❌ API response not OK:', response.status)
-            throw new Error(`API response: ${response.status}`)
-          }
-        } catch (apiError) {
-          console.warn('❌ API fetch failed:', apiError)
-          // Продолжаем с дефолтными данными
         }
-
-        // 4. Если дошли сюда - используем дефолтные данные
-        console.log('🎯 Using default user data')
-        setUserData({
-          avatar: '/icons/avatar-placeholder.svg',
-          username: 'Космонавт',
-          status: 'ok'
-        })
-
       } catch (error) {
-        console.error('💥 Failed to load user data:', error)
-        // Всегда возвращаем какие-то данные, даже при ошибке
+        console.error('Error loading user data:', error)
         setUserData({
-          avatar: '/icons/avatar-placeholder.svg',
-          username: 'Гость',
-          status: 'error'
+          ...MOCK_USER_DATA,
+          status: 'ok'
         })
       }
     }
 
-    loadUserData()
+    const timer = setTimeout(loadUserData, 500)
+    return () => clearTimeout(timer)
   }, [])
 
   return userData

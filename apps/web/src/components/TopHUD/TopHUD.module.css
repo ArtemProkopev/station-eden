@@ -256,6 +256,39 @@
   text-shadow: 0 0 2px rgba(99,239,255,0.9);
 }
 
+.iconSkeleton {
+  width: 34px;
+  height: 34px;
+  background: #63EFFF;
+  opacity: 0.3;
+  border-radius: 4px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.starSkeleton {
+  width: 18px;
+  height: 18px;
+  background: #63EFFF;
+  opacity: 0.3;
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.avatarSkeleton {
+  width: 40px;
+  height: 40px;
+  background: #63EFFF;
+  opacity: 0.3;
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+  100% { opacity: 0.3; }
+}
+
 /* Адаптив через медиа-запросы как резервная система */
 @media (max-width: 1200px) {
   .hud {
