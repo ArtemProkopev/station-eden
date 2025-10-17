@@ -7,11 +7,7 @@ import {
 } from '@aws-sdk/client-s3'
 import 'dotenv/config'
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
-<<<<<<< HEAD
 import { join, relative } from 'path'
-=======
-import { join } from 'path'
->>>>>>> features/frontend
 
 const {
 	S3_ENDPOINT = 'https://s3.ru-1.storage.selcloud.ru',
@@ -90,7 +86,6 @@ function detectContentType(key: string): string {
 	if (k.endsWith('.jpg') || k.endsWith('.jpeg')) return 'image/jpeg'
 	if (k.endsWith('.webp')) return 'image/webp'
 	if (k.endsWith('.gif')) return 'image/gif'
-<<<<<<< HEAD
 	if (k.endsWith('.bmp')) return 'image/bmp'
 	if (k.endsWith('.avif')) return 'image/avif'
 
@@ -111,11 +106,6 @@ function detectContentType(key: string): string {
 	if (k.endsWith('.txt')) return 'text/plain; charset=utf-8'
 	if (k.endsWith('.css')) return 'text/css; charset=utf-8'
 	if (k.endsWith('.js')) return 'application/javascript; charset=utf-8'
-=======
-	if (k.endsWith('.woff2')) return 'font/woff2'
-	if (k.endsWith('.woff')) return 'font/woff'
-	if (k.endsWith('.ttf')) return 'font/ttf'
->>>>>>> features/frontend
 	return 'application/octet-stream'
 }
 
@@ -203,7 +193,6 @@ function findPublicRoots(): Array<{ app: string; dir: string }> {
 async function main() {
 	await sanityChecks()
 
-<<<<<<< HEAD
 	const roots = findPublicRoots()
 	if (!roots.length) {
 		console.warn('Не найдено ни одной папки apps/*/public — загружать нечего.')
@@ -219,52 +208,6 @@ async function main() {
 			uploaded++
 		}
 	}
-=======
-	// Каталоги, уходящие под /web/*
-	const roots = [
-		{ dir: 'apps/web/public/avatars', prefix: 'web/avatars/' },
-		{ dir: 'apps/web/public/frames', prefix: 'web/frames/' },
-		{ dir: 'apps/web/public/icons', prefix: 'web/icons/' },
-		{ dir: 'apps/web/public/fonts', prefix: 'web/fonts/' },
-		{ dir: 'apps/web/public/decor', prefix: 'web/decor/' }, // <-- ВОТ ЭТА СТРОКА
-	]
-
-	// Одиночные файлы (используем реальные имена из /public)
-	const singles = [
-		// У тебя в дереве: public/profile-backrground.jpg (с опечаткой)
-		{
-			path: 'apps/web/public/profile-backrground.jpg',
-			key: 'web/profile-backrground.jpg',
-		},
-		{ path: 'apps/web/public/logo.svg', key: 'web/logo.svg' },
-		{
-			path: 'apps/web/public/login-background.png',
-			key: 'web/login-background.png',
-		},
-		{ path: 'apps/web/public/favicon.ico', key: 'web/favicon.ico' },
-	]
-
-	let count = 0
-	for (const r of roots) {
-		if (!existsSync(r.dir)) {
-			console.warn('skip dir (not found):', r.dir)
-			continue
-		}
-		for (const f of walk(r.dir)) {
-			await put(f.path, r.prefix + f.key)
-			count++
-		}
-	}
-
-	for (const s of singles) {
-		if (!existsSync(s.path)) {
-			console.warn('skip (not found):', s.path)
-			continue
-		}
-		await put(s.path, s.key)
-		count++
-	}
->>>>>>> features/frontend
 
 	console.log(`== S3 sync finished: ${uploaded} file(s) processed ==`)
 }
