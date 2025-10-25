@@ -19,7 +19,7 @@
   border-radius: 16px;
   padding: 24px;
   width: 100%;
-  max-width: 600px;
+  max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 0 30px rgba(99, 239, 255, 0.3);
@@ -85,57 +85,113 @@
 }
 
 .tabContent {
-  min-height: 300px;
+  min-height: 200px;
 }
 
-.previewSection {
+.settingGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settingItem {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settingLabel {
+  color: #63EFFF;
+  font-family: 'RussoOne', sans-serif;
+  font-size: 16px;
+  text-shadow: 0 0 4px rgba(99, 239, 255, 0.4);
+}
+
+.select {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid #63EFFF;
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: white;
+  font-family: 'RussoOne', sans-serif;
+  outline: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.select:focus {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 8px rgba(99, 239, 255, 0.4);
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  color: #63EFFF;
+  font-family: 'RussoOne', sans-serif;
+}
+
+.checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: #63EFFF;
+}
+
+.passwordInput {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid #63EFFF;
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: white;
+  font-family: 'RussoOne', sans-serif;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.passwordInput:focus {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 8px rgba(99, 239, 255, 0.4);
+}
+
+.radioGroup {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.radioLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: #63EFFF;
+  font-family: 'RussoOne', sans-serif;
+}
+
+.radio {
+  width: 16px;
+  height: 16px;
+  accent-color: #63EFFF;
+}
+
+.preview {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(99, 239, 255, 0.3);
   border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 24px;
+  padding: 16px;
+  margin-top: 20px;
 }
 
 .previewTitle {
   color: #63EFFF;
   font-family: 'RussoOne', sans-serif;
-  margin: 0 0 16px 0;
-  font-size: 18px;
+  margin: 0 0 12px 0;
+  font-size: 16px;
 }
 
-.previewContainer {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-}
-
-.previewImage {
-  position: relative;
-  width: 100px;
-  height: 100px;
-  flex-shrink: 0;
-}
-
-.previewAvatar {
-  width: 100%;
-  height: 100%;
-  border-radius: 12px;
-  object-fit: cover;
-  border: 2px solid rgba(99, 239, 255, 0.5);
-}
-
-.previewFrame {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 12px;
-}
-
-.previewInfo {
-  flex: 1;
+.previewContent {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -153,73 +209,12 @@
   color: rgba(255, 255, 255, 0.7);
 }
 
-.previewValue {
-  color: #63EFFF;
-  font-weight: 600;
+.private {
+  color: #FF6B6B;
 }
 
-.selectionSection {
-  margin-bottom: 20px;
-}
-
-.sectionTitle {
-  color: #63EFFF;
-  font-family: 'RussoOne', sans-serif;
-  margin: 0 0 16px 0;
-  font-size: 18px;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  gap: 12px;
-}
-
-.option {
-  position: relative;
-  background: rgba(255, 255, 255, 0.05);
-  border: 2px solid transparent;
-  border-radius: 8px;
-  padding: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  aspect-ratio: 1;
-  overflow: hidden;
-}
-
-.option:hover {
-  border-color: rgba(99, 239, 255, 0.5);
-  transform: translateY(-2px);
-}
-
-.option.selected {
-  border-color: #63EFFF;
-  background: rgba(99, 239, 255, 0.1);
-  box-shadow: 0 0 15px rgba(99, 239, 255, 0.3);
-}
-
-.optionImage {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 6px;
-}
-
-.selectedBadge {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  background: #63EFFF;
-  color: #1a1a2e;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  font-weight: bold;
-  box-shadow: 0 0 8px rgba(99, 239, 255, 0.5);
+.public {
+  color: #4CAF50;
 }
 
 .modalActions {
@@ -276,38 +271,9 @@
   
   .modalContent {
     padding: 20px;
-    max-width: 95%;
-  }
-  
-  .previewContainer {
-    flex-direction: column;
-    gap: 16px;
-    text-align: center;
-  }
-  
-  .previewImage {
-    width: 80px;
-    height: 80px;
-  }
-  
-  .grid {
-    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
-    gap: 10px;
   }
   
   .modalActions {
     flex-direction: column;
-  }
-}
-
-@media (max-width: 480px) {
-  .previewImage {
-    width: 70px;
-    height: 70px;
-  }
-  
-  .grid {
-    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-    gap: 8px;
   }
 }

@@ -1,0 +1,44 @@
+.startBtn {
+  background: rgba(99, 239, 255, 0.1);
+  border: 2px solid #63EFFF;
+  color: #63EFFF;
+  padding: 16px;
+  font-size: 20px;
+  box-shadow: 0 0 20px rgba(99, 239, 255, 0.4);
+  width: 100%;
+  text-align: center;
+  height: 100%;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'RussoOne', sans-serif;
+  text-transform: lowercase;
+  text-shadow: 0 0 6px rgba(99, 239, 255, 0.6);
+}
+
+.startBtn:hover:not(:disabled) {
+  background: rgba(99, 239, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(99, 239, 255, 0.3);
+}
+
+.startBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+@media (max-width: 768px) {
+  .startBtn {
+    font-size: 18px;
+    padding: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .startBtn {
+    font-size: 16px;
+    padding: 12px;
+  }
+}

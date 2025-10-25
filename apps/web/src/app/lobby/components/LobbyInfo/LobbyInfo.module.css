@@ -1,0 +1,159 @@
+.robotBlock {
+  flex: 0.8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  height: 600px;
+  min-height: 600px;
+}
+
+.robotImage {
+  width: 300px;
+  height: 300px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 20px rgba(99, 239, 255, 0.8));
+  transition: all 0.3s ease;
+}
+
+.robotImage:hover {
+  transform: scale(1.05);
+  filter: drop-shadow(0 0 25px rgba(99, 239, 255, 1));
+}
+
+.currentSettings {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(99, 239, 255, 0.3);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 250px;
+}
+
+.settingItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.settingLabel {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  font-family: 'RussoOne', sans-serif;
+}
+
+.settingValue {
+  color: #63EFFF;
+  font-size: 14px;
+  text-shadow: 0 0 4px rgba(99, 239, 255, 0.4);
+  font-family: 'RussoOne', sans-serif;
+  text-align: right;
+}
+
+.lobbySettingsBtn {
+  background: rgba(99, 239, 255, 0.1);
+  border: 2px solid #63EFFF;
+  color: #63EFFF;
+  padding: 14px 28px;
+  font-size: 16px;
+  height: 50px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'RussoOne', sans-serif;
+  text-transform: lowercase;
+  text-shadow: 0 0 6px rgba(99, 239, 255, 0.6);
+}
+
+.lobbySettingsBtn:hover {
+  background: rgba(99, 239, 255, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 239, 255, 0.3);
+}
+
+@media (max-width: 1200px) {
+  .robotBlock {
+    height: 500px;
+    min-height: 500px;
+  }
+  
+  .robotImage {
+    width: 250px;
+    height: 250px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .robotBlock {
+    height: 450px;
+    min-height: 450px;
+  }
+  
+  .robotImage {
+    width: 200px;
+    height: 200px;
+  }
+}
+
+@media (max-width: 768px) {
+  .robotBlock {
+    order: -1;
+    height: 250px;
+    min-height: 250px;
+    gap: 20px;
+    flex-direction: row;
+    justify-content: space-around;
+  }
+  
+  .robotImage {
+    width: 150px;
+    height: 150px;
+  }
+  
+  .currentSettings {
+    max-width: 200px;
+    padding: 12px;
+    gap: 8px;
+  }
+  
+  .lobbySettingsBtn {
+    height: 45px;
+    font-size: 15px;
+    padding: 12px 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .robotBlock {
+    height: 200px;
+    min-height: 200px;
+    gap: 15px;
+  }
+  
+  .robotImage {
+    width: 120px;
+    height: 120px;
+  }
+  
+  .currentSettings {
+    max-width: 150px;
+    padding: 10px;
+  }
+  
+  .settingLabel,
+  .settingValue {
+    font-size: 12px;
+  }
+  
+  .lobbySettingsBtn {
+    height: 40px;
+    font-size: 14px;
+    padding: 10px 16px;
+  }
+}

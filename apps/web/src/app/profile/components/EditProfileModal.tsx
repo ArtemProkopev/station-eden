@@ -67,6 +67,7 @@ export default function EditProfileModal({
 
 	const [selectedAvatar, setSelectedAvatar] = useState(initialAvatar)
 	const [selectedFrame, setSelectedFrame] = useState(initialFrame)
+	const [activeTab, setActiveTab] = useState<'avatars' | 'frames'>('avatars')
 
 	if (!isOpen) return null
 
@@ -77,69 +78,105 @@ export default function EditProfileModal({
 	}
 
 	return (
-		<div className={styles.overlay}>
-			<div className={styles.modal}>
-				<div className={styles.header}>
-					<h2>Редактировать профиль</h2>
+		<div className={styles.modalOverlay} onClick={onClose}>
+			<div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+				<div className={styles.modalHeader}>
+					<h2 className={styles.modalTitle}>Редактирование профиля</h2>
 					<button className={styles.closeButton} onClick={onClose}>
 						×
 					</button>
 				</div>
 
-				<div className={styles.content}>
-					<div className={styles.preview}>
+				<div className={styles.tabs}>
+					<button 
+						className={`${styles.tab} ${activeTab === 'avatars' ? styles.activeTab : ''}`}
+						onClick={() => setActiveTab('avatars')}
+					>
+						Аватары
+					</button>
+					<button 
+						className={`${styles.tab} ${activeTab === 'frames' ? styles.activeTab : ''}`}
+						onClick={() => setActiveTab('frames')}
+					>
+						Рамки
+					</button>
+				</div>
+
+				<div className={styles.tabContent}>
+					<div className={styles.previewSection}>
+						<h3 className={styles.previewTitle}>Предпросмотр</h3>
 						<div className={styles.previewContainer}>
-							<ImgCdn
-								src={selectedAvatar!}
-								alt='Аватар'
-								className={styles.previewAvatar}
-							/>
-							<ImgCdn
-								src={selectedFrame!}
-								alt='Рамка'
-								className={styles.previewFrame}
-							/>
+							<div className={styles.previewImage}>
+								<ImgCdn
+									src={selectedAvatar!}
+									alt='Аватар'
+									className={styles.previewAvatar}
+								/>
+								<ImgCdn
+									src={selectedFrame!}
+									alt='Рамка'
+									className={styles.previewFrame}
+								/>
+							</div>
+							<div className={styles.previewInfo}>
+								<div className={styles.previewItem}>
+									<span>Аватар:</span>
+									<span className={styles.previewValue}>Выбран</span>
+								</div>
+								<div className={styles.previewItem}>
+									<span>Рамка:</span>
+									<span className={styles.previewValue}>Выбрана</span>
+								</div>
+							</div>
 						</div>
 					</div>
 
-					<div className={styles.section}>
-						<h3>Выберите аватарку</h3>
-						<div className={styles.grid}>
-							{AVATARS.map(a => (
-								<button
-									key={a}
-									className={`${styles.avatarOption} ${selectedAvatar === a ? styles.selected : ''}`}
-									onClick={() => setSelectedAvatar(a)}
-								>
-									<ImgCdn src={a} alt='Аватар' />
-								</button>
-							))}
-						</div>
-					</div>
+					<div className={styles.selectionSection}>
+						{activeTab === 'avatars' && (
+							<div>
+								<h3 className={styles.sectionTitle}>Выберите аватар</h3>
+								<div className={styles.grid}>
+									{AVATARS.map(a => (
+										<button
+											key={a}
+											className={`${styles.option} ${selectedAvatar === a ? styles.selected : ''}`}
+											onClick={() => setSelectedAvatar(a)}
+										>
+											<ImgCdn src={a} alt='Аватар' className={styles.optionImage} />
+											{selectedAvatar === a && <div className={styles.selectedBadge}>✓</div>}
+										</button>
+									))}
+								</div>
+							</div>
+						)}
 
-					<div className={styles.section}>
-						<h3>Выберите рамку</h3>
-						<div className={styles.grid}>
-							{FRAMES.map(f => (
-								<button
-									key={f}
-									className={`${styles.frameOption} ${selectedFrame === f ? styles.selected : ''}`}
-									onClick={() => setSelectedFrame(f)}
-								>
-									<ImgCdn src={f} alt='Рамка' />
-								</button>
-							))}
-						</div>
+						{activeTab === 'frames' && (
+							<div>
+								<h3 className={styles.sectionTitle}>Выберите рамку</h3>
+								<div className={styles.grid}>
+									{FRAMES.map(f => (
+										<button
+											key={f}
+											className={`${styles.option} ${selectedFrame === f ? styles.selected : ''}`}
+											onClick={() => setSelectedFrame(f)}
+										>
+											<ImgCdn src={f} alt='Рамка' className={styles.optionImage} />
+											{selectedFrame === f && <div className={styles.selectedBadge}>✓</div>}
+										</button>
+									))}
+								</div>
+							</div>
+						)}
 					</div>
+				</div>
 
-					<div className={styles.actions}>
-						<button className={styles.cancelButton} onClick={onClose}>
-							Отмена
-						</button>
-						<button className={styles.saveButton} onClick={handleSave}>
-							Сохранить
-						</button>
-					</div>
+				<div className={styles.modalActions}>
+					<button className={styles.cancelButton} onClick={onClose}>
+						Отмена
+					</button>
+					<button className={styles.saveButton} onClick={handleSave}>
+						Сохранить изменения
+					</button>
 				</div>
 			</div>
 		</div>
