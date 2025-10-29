@@ -1,30 +1,36 @@
-# ==================== PROD: основной домен (фронт + /api под одним origin) ====================
+{
+  email artemprokopev@internet.ru
+}
+
+# ==================== PROD: основной домен ====================
 stationeden.ru, www.stationeden.ru {
+  tls {
+    issuer acme {
+      email artemprokopev@internet.ru
+      disable_tlsalpn_challenge
+    }
+  }
+
   encode zstd gzip
 
-  # /api/* → обрезаем префикс и шлём в api:4000
   handle /api* {
     uri strip_prefix /api
     reverse_proxy api:4000
   }
 
-  # /auth/* → проксируем как есть (нужен для OAuth коллбэков)
   handle /auth* {
     reverse_proxy api:4000
   }
 
-  # анти-кэш для CSRF
   @csrf path /auth/csrf
   header @csrf Cache-Control "no-store, no-cache, must-revalidate"
   header @csrf Pragma "no-cache"
   header @csrf Expires "0"
 
-  # остальное → фронт
   handle {
     reverse_proxy web:3000
   }
 
-  # безопасные заголовки (HSTS только на проде)
   header {
     Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     X-Content-Type-Options "nosniff"
@@ -32,8 +38,15 @@ stationeden.ru, www.stationeden.ru {
   }
 }
 
-# ==================== PROD: отдельный API-хост (обратная совместимость) ====================
+# ==================== PROD: отдельный API-хост ====================
 api.stationeden.ru {
+  tls {
+    issuer acme {
+      email artemprokopev@internet.ru
+      disable_tlsalpn_challenge
+    }
+  }
+
   encode zstd gzip
   reverse_proxy api:4000
 
@@ -49,8 +62,7 @@ api.stationeden.ru {
   }
 }
 
-# ==================== LOCAL: единый origin на https://localhost ====================
-# (без HSTS, чтобы не «залипал»)
+# ==================== LOCAL ====================
 http://localhost, https://localhost {
   encode zstd gzip
 
