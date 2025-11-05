@@ -1,75 +1,206 @@
-/* apps/web/src/app/home.module.css */
+/* ===== фон ===== */
 .bg {
-	position: fixed;
-	inset: 0;
-	z-index: 0;
-	background-image: url('/login-background.png');
-	background-size: cover;
-	background-position: center;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-image: url('/main-background.png');
+  background-size: cover;
+  background-position: right center;
+  filter: saturate(110%) brightness(95%);
 }
 
+.bgFx {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(600px 300px at 20% 10%, rgba(94, 231, 255, 0.10), transparent 60%),
+    radial-gradient(600px 400px at 75% 35%, rgba(113, 66, 244, 0.10), transparent 60%),
+    radial-gradient(500px 300px at 45% 70%, rgba(40, 216, 255, 0.08), transparent 65%);
+}
+
+.bgFx::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.7;
+  background-image:
+    radial-gradient(1px 1px at 15% 25%, rgba(255, 255, 255, 0.55) 50%, transparent 51%),
+    radial-gradient(1px 1px at 35% 65%, rgba(255, 255, 255, 0.45) 50%, transparent 51%),
+    radial-gradient(1px 1px at 60% 35%, rgba(255, 255, 255, 0.50) 50%, transparent 51%),
+    radial-gradient(1px 1px at 85% 55%, rgba(255, 255, 255, 0.40) 50%, transparent 51%),
+    radial-gradient(1px 1px at 70% 80%, rgba(255, 255, 255, 0.40) 50%, transparent 51%);
+}
+
+/* ===== компоновка ===== */
 .container {
-	min-height: 100vh;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	padding: 20px;
-	font-family: 'Nunito', sans-serif;
-	position: relative;
-	z-index: 1;
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 200px;
+  z-index: 1;
+  gap: 80px;
+  overflow: hidden;
+  box-sizing: border-box;
+  min-width: 1400px;
 }
 
-.card {
-	background: #4740a8;
-	padding: 3rem 2rem;
-	border-radius: 36px;
-	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
-	backdrop-filter: blur(12px);
-	max-width: 540px;
-	width: 100%;
-	text-align: center;
-	border: 4px solid #201f5c;
-	position: relative;
-	overflow: hidden;
-}
-.card::before {
-	content: '';
-	position: absolute;
-	inset: 0;
-	border-radius: 36px;
-	padding: 4px;
-	background: linear-gradient(to bottom, #6a5bc4, #4f47a6);
-	mask:
-		linear-gradient(#000 0 0) content-box,
-		linear-gradient(#000 0 0);
-	-webkit-mask:
-		linear-gradient(#000 0 0) content-box,
-		linear-gradient(#000 0 0);
-	-webkit-mask-composite: xor;
-	mask-composite: exclude;
-	pointer-events: none;
-	z-index: 0;
+/* ===== заголовок ===== */
+.stationTitle {
+  position: relative;
+  left: auto;
+  top: auto;
+  transform: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  filter: drop-shadow(0 0 18px rgba(40, 216, 255, 0.3));
+  z-index: 2;
+  margin-top: -60px;
 }
 
-.title {
-	margin: 0 0 12px 0;
-	font-size: 32px;
-	color: #fff;
-	font-family: 'RussoOne', sans-serif;
-	-webkit-text-stroke: 1.5px #7050d5;
-	paint-order: stroke fill;
-	text-shadow: 0 2px 0 #7050d5;
+.titleLine {
+  font-family: 'RussoOne', sans-serif;
+  font-size: 72px;
+  font-weight: 800;
+  color: #b9f4ff;
+  letter-spacing: 0.35em;
+  line-height: 0.9;
+  margin-bottom: 0.2em;
+  text-transform: uppercase;
+  text-shadow: 0 0 6px #28d8ff, 0 0 12px #28d8ff;
+  filter: drop-shadow(0 0 8px #28d8ff);
+  animation: pulseGlow 2.6s ease-in-out infinite;
+  white-space: nowrap;
 }
 
-.subtitle {
-	margin: 0 1rem 1.5rem;
-	font-size: 16px;
-	color: #eaeaff;
+.titleLineEden {
+  font-family: 'RussoOne', sans-serif;
+  font-size: 110px;
+  font-weight: 900;
+  color: #b9f4ff;
+  letter-spacing: 0.08em;
+  line-height: 0.9;
+  text-transform: uppercase;
+  text-shadow: 0 0 8px #28d8ff, 0 0 16px #28d8ff;
+  animation: pulseGlow 2.6s ease-in-out infinite;
+  white-space: nowrap;
 }
 
-.welcomeText {
-	margin: 1rem 0;
-	font-size: 14px;
-	color: #eaeaff;
-	line-height: 1.5;
+/* ===== правая часть - меню ===== */
+.menuSection {
+  position: relative;
+  right: auto;
+  top: auto;
+  transform: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 2;
+  margin-top: -40px;
+}
+
+/* Боковое меню */
+.sideMenu {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: center;
+  margin-right: 80px;
+}
+
+.menuItem {
+  padding: 16px 50px;
+  font-family: 'RussoOne', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #83eefb;
+  background: rgba(10, 30, 40, 0.25);
+  border: 1px solid rgba(0, 230, 255, 0.4);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-shadow: 0 0 4px #83eefb;
+  backdrop-filter: blur(12px);
+  width: 320px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.menuItem::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(0, 247, 255, 0.2),
+    transparent
+  );
+  transition: left 0.6s ease;
+}
+
+.menuItem:hover {
+  background: rgba(10, 30, 40, 0.4);
+  box-shadow:
+    0 0 15px rgba(0, 230, 255, 0.4),
+    inset 0 0 15px rgba(0, 230, 255, 0.15);
+  transform: translateY(-3px) scale(1.02);
+  border-color: rgba(0, 230, 255, 0.7);
+  color: #b9f4ff;
+}
+
+.menuItem:hover::before {
+  left: 100%;
+}
+
+/* ===== анимации ===== */
+@keyframes pulseGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 8px #28d8ff);
+  }
+  50% {
+    filter: drop-shadow(0 0 15px #28d8ff);
+  }
+}
+
+/* Адаптивность для всего контейнера */
+@media (max-width: 1400px) {
+  .container {
+    min-width: 1400px;
+  }
+}
+
+/* Адаптивность для меню */
+@media (max-width: 1400px) {
+  .sideMenu {
+    margin-right: 60px;
+  }
+  
+  .menuItem {
+    width: 280px;
+    font-size: 1.3rem;
+  }
+}
+
+@media (max-width: 1000px) {
+  .sideMenu {
+    margin-right: 40px;
+  }
+  
+  .menuItem {
+    width: 240px;
+    font-size: 1.1rem;
+    padding: 14px 40px;
+  }
 }

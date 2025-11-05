@@ -1,473 +1,780 @@
-/* apps/web/src/app/login/page.module.css — минималистичный стиль */
-.bg {
-	position: fixed;
-	inset: 0;
-	z-index: 0;
-	background-image: url('/login-background.png');
-	background-size: cover;
-	background-position: center;
+.page {
+  position: relative;
+  min-height: 100vh;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  background-image: url("/register-background.png");
+  background-size: cover;
+  background-position: center;
+  font-family: 'RussoOne', sans-serif;
+  overflow: hidden;
 }
+
 .container {
-	min-height: 100vh;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	padding: 20px;
-	font-family: 'Nunito', sans-serif;
-	position: relative;
-	z-index: 1;
+  width: 100%;
+  max-width: 700px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
 }
+
 .card {
-	--placeholder: rgba(255, 255, 255, 0.75);
-	background: #4740a8;
-	padding: 2.5rem;
-	border-radius: 36px;
-	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
-	backdrop-filter: blur(12px);
-	max-width: 480px;
-	width: 100%;
-	text-align: center;
-	border: 4px solid #201f5c;
-	position: relative;
-	overflow: hidden;
-	animation: se-fade-in-up 320ms ease-out both;
-	animation-delay: 40ms;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  border: 2px solid #63EFFF;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
 }
+
 .card::before {
-	content: '';
-	position: absolute;
-	inset: 0;
-	border-radius: 36px;
-	padding: 4px;
-	background: linear-gradient(to bottom, #6a5bc4, #4f47a6);
-	mask:
-		linear-gradient(#000 0 0) content-box,
-		linear-gradient(#000 0 0);
-	-webkit-mask:
-		linear-gradient(#000 0 0) content-box,
-		linear-gradient(#000 0 0);
-	mask-composite: exclude;
-	-webkit-mask-composite: xor;
-	pointer-events: none;
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #63EFFF, transparent);
 }
+
+.header {
+  text-align: center;
+  margin-bottom: 24px;
+  transition: all 0.3s ease;
+}
+
 .title {
-	margin: 0 0 12px 0;
-	font-size: 28px;
-	color: #fff;
-	font-family: 'RussoOne', sans-serif;
-	-webkit-text-stroke: 1.5px #7050d5;
-	paint-order: stroke fill;
-	text-shadow: 0 2px 0 #7050d5;
+  font-size: 32px;
+  font-weight: 700;
+  color: #63EFFF;
+  text-shadow: 0 0 10px rgba(99, 239, 255, 0.6);
+  margin: 0;
+  transition: all 0.3s ease;
 }
 
-/* ===== Бейджи (лаконичные) ===== */
-.pillRow {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-	margin: 10px 0 16px;
-	justify-content: flex-start;
-}
-.pill {
-	display: inline-flex;
-	align-items: center;
-	gap: 8px;
-	padding: 6px 10px;
-	border-radius: 999px;
-	font-size: 13px;
-	line-height: 1;
-	border: 1px solid rgba(255, 255, 255, 0.22);
-	background: rgba(255, 255, 255, 0.06);
-	color: #fff;
-	user-select: none;
-}
-.pillLock {
-	border-color: rgba(255, 128, 128, 0.35);
-	background: rgba(255, 128, 128, 0.08);
-}
-.pillWarn {
-	border-color: rgba(255, 220, 130, 0.35);
-	background: rgba(255, 220, 130, 0.08);
-}
-.iconWrap {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 16px;
-	height: 16px;
-	opacity: 0.95;
-}
-.pillLabel {
-	font-weight: 700;
-	letter-spacing: 0.2px;
-	opacity: 0.95;
-}
-.pillValue {
-	font-family:
-		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-		'Courier New', monospace;
-	font-weight: 800;
-	white-space: nowrap;
-}
-
-/* кружок-разделитель */
-.sep {
-	width: 6px;
-	height: 6px;
-	border-radius: 999px;
-	background: currentColor;
-	opacity: 0.4;
-}
-
-/* Встроенный компактный таймер */
-.timerBadge {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	padding: 2px 8px;
-	border-radius: 8px;
-	border: 1px solid rgba(255, 255, 255, 0.22);
-	background: rgba(255, 255, 255, 0.06);
-}
-.timerDigits {
-	font-family:
-		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-		'Courier New', monospace;
-	font-weight: 800;
-	letter-spacing: 0.3px;
-	white-space: nowrap;
-}
-
-/* Индикатор оставшихся попыток */
-.meterWrap {
-	position: relative;
-	width: 64px;
-	height: 6px;
-	border-radius: 999px;
-	border: 1px solid rgba(255, 255, 255, 0.18);
-	margin-left: 6px;
-	overflow: hidden;
-	flex: 0 0 auto;
-	background: rgba(255, 255, 255, 0.06);
-}
-.meterFill {
-	position: absolute;
-	left: 0;
-	top: 0;
-	bottom: 0;
-	width: 0%;
-	background: linear-gradient(90deg, #ffd18f, #ff9e9e);
-}
-
-/* ===== Инфо (reason) ===== */
 .notice {
-	text-align: left;
-	margin: 10px 0 16px;
-	padding: 10px 12px;
-	border-radius: 12px;
-	font-size: 14px;
-	line-height: 1.45;
-}
-.info {
-	color: #d7ecff;
-	background: rgba(125, 249, 255, 0.1);
-	border: 2px solid rgba(125, 249, 255, 0.35);
+  text-align: center;
+  margin: 0 0 24px 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.45;
+  background: rgba(99, 239, 255, 0.1);
+  border: 1px solid rgba(99, 239, 255, 0.3);
+  color: #63EFFF;
+  transition: all 0.3s ease;
 }
 
-/* ===== Форма ===== */
+/* Стили для бейджей блокировки и попыток */
+.pillRow {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  transition: all 0.3s ease;
+}
+
+.pillLock {
+  background: rgba(255, 144, 144, 0.15);
+  border: 1px solid rgba(255, 144, 144, 0.4);
+  color: #ff9090;
+  justify-content: center;
+}
+
+.pillWarn {
+  background: rgba(255, 209, 143, 0.15);
+  border: 1px solid rgba(255, 209, 143, 0.4);
+  color: #ffd18f;
+  justify-content: space-between;
+}
+
+.iconWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pillLabel {
+  font-weight: 500;
+}
+
+.pillValue {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.timerBadge {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 4px 8px;
+  margin-left: 8px;
+}
+
+.timerDigits {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+.sep {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 209, 143, 0.4);
+}
+
+.meterWrap {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 0 0 20px 20px;
+  overflow: hidden;
+}
+
+.meterFill {
+  height: 100%;
+  background: linear-gradient(90deg, #ffd18f, #ff9090);
+  transition: width 0.3s ease;
+  border-radius: inherit;
+}
+
 .form {
-	display: grid;
-	gap: 1.5rem;
-	animation: se-fade-in-up 320ms ease-out both;
-	animation-delay: 80ms;
-}
-.isShaking {
-	animation: se-shake-x 320ms ease-out;
-}
-.inputGroup {
-	text-align: left;
-}
-.inputWrap {
-	position: relative;
+  display: grid;
+  gap: 1.5rem;
+  transition: all 0.3s ease;
 }
 
-.input {
-	padding: 14px 64px 14px 16px;
-	border: 4px solid #201f5c;
-	border-radius: 8px;
-	font-size: 16px;
-	width: 100%;
-	transition:
-		border-color 0.2s,
-		box-shadow 0.2s,
-		transform 0.12s ease;
-	background-color: #2c2b7b;
-	color: #fff;
-	font-family: 'Nunito', sans-serif;
-	appearance: none;
+.isShaking {
+  animation: shake 320ms ease-out;
 }
-.input::placeholder {
-	color: var(--placeholder);
-	opacity: 1;
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
 }
-.input:focus {
-	outline: none;
-	border-color: #6f59d6;
-	box-shadow: 0 0 0 3px rgba(205, 141, 238, 0.2);
+
+.inputGroup {
+  text-align: left;
+  transition: all 0.3s ease;
 }
 
 .label {
-	display: block;
-	font-size: 14px;
-	font-weight: 600;
-	margin-bottom: 8px;
-	color: #fff;
-	font-family: 'RussoOne', sans-serif;
+  display: block;
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: #63EFFF;
+  text-shadow: 0 0 6px rgba(99, 239, 255, 0.4);
+  transition: all 0.3s ease;
 }
 
-/* Кнопка-глаз */
+.inputWrap {
+  position: relative;
+}
+
+.input {
+  width: 100%;
+  padding: 14px 50px 14px 16px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 2px solid #63EFFF;
+  border-radius: 12px;
+  color: white;
+  font-size: 16px;
+  font-family: 'RussoOne', sans-serif;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.input:focus {
+  border-color: #4FD8FF;
+  box-shadow: 0 0 8px rgba(99, 239, 255, 0.4);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  border-color: rgba(99, 239, 255, 0.4);
+}
+
+.valid {
+  border-color: #60ffc4;
+  box-shadow: 0 0 8px rgba(96, 255, 196, 0.3);
+}
+
+.invalid {
+  border-color: #ff9090;
+  box-shadow: 0 0 8px rgba(255, 144, 144, 0.3);
+}
+
 .toggleBtn {
-	position: absolute;
-	top: 50%;
-	right: 10px;
-	transform: translateY(-50%);
-	width: 40px;
-	height: 40px;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	border: 0;
-	background: transparent;
-	color: var(--placeholder);
-	opacity: 0.95;
-	cursor: pointer;
-	border-radius: 8px;
-	transition:
-		opacity 0.15s ease,
-		transform 0.08s ease,
-		background 0.12s ease;
-}
-.toggleBtn:hover {
-	opacity: 1;
-	background: rgba(255, 255, 255, 0.06);
-}
-.toggleBtn:active {
-	transform: translateY(-50%) scale(0.98);
-}
-.toggleBtn:focus-visible {
-	outline: none;
-	box-shadow: 0 0 0 2px rgba(205, 141, 238, 0.35);
-	border-radius: 8px;
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: #63EFFF;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease;
 }
 
-/* скрыть встроенную кнопку показа/очистки в Edge */
-.input[type='password']::-ms-reveal,
-.input[type='password']::-ms-clear {
-	display: none;
+.toggleBtn:hover:not(:disabled) {
+  background: rgba(99, 239, 255, 0.1);
+  transform: translateY(-50%) scale(1.05);
 }
 
-/* Кнопка входа */
+.toggleBtn:active:not(:disabled) {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.toggleBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggleBtn svg {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+
 .button {
-	padding: 14px;
-	background: #8b66e7;
-	color: #fff;
-	border: 2px solid #7050d5;
-	border-radius: 36px;
-	font-size: 28px;
-	font-weight: 600;
-	cursor: pointer;
-	width: 100%;
-	letter-spacing: 0.5px;
-	margin-top: 0.5rem;
-	font-family: 'RussoOne', sans-serif;
-	-webkit-text-stroke: 1.5px #7050d5;
-	paint-order: stroke fill;
-	text-shadow: 0 2px 0 #7050d5;
-	box-shadow:
-		0 6px 0 #5a3fb5,
-		0 8px 10px rgba(0, 0, 0, 0.2),
-		inset 0 6px 0 #cd8dee;
-	transition: all 0.1s ease;
-	position: relative;
-	top: 0;
-	animation: se-fade-in-up 320ms ease-out both;
-	animation-delay: 240ms;
+  background: rgba(99, 239, 255, 0.1);
+  border: 2px solid #63EFFF;
+  color: #63EFFF;
+  font-weight: 500;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'RussoOne', sans-serif;
+  text-transform: lowercase;
+  text-shadow: 0 0 6px rgba(99, 239, 255, 0.6);
+  padding: 16px;
+  font-size: 18px;
+  width: 100%;
+  margin-top: 8px;
+  position: relative;
+  overflow: hidden;
 }
-.button:hover {
-	background: #7a5ad6;
-	box-shadow:
-		0 4px 0 #5a3fb5,
-		0 6px 8px rgba(0, 0, 0, 0.15),
-		inset 0 6px 0 #cd8dee;
-	top: 2px;
+
+.button:hover:not(:disabled) {
+  background: rgba(99, 239, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(99, 239, 255, 0.3);
 }
-.button:active {
-	background: #6a4ec5;
-	box-shadow:
-		0 2px 0 #5a3fb5,
-		0 4px 6px rgba(0, 0, 0, 0.1),
-		inset 0 6px 0 #cd8dee;
-	top: 4px;
-	transform: translateY(2px);
-}
-.loading {
-	cursor: progress;
-	opacity: 0.9;
-}
-.loading::after {
-	display: inline-block;
-	vertical-align: baseline;
-	margin-left: 4px;
-	font-weight: 700;
-	content: '';
-	animation: se-ellipsis 1s steps(3, end) infinite;
+
+.button:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .button:disabled,
-.button[aria-disabled='true'],
-.button:disabled:hover,
-.button[aria-disabled='true']:hover,
-.button:disabled:active,
-.button[aria-disabled='true']:active {
-	opacity: 0.6;
-	cursor: not-allowed;
-	background: #8b66e7;
-	border: 2px solid #7050d5;
-	text-shadow: 0 2px 0 #7050d5;
-	box-shadow:
-		0 6px 0 #5a3fb5,
-		0 8px 10px rgba(0, 0, 0, 0.2),
-		inset 0 6px 0 #cd8dee;
-	top: 0;
-	transform: none;
+.button[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
-/* Текстовые блоки / ссылки */
-.ok {
-	color: #b5ffcf;
-	margin-top: 1rem;
-	font-family: 'Nunito', sans-serif;
+.button.loading {
+  cursor: progress;
 }
+
+.button.loading::after {
+  content: '';
+  display: inline-block;
+  margin-left: 8px;
+  animation: ellipsis 1s steps(3, end) infinite;
+}
+
+@keyframes ellipsis {
+  0% { content: ''; }
+  33% { content: '.'; }
+  66% { content: '..'; }
+  100% { content: '...'; }
+}
+
 .error {
-	color: #ffd5d5;
-	margin-top: 1rem;
-	font-family: 'Nunito', sans-serif;
-}
-.swap {
-	margin-top: 1rem;
-	font-size: 14px;
-	color: #fff;
-	font-family: 'Nunito', sans-serif;
-}
-.link {
-	color: #cd8dee;
-	text-decoration: none;
-	font-weight: 600;
-	font-family: 'Nunito', sans-serif;
-}
-.link:hover {
-	text-decoration: underline;
+  color: #ff9090;
+  text-align: center;
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(255, 144, 144, 0.1);
+  border: 1px solid rgba(255, 144, 144, 0.3);
+  border-radius: 8px;
+  text-shadow: 0 0 4px rgba(255, 144, 144, 0.4);
+  transition: all 0.3s ease;
 }
 
-/* Разделитель */
-.hr {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-	margin: 16px 0;
-	color: rgba(255, 255, 255, 0.9);
-	font-size: 13px;
-	line-height: 1;
+.swap {
+  text-align: center;
+  margin-top: 24px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  transition: all 0.3s ease;
 }
+
+.link {
+  color: #63EFFF;
+  text-decoration: none;
+  text-shadow: 0 0 4px rgba(99, 239, 255, 0.4);
+  transition: all 0.2s ease;
+}
+
+.link:hover {
+  color: #4FD8FF;
+  text-shadow: 0 0 8px rgba(79, 216, 255, 0.6);
+}
+
+.hr {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0;
+  color: rgba(99, 239, 255, 0.8);
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
 .hr::before,
 .hr::after {
-	content: '';
-	flex: 1 1 auto;
-	height: 1px;
-	background: rgba(255, 255, 255, 0.2);
-}
-.hr > span {
-	opacity: 0.9;
-	letter-spacing: 0.2px;
-	white-space: nowrap;
-	transform: translateY(-0.5px);
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(99, 239, 255, 0.3);
 }
 
-/* motion-safe */
-@media (prefers-reduced-motion: no-preference) {
-	@keyframes se-fade-in-up {
-		from {
-			opacity: 0;
-			transform: translateY(8px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-	@keyframes se-shake-x {
-		0%,
-		100% {
-			transform: translateX(0);
-		}
-		20% {
-			transform: translateX(-4px);
-		}
-		40% {
-			transform: translateX(4px);
-		}
-		60% {
-			transform: translateX(-3px);
-		}
-		80% {
-			transform: translateX(2px);
-		}
-	}
-	@keyframes se-ellipsis {
-		0% {
-			content: '';
-		}
-		33% {
-			content: '.';
-		}
-		66% {
-			content: '..';
-		}
-		100% {
-			content: '...';
-		}
-	}
-}
-
-/* адаптив */
 .oauthBlock {
-	display: grid;
-	justify-items: center;
-	gap: 8px;
+  display: grid;
+  justify-items: center;
+  transition: all 0.3s ease;
 }
-@media (max-width: 520px) {
-	.card {
-		padding: 2rem;
-	}
-	.title {
-		font-size: 24px;
-	}
-	.pill {
-		font-size: 12px;
-		gap: 8px;
-	}
-	.timerBadge {
-		padding: 2px 6px;
-	}
+
+.loadingSpinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(99, 239, 255, 0.3);
+  border-left: 4px solid #63EFFF;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 20px auto;
 }
-@media (max-width: 360px) {
-	.card {
-		padding: 1.5rem;
-	}
-	.title {
-		font-size: 22px;
-	}
-	.button {
-		font-size: 24px;
-	}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* АДАПТИВ ПО ВЫСОТЕ ЭКРАНА ДЛЯ ДЕСКТОПОВ */
+
+/* Высота 900px и меньше */
+@media (max-height: 900px) and (min-width: 769px) {
+  .page {
+    padding: 20px;
+  }
+  
+  .card {
+    padding: 28px;
+  }
+  
+  .title {
+    font-size: 30px;
+  }
+  
+  .form {
+    gap: 1.25rem;
+  }
+  
+  .input {
+    padding: 13px 48px 13px 15px;
+  }
+  
+  .button {
+    padding: 15px;
+    font-size: 17px;
+  }
+}
+
+/* Высота 800px и меньше */
+@media (max-height: 800px) and (min-width: 769px) {
+  .page {
+    padding: 16px;
+  }
+  
+  .container {
+    padding: 15px;
+  }
+  
+  .card {
+    padding: 24px;
+  }
+  
+  .header {
+    margin-bottom: 20px;
+  }
+  
+  .title {
+    font-size: 28px;
+  }
+  
+  .notice {
+    margin-bottom: 20px;
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+  
+  .pillRow {
+    margin-bottom: 20px;
+  }
+  
+  .pill {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+  
+  .form {
+    gap: 1.125rem;
+  }
+  
+  .input {
+    padding: 12px 46px 12px 14px;
+    font-size: 15px;
+  }
+  
+  .label {
+    font-size: 15px;
+    margin-bottom: 6px;
+  }
+  
+  .button {
+    padding: 14px;
+    font-size: 16px;
+    margin-top: 6px;
+  }
+  
+  .toggleBtn {
+    width: 38px;
+    height: 38px;
+  }
+  
+  .toggleBtn svg {
+    width: 22px;
+    height: 22px;
+  }
+  
+  .swap {
+    margin-top: 20px;
+    font-size: 13px;
+  }
+  
+  .hr {
+    margin: 20px 0;
+    font-size: 13px;
+  }
+}
+
+/* Высота 700px и меньше */
+@media (max-height: 700px) and (min-width: 769px) {
+  .page {
+    padding: 12px;
+  }
+  
+  .container {
+    padding: 10px;
+  }
+  
+  .card {
+    padding: 20px;
+  }
+  
+  .header {
+    margin-bottom: 16px;
+  }
+  
+  .title {
+    font-size: 26px;
+  }
+  
+  .notice {
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  
+  .pillRow {
+    margin-bottom: 16px;
+  }
+  
+  .pill {
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+  
+  .timerDigits {
+    font-size: 11px;
+  }
+  
+  .form {
+    gap: 1rem;
+  }
+  
+  .input {
+    padding: 10px 42px 10px 12px;
+    font-size: 14px;
+  }
+  
+  .label {
+    font-size: 14px;
+    margin-bottom: 5px;
+  }
+  
+  .button {
+    padding: 12px;
+    font-size: 15px;
+    margin-top: 4px;
+  }
+  
+  .toggleBtn {
+    width: 36px;
+    height: 36px;
+    right: 8px;
+  }
+  
+  .toggleBtn svg {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .swap {
+    margin-top: 16px;
+    font-size: 12px;
+  }
+  
+  .hr {
+    margin: 16px 0;
+    font-size: 12px;
+    gap: 10px;
+  }
+  
+  .error {
+    margin-top: 12px;
+    padding: 10px;
+    font-size: 12px;
+  }
+}
+
+/* Высота 600px и меньше - компактный режим */
+@media (max-height: 600px) and (min-width: 769px) {
+  .page {
+    padding: 8px;
+    justify-content: flex-start;
+  }
+  
+  .container {
+    padding: 8px;
+    max-width: 480px;
+  }
+  
+  .card {
+    padding: 16px;
+    border-radius: 12px;
+  }
+  
+  .header {
+    margin-bottom: 12px;
+  }
+  
+  .title {
+    font-size: 24px;
+  }
+  
+  .notice {
+    margin-bottom: 12px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  
+  .pillRow {
+    margin-bottom: 12px;
+  }
+  
+  .pill {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  
+  .timerDigits {
+    font-size: 10px;
+  }
+  
+  .form {
+    gap: 0.75rem;
+  }
+  
+  .input {
+    padding: 8px 38px 8px 10px;
+    font-size: 13px;
+    border-radius: 8px;
+  }
+  
+  .label {
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+  
+  .button {
+    padding: 10px;
+    font-size: 14px;
+    margin-top: 2px;
+    border-radius: 8px;
+  }
+  
+  .toggleBtn {
+    width: 32px;
+    height: 32px;
+    right: 6px;
+  }
+  
+  .toggleBtn svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .swap {
+    margin-top: 12px;
+    font-size: 11px;
+  }
+  
+  .hr {
+    margin: 12px 0;
+    font-size: 11px;
+    gap: 8px;
+  }
+  
+  .error {
+    margin-top: 8px;
+    padding: 8px;
+    font-size: 11px;
+  }
+}
+
+/* Высота 500px и меньше - ультра компактный режим */
+@media (max-height: 500px) and (min-width: 769px) {
+  .page {
+    padding: 4px;
+  }
+  
+  .container {
+    padding: 4px;
+  }
+  
+  .card {
+    padding: 12px;
+  }
+  
+  .header {
+    margin-bottom: 8px;
+  }
+  
+  .title {
+    font-size: 20px;
+  }
+  
+  .notice {
+    display: none;
+  }
+  
+  .pillRow {
+    margin-bottom: 8px;
+  }
+  
+  .pill {
+    padding: 5px 8px;
+    font-size: 10px;
+  }
+  
+  .timerDigits {
+    font-size: 9px;
+  }
+  
+  .form {
+    gap: 0.5rem;
+  }
+  
+  .input {
+    padding: 6px 34px 6px 8px;
+    font-size: 12px;
+  }
+  
+  .label {
+    font-size: 12px;
+    margin-bottom: 3px;
+  }
+  
+  .button {
+    padding: 8px;
+    font-size: 12px;
+  }
+  
+  .toggleBtn {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .toggleBtn svg {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .swap {
+    margin-top: 8px;
+    font-size: 10px;
+  }
+  
+  .hr {
+    margin: 8px 0;
+    font-size: 10px;
+  }
+  
+  .oauthBlock {
+    display: none;
+  }
 }

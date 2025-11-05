@@ -12,6 +12,7 @@
 		"dev": "run-p dev:api dev:web",
 		"dev:nocache": "run-p dev:api dev:web:nocache",
 		"build": "pnpm -r build",
+		"build:wasm": "pnpm --filter @station-eden/web build:wasm",
 		"migrate:run": "dotenv -e apps/api/.env.local -- pnpm --filter @station-eden/api run migration:run",
 		"migrate:revert": "dotenv -e apps/api/.env.local -- pnpm --filter @station-eden/api run migration:revert",
 		"clean": "pnpm -r run clean && rimraf node_modules && pnpm store prune",
