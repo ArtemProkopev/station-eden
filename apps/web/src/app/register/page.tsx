@@ -5,11 +5,14 @@ import { api, getUserMessage } from '@/src/lib/api'
 import { GOOGLE_ENABLED } from '@/src/lib/flags'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, memo } from 'react'
 import styles from './page.module.css'
+import { useUsernameGenerator } from '@/src/hooks/useUsernameGenerator'
 import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
 import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
-import { useUsernameGenerator } from '@/src/hooks/useUsernameGenerator'
+
+const MemoizedFireflies = memo(FirefliesProfile)
+const MemoizedStars = memo(TwinklingStars)
 
 function EyeIcon() {
 	return (
@@ -167,8 +170,8 @@ export default function RegisterPage() {
 	return (
 		<>
 			<main className={styles.page}>
-				<FirefliesProfile />
-				<TwinklingStars />
+				<MemoizedFireflies />
+				<MemoizedStars />
 				
 				<div className={styles.container}>
 					<section className={styles.card} aria-labelledby='reg-title'>
@@ -230,9 +233,15 @@ export default function RegisterPage() {
 										onClick={handleGenerateUsername}
 										disabled={generating}
 										className={styles.generateBtn}
-										title={isWasmSupported ? "Сгенерировать ник" : "Сгенерировать случайный ник"}
+										title={isWasmSupported ? "Сгенерировать ник с помощью WebAssembly" : "Сгенерировать случайный ник"}
 									>
-										{generating ? 'Генерируем...' : 'Сгенерировать'}
+										{generating ? (
+											<>
+												<span style={{ opacity: 0 }}>Генерируем</span>
+											</>
+										) : (
+											'Сгенерировать'
+										)}
 									</button>
 								</div>
 								
@@ -256,8 +265,6 @@ export default function RegisterPage() {
 									aria-invalid={userTouched ? !isUserValid : undefined}
 									aria-describedby='user-hint'
 								/>
-
-								{ isWasmSupported && !generating }
 
 								<p id='user-hint' className={styles.pwHint}>
 									Доступны латиница, цифры и подчёркивание. Длина — 3–20 символов.

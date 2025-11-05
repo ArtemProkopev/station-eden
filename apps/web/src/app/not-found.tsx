@@ -8,23 +8,28 @@ export const metadata = {
 
 export default function NotFound() {
   return (
-    <>
-      <div className={styles.bg} aria-hidden />
+    <div className={styles.page}>
       <div className={styles.container}>
         <section className={styles.card}>
-          <h1 className={styles.title}>Station Eden</h1>
-          <p className={styles.subtitle}>
-            Страница не найдена
-          </p>
+          <div className={styles.header}>
+            <h1 className={styles.title}>Station Eden</h1>
+          </div>
+          
           <div className={styles.big404}>404</div>
+          
+          <div className={styles.notice}>
+            Страница не найдена
+          </div>
+          
           <p className={styles.description}>
             Запрашиваемая страница не существует или была перемещена
           </p>
-          <a href="/" className={styles.homeLink}>
+          
+          <a href="/" className={styles.button}>
             Вернуться на главную
           </a>
         </section>
       </div>
-    </>
+    </div>
   )
 }

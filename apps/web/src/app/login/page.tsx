@@ -5,10 +5,13 @@ import { api, getUserMessage } from '@/src/lib/api'
 import { GOOGLE_ENABLED } from '@/src/lib/flags'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, memo } from 'react'
 import styles from './page.module.css'
 import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
 import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
+
+const MemoizedFireflies = memo(FirefliesProfile)
+const MemoizedStars = memo(TwinklingStars)
 
 function EyeIcon() {
 	return (
@@ -323,8 +326,8 @@ function LoginInner() {
 	return (
 		<>
 			<main className={styles.page}>
-				<FirefliesProfile />
-				<TwinklingStars />
+				<MemoizedFireflies />
+				<MemoizedStars />
 				
 				<div className={styles.container}>
 					<section className={styles.card} aria-labelledby='login-title'>

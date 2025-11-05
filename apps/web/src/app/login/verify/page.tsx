@@ -3,8 +3,13 @@
 import OTPInput from '@/src/components/ui/OTPInput'
 import { api } from '@/src/lib/api'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, memo } from 'react'
 import styles from './page.module.css'
+import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
+import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
+
+const MemoizedFireflies = memo(FirefliesProfile)
+const MemoizedStars = memo(TwinklingStars)
 
 function EyeIcon() {
 	return (
@@ -137,6 +142,8 @@ export default function VerifyEmailCodePage() {
 	return (
 		<>
 			<div className={styles.bg} aria-hidden />
+				<MemoizedFireflies />
+				<MemoizedStars />
 			<main className={styles.container}>
 				<section className={styles.card} aria-labelledby='verify-title'>
 					<header>
@@ -172,22 +179,22 @@ export default function VerifyEmailCodePage() {
 									Код из письма
 								</label>
 
-								<OTPInput
-									id='code'
-									name='code'
-									length={6}
-									value={code}
-									onChange={v => {
-										setCode(v.replace(/\D/g, '').slice(0, 6))
-										if (err) setErr(null)
-									}}
-									onComplete={v => setCode(v)}
-									autoFocus
-									disabled={busy}
-									error={!!err}
-									ariaLabel='Код подтверждения из письма'
-									className={styles.otp}
-								/>
+									<OTPInput
+										id='code'
+										name='code'
+										length={6}
+										value={code}
+										onChange={v => {
+											setCode(v.replace(/\D/g, '').slice(0, 6))
+											if (err) setErr(null)
+										}}
+										onComplete={v => setCode(v)}
+										autoFocus
+										disabled={busy}
+										error={!!err}
+										ariaLabel='Код подтверждения из письма'
+										className={styles.otp}
+									/>
 							</div>
 						</fieldset>
 
@@ -246,7 +253,7 @@ export default function VerifyEmailCodePage() {
 							aria-disabled={!canSubmit}
 						>
 							{busy
-								? 'Проверяем…'
+								? 'Проверяем'
 								: mode === 'set_password'
 									? 'ПОДТВЕРДИТЬ И СОХРАНИТЬ ПАРОЛЬ'
 									: 'ПОДТВЕРДИТЬ'}

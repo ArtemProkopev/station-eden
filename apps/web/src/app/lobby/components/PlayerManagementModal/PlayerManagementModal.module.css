@@ -1,0 +1,309 @@
+/* components/PlayerManagementModal/PlayerManagementModal.module.css */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modalContent {
+  background: rgba(0, 10, 20, 0.95);
+  border: 2px solid #63EFFF;
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 0 30px rgba(99, 239, 255, 0.3);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.modalTitle {
+  color: #63EFFF;
+  font-size: 24px;
+  text-shadow: 0 0 8px rgba(99, 239, 255, 0.6);
+  margin: 0;
+  font-family: 'RussoOne', sans-serif;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  color: #63EFFF;
+  font-size: 28px;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.closeButton:hover {
+  background: rgba(99, 239, 255, 0.1);
+}
+
+.playerInfo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(99, 239, 255, 0.2);
+}
+
+.playerAvatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(99, 239, 255, 0.3);
+  border: 2px solid #63EFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #63EFFF;
+  font-weight: bold;
+  font-family: 'RussoOne', sans-serif;
+}
+
+.playerDetails {
+  flex: 1;
+}
+
+.playerName {
+  color: #63EFFF;
+  font-size: 18px;
+  text-shadow: 0 0 4px rgba(99, 239, 255, 0.4);
+  margin: 0 0 8px 0;
+  font-family: 'RussoOne', sans-serif;
+}
+
+.playerStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.statusIndicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.statusIndicator.ready {
+  background: #63EFFF;
+  box-shadow: 0 0 8px rgba(99, 239, 255, 0.6);
+}
+
+.statusIndicator.notReady {
+  background: #ff6b6b;
+  box-shadow: 0 0 8px rgba(255, 107, 107, 0.6);
+}
+
+.statusText {
+  color: rgba(99, 239, 255, 0.8);
+  font-size: 14px;
+  font-family: 'RussoOne', sans-serif;
+}
+
+.youBadge {
+  background: rgba(99, 239, 255, 0.2);
+  color: #63EFFF;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(99, 239, 255, 0.3);
+  font-family: 'RussoOne', sans-serif;
+}
+
+.controlsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.controlGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.controlLabel {
+  color: #63EFFF;
+  font-size: 16px;
+  text-shadow: 0 0 4px rgba(99, 239, 255, 0.4);
+  font-family: 'RussoOne', sans-serif;
+}
+
+.volumeControl {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.muteButton {
+  background: rgba(99, 239, 255, 0.1);
+  border: 2px solid #63EFFF;
+  border-radius: 8px;
+  padding: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 18px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #63EFFF;
+}
+
+.muteButton:hover {
+  background: rgba(99, 239, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.muteButton.muted {
+  background: rgba(255, 107, 107, 0.1);
+  border-color: #ff6b6b;
+  color: #ff6b6b;
+}
+
+.volumeSlider {
+  width: 100%;
+  height: 18px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.19);
+  border: 1px solid #63EFFF;
+  outline: none;
+  appearance: none;
+  position: relative;
+  margin: 0 1rem;
+}
+
+.volumeSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #63EFFF;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 0 8px rgba(99, 239, 255, 0.6);
+  transition: all 0.2s ease;
+}
+
+.volumeSlider::-webkit-slider-thumb:hover {
+  background: #52dfff;
+  transform: scale(1.1);
+}
+
+.volumeSlider:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.volumeSlider:disabled::-webkit-slider-thumb {
+  background: #666;
+  cursor: not-allowed;
+}
+
+.volumeValue {
+  color: #63EFFF;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 45px;
+  text-align: center;
+  font-family: 'RussoOne', sans-serif;
+}
+
+.actionsGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.actionButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(99, 239, 255, 0.1);
+  border: 2px solid #63EFFF;
+  border-radius: 8px;
+  padding: 12px 24px;
+  color: #63EFFF;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'RussoOne', sans-serif;
+  text-transform: lowercase;
+  font-size: 16px;
+  width: 100%;
+}
+
+.actionButton:hover {
+  background: rgba(99, 239, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.removeButton {
+  background: rgba(255, 107, 107, 0.1);
+  border-color: #ff6b6b;
+  color: #ff6b6b;
+}
+
+.removeButton:hover {
+  background: rgba(255, 107, 107, 0.15);
+}
+
+.actionIcon {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.modalFooter {
+  margin-top: 24px;
+  display: flex;
+  justify-content: center;
+}
+
+.closeButtonSecondary {
+  background: rgba(99, 239, 255, 0.1);
+  border: 2px solid #63EFFF;
+  color: #63EFFF;
+  padding: 12px 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'RussoOne', sans-serif;
+  text-transform: lowercase;
+  font-size: 16px;
+  min-width: 120px;
+}
+
+.closeButtonSecondary:hover {
+  background: rgba(99, 239, 255, 0.15);
+  transform: translateY(-1px);
+}

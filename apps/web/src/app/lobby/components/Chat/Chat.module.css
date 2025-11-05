@@ -1,0 +1,236 @@
+.chatBlock {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  border: 2px solid #63EFFF;
+  position: relative;
+  overflow: hidden;
+  height: 600px;
+  width: 100%;
+  max-height: 600px;
+  min-height: 600px;
+}
+
+.blockTitle {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  text-align: center;
+  color: #63EFFF;
+  text-shadow: 0 0 8px rgba(99, 239, 255, 0.6);
+  position: relative;
+  z-index: 1;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.chatMessagesContainer {
+  background: rgba(0, 0, 0, 0.25);
+  border: 2px solid #63EFFF;
+  border-radius: 12px;
+  padding: 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+  margin-bottom: 16px;
+  overflow-y: auto;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Стилизация скроллбара для контейнера сообщений */
+.chatMessagesContainer::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chatMessagesContainer::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.chatMessagesContainer::-webkit-scrollbar-thumb {
+  background: #63EFFF;
+  border-radius: 3px;
+}
+
+.chatMessagesContainer::-webkit-scrollbar-thumb:hover {
+  background: #4FD8FF;
+}
+
+.chatMessages {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Для Firefox */
+.chatMessagesContainer {
+  scrollbar-width: thin;
+  scrollbar-color: #63EFFF rgba(255, 255, 255, 0.1);
+}
+
+.chatMessage {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid rgba(99, 239, 255, 0.2);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.chatMessage:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(99, 239, 255, 0.3);
+}
+
+.systemMessage {
+  background: rgba(99, 239, 255, 0.1);
+  border-color: rgba(99, 239, 255, 0.3);
+}
+
+.systemMessage .chatName {
+  color: rgba(99, 239, 255, 0.8);
+}
+
+.chatMessageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.chatName {
+  color: #63EFFF;
+  font-weight: 600;
+  text-shadow: 0 0 6px rgba(99, 239, 255, 0.4);
+  font-size: 15px;
+}
+
+.chatTime {
+  color: rgba(99, 239, 255, 0.6);
+  font-size: 12px;
+  text-shadow: 0 0 4px rgba(99, 239, 255, 0.3);
+}
+
+.chatText {
+  font-size: 14px;
+  opacity: 0.9;
+  line-height: 1.4;
+  word-wrap: break-word;
+  margin: 0;
+}
+
+.chatForm {
+  display: flex;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+  height: 50px;
+  flex-shrink: 0;
+}
+
+.chatInput {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 16px;
+  outline: none;
+  border: 1px solid #63EFFF;
+  font-family: 'RussoOne', sans-serif;
+  transition: all 0.2s ease;
+  height: 100%;
+}
+
+.chatInput:focus {
+  border-color: #4FD8FF;
+  box-shadow: 0 0 8px rgba(99, 239, 255, 0.4);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.chatInput::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.sendButton {
+  background: rgba(99, 239, 255, 0.1);
+  border: 2px solid #63EFFF;
+  color: #63EFFF;
+  width: 50px;
+  height: 50px;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'RussoOne', sans-serif;
+  text-shadow: 0 0 6px rgba(99, 239, 255, 0.6);
+}
+
+.sendButton:hover:not(:disabled) {
+  background: rgba(99, 239, 255, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 239, 255, 0.3);
+}
+
+.sendButton:disabled {
+  background: rgba(255, 255, 255, 0.05);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .chatBlock {
+    height: 350px;
+    min-height: 350px;
+    max-height: 350px;
+    padding: 16px;
+  }
+  
+  .chatForm {
+    height: 45px;
+  }
+  
+  .sendButton {
+    width: 45px;
+    height: 45px;
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .chatBlock {
+    height: 300px;
+    min-height: 300px;
+    max-height: 300px;
+    padding: 12px;
+  }
+  
+  .chatForm {
+    height: 40px;
+  }
+  
+  .chatInput {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+  
+  .sendButton {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+}

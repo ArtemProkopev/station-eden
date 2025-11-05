@@ -1,0 +1,279 @@
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modalContent {
+  background: rgba(0, 10, 20, 0.95);
+  border: 2px solid #63EFFF;
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 0 30px rgba(99, 239, 255, 0.3);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.modalTitle {
+  color: #63EFFF;
+  font-size: 24px;
+  text-shadow: 0 0 8px rgba(99, 239, 255, 0.6);
+  margin: 0;
+  font-family: 'RussoOne', sans-serif;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  color: #63EFFF;
+  font-size: 28px;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.closeButton:hover {
+  background: rgba(99, 239, 255, 0.1);
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid rgba(99, 239, 255, 0.3);
+}
+
+.tab {
+  background: none;
+  border: none;
+  color: rgba(99, 239, 255, 0.6);
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+  font-family: 'RussoOne', sans-serif;
+}
+
+.activeTab {
+  color: #63EFFF;
+  border-bottom-color: #63EFFF;
+  text-shadow: 0 0 6px rgba(99, 239, 255, 0.6);
+}
+
+.tabContent {
+  min-height: 200px;
+}
+
+.settingGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settingItem {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settingLabel {
+  color: #63EFFF;
+  font-family: 'RussoOne', sans-serif;
+  font-size: 16px;
+  text-shadow: 0 0 4px rgba(99, 239, 255, 0.4);
+}
+
+.select {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid #63EFFF;
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: white;
+  font-family: 'RussoOne', sans-serif;
+  outline: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.select:focus {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 8px rgba(99, 239, 255, 0.4);
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  color: #63EFFF;
+  font-family: 'RussoOne', sans-serif;
+}
+
+.checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: #63EFFF;
+}
+
+.passwordInput {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid #63EFFF;
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: white;
+  font-family: 'RussoOne', sans-serif;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.passwordInput:focus {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 8px rgba(99, 239, 255, 0.4);
+}
+
+.radioGroup {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.radioLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: #63EFFF;
+  font-family: 'RussoOne', sans-serif;
+}
+
+.radio {
+  width: 16px;
+  height: 16px;
+  accent-color: #63EFFF;
+}
+
+.preview {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(99, 239, 255, 0.3);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 20px;
+}
+
+.previewTitle {
+  color: #63EFFF;
+  font-family: 'RussoOne', sans-serif;
+  margin: 0 0 12px 0;
+  font-size: 16px;
+}
+
+.previewContent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.previewItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: white;
+  font-size: 14px;
+}
+
+.previewItem span:first-child {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.private {
+  color: #FF6B6B;
+}
+
+.public {
+  color: #4CAF50;
+}
+
+.modalActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(99, 239, 255, 0.3);
+}
+
+.cancelButton {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 12px 24px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'RussoOne', sans-serif;
+  flex: 1;
+}
+
+.cancelButton:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.saveButton {
+  background: rgba(99, 239, 255, 0.1);
+  border: 2px solid #63EFFF;
+  color: #63EFFF;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'RussoOne', sans-serif;
+  flex: 1;
+}
+
+.saveButton:hover:not(:disabled) {
+  background: rgba(99, 239, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.saveButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .modalOverlay {
+    padding: 10px;
+  }
+  
+  .modalContent {
+    padding: 20px;
+  }
+  
+  .modalActions {
+    flex-direction: column;
+  }
+}
