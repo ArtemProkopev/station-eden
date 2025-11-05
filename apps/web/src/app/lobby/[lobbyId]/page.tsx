@@ -77,6 +77,8 @@ export default function LobbyPage() {
 							onSendMessage={lobby.handleSendMessage}
 							onKeyPress={lobby.handleKeyPress}
 							onChatScroll={lobby.handleChatScroll}
+							/* добавлено: передаём ref для корректного автоскролла */
+							chatContainerRef={lobby.chatContainerRef}
 						/>
 					</div>
 				</div>

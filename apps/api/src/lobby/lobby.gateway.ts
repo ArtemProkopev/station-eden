@@ -258,6 +258,10 @@ export class LobbyGateway
 
 			case 'SEND_MESSAGE': {
 				const message = data.message
+				// добавлен диагностический лог — видно, в какую лобби уходит сообщение
+				this.log.debug(
+					`CHAT: lobby=${lobbyId} from=${message?.playerId} "${message?.text}"`
+				)
 				this.broadcast(lobbyId, { type: 'CHAT_MESSAGE', message })
 				this.safeSend(client, { type: 'MESSAGE_SENT', messageId: message.id })
 				break
