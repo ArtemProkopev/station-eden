@@ -4,6 +4,7 @@ import TopHUD from '@/components/TopHUD/TopHUD'
 import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
 import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
 import { useParams } from 'next/navigation'
+import { memo } from 'react'
 import Chat from '../components/Chat/Chat'
 import LobbyHeader from '../components/LobbyHeader/LobbyHeader'
 import LobbyInfo from '../components/LobbyInfo/LobbyInfo'
@@ -11,7 +12,6 @@ import PlayersList from '../components/PlayersList/PlayersList'
 import StartGameButton from '../components/StartGameButton/StartGameButton'
 import { useLobby } from '../hooks/useLobby'
 import styles from '../page.module.css'
-import { useEffect, useMemo, useState, memo } from 'react'
 
 const MemoizedFireflies = memo(FirefliesProfile)
 const MemoizedStars = memo(TwinklingStars)
@@ -37,8 +37,8 @@ export default function LobbyPage() {
 
 	return (
 		<main className={styles.page}>
-				<MemoizedFireflies />
-				<MemoizedStars />
+			<MemoizedFireflies />
+			<MemoizedStars />
 			<TopHUD profile={lobby.profile} avatar={lobby.assets.avatar} />
 
 			<div className={styles.container}>
@@ -77,6 +77,8 @@ export default function LobbyPage() {
 							onSendMessage={lobby.handleSendMessage}
 							onKeyPress={lobby.handleKeyPress}
 							onChatScroll={lobby.handleChatScroll}
+							/* добавлено: передаём ref для корректного автоскролла */
+							chatContainerRef={lobby.chatContainerRef}
 						/>
 					</div>
 				</div>

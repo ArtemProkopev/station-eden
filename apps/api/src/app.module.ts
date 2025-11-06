@@ -1,4 +1,3 @@
-// apps/api/src/app.module.ts
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { APP_FILTER } from '@nestjs/core'
@@ -14,6 +13,7 @@ import { OAuthAccount } from './auth/oauth-account.entity'
 import { RefreshToken } from './auth/refresh-token.entity'
 import { NotFoundExceptionFilter } from './common/filters/not-found.filter'
 import { EnvSchema } from './config/env.schema'
+import { LobbyModule } from './lobby/lobby.module'
 import { User } from './users/user.entity'
 import { UsersModule } from './users/users.module'
 
@@ -80,6 +80,7 @@ function resolveEnvPaths(): string[] {
 		ThrottlerModule.forRoot([{ ttl: 300_000, limit: 100 }]),
 		AuthModule,
 		UsersModule,
+		LobbyModule,
 	],
 	providers: [{ provide: APP_FILTER, useClass: NotFoundExceptionFilter }],
 })

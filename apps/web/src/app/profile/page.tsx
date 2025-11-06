@@ -87,12 +87,6 @@ export default function ProfilePage() {
 
       <TopHUD profile={profile} avatar={assets.avatar} />
 
-      <ScaleContainer
-        baseWidth={1200}
-        baseHeight={800}
-        minScale={0.5}
-        maxScale={1}
-      >
         <ProfileHeader
           onEditClick={handleEditModalOpen}
           iconsStatus={iconsStatus}
@@ -119,7 +113,6 @@ export default function ProfilePage() {
           currentAvatar={assets.avatar}
           currentFrame={assets.frame}
         />
-      </ScaleContainer>
     </main>
   );
 }

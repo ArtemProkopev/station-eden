@@ -1,3 +1,6 @@
+// JavaScript Username Generator
+console.log('Username Generator loaded');
+
 const adjectives = [
     'Quantum', 'Cyber', 'Digital', 'Virtual', 'Neo', 'Meta', 'Hyper', 'Ultra',
     'Alpha', 'Beta', 'Omega', 'Prime', 'Nova', 'Cosmic', 'Solar', 'Lunar',
@@ -33,18 +36,26 @@ function randomNumber(min, max) {
 
 export class UsernameGenerator {
     constructor() {
-        console.log('UsernameGenerator instance created');
+        console.log('🔧 UsernameGenerator instance created');
     }
     
     generate_username() {
         const template = randomItem([
+            // Adjective + Noun
             () => randomItem(adjectives) + randomItem(nouns),
+            // Color + Noun
             () => randomItem(colors) + randomItem(nouns),
+            // Adjective + Color
             () => randomItem(adjectives) + randomItem(colors),
+            // Pattern + Noun + Number
             () => randomItem(patterns) + randomItem(nouns) + randomNumber(10, 99),
+            // Lowercase with underscore
             () => randomItem(adjectives).toLowerCase() + '_' + randomItem(nouns).toLowerCase(),
+            // The + Adjective + Noun
             () => 'The' + randomItem(adjectives) + randomItem(nouns),
+            // Color + Pattern + Number
             () => randomItem(colors) + randomItem(patterns) + randomNumber(100, 999),
+            // Double Adjective
             () => randomItem(adjectives) + randomItem(adjectives).slice(0, 3)
         ]);
         
@@ -63,7 +74,7 @@ export class UsernameGenerator {
     }
     
     free() {
-        console.log('UsernameGenerator cleaned up');
+        console.log('🧹 UsernameGenerator cleaned up');
     }
 }
 
@@ -75,11 +86,14 @@ export function generate_username() {
 }
 
 export async function init() {
+    console.log('🚀 Username generator initialized');
     return {
         UsernameGenerator,
         generate_username
     };
 }
 
+// Default export for compatibility
 export default init;
 
+console.log('Username generator module ready');
