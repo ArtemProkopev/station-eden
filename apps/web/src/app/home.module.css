@@ -1,4 +1,3 @@
-/* ===== фон ===== */
 .bg {
   position: fixed;
   inset: 0;
@@ -9,108 +8,224 @@
   filter: saturate(110%) brightness(95%);
 }
 
-.bgFx {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(600px 300px at 20% 10%, rgba(94, 231, 255, 0.10), transparent 60%),
-    radial-gradient(600px 400px at 75% 35%, rgba(113, 66, 244, 0.10), transparent 60%),
-    radial-gradient(500px 300px at 45% 70%, rgba(40, 216, 255, 0.08), transparent 65%);
-}
-
-.bgFx::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  opacity: 0.7;
-  background-image:
-    radial-gradient(1px 1px at 15% 25%, rgba(255, 255, 255, 0.55) 50%, transparent 51%),
-    radial-gradient(1px 1px at 35% 65%, rgba(255, 255, 255, 0.45) 50%, transparent 51%),
-    radial-gradient(1px 1px at 60% 35%, rgba(255, 255, 255, 0.50) 50%, transparent 51%),
-    radial-gradient(1px 1px at 85% 55%, rgba(255, 255, 255, 0.40) 50%, transparent 51%),
-    radial-gradient(1px 1px at 70% 80%, rgba(255, 255, 255, 0.40) 50%, transparent 51%);
-}
-
-/* ===== компоновка ===== */
 .container {
   position: fixed;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 200px;
+  padding: 0 100px;
   z-index: 1;
   gap: 80px;
   overflow: hidden;
   box-sizing: border-box;
-  min-width: 1400px;
+  min-width: 1200px;
 }
 
-/* ===== заголовок ===== */
+.leftSection {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  height: 100vh;
+  padding: 80px 0;
+  gap: 40px;
+  flex: 1;
+}
+
 .stationTitle {
-  position: relative;
-  left: auto;
-  top: auto;
-  transform: none;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
   filter: drop-shadow(0 0 18px rgba(40, 216, 255, 0.3));
   z-index: 2;
-  margin-top: -60px;
+  margin-bottom: 100px;
 }
 
 .titleLine {
   font-family: 'RussoOne', sans-serif;
-  font-size: 72px;
+  font-size: 110px;
   font-weight: 800;
-  color: #b9f4ff;
-  letter-spacing: 0.35em;
+  color: #63EFFF;
   line-height: 0.9;
   margin-bottom: 0.2em;
-  text-transform: uppercase;
-  text-shadow: 0 0 6px #28d8ff, 0 0 12px #28d8ff;
-  filter: drop-shadow(0 0 8px #28d8ff);
+  text-shadow: 0 0 12px #63EFFF;
   animation: pulseGlow 2.6s ease-in-out infinite;
   white-space: nowrap;
 }
 
-.titleLineEden {
-  font-family: 'RussoOne', sans-serif;
-  font-size: 110px;
-  font-weight: 900;
-  color: #b9f4ff;
-  letter-spacing: 0.08em;
-  line-height: 0.9;
-  text-transform: uppercase;
-  text-shadow: 0 0 8px #28d8ff, 0 0 16px #28d8ff;
-  animation: pulseGlow 2.6s ease-in-out infinite;
-  white-space: nowrap;
-}
-
-/* ===== правая часть - меню ===== */
-.menuSection {
+.newsSliderContainer {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  max-width: 600px;
   position: relative;
-  right: auto;
-  top: auto;
-  transform: none;
+}
+
+.sliderArrowLeft,
+.sliderArrowRight {
+  background: rgba(99, 239, 255, 0);
+  border: none;
+  color: #63EFFF;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 60px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.newsPanel {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(99, 239, 255, 0.3);
+  border-radius: 12px;
+  padding: 24px;
+  width: 1000px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  position: relative;
+  flex: 1;
+  font-family: 'RussoOne', sans-serif;
+}
+
+.newsInfo {
+  font-family: 'RussoOne', sans-serif;
+}
+
+.newsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 16px;
+}
+
+.newsTitle {
+  font-family: 'RussoOne', sans-serif;
+  font-size: 16px;
+  color: #63EFFF;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 0 0 4px rgba(99, 239, 255, 0.6);
+  flex: 1;
+}
+
+.newsDate {
+  font-family: 'RussoOne', sans-serif;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+}
+
+.newsContent {
+  font-family: sans-serif;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.5;
+  min-height: 80px;
+}
+
+.newsContent p {
+  margin: 8px 0;
+}
+
+.newsHighlight {
+  color: #63EFFF;
+  font-weight: bold;
+  text-shadow: 0 0 4px rgba(99, 239, 255, 0.4);
+  font-size: 15px;
+}
+
+.sliderControls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(99, 239, 255, 0.2);
+}
+
+.sliderDots {
+  display: flex;
+  gap: 8px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.activeDot {
+  background: #63EFFF;
+  box-shadow: 0 0 6px rgba(99, 239, 255, 0.8);
+  transform: scale(1.2);
+}
+
+.socialSection {
+  position: fixed;
+  left: 40px;
+  bottom: 40px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.socialText {
+  font-family: 'RussoOne', sans-serif;
+  font-size: 18px;
+  color: #63EFFF;
+  text-align: left;
+  margin-bottom: 12px;
+  text-shadow: 0 0 4px rgba(99, 239, 255, 0.6);
+}
+
+.socialIcons {
+  display: flex;
+  gap: 60px;
+  color: #63EFFF;
+}
+
+.socialIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(8px);
+}
+
+.socialIcon img {
+  width: 50px;
+  height: 50px;
+}
+
+.menuSection {
   display: flex;
   flex-direction: column;
   align-items: center;
   z-index: 2;
-  margin-top: -40px;
 }
 
-/* Боковое меню */
 .sideMenu {
   display: flex;
   flex-direction: column;
   gap: 24px;
   align-items: center;
-  margin-right: 80px;
+  margin-bottom: 40px;
+  margin-right: 100px;
 }
 
 .menuItem {
@@ -128,7 +243,7 @@
   letter-spacing: 2px;
   text-shadow: 0 0 4px #83eefb;
   backdrop-filter: blur(12px);
-  width: 320px;
+  width: 420px;
   text-align: center;
   position: relative;
   overflow: hidden;
@@ -164,43 +279,43 @@
   left: 100%;
 }
 
-/* ===== анимации ===== */
 @keyframes pulseGlow {
   0%, 100% {
-    filter: drop-shadow(0 0 8px #28d8ff);
+    text-shadow: 0 0 12px #63EFFF;
   }
   50% {
-    filter: drop-shadow(0 0 15px #28d8ff);
+    text-shadow: 0 0 20px #63EFFF, 0 0 30px rgba(99, 239, 255, 0.6);
   }
 }
 
-/* Адаптивность для всего контейнера */
 @media (max-width: 1400px) {
   .container {
-    min-width: 1400px;
+    padding: 0 60px;
+    min-width: 1200px;
+  }
+  
+  .titleLine {
+    font-size: 90px;
   }
 }
 
-/* Адаптивность для меню */
-@media (max-width: 1400px) {
-  .sideMenu {
-    margin-right: 60px;
+@media (max-width: 1200px) {
+  .container {
+    padding: 0 40px;
+    min-width: 1000px;
+  }
+  
+  .titleLine {
+    font-size: 75px;
   }
   
   .menuItem {
-    width: 280px;
+    width: 350px;
     font-size: 1.3rem;
   }
-}
-
-@media (max-width: 1000px) {
-  .sideMenu {
-    margin-right: 40px;
-  }
   
-  .menuItem {
-    width: 240px;
-    font-size: 1.1rem;
-    padding: 14px 40px;
+  .socialSection {
+    left: 20px;
+    bottom: 20px;
   }
 }
