@@ -1,0 +1,546 @@
+/* apps/web/src/components/TopHUD/TopHUD.module.css */
+.root > :first-child {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: transparent;
+}
+
+.hud{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 30px 80px 0 80px;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: 'RussoOne', sans-serif;
+  transition: transform 0.3s ease;
+  /* transform и transformOrigin задаются через style */
+}
+
+.backLink{
+  display: inline-flex;
+  align-items: center;
+  gap: 30px;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.3s ease;
+}
+
+.icon{
+  width: 69px;
+  height: 69px;
+  filter: drop-shadow(0 0 6px rgba(99,239,255,0.9));
+  transition: all 0.3s ease;
+}
+
+.backText{
+  color: #63EFFF;
+  font-size: 32px;
+  line-height: 1;
+  text-transform: lowercase;
+  letter-spacing: 0.8px;
+  text-shadow:
+    0 0 2px rgba(99,239,255,0.9),
+    0 0 8px rgba(99,239,255,0.35),
+    0 0 20px rgba(99,239,255,0.12);
+  transform: translateY(1px);
+  transition: all 0.3s ease;
+}
+
+.hudRight{
+  display: inline-flex;
+  align-items: center;
+  gap: 80px;
+  transition: all 0.3s ease;
+}
+
+.currency {
+  display: flex;
+  align-items: center;
+  padding: 6px 20px;
+  border-radius: 20px;
+  background: rgba(99,239,255,0.04);
+  border: 2px solid #204C72;
+  box-shadow: 0 0 10px #63efff59;
+  gap: 10px;
+  transition: all 0.3s ease;
+}
+
+.currencyContent {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  transition: all 0.3s ease;
+}
+
+.star {
+  width: 33px;
+  height: 33px;
+  filter: drop-shadow(0 0 6px rgba(99,239,255,0.9));
+  transition: all 0.3s ease;
+}
+
+/* Стили для аватара и выпадающего меню */
+.avatarDropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.avatarButton {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 24px;
+  transition: all 0.3s ease;
+  background: rgba(99,239,255,0.04);
+  border: 2px solid #204C72;
+  box-shadow: 0 0 10px #63efff59;
+}
+
+.avatarButton:hover {
+  background: rgba(99,239,255,0.08);
+  box-shadow: 0 0 15px #63efff80;
+}
+
+.avatarContainer {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(99,239,255,0.1);
+  border: 2px solid #63EFFF;
+}
+
+.avatarIcon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: drop-shadow(0 0 4px rgba(99,239,255,0.7));
+}
+
+.arrow {
+  transition: transform 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.arrowUp {
+  transform: rotate(180deg);
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: rgba(32, 76, 114, 0.95);
+  backdrop-filter: blur(10px);
+  border: 2px solid #63EFFF;
+  border-radius: 12px;
+  padding: 8px;
+  min-width: 160px;
+  box-shadow: 0 8px 25px rgba(99, 239, 255, 0.2);
+  z-index: 1000;
+  animation: dropdownFade 0.2s ease;
+}
+
+@keyframes dropdownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.menuItem {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  color: #63EFFF;
+  font-family: 'RussoOne', sans-serif;
+  font-size: 16px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  text-shadow: 0 0 2px rgba(99,239,255,0.9);
+}
+
+.menuItem:hover {
+  background: rgba(99, 239, 255, 0.1);
+  box-shadow: 0 0 8px rgba(99, 239, 255, 0.3);
+}
+
+.menuItem:not(:last-child) {
+  margin-bottom: 4px;
+}
+
+.plusButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 45px;
+  height: 45px;
+  background-color: #63efff36;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  color: #63EFFF;
+  font-size: 40px;
+  font-weight: bold;
+  line-height: 1;
+  padding: 0;
+  margin: 0;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.plusButton::before {
+  content: '+';
+  display: block;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.currencyValue {
+  color: #63EFFF;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 30px;
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: rgba(32, 76, 114, 0.95);
+  backdrop-filter: blur(10px);
+  border: 2px solid #63EFFF;
+  border-radius: 12px;
+  padding: 8px;
+  min-width: 160px;
+  box-shadow: 0 8px 25px rgba(99, 239, 255, 0.2);
+  z-index: 1000;
+  animation: dropdownFade 0.2s ease;
+}
+
+.userInfo {
+  padding: 8px 12px;
+  color: #63EFFF;
+  font-family: 'RussoOne', sans-serif;
+  font-size: 14px;
+  border-bottom: 1px solid rgba(99, 239, 255, 0.3);
+  margin-bottom: 4px;
+  text-align: center;
+  text-shadow: 0 0 2px rgba(99,239,255,0.9);
+}
+
+.iconSkeleton {
+  width: 34px;
+  height: 34px;
+  background: #63EFFF;
+  opacity: 0.3;
+  border-radius: 4px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.starSkeleton {
+  width: 18px;
+  height: 18px;
+  background: #63EFFF;
+  opacity: 0.3;
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.avatarSkeleton {
+  width: 40px;
+  height: 40px;
+  background: #63EFFF;
+  opacity: 0.3;
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+  100% { opacity: 0.3; }
+}
+
+/* Адаптив через медиа-запросы как резервная система */
+@media (max-width: 1200px) {
+  .hud {
+    padding: 25px 60px 0 60px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .hud {
+    padding: 20px 40px 0 40px;
+  }
+  
+  .backLink {
+    gap: 20px;
+  }
+  
+  .hudRight {
+    gap: 60px;
+  }
+}
+
+@media (max-width: 800px) {
+  .hud {
+    padding: 15px 30px 0 30px;
+  }
+  
+  .icon {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .backText {
+    font-size: 24px;
+  }
+  
+  .avatarContainer {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .avatarButton {
+    gap: 8px;
+    padding: 6px;
+  }
+  
+  .star {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .plusButton {
+    width: 35px;
+    height: 35px;
+    font-size: 30px;
+  }
+  
+  .hudRight {
+    gap: 40px;
+  }
+  
+  .currency {
+    padding: 4px 15px;
+  }
+  
+  .currencyContent {
+    gap: 20px;
+  }
+  
+  .dropdownMenu {
+    min-width: 140px;
+  }
+  
+  .menuItem {
+    font-size: 14px;
+    padding: 10px 14px;
+  }
+}
+
+@media (max-width: 600px) {
+  .hud {
+    padding: 12px 20px 0 20px;
+    gap: 8px;
+  }
+  
+  .backLink {
+    gap: 15px;
+  }
+  
+  .icon {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .backText {
+    font-size: 20px;
+    letter-spacing: 0.5px;
+  }
+  
+  .avatarContainer {
+    width: 35px;
+    height: 35px;
+  }
+  
+  .avatarButton {
+    gap: 6px;
+    padding: 4px;
+  }
+  
+  .star {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .plusButton {
+    width: 30px;
+    height: 30px;
+    font-size: 24px;
+  }
+  
+  .hudRight {
+    gap: 30px;
+  }
+  
+  .currency {
+    padding: 3px 12px;
+    gap: 8px;
+  }
+  
+  .currencyContent {
+    gap: 15px;
+  }
+  
+  .dropdownMenu {
+    min-width: 120px;
+  }
+  
+  .menuItem {
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hud {
+    padding: 10px 15px 0 15px;
+    gap: 6px;
+  }
+  
+  .backLink {
+    gap: 12px;
+  }
+  
+  .icon {
+    width: 35px;
+    height: 35px;
+  }
+  
+  .backText {
+    font-size: 18px;
+  }
+  
+  .avatarContainer {
+    width: 30px;
+    height: 30px;
+  }
+  
+  .hudRight {
+    gap: 20px;
+  }
+  
+  .currency {
+    padding: 2px 10px;
+  }
+  
+  .currencyContent {
+    gap: 12px;
+  }
+  
+  .dropdownMenu {
+    min-width: 110px;
+    right: -10px;
+  }
+}
+
+@media (max-width: 360px) {
+  .hud {
+    padding: 8px 12px 0 12px;
+  }
+  
+  .backText {
+    font-size: 16px;
+  }
+  
+  .icon {
+    width: 30px;
+    height: 30px;
+  }
+  
+  .avatarContainer {
+    width: 25px;
+    height: 25px;
+  }
+  
+  .avatarButton {
+    gap: 4px;
+  }
+  
+  .arrow svg {
+    width: 10px;
+    height: 6px;
+  }
+  
+  .star {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .plusButton {
+    width: 25px;
+    height: 25px;
+    font-size: 20px;
+  }
+  
+  .dropdownMenu {
+    min-width: 100px;
+  }
+  
+  .menuItem {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+}
+
+/* Для вертикальной ориентации на мобильных */
+@media (max-height: 600px) and (max-width: 900px) {
+  .hud {
+    padding-top: 15px;
+  }
+}
+
+@media (max-height: 500px) and (max-width: 900px) {
+  .hud {
+    padding-top: 10px;
+  }
+  
+  .icon {
+    width: 35px;
+    height: 35px;
+  }
+  
+  .avatarContainer {
+    width: 30px;
+    height: 30px;
+  }
+}

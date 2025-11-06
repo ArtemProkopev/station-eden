@@ -1,0 +1,65 @@
+/* apps/web/src/components/TopHUD/components/Currency.module.css */
+.currency {
+  display: flex;
+  align-items: center;
+  padding: 6px 20px;
+  border-radius: 20px;
+  background: rgba(99,239,255,0.04);
+  border: 2px solid #204C72;
+  box-shadow: 0 0 10px #63efff59;
+  gap: 10px;
+  transition: all 0.3s ease;
+}
+
+.value {
+  color: #63EFFF;
+  font-size: 32px;  /* Увеличили с 18px */
+  font-weight: 700;
+  line-height: 1;
+  min-width: 60px;  /* Увеличили для больших цифр */
+  font-family: 'RussoOne', sans-serif;
+  text-shadow: 
+    0 0 2px rgba(99,239,255,0.9),
+    0 0 8px rgba(99,239,255,0.35),
+    0 0 20px rgba(99,239,255,0.12);
+  transform: translateY(1px);
+}
+
+.content {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  transition: all 0.3s ease;
+}
+
+.addButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 45px;
+  height: 45px;
+  background-color: #63efff36;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  color: #63EFFF;
+  font-size: 40px;
+  font-weight: bold;
+  line-height: 1;
+  padding: 0;
+  margin: 0;
+  position: relative;
+  transition: all 0.3s ease;
+  font-family: 'RussoOne', sans-serif;
+}
+
+.addButton:hover {
+  background-color: #63efff52;
+  transform: scale(1.05);
+}
+
+.plusIcon {
+  display: block;
+  transform: translateY(-2px);
+}

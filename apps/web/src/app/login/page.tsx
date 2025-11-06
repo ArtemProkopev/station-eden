@@ -13,6 +13,32 @@ import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
 const MemoizedFireflies = memo(FirefliesProfile)
 const MemoizedStars = memo(TwinklingStars)
 
+// Добавляем интерфейсы для данных пользователя и ответа API
+interface UserData {
+  id: string;
+  email: string;
+  username: string;
+  avatar?: string;
+  token: string;
+}
+
+interface LoginResponse {
+  mfa?: string;
+  email?: string;
+  needSetPassword?: boolean;
+  user?: {
+    id: string;
+    email: string;
+    username: string;
+    avatar?: string;
+  };
+  id?: string;
+  token?: string;
+  access_token?: string;
+  username?: string;
+  avatar?: string;
+}
+
 function EyeIcon() {
 	return (
 		<svg
@@ -290,26 +316,56 @@ function LoginInner() {
 		lastLoginRef.current = normLogin(login)
 		try {
 			const res = await api.login(login, password)
-			if ((res as any)?.mfa === 'email_code_sent') {
-				const needSet = (res as any)?.needSetPassword === true
+			
+			// Приводим ответ к типу LoginResponse
+			const response = res as LoginResponse;
+			
+			// ОБНОВЛЕННЫЙ БЛОК: Сохраняем данные пользователя
+			if (response.mfa === 'email_code_sent') {
+				const needSet = response.needSetPassword === true;
 				const q = new URLSearchParams({
-					email: (res as any)?.email || '',
+					email: response.email || '',
 					next,
 					...(needSet ? { mode: 'set_password' } : {}),
-				})
-				clearLock()
-				router.replace(`/login/verify?${q.toString()}`)
-				return
+				});
+				clearLock();
+				router.replace(`/login/verify?${q.toString()}`);
+				return;
 			}
-			clearLock()
-			router.replace(next)
+			
+			// СОХРАНЯЕМ ДАННЫЕ ПОЛЬЗОВАТЕЛЯ В LOCALSTORAGE
+			const userData: UserData = {
+				id: response.user?.id || response.id || 'unknown',
+				email: response.user?.email || response.email || login,
+				username: response.user?.username || response.username || login,
+				avatar: response.user?.avatar || response.avatar,
+				token: response.token || response.access_token || 'auth-token'
+			};
+			
+			localStorage.setItem('authToken', userData.token);
+			localStorage.setItem('userData', JSON.stringify(userData));
+			
+			// ТРИГГЕРИМ СОБЫТИЕ ДЛЯ ОБНОВЛЕНИЯ ГЛАВНОЙ СТРАНИЦЫ
+			window.dispatchEvent(new Event('authChange'));
+			
+			// Также диспатчим storage event для надежности
+			window.dispatchEvent(new StorageEvent('storage', {
+				key: 'authToken',
+				newValue: userData.token,
+				storageArea: localStorage
+			}));
+			
+			clearLock();
+			console.log('Login successful, redirecting to:', next);
+			console.log('User data saved:', userData);
+			router.replace(next);
 		} catch (err: any) {
-			setError(getUserMessage(err, 'login'))
-			handleParseAndSet(err)
-			setShake(true)
-			setTimeout(() => setShake(false), 340)
+			setError(getUserMessage(err, 'login'));
+			handleParseAndSet(err);
+			setShake(true);
+			setTimeout(() => setShake(false), 340);
 		} finally {
-			setBusy(false)
+			setBusy(false);
 		}
 	}
 

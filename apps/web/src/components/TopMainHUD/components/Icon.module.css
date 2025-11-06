@@ -1,0 +1,47 @@
+/* apps/web/src/components/TopHUD/components/Icon.module.css */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.iconImage {
+  display: block;
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+}
+
+/* Размеры для разных иконок */
+.size-small {
+  width: 33px;  /* Было 18px */
+  height: 33px;
+}
+
+.size-medium {
+  width: 69px;  /* Было 34px */
+  height: 69px;
+}
+
+.size-large {
+  width: 50px;  /* Было 40px */
+  height: 50px;
+}
+
+/* Специфичные стили для иконок */
+.iconRocket {
+  filter: drop-shadow(0 0 6px rgba(99,239,255,0.9));
+  transition: all 0.3s ease;
+}
+
+.iconStar {
+  filter: drop-shadow(0 0 6px rgba(99,239,255,0.9));
+  transition: all 0.3s ease;
+}
+
+.iconAvatar {
+  filter: drop-shadow(0 0 4px rgba(99,239,255,0.7));
+  border-radius: 50%;
+  border: 2px solid #63EFFF;
+}
