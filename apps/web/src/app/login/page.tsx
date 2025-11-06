@@ -5,8 +5,13 @@ import { api, getUserMessage } from '@/src/lib/api'
 import { GOOGLE_ENABLED } from '@/src/lib/flags'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, memo } from 'react'
 import styles from './page.module.css'
+import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
+import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
+
+const MemoizedFireflies = memo(FirefliesProfile)
+const MemoizedStars = memo(TwinklingStars)
 
 function EyeIcon() {
 	return (
@@ -27,6 +32,7 @@ function EyeIcon() {
 		</svg>
 	)
 }
+
 function EyeOffIcon() {
 	return (
 		<svg
@@ -49,7 +55,7 @@ function EyeOffIcon() {
 	)
 }
 
-/** Часы для бейджа блокировки (минимал) */
+/** Часы для бейджа блокировки */
 function ClockIcon() {
 	return (
 		<svg
@@ -80,7 +86,7 @@ function formatRemaining(ms: number) {
 
 const MAX_ATTEMPTS_UI = 5
 
-// ===== LocalStorage helpers (персистентная блокировка) =====
+// ===== LocalStorage helpers =====
 const LOCK_KEY = 'se_auth_lock' as const
 type LockPayload = { login: string; lockedUntilIso: string }
 const normLogin = (s: string) => s.trim().toLowerCase()
@@ -96,6 +102,7 @@ function readLock(): LockPayload | null {
 		return null
 	}
 }
+
 function writeLock(login: string, lockedUntilIso: string) {
 	try {
 		localStorage.setItem(
@@ -104,6 +111,7 @@ function writeLock(login: string, lockedUntilIso: string) {
 		)
 	} catch {}
 }
+
 function clearLock() {
 	try {
 		localStorage.removeItem(LOCK_KEY)
@@ -176,7 +184,7 @@ function LoginInner() {
 	const reason = sp.get('reason')
 
 	const timerRef = useRef<number | null>(null)
-	const lastLoginRef = useRef<string>('') // чтобы писать в localStorage логин, по которому пришла блокировка
+	const lastLoginRef = useRef<string>('')
 
 	useEffect(() => setMounted(true), [])
 
@@ -317,176 +325,175 @@ function LoginInner() {
 
 	return (
 		<>
-			<div className={styles.bg} aria-hidden />
-			<main className={styles.container}>
-				<section className={styles.card} aria-labelledby='login-title'>
-					<header>
-						<h1 id='login-title' className={styles.title}>
-							Вход
-						</h1>
-					</header>
+			<main className={styles.page}>
+				<MemoizedFireflies />
+				<MemoizedStars />
+				
+				<div className={styles.container}>
+					<section className={styles.card} aria-labelledby='login-title'>
+						<header className={styles.header}>
+							<h1 id='login-title' className={styles.title}>
+								Вход
+							</h1>
+						</header>
 
-					{reason === 'google_exists' && (
-						<p className={`${styles.notice} ${styles.info}`} role='status'>
-							Аккаунт с этим Google-email уже существует — просто войдите.
-						</p>
-					)}
-					{reason === 'google_no_account' && (
-						<p className={`${styles.notice} ${styles.info}`} role='status'>
-							Похоже, такого аккаунта ещё нет. Вы можете зарегистрироваться.
-						</p>
-					)}
-
-					{/* Лаконичные бейджи */}
-					<div className={styles.pillRow} aria-live='polite'>
-						{locked && (
-							<div
-								className={`${styles.pill} ${styles.pillLock}`}
-								role='status'
-							>
-								<span className={styles.iconWrap}>
-									<ClockIcon />
-								</span>
-								<span className={styles.pillLabel}>Блокировка</span>
-								<span className={styles.timerBadge}>
-									<span className={styles.timerDigits}>{countdown}</span>
-								</span>
-							</div>
-						)}
-						{!locked && attemptsLeft !== null && (
-							<div
-								className={`${styles.pill} ${styles.pillWarn}`}
-								role='status'
-							>
-								<span className={styles.pillLabel}>
-									Неверный логин или пароль
-								</span>
-								<span className={styles.sep} aria-hidden='true' />
-								<span className={styles.pillLabel}>Осталось попыток</span>
-								<span className={styles.pillValue}>{attemptsLeft}</span>
-								<span className={styles.meterWrap} aria-hidden='true'>
-									<span
-										className={styles.meterFill}
-										style={{ width: `${progressPct}%` }}
-									/>
-								</span>
-							</div>
-						)}
-					</div>
-
-					<form
-						onSubmit={onSubmit}
-						className={`${styles.form} ${shake ? styles.isShaking : ''}`}
-						onAnimationEnd={() => shake && setShake(false)}
-						noValidate
-						autoComplete='on'
-						aria-describedby={
-							error && attemptsLeft === null && !locked
-								? 'login-error'
-								: undefined
-						}
-					>
-						<div className={styles.inputGroup}>
-							<label htmlFor='login' className={styles.label}>
-								Email или username
-							</label>
-							<input
-								id='login'
-								name='login'
-								required
-								type='text'
-								spellCheck={false}
-								autoCorrect='off'
-								autoCapitalize='none'
-								autoComplete='username email'
-								placeholder='Введите email или username'
-								value={login}
-								onChange={e => setLogin(e.target.value.trimStart())}
-								className={styles.input}
-								aria-invalid={
-									login.length > 0
-										? !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(login) &&
-											!/^[a-zA-Z0-9_]{3,20}$/.test(login)
-										: undefined
-								}
-								disabled={locked}
-							/>
-						</div>
-
-						<div className={styles.inputGroup}>
-							<label htmlFor='password' className={styles.label}>
-								Пароль
-							</label>
-							<div className={styles.inputWrap}>
-								<input
-									id='password'
-									name='current-password'
-									required
-									type={show ? 'text' : 'password'}
-									autoComplete='current-password'
-									minLength={8}
-									placeholder='Введите пароль (≥8)'
-									value={password}
-									onChange={e => setPassword(e.target.value)}
-									className={styles.input}
-									aria-invalid={
-										password.length > 0 ? password.length < 8 : undefined
-									}
-									disabled={locked}
-								/>
-								<button
-									type='button'
-									className={styles.toggleBtn}
-									aria-label={show ? 'Скрыть пароль' : 'Показать пароль'}
-									aria-pressed={show}
-									onClick={() => setShow(s => !s)}
-									title={show ? 'Скрыть пароль' : 'Показать пароль'}
-									disabled={locked}
-								>
-									{show ? <EyeOffIcon /> : <EyeIcon />}
-								</button>
-							</div>
-						</div>
-
-						<button
-							type='submit'
-							className={`${styles.button} ${busy ? styles.loading : ''}`}
-							disabled={!canSubmit}
-							aria-disabled={!canSubmit}
-						>
-							{locked ? 'Заблокировано…' : busy ? 'Входим' : 'ВОЙТИ'}
-						</button>
-
-						{/* общий текст ниже только если нет пилюль */}
-						{error && attemptsLeft === null && !locked && (
-							<p id='login-error' className={styles.error} role='alert'>
-								{error}
+						{reason === 'google_exists' && (
+							<p className={`${styles.notice} ${styles.info}`} role='status'>
+								Аккаунт с этим Google-email уже существует — просто войдите.
 							</p>
 						)}
-					</form>
+						{reason === 'google_no_account' && (
+							<p className={`${styles.notice} ${styles.info}`} role='status'>
+								Похоже, такого аккаунта ещё нет. Вы можете зарегистрироваться.
+							</p>
+						)}
 
-					<p className={styles.swap}>
-						Нет аккаунта?{' '}
-						<Link href='/register' className={styles.link}>
-							Зарегистрироваться
-						</Link>
-					</p>
+						{/* Бейджи блокировки и попыток */}
+						<div className={styles.pillRow} aria-live='polite'>
+							{locked && (
+								<div
+									className={`${styles.pill} ${styles.pillLock}`}
+									role='status'
+								>
+									<span className={styles.iconWrap}>
+										<ClockIcon />
+									</span>
+									<span className={styles.pillLabel}>Блокировка</span>
+									<span className={styles.timerBadge}>
+										<span className={styles.timerDigits}>{countdown}</span>
+									</span>
+								</div>
+							)}
+							{!locked && attemptsLeft !== null && (
+								<div
+									className={`${styles.pill} ${styles.pillWarn}`}
+									role='status'
+								>
+									<span className={styles.pillLabel}>
+										Неверный логин или пароль
+									</span>
+									<span className={styles.sep} aria-hidden='true' />
+									<span className={styles.pillLabel}>Осталось попыток</span>
+									<span className={styles.pillValue}>{attemptsLeft}</span>
+									<span className={styles.meterWrap} aria-hidden='true'>
+										<span
+											className={styles.meterFill}
+											style={{ width: `${progressPct}%` }}
+										/>
+									</span>
+								</div>
+							)}
+						</div>
 
-					{mounted && googleEnabled && (
-						<>
-							<div
-								className={styles.hr}
-								role='separator'
-								aria-label='Или через Google'
+						<form
+							onSubmit={onSubmit}
+							className={`${styles.form} ${shake ? styles.isShaking : ''}`}
+							onAnimationEnd={() => shake && setShake(false)}
+							noValidate
+							autoComplete='on'
+							aria-describedby={
+								error && attemptsLeft === null && !locked
+									? 'login-error'
+									: undefined
+							}
+						>
+							<div className={styles.inputGroup}>
+								<label htmlFor='login' className={styles.label}>
+									Email или username
+								</label>
+								<input
+									id='login'
+									name='login'
+									required
+									type='text'
+									spellCheck={false}
+									autoCorrect='off'
+									autoCapitalize='none'
+									autoComplete='username email'
+									placeholder='Введите email или username'
+									value={login}
+									onChange={e => setLogin(e.target.value.trimStart())}
+									className={`${styles.input} ${login.length > 0 && !isLoginValid ? styles.invalid : ''}`}
+									aria-invalid={login.length > 0 ? !isLoginValid : undefined}
+									disabled={locked}
+								/>
+							</div>
+
+							<div className={styles.inputGroup}>
+								<label htmlFor='password' className={styles.label}>
+									Пароль
+								</label>
+								<div className={styles.inputWrap}>
+									<input
+										id='password'
+										name='current-password'
+										required
+										type={show ? 'text' : 'password'}
+										autoComplete='current-password'
+										minLength={8}
+										placeholder='Введите пароль (≥8)'
+										value={password}
+										onChange={e => setPassword(e.target.value)}
+										className={`${styles.input} ${password.length > 0 && password.length < 8 ? styles.invalid : ''}`}
+										aria-invalid={
+											password.length > 0 ? password.length < 8 : undefined
+										}
+										disabled={locked}
+									/>
+									<button
+										type='button'
+										className={styles.toggleBtn}
+										aria-label={show ? 'Скрыть пароль' : 'Показать пароль'}
+										aria-pressed={show}
+										onClick={() => setShow(s => !s)}
+										title={show ? 'Скрыть пароль' : 'Показать пароль'}
+										disabled={locked}
+									>
+										{show ? <EyeOffIcon /> : <EyeIcon />}
+									</button>
+								</div>
+							</div>
+
+							<button
+								type='submit'
+								className={`${styles.button} ${busy ? styles.loading : ''}`}
+								disabled={!canSubmit}
+								aria-disabled={!canSubmit}
 							>
-								<span>Или через Google</span>
-							</div>
-							<div className={styles.oauthBlock}>
-								<GoogleAuthButton label='Войти с Google' mode='login' />
-							</div>
-						</>
-					)}
-				</section>
+								{locked ? 'Заблокировано…' : busy ? 'Входим' : 'ВОЙТИ'}
+							</button>
+
+							{/* общий текст ниже только если нет пилюль */}
+							{error && attemptsLeft === null && !locked && (
+								<p id='login-error' className={styles.error} role='alert'>
+									{error}
+								</p>
+							)}
+						</form>
+
+						<p className={styles.swap}>
+							Нет аккаунта?{' '}
+							<Link href='/register' className={styles.link}>
+								Зарегистрироваться
+							</Link>
+						</p>
+
+						{mounted && googleEnabled && (
+							<>
+								<div
+									className={styles.hr}
+									role='separator'
+									aria-label='Или через Google'
+								>
+									<span>Или через Google</span>
+								</div>
+								<div className={styles.oauthBlock}>
+									<GoogleAuthButton label='Войти с Google' mode='login' />
+								</div>
+							</>
+						)}
+					</section>
+				</div>
 			</main>
 		</>
 	)
@@ -497,12 +504,15 @@ export default function LoginPage() {
 		<Suspense
 			fallback={
 				<>
-					<div className={styles.bg} aria-hidden />
-					<main className={styles.container}>
-						<section className={styles.card}>
-							<h1 className={styles.title}>Вход</h1>
-							<p>Loading…</p>
-						</section>
+					<main className={styles.page}>
+						<FirefliesProfile />
+						<TwinklingStars />
+						<div className={styles.container}>
+							<section className={styles.card}>
+								<h1 className={styles.title}>Вход</h1>
+								<div className={styles.loadingSpinner}></div>
+							</section>
+						</div>
 					</main>
 				</>
 			}

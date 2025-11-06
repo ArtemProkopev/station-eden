@@ -1,342 +1,448 @@
-/* sr-only */
-.sr-only {
-	position: absolute !important;
-	width: 1px !important;
-	height: 1px !important;
-	padding: 0 !important;
-	margin: -1px !important;
-	overflow: hidden !important;
-	clip: rect(0, 0, 0, 0) !important;
-	white-space: nowrap !important;
-	border: 0 !important;
-}
-
-/* фон */
 .bg {
-	position: fixed;
-	inset: 0;
-	z-index: 0;
-	background-image: url('/login-background.png');
-	background-size: cover;
-	background-position: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url("/register-background.png");
+  background-size: cover;
+  background-position: center;
+  z-index: -1;
 }
 
-/* контейнер */
 .container {
-	min-height: 100vh;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	padding: 20px;
-	font-family: 'Nunito', sans-serif;
-	position: relative;
-	z-index: 1;
+  position: relative;
+  min-height: 100vh;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-family: 'RussoOne', sans-serif;
+  overflow: hidden;
 }
 
-/* карточка */
 .card {
-	--placeholder: rgba(255, 255, 255, 0.75);
-	background: #4740a8;
-	padding: 2.5rem;
-	border-radius: 36px;
-	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
-	backdrop-filter: blur(12px);
-	max-width: 520px;
-	width: 100%;
-	text-align: center;
-	border: 4px solid #201f5c;
-	position: relative;
-	overflow: hidden;
-	animation: se-fade-in-up 320ms ease-out both;
-	animation-delay: 40ms;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  border: 2px solid #63EFFF;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
 }
+
 .card::before {
-	content: '';
-	position: absolute;
-	inset: 0;
-	border-radius: 36px;
-	padding: 4px;
-	background: linear-gradient(to bottom, #6a5bc4, #4f47a6);
-	mask:
-		linear-gradient(#000 0 0) content-box,
-		linear-gradient(#000 0 0);
-	-webkit-mask:
-		linear-gradient(#000 0 0) content-box,
-		linear-gradient(#000 0 0);
-	mask-composite: exclude;
-	-webkit-mask-composite: xor;
-	pointer-events: none;
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #63EFFF, transparent);
 }
 
-/* заголовок */
+.header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
 .title {
-	margin: 0 0 12px 0;
-	font-size: 28px;
-	color: #fff;
-	font-family: 'RussoOne', sans-serif;
-	-webkit-text-stroke: 1.5px #7050d5;
-	paint-order: stroke fill;
-	text-shadow: 0 2px 0 #7050d5;
+  font-size: 28px;
+  font-weight: 700;
+  color: #63EFFF;
+  text-shadow: 0 0 10px rgba(99, 239, 255, 0.6);
+  margin: 0 0 8px 0;
+  transition: all 0.3s ease;
+  text-align: center;
 }
 
-/* лид */
 .lead {
-	margin: 6px 0 14px;
-	color: #fff;
-	opacity: 0.95;
+  text-align: center;
+  margin: 0 0 24px 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 16px;
+  line-height: 1.5;
 }
 
-/* форма */
+.lead b {
+  color: #63EFFF;
+  text-shadow: 0 0 6px rgba(99, 239, 255, 0.4);
+}
+
 .form {
-	display: grid;
-	gap: 1.5rem;
-	animation: se-fade-in-up 320ms ease-out both;
-	animation-delay: 80ms;
+  display: grid;
+  gap: 1.5rem;
+  transition: all 0.3s ease;
 }
+
 .isShaking {
-	animation: se-shake-x 320ms ease-out;
+  animation: shake 320ms ease-out;
 }
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+
 .fieldset {
-	border: 0;
-	margin: 0;
-	padding: 0;
-	min-inline-size: 0;
+  border: none;
+  padding: 0;
+  margin: 0;
 }
+
 .inputGroup {
-	text-align: left;
-	animation: se-fade-in-up 320ms ease-out both;
-}
-.inputGroup + .inputGroup {
-	margin-top: 4px;
+  text-align: left;
 }
 
-/* обёртка и инпут пароля */
-.inputWrap {
-	position: relative;
-}
-.input {
-	padding: 14px 64px 14px 16px;
-	border: 4px solid #201f5c;
-	border-radius: 8px;
-	font-size: 16px;
-	width: 100%;
-	transition:
-		border-color 0.2s,
-		box-shadow 0.2s,
-		transform 0.12s ease;
-	background-color: #2c2b7b;
-	color: #fff;
-	font-family: 'Nunito', sans-serif;
-}
-.input::placeholder {
-	color: var(--placeholder);
-	opacity: 1;
-}
-.input:focus {
-	outline: none;
-	border-color: #6f59d6;
-	box-shadow: 0 0 0 3px rgba(205, 141, 238, 0.2);
-}
-
-/* метка */
 .label {
-	display: block;
-	font-size: 14px;
-	font-weight: 600;
-	margin-bottom: 8px;
-	color: #fff;
-	font-family: 'RussoOne', sans-serif;
+  display: block;
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 12px;
+  color: #63EFFF;
+  text-shadow: 0 0 6px rgba(99, 239, 255, 0.4);
 }
 
-/* кнопка-глаз */
-.toggleBtn {
-	position: absolute;
-	top: 50%;
-	right: 10px;
-	transform: translateY(-50%);
-	width: 40px;
-	height: 40px;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	border: 0;
-	background: transparent;
-	color: var(--placeholder);
-	opacity: 0.95;
-	cursor: pointer;
-	border-radius: 8px;
-	transition:
-		opacity 0.15s ease,
-		transform 0.08s ease,
-		background 0.12s ease;
-}
-.toggleBtn:hover {
-	opacity: 1;
-	background: rgba(255, 255, 255, 0.06);
-}
-.toggleBtn:active {
-	transform: translateY(-50%) scale(0.98);
-}
-.toggleBtn:focus-visible {
-	outline: none;
-	box-shadow: 0 0 0 2px rgba(205, 141, 238, 0.35);
-	border-radius: 8px;
-}
-
-/* ===== OTP =====
-   НИЧЕГО не переопределяем по layout у корня компонента.
-   Только переменные размеров + базовый блочный бокс. */
+/* Стили для OTP инпута */
 .otp {
-	display: block; /* корневой див ведёт себя как обычный блок */
-	width: 100%;
-	/* тонкая настройка размеров слотов компонента */
-	--slot-size: clamp(36px, 6vw, 56px);
-	--slot-gap: 10px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 8px;
+   border: 2px solid #63EFFF
 }
 
-/* кнопка */
+.otp input {
+  width: 50px !important;
+  height: 60px !important;
+  text-align: center;
+  font-size: 24px !important;
+  font-weight: bold;
+  font-family: 'RussoOne', sans-serif;
+  background: rgba(0, 0, 0, 0.25) !important;
+  border: 2px solid #63EFFF !important;
+  border-radius: 12px !important;
+  color: white !important;
+  transition: all 0.2s ease !important;
+  outline: none !important;
+}
+
+.otp input:focus {
+  border-color: #4FD8FF !important;
+  box-shadow: 0 0 8px rgba(99, 239, 255, 0.4) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  transform: scale(1.05) !important;
+}
+
+.otp input:invalid {
+  border-color: #ff9090 !important;
+  box-shadow: 0 0 8px rgba(255, 144, 144, 0.3) !important;
+}
+
+.inputWrap {
+  position: relative;
+}
+
+.input {
+  width: 100%;
+  padding: 14px 50px 14px 16px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 2px solid #63EFFF;
+  border-radius: 12px;
+  color: white;
+  font-size: 16px;
+  font-family: 'RussoOne', sans-serif;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.input:focus {
+  border-color: #4FD8FF;
+  box-shadow: 0 0 8px rgba(99, 239, 255, 0.4);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.toggleBtn {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: #63EFFF;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.toggleBtn:hover {
+  background: rgba(99, 239, 255, 0.1);
+  transform: translateY(-50%) scale(1.05);
+}
+
+.toggleBtn:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.toggleBtn svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.pwHint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(99, 239, 255, 0.8);
+  line-height: 1.4;
+}
+
 .button {
-	padding: 14px;
-	background: #8b66e7;
-	color: #fff;
-	border: 2px solid #7050d5;
-	border-radius: 36px;
-	font-size: 20px;
-	font-weight: 700;
-	cursor: pointer;
-	width: 100%;
-	letter-spacing: 0.5px;
-	font-family: 'RussoOne', sans-serif;
-	-webkit-text-stroke: 1.5px #7050d5;
-	paint-order: stroke fill;
-	text-shadow: 0 2px 0 #7050d5;
-	box-shadow:
-		0 6px 0 #5a3fb5,
-		0 8px 10px rgba(0, 0, 0, 0.2),
-		inset 0 6px 0 #cd8dee;
-	transition: all 0.1s ease;
-	position: relative;
-	top: 0;
-	animation: se-fade-in-up 320ms ease-out both;
-	animation-delay: 240ms;
+  background: rgba(99, 239, 255, 0.1);
+  border: 2px solid #63EFFF;
+  color: #63EFFF;
+  font-weight: 500;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'RussoOne', sans-serif;
+  text-transform: lowercase;
+  text-shadow: 0 0 6px rgba(99, 239, 255, 0.6);
+  padding: 16px;
+  font-size: 16px;
+  width: 100%;
+  margin-top: 8px;
+  position: relative;
+  overflow: hidden;
 }
-.button:hover {
-	background: #7a5ad6;
-	box-shadow:
-		0 4px 0 #5a3fb5,
-		0 6px 8px rgba(0, 0, 0, 0.15),
-		inset 0 6px 0 #cd8dee;
-	top: 2px;
+
+.button:hover:not(:disabled) {
+  background: rgba(99, 239, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(99, 239, 255, 0.3);
 }
-.button:active {
-	background: #6a4ec5;
-	box-shadow:
-		0 2px 0 #5a3fb5,
-		0 4px 6px rgba(0, 0, 0, 0.1),
-		inset 0 6px 0 #cd8dee;
-	top: 4px;
-	transform: translateY(2px);
+
+.button:active:not(:disabled) {
+  transform: translateY(0);
 }
+
 .button:disabled,
-.button[aria-disabled='true'],
-.button:disabled:hover,
-.button[aria-disabled='true']:hover,
-.button:disabled:active,
-.button[aria-disabled='true']:active {
-	opacity: 0.6;
-	cursor: not-allowed;
-	background: #8b66e7;
-	border: 2px solid #7050d5;
-	text-shadow: 0 2px 0 #7050d5;
-	box-shadow:
-		0 6px 0 #5a3fb5,
-		0 8px 10px rgba(0, 0, 0, 0.2),
-		inset 0 6px 0 #cd8dee;
-	top: 0;
-	transform: none;
+.button[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
-/* сообщения */
-.ok {
-	color: #b5ffcf;
-	margin-top: 1rem;
-	font-family: 'Nunito', sans-serif;
+.button.loading {
+  cursor: progress;
 }
+
+.button.loading::after {
+  content: '';
+  display: inline-block;
+  margin-left: 8px;
+  animation: ellipsis 1s steps(3, end) infinite;
+}
+
+@keyframes ellipsis {
+  0% { content: ''; }
+  33% { content: '.'; }
+  66% { content: '..'; }
+  100% { content: '...'; }
+}
+
 .error {
-	color: #ffd5d5;
-	margin-top: 1rem;
-	font-family: 'Nunito', sans-serif;
+  color: #ff9090;
+  text-align: center;
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(255, 144, 144, 0.1);
+  border: 1px solid rgba(255, 144, 144, 0.3);
+  border-radius: 8px;
+  text-shadow: 0 0 4px rgba(255, 144, 144, 0.4);
 }
+
+.ok {
+  color: #60ffc4;
+  text-align: center;
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(96, 255, 196, 0.1);
+  border: 1px solid rgba(96, 255, 196, 0.3);
+  border-radius: 8px;
+  text-shadow: 0 0 4px rgba(96, 255, 196, 0.4);
+}
+
 .helper {
-	margin-top: 12px;
-	color: #fff;
-	opacity: 0.95;
+  text-align: center;
+  margin-top: 16px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  line-height: 1.4;
 }
 
-/* линк-кнопка */
 .linkButton {
-	background: transparent;
-	border: 0;
-	padding: 0;
-	color: #cd8dee;
-	text-decoration: none;
-	font-weight: 600;
-	font-family: 'Nunito', sans-serif;
-	cursor: pointer;
-}
-.linkButton:hover {
-	text-decoration: underline;
-}
-
-/* motion-safe */
-@media (prefers-reduced-motion: no-preference) {
-	@keyframes se-fade-in-up {
-		from {
-			opacity: 0;
-			transform: translateY(8px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-	@keyframes se-shake-x {
-		0%,
-		100% {
-			transform: translateX(0);
-		}
-		20% {
-			transform: translateX(-4px);
-		}
-		40% {
-			transform: translateX(4px);
-		}
-		60% {
-			transform: translateX(-3px);
-		}
-		80% {
-			transform: translateX(2px);
-		}
-	}
+  background: none;
+  border: none;
+  color: #63EFFF;
+  text-decoration: underline;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0;
+  text-shadow: 0 0 4px rgba(99, 239, 255, 0.4);
+  transition: all 0.2s ease;
 }
 
-/* адаптив */
-@media (max-width: 520px) {
-	.card {
-		padding: 2rem;
-	}
-	.title {
-		font-size: 24px;
-	}
+.linkButton:hover:not(:disabled) {
+  color: #4FD8FF;
+  text-shadow: 0 0 8px rgba(79, 216, 255, 0.6);
 }
-@media (max-width: 360px) {
-	.card {
-		padding: 1.5rem;
-	}
-	.title {
-		font-size: 22px;
-	}
-	.button {
-		font-size: 18px;
-	}
+
+.linkButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Адаптивность */
+@media (max-height: 800px) {
+  .container {
+    padding: 16px;
+  }
+  
+  .card {
+    padding: 24px;
+  }
+  
+  .title {
+    font-size: 24px;
+  }
+  
+  .lead {
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+  
+  .form {
+    gap: 1.25rem;
+  }
+  
+  .otp input {
+    width: 45px !important;
+    height: 55px !important;
+    font-size: 22px !important;
+  }
+  
+  .input {
+    padding: 12px 46px 12px 14px;
+    font-size: 15px;
+  }
+  
+  .button {
+    padding: 14px;
+    font-size: 15px;
+  }
+}
+
+@media (max-height: 600px) {
+  .container {
+    padding: 12px;
+  }
+  
+  .card {
+    padding: 20px;
+  }
+  
+  .header {
+    margin-bottom: 16px;
+  }
+  
+  .title {
+    font-size: 22px;
+  }
+  
+  .lead {
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  
+  .form {
+    gap: 1rem;
+  }
+  
+  .otp input {
+    width: 40px !important;
+    height: 50px !important;
+    font-size: 20px !important;
+  }
+  
+  .input {
+    padding: 10px 42px 10px 12px;
+    font-size: 14px;
+  }
+  
+  .button {
+    padding: 12px;
+    font-size: 14px;
+  }
+  
+  .helper {
+    font-size: 13px;
+    margin-top: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 12px;
+  }
+  
+  .card {
+    padding: 20px;
+    border-radius: 12px;
+  }
+  
+  .otp {
+    gap: 8px;
+  }
+  
+  .otp input {
+    width: 40px !important;
+    height: 50px !important;
+    font-size: 20px !important;
+  }
+}
+
+/* Скрыть элемент для скринридеров */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
