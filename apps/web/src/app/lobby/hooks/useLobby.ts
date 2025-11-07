@@ -52,6 +52,8 @@ export function useLobby(lobbyIdFromProps?: string) {
 	const [isLoading, setIsLoading] = useState(true)
 	const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
 	const [isPlayerModalOpen, setIsPlayerModalOpen] = useState(false)
+	const [lobbyCreatorId, setLobbyCreatorId] = useState<string>('')
+	const [error, setError] = useState<string>('')
 
 	const chatContainerRef = useRef<HTMLDivElement>(null)
 	const shouldScrollRef = useRef(true)
@@ -59,7 +61,8 @@ export function useLobby(lobbyIdFromProps?: string) {
 	const playersRef = useRef<Player[]>([])
 	const lobbySettingsRef = useRef<LobbySettings>(DEFAULT_LOBBY_SETTINGS)
 	const lobbyIdRef = useRef<string>(lobbyIdFromProps || 'default-lobby')
-	const hasProfileUpdatedRef = useRef(false)
+	const hasJoinedRef = useRef(false)
+	const reconnectTimeoutRef = useRef<NodeJS.Timeout>()
 
 	useEffect(() => {
 		playersRef.current = players
@@ -74,31 +77,19 @@ export function useLobby(lobbyIdFromProps?: string) {
 	useScrollPrevention()
 
 	const handleWebSocketMessage = useCallback((data: WebSocketMessage) => {
-		console.log('WebSocket message received:', data.type, data)
-
-		if (!data?.type) {
-			console.warn('WebSocket message without type:', data)
-			return
-		}
+		if (!data?.type) return
 
 		switch (data.type) {
 			case 'PLAYER_JOINED':
-				console.log('Player joined:', data.player)
 				setPlayers(prev => {
-					const exists = prev.some((p: Player) => p.id === data.player?.id)
-					if (
-						data.player &&
-						!exists &&
-						prev.length < lobbySettingsRef.current.maxPlayers
-					) {
-						return [...prev, data.player]
-					}
-					return prev
+					const exists = prev.some((p: Player) => p.id === data.player.id)
+					return !exists && prev.length < lobbySettingsRef.current.maxPlayers
+						? [...prev, data.player]
+						: prev
 				})
 				break
 
 			case 'PLAYER_LEFT':
-				console.log('Player left:', data.playerId)
 				setPlayers(prev => prev.filter((p: Player) => p.id !== data.playerId))
 				break
 
@@ -127,22 +118,13 @@ export function useLobby(lobbyIdFromProps?: string) {
 			}
 
 			case 'LOBBY_STATE':
-				console.log(
-					'Lobby state received:',
-					data.players,
-					'settings:',
-					data.settings
-				)
-				if (data.players && Array.isArray(data.players)) {
-					setPlayers(data.players)
-				}
-				if (data.settings) {
-					setLobbySettings(data.settings)
-				}
+				// Сервер является источником истины - полностью заменяем состояние
+				setPlayers(data.players || [])
+				if (data.settings) setLobbySettings(data.settings)
+				if (data.creatorId) setLobbyCreatorId(data.creatorId)
 				break
 
 			case 'PLAYER_READY':
-				console.log('Player ready:', data.playerId, data.isReady)
 				setPlayers(prev =>
 					prev.map((p: Player) =>
 						p.id === data.playerId ? { ...p, isReady: data.isReady } : p
@@ -151,18 +133,13 @@ export function useLobby(lobbyIdFromProps?: string) {
 				break
 
 			case 'LOBBY_SETTINGS_UPDATED':
-				console.log('Lobby settings updated:', data.settings)
-				if (data.settings) {
-					setLobbySettings(data.settings)
-				}
+				setLobbySettings(data.settings)
 				break
 
 			case 'ERROR':
-				console.error('WebSocket error:', data.message)
+				console.error('Server error:', data.message)
+				setError(data.message || 'Произошла ошибка')
 				break
-
-			default:
-				console.log('Unknown WebSocket message type:', data.type)
 		}
 	}, [])
 
@@ -181,37 +158,55 @@ export function useLobby(lobbyIdFromProps?: string) {
 		wsParams
 	)
 
-	// Обновляем профиль игрока после загрузки данных
+	// Автоматическое переподключение при разрыве соединения
 	useEffect(() => {
-		if (
-			!profile?.userId ||
-			!assets.avatar ||
-			!isConnected ||
-			hasProfileUpdatedRef.current
-		)
-			return
-
-		const updatePlayerProfile = () => {
-			const currentUser: Partial<Player> = {
-				id: profile.userId,
-				name: profile.username || 'Игрок',
-				missions: (profile as any).missionsCompleted || 0,
-				hours: (profile as any).playTime || 0,
-				avatar: assets.avatar,
-			}
-
-			console.log('Updating player profile:', currentUser.name)
-			sendWS({
-				type: 'UPDATE_PLAYER_PROFILE',
-				player: currentUser,
-			})
-			hasProfileUpdatedRef.current = true
+		if (!isConnected && hasJoinedRef.current) {
+			reconnectTimeoutRef.current = setTimeout(() => {
+				if (profile?.userId) {
+					hasJoinedRef.current = false
+				}
+			}, 2000)
 		}
 
-		// Небольшая задержка чтобы убедиться что соединение установлено
-		const timer = setTimeout(updatePlayerProfile, 100)
-		return () => clearTimeout(timer)
-	}, [profile, assets.avatar, isConnected, sendWS])
+		return () => {
+			if (reconnectTimeoutRef.current) {
+				clearTimeout(reconnectTimeoutRef.current)
+			}
+		}
+	}, [isConnected, profile?.userId])
+
+	// Очистка ошибки при изменении состояния
+	useEffect(() => {
+		if (isConnected) {
+			setError('')
+		}
+	}, [isConnected])
+
+	// Основной эффект для присоединения к лобби
+	useEffect(() => {
+		if (!profile?.userId || isLoading || hasJoinedRef.current) return
+
+		const currentUser: Player = {
+			id: profile.userId,
+			name: profile.username || 'Игрок',
+			missions: (profile as any).missionsCompleted || 0,
+			hours: (profile as any).playTime || 0,
+			avatar: assets.avatar,
+			isReady: false,
+		}
+
+		console.log('Sending JOIN_LOBBY for user:', currentUser.name)
+		const success = sendWS({ type: 'JOIN_LOBBY', player: currentUser })
+
+		if (success) {
+			hasJoinedRef.current = true
+		} else {
+			// Если отправка не удалась, пробуем снова через 1 секунду
+			setTimeout(() => {
+				hasJoinedRef.current = false
+			}, 1000)
+		}
+	}, [profile, isLoading, assets.avatar, sendWS])
 
 	const handlePlayerMenuClick = useCallback((player: Player) => {
 		setSelectedPlayer(player)
@@ -235,15 +230,15 @@ export function useLobby(lobbyIdFromProps?: string) {
 		[sendWS]
 	)
 
-	const handleMutePlayer = useCallback((playerId: string, muted: boolean) => {
-		// Реализация mute функциональности
-		console.log(`Player ${playerId} muted: ${muted}`)
-	}, [])
+	const handleMutePlayer = useCallback(
+		(playerId: string, muted: boolean) => {},
+		[]
+	)
 
-	const handleVolumeChange = useCallback((playerId: string, volume: number) => {
-		// Реализация изменения громкости
-		console.log(`Player ${playerId} volume: ${volume}`)
-	}, [])
+	const handleVolumeChange = useCallback(
+		(playerId: string, volume: number) => {},
+		[]
+	)
 
 	const handleAddFriend = useCallback(() => {
 		if (selectedPlayer) {
@@ -253,7 +248,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 	const handleRemovePlayer = useCallback(
 		(playerId: string) => {
-			setPlayers(prev => prev.filter((p: Player) => p.id !== playerId))
 			sendWS({ type: 'PLAYER_LEFT', playerId })
 			handleClosePlayerModal()
 		},
@@ -383,14 +377,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 	)
 
 	const lobbyId = lobbyIdFromProps || 'default-lobby'
-	const isLobbyCreator = true
-
-	console.log('Current lobby state:', {
-		players: players.map(p => ({ id: p.id, name: p.name, isReady: p.isReady })),
-		currentUser: profile?.userId,
-		isConnected,
-		hasProfileUpdated: hasProfileUpdatedRef.current,
-	})
+	const isLobbyCreator = lobbyCreatorId === profile?.userId
 
 	return {
 		profile,
@@ -408,6 +395,8 @@ export function useLobby(lobbyIdFromProps?: string) {
 		isPlayerModalOpen,
 		lobbyId,
 		chatContainerRef,
+		error,
+		isLobbyCreator,
 		setShowAddPlayerModal,
 		setShowLobbySettingsModal,
 		setNewMessage,
@@ -427,6 +416,5 @@ export function useLobby(lobbyIdFromProps?: string) {
 		AddPlayerModal,
 		PlayerManagementModal,
 		LobbySettingsModal,
-		isLobbyCreator,
 	}
 }
