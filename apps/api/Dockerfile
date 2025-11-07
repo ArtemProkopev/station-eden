@@ -3,7 +3,7 @@ FROM public.ecr.aws/docker/library/node:20-alpine AS build
 WORKDIR /app
 
 # Утилиты + сертификаты для стабильного TLS
-RUN apk add --no-cache ca-certificates curl && update-ca-certificates
+RUN apk add --no-cache ca-certificates curl wget && update-ca-certificates
 
 # PNPM
 ENV PNPM_HOME=/root/.local/share/pnpm
@@ -41,6 +41,9 @@ FROM public.ecr.aws/docker/library/node:20-alpine AS runtime
 WORKDIR /app/apps/api
 ENV NODE_ENV=production
 ENV PNPM_HOME=/root/.local/share/pnpm
+
+# Устанавливаем wget для healthcheck
+RUN apk add --no-cache wget
 
 COPY --from=build /root/.local/share/pnpm /root/.local/share/pnpm
 COPY --from=build /app/node_modules /app/node_modules

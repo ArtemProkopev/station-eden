@@ -1,214 +1,183 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { io, Socket } from 'socket.io-client'
 
 interface WebSocketMessage {
 	type: string
 	[key: string]: any
 }
 
-/**
- * Мок WebSocket:
- * - имитирует ответы сервера,
- * - рассылает события между вкладками через BroadcastChannel (общий "room"),
- * - подходит для локальной разработки без бэка.
- */
-class MockWebSocket implements WebSocket {
-	static readonly CONNECTING = 0
-	static readonly OPEN = 1
-	static readonly CLOSING = 2
-	static readonly CLOSED = 3
-
-	readonly CONNECTING = 0
-	readonly OPEN = 1
-	readonly CLOSING = 2
-	readonly CLOSED = 3
-
-	readonly url: string
-	readyState: number
-	bufferedAmount = 0
-	extensions = ''
-	protocol = ''
-	binaryType: BinaryType = 'blob'
-
-	onopen: ((this: WebSocket, ev: Event) => any) | null = null
-	onmessage: ((this: WebSocket, ev: MessageEvent) => any) | null = null
-	onclose: ((this: WebSocket, ev: CloseEvent) => any) | null = null
-	onerror: ((this: WebSocket, ev: Event) => any) | null = null
-
-	private listeners: Record<string, EventListenerOrEventListenerObject[]> = {}
+class MockSocketIO {
+	private listeners: Map<string, ((data: any) => void)[]> = new Map()
 	private bc: BroadcastChannel
 	private lobbyId: string
+	public connected = false
+	public id = `mock-${Math.random().toString(36).slice(2, 9)}`
 
-	constructor(url: string) {
-		this.url = url
+	constructor(url: string, options: any) {
 		const u = new URL(url)
 		this.lobbyId = u.searchParams.get('lobbyId') || 'default-lobby'
-		this.bc = new BroadcastChannel(`mock-ws:${this.lobbyId}`)
-		this.readyState = WebSocket.CONNECTING
+		this.bc = new BroadcastChannel(`mock-socketio:${this.lobbyId}`)
 
-		// принимать сообщения из "комнаты"
-		this.bc.onmessage = (ev: MessageEvent<any>) => {
-			const payload = ev.data
-			const msg = new MessageEvent('message', { data: JSON.stringify(payload) })
-			// прокидываем наружу
-			this.onmessage?.call(this as any, msg)
-			this.dispatchEvent(msg)
+		setTimeout(() => {
+			this.connected = true
+			this.emitEvent('connect')
+
+			// Эмулируем начальное состояние лобби с создателем
+			setTimeout(() => {
+				const creatorPlayer = {
+					id: 'creator-123',
+					name: 'Создатель',
+					missions: 10,
+					hours: 50,
+					isReady: false,
+				}
+
+				this.emitEvent('LOBBY_STATE', {
+					players: [creatorPlayer],
+					settings: {
+						maxPlayers: 4,
+						gameMode: 'standard',
+						isPrivate: false,
+						password: '',
+					},
+				})
+			}, 100)
+		}, 200)
+
+		this.bc.onmessage = (event: MessageEvent) => {
+			const { type, data } = event.data
+			this.emitEvent(type, data)
+		}
+	}
+
+	private emitEvent(event: string, data?: any) {
+		const callbacks = this.listeners.get(event) || []
+		callbacks.forEach(callback => callback(data))
+	}
+
+	on(event: string, callback: (data: any) => void) {
+		if (!this.listeners.has(event)) {
+			this.listeners.set(event, [])
+		}
+		this.listeners.get(event)!.push(callback)
+		return this
+	}
+
+	emit(event: string, data?: any) {
+		if (event === 'JOIN_LOBBY') {
+			this.bc.postMessage({
+				type: 'PLAYER_JOINED',
+				data: { player: data.player },
+			})
+			setTimeout(() => {
+				this.emitEvent('LOBBY_STATE', {
+					players: [data.player],
+					settings: {
+						maxPlayers: 4,
+						gameMode: 'standard',
+						isPrivate: false,
+						password: '',
+					},
+				})
+			}, 50)
+		} else if (event === 'UPDATE_PLAYER_PROFILE') {
+			this.bc.postMessage({
+				type: 'LOBBY_STATE',
+				data: {
+					players: [data.player],
+					settings: {
+						maxPlayers: 4,
+						gameMode: 'standard',
+						isPrivate: false,
+						password: '',
+					},
+				},
+			})
+		} else if (event === 'SEND_MESSAGE') {
+			this.bc.postMessage({
+				type: 'CHAT_MESSAGE',
+				data: { message: data.message },
+			})
+			setTimeout(() => {
+				this.emitEvent('MESSAGE_SENT', { messageId: data.message.id })
+			}, 50)
+		} else if (event === 'TOGGLE_READY') {
+			this.bc.postMessage({
+				type: 'PLAYER_READY',
+				data: {
+					playerId: data.playerId,
+					isReady: data.isReady,
+				},
+			})
+			setTimeout(() => {
+				this.emitEvent('LOBBY_STATE', {
+					players: [
+						{
+							id: data.playerId,
+							name: 'Игрок',
+							missions: 0,
+							hours: 0,
+							isReady: data.isReady,
+						},
+					],
+					settings: {
+						maxPlayers: 4,
+						gameMode: 'standard',
+						isPrivate: false,
+						password: '',
+					},
+				})
+			}, 50)
+		} else if (event === 'UPDATE_LOBBY_SETTINGS') {
+			this.bc.postMessage({
+				type: 'LOBBY_SETTINGS_UPDATED',
+				data: { settings: data.settings },
+			})
+			setTimeout(() => {
+				this.emitEvent('LOBBY_SETTINGS_UPDATE_SUCCESS', {
+					settings: data.settings,
+				})
+				this.emitEvent('LOBBY_STATE', {
+					players: [],
+					settings: data.settings,
+				})
+			}, 50)
+		} else if (event === 'PLAYER_LEFT') {
+			this.bc.postMessage({
+				type: 'PLAYER_LEFT',
+				data: { playerId: data.playerId },
+			})
+			setTimeout(() => {
+				this.emitEvent('LOBBY_STATE', {
+					players: [],
+					settings: {
+						maxPlayers: 4,
+						gameMode: 'standard',
+						isPrivate: false,
+						password: '',
+					},
+				})
+			}, 50)
 		}
 
-		setTimeout(() => {
-			this.readyState = WebSocket.OPEN
-			const open = new Event('open')
-			this.onopen?.call(this as any, open)
-			this.dispatchEvent(open)
-			// отдать начальное состояние комнаты (минимум — настройки)
-			const init = {
-				type: 'LOBBY_STATE',
-				players: [],
-				settings: {
-					maxPlayers: 4,
-					gameMode: 'standard',
-					isPrivate: false,
-					password: '',
-				},
-			}
-			const ev = new MessageEvent('message', { data: JSON.stringify(init) })
-			this.onmessage?.call(this as any, ev)
-			this.dispatchEvent(ev)
-		}, 200)
+		return this
 	}
 
-	send(data: string | ArrayBufferLike | Blob | ArrayBufferView) {
-		if (this.readyState !== WebSocket.OPEN) throw new Error('MockWS not open')
-		const asString =
-			typeof data === 'string'
-				? data
-				: new TextDecoder().decode(data as ArrayBuffer)
-
-		setTimeout(() => {
-			try {
-				const parsed = JSON.parse(asString)
-
-				// эмуляция ACK для некоторых команд
-				if (parsed.type === 'SEND_MESSAGE') {
-					const ack = { type: 'MESSAGE_SENT', messageId: parsed.message.id }
-					const ackEv = new MessageEvent('message', {
-						data: JSON.stringify(ack),
-					})
-					this.onmessage?.call(this as any, ackEv)
-					this.dispatchEvent(ackEv)
-				}
-				if (parsed.type === 'UPDATE_LOBBY_SETTINGS') {
-					const ok = {
-						type: 'LOBBY_SETTINGS_UPDATE_SUCCESS',
-						settings: parsed.settings,
-					}
-					const okEv = new MessageEvent('message', { data: JSON.stringify(ok) })
-					this.onmessage?.call(this as any, okEv)
-					this.dispatchEvent(okEv)
-				}
-
-				// "рассылка по комнате"
-				switch (parsed.type) {
-					case 'JOIN_LOBBY':
-						this.bc.postMessage({
-							type: 'PLAYER_JOINED',
-							player: parsed.player,
-						})
-						// и актуальное состояние отправителю
-						this.bc.postMessage({
-							type: 'LOBBY_STATE',
-							players: [parsed.player],
-							settings: {
-								maxPlayers: 4,
-								gameMode: 'standard',
-								isPrivate: false,
-								password: '',
-							},
-						})
-						break
-					case 'PLAYER_LEFT':
-						this.bc.postMessage({
-							type: 'PLAYER_LEFT',
-							playerId: parsed.playerId,
-						})
-						break
-					case 'SEND_MESSAGE':
-						this.bc.postMessage({
-							type: 'CHAT_MESSAGE',
-							message: parsed.message,
-						})
-						break
-					case 'TOGGLE_READY':
-						this.bc.postMessage({
-							type: 'PLAYER_READY',
-							playerId: parsed.playerId,
-							isReady: parsed.isReady,
-						})
-						break
-					case 'UPDATE_LOBBY_SETTINGS':
-						this.bc.postMessage({
-							type: 'LOBBY_SETTINGS_UPDATED',
-							settings: parsed.settings,
-						})
-						break
-				}
-			} catch (e) {
-				console.error('[MockWS] parse error:', e)
-			}
-		}, 30)
-	}
-
-	close(code?: number, reason?: string) {
-		this.readyState = WebSocket.CLOSING
-		setTimeout(() => {
-			this.readyState = WebSocket.CLOSED
-			try {
-				this.bc.close()
-			} catch {}
-			const ev = new CloseEvent('close', {
-				code: code ?? 1000,
-				reason: reason ?? 'Normal closure',
-				wasClean: true,
-			})
-			this.onclose?.call(this as any, ev)
-			this.dispatchEvent(ev)
-		}, 60)
-	}
-
-	addEventListener(type: any, listener: any) {
-		if (!this.listeners[type]) this.listeners[type] = []
-		this.listeners[type].push(listener)
-	}
-	removeEventListener(type: any, listener: any) {
-		if (!this.listeners[type]) return
-		this.listeners[type] = this.listeners[type].filter(l => l !== listener)
-	}
-	dispatchEvent(event: Event): boolean {
-		const list = this.listeners[event.type] || []
-		list.forEach(l => {
-			if (typeof l === 'function') l.call(this, event)
-			else if ((l as any)?.handleEvent) (l as any).handleEvent(event)
-		})
-		return true
+	disconnect() {
+		this.connected = false
+		this.bc.close()
+		this.emitEvent('disconnect', 'io client disconnect')
 	}
 }
 
-/**
- * WebSocket-хук:
- *  - очередь сообщений до открытия,
- *  - экспоненциальный бэк-офф,
- *  - no-retry на 1000/1001 и при выгрузке,
- *  - стабильные onMessage/params,
- *  - dev/prod автоопределение и контролируемый мок.
- */
 export const useWebSocket = (
 	baseUrl: string,
 	onMessage: (data: WebSocketMessage) => void,
 	params?: Record<string, string | number | boolean | undefined>
 ) => {
-	const ws = useRef<WebSocket | null>(null)
+	const socket = useRef<Socket | MockSocketIO | null>(null)
 	const [isConnected, setIsConnected] = useState(false)
 
-	// стабильные ссылки
 	const onMessageRef = useRef(onMessage)
 	useEffect(() => {
 		onMessageRef.current = onMessage
@@ -221,21 +190,9 @@ export const useWebSocket = (
 
 	const buildUrl = useCallback(() => {
 		const u = new URL(baseUrl)
-		const p = paramsRef.current
-		if (p)
-			for (const [k, v] of Object.entries(p)) {
-				if (v !== undefined && v !== null) u.searchParams.set(k, String(v))
-			}
-		return u.toString()
+		return u.origin
 	}, [baseUrl])
 
-	const queueRef = useRef<string[]>([])
-	const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-	const reconnectAttempt = useRef(0)
-	const connecting = useRef(false)
-	const pageUnloading = useRef(false)
-
-	// ----- универсальная логика выбора мока -----
 	const isProd = process.env.NODE_ENV === 'production'
 	const urlMockFlag =
 		typeof window !== 'undefined' &&
@@ -248,112 +205,129 @@ export const useWebSocket = (
 		process.env.NEXT_PUBLIC_WS_USE_MOCK === 'true'
 
 	const useMock = !isProd && (urlMockFlag || lsMockFlag || envMockFlag)
-	// --------------------------------------------
-
-	const flushQueue = useCallback(() => {
-		if (!ws.current || ws.current.readyState !== WebSocket.OPEN) return
-		while (queueRef.current.length) ws.current.send(queueRef.current.shift()!)
-	}, [])
-
-	const scheduleReconnect = useCallback((why: string) => {
-		if (pageUnloading.current) return
-		if (document.visibilityState === 'hidden') {
-			const onVisible = () => {
-				document.removeEventListener('visibilitychange', onVisible)
-				scheduleReconnect('became-visible')
-			}
-			document.addEventListener('visibilitychange', onVisible)
-			return
-		}
-		const step = Math.min(reconnectAttempt.current, 4)
-		const delay = Math.min(1000 * Math.pow(2, step), 10000)
-		if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
-		reconnectTimer.current = setTimeout(() => {
-			reconnectAttempt.current += 1
-			connect()
-		}, delay)
-	}, []) // без deps намеренно
-
-	const connect = useCallback(() => {
-		if (connecting.current) return
-		connecting.current = true
-
-		try {
-			const url = buildUrl()
-			console.info('[WS] connecting to', url, 'mock=', useMock)
-			ws.current = (
-				useMock ? new MockWebSocket(url) : new WebSocket(url)
-			) as WebSocket
-
-			ws.current.onopen = () => {
-				setIsConnected(true)
-				reconnectAttempt.current = 0
-				connecting.current = false
-				if (reconnectTimer.current) {
-					clearTimeout(reconnectTimer.current)
-					reconnectTimer.current = null
-				}
-				flushQueue()
-			}
-
-			ws.current.onmessage = (event: MessageEvent) => {
-				try {
-					const data = JSON.parse(event.data)
-					onMessageRef.current?.(data)
-				} catch (e) {
-					console.error('[WS] parse error:', e)
-				}
-			}
-
-			ws.current.onclose = (e: CloseEvent) => {
-				setIsConnected(false)
-				connecting.current = false
-				if (e.code === 1000 || e.code === 1001 || pageUnloading.current) return
-				scheduleReconnect('abnormal-close')
-			}
-
-			ws.current.onerror = () => {
-				/* реконнект пойдёт через onclose */
-			}
-		} catch {
-			connecting.current = false
-			scheduleReconnect('connect-failed')
-		}
-	}, [buildUrl, flushQueue, scheduleReconnect, useMock])
 
 	useEffect(() => {
-		const onBeforeUnload = () => {
-			pageUnloading.current = true
-			if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
-			if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-				try {
-					ws.current.close(1001, 'page unload')
-				} catch {}
+		const url = buildUrl()
+
+		let currentSocket: Socket | MockSocketIO
+
+		if (useMock) {
+			currentSocket = new MockSocketIO(url, {
+				transports: ['websocket', 'polling'],
+				withCredentials: true,
+				autoConnect: true,
+			}) as any
+		} else {
+			currentSocket = io(url, {
+				path: '/lobby',
+				query: paramsRef.current,
+				transports: ['websocket', 'polling'],
+				withCredentials: true,
+				autoConnect: true,
+				reconnection: true,
+				reconnectionAttempts: Infinity,
+				reconnectionDelay: 1000,
+				reconnectionDelayMax: 5000,
+				timeout: 20000,
+			})
+		}
+
+		socket.current = currentSocket
+
+		const handleConnect = () => {
+			console.log('WebSocket connected')
+			setIsConnected(true)
+		}
+
+		const handleDisconnect = (reason: string) => {
+			console.log('WebSocket disconnected:', reason)
+			setIsConnected(false)
+		}
+
+		const handleConnectError = (error: Error) => {
+			console.error('WebSocket connection error:', error)
+			setIsConnected(false)
+		}
+
+		// ИЗМЕНЕНИЕ: Правильно формируем сообщение с типом
+		const handleEvent = (data: any) => {
+			console.log('WebSocket event received:', data)
+			// Для событий, которые приходят как объект, добавляем тип
+			if (data && typeof data === 'object') {
+				onMessageRef.current?.(data)
 			}
 		}
-		window.addEventListener('beforeunload', onBeforeUnload)
-		return () => window.removeEventListener('beforeunload', onBeforeUnload)
-	}, [])
 
-	useEffect(() => {
-		connect()
+		// ИЗМЕНЕНИЕ: Обрабатываем каждое событие отдельно с правильным типом
+		const handleLobbyState = (data: any) => {
+			onMessageRef.current?.({ type: 'LOBBY_STATE', ...data })
+		}
+
+		const handlePlayerJoined = (data: any) => {
+			onMessageRef.current?.({ type: 'PLAYER_JOINED', ...data })
+		}
+
+		const handlePlayerLeft = (data: any) => {
+			onMessageRef.current?.({ type: 'PLAYER_LEFT', ...data })
+		}
+
+		const handleChatMessage = (data: any) => {
+			onMessageRef.current?.({ type: 'CHAT_MESSAGE', ...data })
+		}
+
+		const handlePlayerReady = (data: any) => {
+			onMessageRef.current?.({ type: 'PLAYER_READY', ...data })
+		}
+
+		const handleLobbySettingsUpdated = (data: any) => {
+			onMessageRef.current?.({ type: 'LOBBY_SETTINGS_UPDATED', ...data })
+		}
+
+		const handleMessageSent = (data: any) => {
+			onMessageRef.current?.({ type: 'MESSAGE_SENT', ...data })
+		}
+
+		const handleLobbySettingsUpdateSuccess = (data: any) => {
+			onMessageRef.current?.({ type: 'LOBBY_SETTINGS_UPDATE_SUCCESS', ...data })
+		}
+
+		const handleError = (data: any) => {
+			onMessageRef.current?.({ type: 'ERROR', ...data })
+		}
+
+		currentSocket.on('connect', handleConnect)
+		currentSocket.on('disconnect', handleDisconnect)
+		currentSocket.on('connect_error', handleConnectError)
+
+		// Подписываемся на конкретные события с правильными обработчиками
+		currentSocket.on('LOBBY_STATE', handleLobbyState)
+		currentSocket.on('PLAYER_JOINED', handlePlayerJoined)
+		currentSocket.on('PLAYER_LEFT', handlePlayerLeft)
+		currentSocket.on('CHAT_MESSAGE', handleChatMessage)
+		currentSocket.on('PLAYER_READY', handlePlayerReady)
+		currentSocket.on('LOBBY_SETTINGS_UPDATED', handleLobbySettingsUpdated)
+		currentSocket.on('MESSAGE_SENT', handleMessageSent)
+		currentSocket.on(
+			'LOBBY_SETTINGS_UPDATE_SUCCESS',
+			handleLobbySettingsUpdateSuccess
+		)
+		currentSocket.on('ERROR', handleError)
+
 		return () => {
-			if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
-			if (ws.current) {
-				try {
-					ws.current.close(1000, 'unmount')
-				} catch {}
+			if (currentSocket) {
+				currentSocket.disconnect()
+				socket.current = null
 			}
 		}
-	}, [connect])
+	}, [buildUrl, useMock])
 
 	const sendMessage = useCallback((message: WebSocketMessage) => {
-		const payload = JSON.stringify(message)
-		if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-			ws.current.send(payload)
+		if (socket.current) {
+			console.log('Sending WebSocket message:', message.type, message)
+			socket.current.emit(message.type, message)
 			return true
 		}
-		queueRef.current.push(payload)
+		console.warn('WebSocket not connected, message not sent:', message.type)
 		return false
 	}, [])
 

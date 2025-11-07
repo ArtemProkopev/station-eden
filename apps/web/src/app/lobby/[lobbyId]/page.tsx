@@ -4,7 +4,7 @@ import TopHUD from '@/components/TopHUD/TopHUD'
 import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
 import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
 import { useParams } from 'next/navigation'
-import { memo } from 'react'
+import { memo, useMemo } from 'react'
 import Chat from '../components/Chat/Chat'
 import LobbyHeader from '../components/LobbyHeader/LobbyHeader'
 import LobbyInfo from '../components/LobbyInfo/LobbyInfo'
@@ -15,6 +15,127 @@ import styles from '../page.module.css'
 
 const MemoizedFireflies = memo(FirefliesProfile)
 const MemoizedStars = memo(TwinklingStars)
+const MemoizedTopHUD = memo(TopHUD)
+const MemoizedLobbyHeader = memo(LobbyHeader)
+const MemoizedLobbyInfo = memo(LobbyInfo)
+const MemoizedPlayersList = memo(PlayersList)
+const MemoizedStartGameButton = memo(StartGameButton)
+const MemoizedChat = memo(Chat)
+
+const LoadingState = memo(() => (
+	<div className={styles.loadingContainer}>
+		<div className={styles.loadingSpinner}></div>
+		<p>Загрузка лобби...</p>
+	</div>
+))
+
+const LobbyContent = memo(
+	({
+		lobbyId,
+		lobby,
+	}: {
+		lobbyId: string
+		lobby: ReturnType<typeof useLobby>
+	}) => {
+		const readyPlayersCount = useMemo(
+			() => lobby.players.filter(p => p.isReady).length,
+			[lobby.players]
+		)
+
+		const isCurrentUserSelected = useMemo(
+			() => lobby.selectedPlayer?.id === lobby.profile?.userId,
+			[lobby.selectedPlayer, lobby.profile?.userId]
+		)
+
+		return (
+			<>
+				<MemoizedTopHUD profile={lobby.profile} avatar={lobby.assets.avatar} />
+
+				<div className={styles.container}>
+					<MemoizedLobbyHeader
+						title='Лобби'
+						lobbyId={lobbyId}
+						isConnected={lobby.isConnected}
+					/>
+
+					<div className={styles.columns}>
+						<div className={styles.leftColumn}>
+							<MemoizedPlayersList
+								players={lobby.players}
+								maxPlayers={lobby.lobbySettings.maxPlayers}
+								currentUserId={lobby.profile?.userId}
+								onPlayerMenuClick={lobby.handlePlayerMenuClick}
+								onAddPlayer={() => lobby.setShowAddPlayerModal(true)}
+								onToggleReady={lobby.toggleReady}
+								currentUserReadyState={lobby.currentUserReadyState}
+							/>
+						</div>
+
+						<div className={styles.centerColumn}>
+							<MemoizedLobbyInfo
+								lobbySettings={lobby.lobbySettings}
+								playersCount={lobby.players.length}
+								onOpenSettings={lobby.handleOpenLobbySettings}
+							/>
+						</div>
+
+						<div className={styles.rightColumn}>
+							<MemoizedChat
+								messages={lobby.chatMessages}
+								newMessage={lobby.newMessage}
+								onMessageChange={lobby.setNewMessage}
+								onSendMessage={lobby.handleSendMessage}
+								onKeyPress={lobby.handleKeyPress}
+								onChatScroll={lobby.handleChatScroll}
+								chatContainerRef={lobby.chatContainerRef}
+							/>
+						</div>
+					</div>
+
+					<div className={styles.bottomSection}>
+						<MemoizedStartGameButton
+							readyPlayersCount={readyPlayersCount}
+							totalPlayersCount={lobby.players.length}
+							isConnected={lobby.isConnected}
+							minPlayersRequired={2}
+						/>
+					</div>
+
+					{lobby.showAddPlayerModal && (
+						<lobby.AddPlayerModal
+							isOpen={lobby.showAddPlayerModal}
+							onClose={() => lobby.setShowAddPlayerModal(false)}
+							onAddPlayer={lobby.addNewPlayer}
+						/>
+					)}
+
+					{lobby.selectedPlayer && (
+						<lobby.PlayerManagementModal
+							player={lobby.selectedPlayer}
+							isOpen={lobby.isPlayerModalOpen}
+							onClose={lobby.handleClosePlayerModal}
+							isLobbyCreator={lobby.isLobbyCreator}
+							isCurrentUser={isCurrentUserSelected}
+							onMutePlayer={lobby.handleMutePlayer}
+							onVolumeChange={lobby.handleVolumeChange}
+							onAddFriend={lobby.handleAddFriend}
+							onRemovePlayer={lobby.handleRemovePlayer}
+						/>
+					)}
+
+					{lobby.showLobbySettingsModal && (
+						<lobby.LobbySettingsModal
+							isOpen={lobby.showLobbySettingsModal}
+							onClose={() => lobby.setShowLobbySettingsModal(false)}
+							currentSettings={lobby.lobbySettings}
+							onSaveSettings={lobby.handleSaveLobbySettings}
+						/>
+					)}
+				</div>
+			</>
+		)
+	}
+)
 
 export default function LobbyPage() {
 	const params = useParams<{ lobbyId: string }>()
@@ -26,11 +147,8 @@ export default function LobbyPage() {
 			<main className={styles.page}>
 				<MemoizedFireflies />
 				<MemoizedStars />
-				<TopHUD />
-				<div className={styles.loadingContainer}>
-					<div className={styles.loadingSpinner}></div>
-					<p>Загрузка лобби...</p>
-				</div>
+				<MemoizedTopHUD />
+				<LoadingState />
 			</main>
 		)
 	}
@@ -39,89 +157,7 @@ export default function LobbyPage() {
 		<main className={styles.page}>
 			<MemoizedFireflies />
 			<MemoizedStars />
-			<TopHUD profile={lobby.profile} avatar={lobby.assets.avatar} />
-
-			<div className={styles.container}>
-				<LobbyHeader
-					title='Лобби'
-					lobbyId={lobby.lobbyId}
-					isConnected={lobby.isConnected}
-				/>
-
-				<div className={styles.columns}>
-					<div className={styles.leftColumn}>
-						<PlayersList
-							players={lobby.players}
-							maxPlayers={lobby.lobbySettings.maxPlayers}
-							currentUserId={lobby.profile?.userId}
-							onPlayerMenuClick={lobby.handlePlayerMenuClick}
-							onAddPlayer={() => lobby.setShowAddPlayerModal(true)}
-							onToggleReady={lobby.toggleReady}
-							currentUserReadyState={lobby.currentUserReadyState}
-						/>
-					</div>
-
-					<div className={styles.centerColumn}>
-						<LobbyInfo
-							lobbySettings={lobby.lobbySettings}
-							playersCount={lobby.players.length}
-							onOpenSettings={lobby.handleOpenLobbySettings}
-						/>
-					</div>
-
-					<div className={styles.rightColumn}>
-						<Chat
-							messages={lobby.chatMessages}
-							newMessage={lobby.newMessage}
-							onMessageChange={lobby.setNewMessage}
-							onSendMessage={lobby.handleSendMessage}
-							onKeyPress={lobby.handleKeyPress}
-							onChatScroll={lobby.handleChatScroll}
-							/* добавлено: передаём ref для корректного автоскролла */
-							chatContainerRef={lobby.chatContainerRef}
-						/>
-					</div>
-				</div>
-
-				<div className={styles.bottomSection}>
-					<StartGameButton
-						readyPlayersCount={lobby.players.filter(p => p.isReady).length}
-						totalPlayersCount={lobby.players.length}
-						isConnected={lobby.isConnected}
-						minPlayersRequired={2}
-					/>
-				</div>
-
-				{lobby.showAddPlayerModal && (
-					<lobby.AddPlayerModal
-						onClose={() => lobby.setShowAddPlayerModal(false)}
-						onAddPlayer={lobby.addNewPlayer}
-					/>
-				)}
-
-				{lobby.selectedPlayer && (
-					<lobby.PlayerManagementModal
-						player={lobby.selectedPlayer}
-						isOpen={lobby.isPlayerModalOpen}
-						onClose={lobby.handleClosePlayerModal}
-						isLobbyCreator={lobby.isLobbyCreator}
-						isCurrentUser={lobby.selectedPlayer.id === lobby.profile?.userId}
-						onMutePlayer={lobby.handleMutePlayer}
-						onVolumeChange={lobby.handleVolumeChange}
-						onAddFriend={lobby.handleAddFriend}
-						onRemovePlayer={lobby.handleRemovePlayer}
-					/>
-				)}
-
-				{lobby.showLobbySettingsModal && (
-					<lobby.LobbySettingsModal
-						isOpen={lobby.showLobbySettingsModal}
-						onClose={() => lobby.setShowLobbySettingsModal(false)}
-						currentSettings={lobby.lobbySettings}
-						onSaveSettings={lobby.handleSaveLobbySettings}
-					/>
-				)}
-			</div>
+			<LobbyContent lobbyId={lobbyId} lobby={lobby} />
 		</main>
 	)
 }

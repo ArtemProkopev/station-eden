@@ -86,7 +86,18 @@ jobs:
             set -euo pipefail
             set -x
 
+            echo "==> Cleanup old Docker networks and containers"
             cd ~/station-eden || { mkdir -p ~/station-eden && cd ~/station-eden; }
+
+            # Останавливаем и удаляем контейнеры
+            docker compose down 2>/dev/null || true
+
+            # Очищаем сети ПЕРЕД любыми операциями
+            docker network prune -f
+
+            # Полная очистка неиспользуемых ресурсов
+            docker system prune -f
+
             if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
               git fetch --all --prune
               git checkout main || true
@@ -147,6 +158,9 @@ jobs:
             else
               echo "API container not found (compose service name 'api'). Skipping migrations."
             fi
+
+            echo "==> Final cleanup"
+            docker system prune -f
 
             echo "==> Status"
             docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"

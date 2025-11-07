@@ -1,6 +1,5 @@
 import { ValidationPipe } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
-import { WsAdapter } from '@nestjs/platform-ws'
 import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
 
@@ -9,16 +8,18 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 import { CsrfMiddleware } from './common/middleware/csrf.middleware'
 
 async function bootstrap() {
-	const app = await NestFactory.create(AppModule)
+	const app = await NestFactory.create(AppModule, {
+		logger: ['error', 'warn', 'log'],
+	})
 
-	app.useWebSocketAdapter(new WsAdapter(app))
-
-	app.use(helmet())
+	app.use(
+		helmet({
+			crossOriginEmbedderPolicy: false,
+		})
+	)
 	app.use(cookieParser())
 
-	// Обновляем CORS для WebSocket
 	const corsOrigins = process.env.API_CORS_ORIGIN?.split(',') || []
-
 	app.enableCors({
 		origin: corsOrigins,
 		credentials: true,
@@ -35,6 +36,7 @@ async function bootstrap() {
 		new ValidationPipe({
 			whitelist: true,
 			forbidNonWhitelisted: true,
+			transform: true,
 		})
 	)
 
@@ -42,13 +44,13 @@ async function bootstrap() {
 	app.use(CsrfMiddleware as any)
 
 	const port = Number(process.env.API_PORT || 4000)
-	// слушаем на '::' — это dual-stack (IPv4+IPv6) на современных Linux/Mac
 	const host = process.env.BIND_HOST || '::'
 	await app.listen(port, host)
 
 	const shownHost = host === '::' ? 'localhost' : host
 	console.log(`API listening on http://${shownHost}:${port}`)
 	console.log(`CORS origins: ${corsOrigins.join(', ')}`)
+	console.log(`Socket.IO enabled on path /lobby`)
 }
 
 bootstrap()

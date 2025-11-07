@@ -4,11 +4,12 @@ import {
 	OnGatewayConnection,
 	OnGatewayDisconnect,
 	OnGatewayInit,
+	SubscribeMessage,
 	WebSocketGateway,
+	WebSocketServer,
 } from '@nestjs/websockets'
 import * as cookie from 'cookie'
-import type { IncomingMessage } from 'http'
-import type { WebSocket } from 'ws'
+import { Server, Socket } from 'socket.io'
 
 type Player = {
 	id: string
@@ -31,273 +32,307 @@ type LobbySettings = {
 	limitedResources?: boolean
 }
 
-type ClientCtx = {
-	userId: string
-	lobbyId: string
-}
-
 type LobbyState = {
 	settings: LobbySettings
 	players: Map<string, Player>
 }
 
+const DEFAULT_LOBBY_SETTINGS: LobbySettings = {
+	maxPlayers: 4,
+	gameMode: 'standard',
+	isPrivate: false,
+	password: '',
+}
+
 @WebSocketGateway({
 	path: '/lobby',
 	cors: {
-		origin: process.env.API_CORS_ORIGIN?.split(',') || [],
+		origin: process.env.API_CORS_ORIGIN?.split(',') || [
+			'http://localhost:3000',
+		],
 		credentials: true,
 	},
-	transports: ['websocket'],
+	transports: ['websocket', 'polling'],
+	pingTimeout: 60000,
+	pingInterval: 25000,
 })
 export class LobbyGateway
 	implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
-	private readonly log = new Logger(LobbyGateway.name)
+	private readonly logger = new Logger(LobbyGateway.name)
 
-	constructor(private readonly jwt: JwtService) {}
+	@WebSocketServer()
+	private server!: Server
 
-	private rooms = new Map<string, Set<WebSocket>>()
-	private clients = new WeakMap<WebSocket, ClientCtx>()
+	constructor(private readonly jwtService: JwtService) {}
+
 	private lobbies = new Map<string, LobbyState>()
 
 	afterInit() {
-		this.log.log('LobbyGateway initialized')
+		this.logger.log('LobbyGateway initialized')
 	}
 
-	async handleConnection(client: WebSocket, req: IncomingMessage) {
+	async handleConnection(socket: Socket) {
 		try {
-			const url = new URL(req.url || '', `http://${req.headers.host}`)
-			const lobbyId = url.searchParams.get('lobbyId') || 'default-lobby'
+			console.log(
+				'New WebSocket connection attempt, headers:',
+				socket.handshake.headers
+			)
+			console.log('Query params:', socket.handshake.query)
 
-			// В production требуем валидный JWT
-			const isProduction = process.env.NODE_ENV === 'production'
-			const rawCookie = req.headers.cookie || ''
-			const parsed = cookie.parse(rawCookie)
-			const token = parsed['access_token']
+			const rawCookie = socket.handshake.headers.cookie || ''
+			const cookies = cookie.parse(rawCookie)
+			const token = cookies['access_token']
+			console.log('Token present:', !!token)
 
-			let userId: string | undefined
+			let userId: string
+			let userName = 'Игрок'
+			let lobbyId = socket.handshake.query.lobbyId as string
 
+			if (!lobbyId) {
+				lobbyId = 'default-lobby'
+			}
+
+			// Аутентификация
 			if (token) {
 				try {
-					const payload = await this.jwt.verifyAsync(token, {
-						algorithms: ['HS256'],
-						secret: process.env.JWT_ACCESS_SECRET || 'UNSET_SECRET',
+					const payload = await this.jwtService.verifyAsync(token, {
+						secret: process.env.JWT_ACCESS_SECRET!,
 					})
-					userId = payload?.sub
-				} catch (e: any) {
-					this.log.warn(`WS auth verify failed: ${e?.message || e}`)
+					userId = payload.sub
+					userName = payload.username || userName
+				} catch (error) {
+					this.logger.warn('Invalid token, using anonymous connection')
+					userId = `anon-${Math.random().toString(36).slice(2, 10)}`
 				}
+			} else {
+				userId = `anon-${Math.random().toString(36).slice(2, 10)}`
 			}
 
-			// В production блокируем неавторизованные подключения
-			if (!userId && isProduction) {
-				this.log.warn(`Blocking unauthorized WS connection in production`)
-				client.close(4001, 'Unauthorized')
-				return
-			}
+			socket.data.userId = userId
+			socket.data.lobbyId = lobbyId
 
-			// В development разрешаем анонимные подключения
-			if (!userId) {
-				userId = `dev-${Math.random().toString(36).slice(2, 10)}`
-				this.log.debug(`DEV mode anonymous connection: ${userId}`)
-			}
-
-			client.on('error', (err: any) => {
-				this.log.error(
-					`WS client error (user=${userId}, lobby=${lobbyId}): ${
-						err?.message || err
-					}`
-				)
-			})
-
-			client.on('close', (code: number, reason: Buffer) => {
-				const reasonStr = (() => {
-					try {
-						return reason?.toString?.() || ''
-					} catch {
-						return ''
-					}
-				})()
-				this.log.warn(
-					`WS closed (user=${userId}, lobby=${lobbyId}) code=${code} reason="${reasonStr}"`
-				)
-				this.handleDisconnect(client)
-			})
-
-			this.clients.set(client, { userId, lobbyId })
-			if (!this.rooms.has(lobbyId)) this.rooms.set(lobbyId, new Set())
-			this.rooms.get(lobbyId)!.add(client)
-
+			// Инициализируем лобби если не существует
 			if (!this.lobbies.has(lobbyId)) {
 				this.lobbies.set(lobbyId, {
-					settings: {
-						maxPlayers: 4,
-						gameMode: 'standard',
-						isPrivate: false,
-						password: '',
-					},
+					settings: { ...DEFAULT_LOBBY_SETTINGS },
 					players: new Map(),
 				})
 			}
 
-			const state = this.getLobbyState(lobbyId)
-			this.safeSend(client, {
-				type: 'LOBBY_STATE',
-				players: Array.from(state.players.values()),
-				settings: state.settings,
-			})
+			const lobby = this.lobbies.get(lobbyId)!
 
-			client.on('message', (buf: Buffer) => {
-				try {
-					const data = JSON.parse(buf.toString('utf-8'))
-					this.routeMessage(client, data)
-				} catch {
-					this.safeSend(client, { type: 'ERROR', message: 'Bad JSON' })
-				}
-			})
+			// Создаем базовую информацию об игроке
+			const player: Player = {
+				id: userId,
+				name: userName,
+				missions: 0,
+				hours: 0,
+				isReady: false,
+			}
 
-			this.log.debug(`WS connected: user=${userId}, lobby=${lobbyId}`)
-		} catch (e: any) {
-			this.log.error(`handleConnection fatal: ${e?.message || e}`)
-			try {
-				client.close(1011, 'Internal error')
-			} catch {}
+			// Добавляем игрока в лобби при подключении
+			lobby.players.set(userId, player)
+
+			// Присоединяем к комнате лобби
+			await socket.join(lobbyId)
+
+			this.logger.log(`Player connected: ${userId} to lobby ${lobbyId}`)
+			this.logger.log(`Lobby ${lobbyId} now has ${lobby.players.size} players`)
+
+			// Отправляем текущее состояние лобби всем участникам
+			this.server.to(lobbyId).emit('LOBBY_STATE', {
+				players: Array.from(lobby.players.values()),
+				settings: lobby.settings,
+			})
+		} catch (error) {
+			this.logger.error('Connection error:', error)
+			socket.disconnect()
 		}
 	}
 
-	handleDisconnect(client: WebSocket) {
-		const ctx = this.clients.get(client)
-		if (!ctx) return
-		const { lobbyId, userId } = ctx
+	handleDisconnect(socket: Socket) {
+		const { userId, lobbyId } = socket.data
 
-		this.clients.delete(client)
-
-		const set = this.rooms.get(lobbyId)
-		if (set) {
-			set.delete(client)
-			if (set.size === 0) this.rooms.delete(lobbyId)
-		}
+		if (!userId || !lobbyId) return
 
 		const lobby = this.lobbies.get(lobbyId)
-		if (lobby && lobby.players.has(userId)) {
+		if (lobby?.players.has(userId)) {
+			const playerName = lobby.players.get(userId)?.name
 			lobby.players.delete(userId)
-			this.broadcast(lobbyId, {
-				type: 'PLAYER_LEFT',
-				playerId: userId,
+
+			// Уведомляем всех о выходе игрока
+			this.server.to(lobbyId).emit('PLAYER_LEFT', { playerId: userId })
+
+			// Обновляем состояние лобби для всех оставшихся игроков
+			this.server.to(lobbyId).emit('LOBBY_STATE', {
+				players: Array.from(lobby.players.values()),
+				settings: lobby.settings,
+			})
+
+			// Если лобби пустое, удаляем его
+			if (lobby.players.size === 0) {
+				this.lobbies.delete(lobbyId)
+				this.logger.log(`Lobby ${lobbyId} deleted (empty)`)
+			}
+
+			this.logger.log(
+				`Player disconnected: ${playerName} from lobby ${lobbyId}`
+			)
+		}
+	}
+
+	@SubscribeMessage('JOIN_LOBBY')
+	handleJoinLobby(socket: Socket, data: { player: Player }) {
+		const { lobbyId, userId } = socket.data
+		const lobby = this.lobbies.get(lobbyId)
+
+		if (!lobby) {
+			socket.emit('ERROR', { message: 'Lobby not found' })
+			return
+		}
+
+		// Проверяем лимит игроков
+		if (lobby.players.size >= lobby.settings.maxPlayers) {
+			socket.emit('ERROR', { message: 'Lobby is full' })
+			return
+		}
+
+		const player = data.player
+
+		// Обновляем или добавляем игрока
+		lobby.players.set(player.id, player)
+
+		this.logger.log(`Player ${player.name} joined lobby ${lobbyId}`)
+		this.logger.log(`Lobby ${lobbyId} now has ${lobby.players.size} players`)
+
+		// Уведомляем всех в лобби о новом игроке
+		this.server.to(lobbyId).emit('PLAYER_JOINED', { player })
+
+		// Также отправляем обновленное состояние всем
+		this.server.to(lobbyId).emit('LOBBY_STATE', {
+			players: Array.from(lobby.players.values()),
+			settings: lobby.settings,
+		})
+	}
+
+	@SubscribeMessage('UPDATE_PLAYER_PROFILE')
+	handleUpdatePlayerProfile(socket: Socket, data: { player: Partial<Player> }) {
+		const { userId, lobbyId } = socket.data
+		const lobby = this.lobbies.get(lobbyId)
+
+		if (!lobby) return
+
+		const player = lobby.players.get(userId)
+		if (player) {
+			// Обновляем данные игрока
+			Object.assign(player, data.player)
+
+			this.logger.log(`Player profile updated: ${player.name}`)
+
+			// Уведомляем всех об изменении
+			this.server.to(lobbyId).emit('LOBBY_STATE', {
+				players: Array.from(lobby.players.values()),
+				settings: lobby.settings,
 			})
 		}
 	}
 
-	private getLobbyState(lobbyId: string): LobbyState {
-		let lobby = this.lobbies.get(lobbyId)
-		if (!lobby) {
-			lobby = {
-				settings: {
-					maxPlayers: 4,
-					gameMode: 'standard',
-					isPrivate: false,
-					password: '',
-				},
-				players: new Map(),
-			}
-			this.lobbies.set(lobbyId, lobby)
-		}
-		return lobby
+	@SubscribeMessage('SEND_MESSAGE')
+	handleSendMessage(socket: Socket, data: { message: any }) {
+		const { lobbyId } = socket.data
+
+		// Рассылаем сообщение всем в лобби, кроме отправителя
+		socket.to(lobbyId).emit('CHAT_MESSAGE', { message: data.message })
+
+		// Подтверждение отправителю
+		socket.emit('MESSAGE_SENT', { messageId: data.message.id })
 	}
 
-	private safeSend(client: WebSocket, payload: any) {
-		try {
-			if ((client as any).readyState === 1) {
-				client.send(JSON.stringify(payload))
-			}
-		} catch (e: any) {
-			this.log.warn(`safeSend error: ${e?.message || e}`)
+	@SubscribeMessage('TOGGLE_READY')
+	handleToggleReady(
+		socket: Socket,
+		data: { playerId?: string; isReady: boolean }
+	) {
+		const { userId, lobbyId } = socket.data
+		const lobby = this.lobbies.get(lobbyId)
+
+		if (!lobby) return
+
+		const playerId = data.playerId || userId
+		const player = lobby.players.get(playerId)
+
+		if (player) {
+			player.isReady = data.isReady
+
+			this.logger.log(`Player ${player.name} ready: ${data.isReady}`)
+
+			// Уведомляем всех в лобби об изменении готовности
+			this.server.to(lobbyId).emit('PLAYER_READY', {
+				playerId,
+				isReady: player.isReady,
+			})
+
+			// Также отправляем полное состояние для синхронизации
+			this.server.to(lobbyId).emit('LOBBY_STATE', {
+				players: Array.from(lobby.players.values()),
+				settings: lobby.settings,
+			})
 		}
 	}
 
-	private broadcast(lobbyId: string, payload: any) {
-		const set = this.rooms.get(lobbyId)
-		if (!set) return
-		const msg = JSON.stringify(payload)
-		for (const c of set) {
-			try {
-				if ((c as any).readyState === 1) c.send(msg)
-			} catch (e: any) {
-				this.log.warn(`broadcast error: ${e?.message || e}`)
-			}
-		}
+	@SubscribeMessage('UPDATE_LOBBY_SETTINGS')
+	handleUpdateLobbySettings(
+		socket: Socket,
+		data: { settings: Partial<LobbySettings> }
+	) {
+		const { lobbyId } = socket.data
+		const lobby = this.lobbies.get(lobbyId)
+
+		if (!lobby) return
+
+		Object.assign(lobby.settings, data.settings)
+
+		this.logger.log(`Lobby settings updated for ${lobbyId}`)
+
+		// Подтверждение инициатору
+		socket.emit('LOBBY_SETTINGS_UPDATE_SUCCESS', { settings: lobby.settings })
+
+		// Уведомление всех остальных в лобби
+		socket
+			.to(lobbyId)
+			.emit('LOBBY_SETTINGS_UPDATED', { settings: lobby.settings })
+
+		// Отправляем полное состояние для синхронизации
+		this.server.to(lobbyId).emit('LOBBY_STATE', {
+			players: Array.from(lobby.players.values()),
+			settings: lobby.settings,
+		})
 	}
 
-	private routeMessage(client: WebSocket, data: any) {
-		const ctx = this.clients.get(client)
-		if (!ctx) return
-		const { userId, lobbyId } = ctx
-		const lobby = this.getLobbyState(lobbyId)
+	@SubscribeMessage('PLAYER_LEFT')
+	handlePlayerLeft(socket: Socket, data: { playerId?: string }) {
+		const { userId, lobbyId } = socket.data
+		const lobby = this.lobbies.get(lobbyId)
 
-		switch (data.type) {
-			case 'JOIN_LOBBY': {
-				const p: Player = data.player
-				lobby.players.set(p.id, p)
-				this.broadcast(lobbyId, { type: 'PLAYER_JOINED', player: p })
-				this.safeSend(client, {
-					type: 'LOBBY_STATE',
-					players: Array.from(lobby.players.values()),
-					settings: lobby.settings,
-				})
-				break
-			}
+		if (!lobby) return
 
-			case 'PLAYER_LEFT': {
-				const pid: string = data.playerId ?? userId
-				lobby.players.delete(pid)
-				this.broadcast(lobbyId, { type: 'PLAYER_LEFT', playerId: pid })
-				break
-			}
+		const playerId = data.playerId || userId
+		const player = lobby.players.get(playerId)
 
-			case 'SEND_MESSAGE': {
-				const message = data.message
-				// добавлен диагностический лог — видно, в какую лобби уходит сообщение
-				this.log.debug(
-					`CHAT: lobby=${lobbyId} from=${message?.playerId} "${message?.text}"`
-				)
-				this.broadcast(lobbyId, { type: 'CHAT_MESSAGE', message })
-				this.safeSend(client, { type: 'MESSAGE_SENT', messageId: message.id })
-				break
-			}
+		if (player) {
+			lobby.players.delete(playerId)
 
-			case 'TOGGLE_READY': {
-				const pid: string = data.playerId ?? userId
-				const player = lobby.players.get(pid)
-				if (player) {
-					player.isReady = !!data.isReady
-					this.broadcast(lobbyId, {
-						type: 'PLAYER_READY',
-						playerId: pid,
-						isReady: player.isReady,
-					})
-				}
-				break
-			}
+			this.logger.log(`Player ${player.name} left lobby ${lobbyId}`)
 
-			case 'UPDATE_LOBBY_SETTINGS': {
-				lobby.settings = { ...lobby.settings, ...(data.settings || {}) }
-				this.safeSend(client, {
-					type: 'LOBBY_SETTINGS_UPDATE_SUCCESS',
-					settings: lobby.settings,
-				})
-				this.broadcast(lobbyId, {
-					type: 'LOBBY_SETTINGS_UPDATED',
-					settings: lobby.settings,
-				})
-				break
-			}
+			// Уведомляем всех в лобби о выходе игрока
+			this.server.to(lobbyId).emit('PLAYER_LEFT', { playerId })
 
-			default: {
-				this.safeSend(client, {
-					type: 'ERROR',
-					message: `Unknown type: ${data.type}`,
-				})
-			}
+			// Обновляем состояние лобби
+			this.server.to(lobbyId).emit('LOBBY_STATE', {
+				players: Array.from(lobby.players.values()),
+				settings: lobby.settings,
+			})
 		}
 	}
 }

@@ -36,24 +36,25 @@ services:
       test:
         [
           "CMD",
-          "node",
-          "-e",
-          "require('http').get('http://127.0.0.1:4000/auth/csrf',r=>process.exit(r.statusCode>=200&&r.statusCode<500?0:1)).on('error',()=>process.exit(1))",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:4000/auth/csrf",
         ]
-      interval: 10s
-      timeout: 3s
-      retries: 15
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     networks: [webnet]
 
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
-      # УБИРАЕМ args - теперь они жестко прописаны в Dockerfile
     image: ${GHCR_REG:-ghcr.io}/${GHCR_OWNER}/station-eden-web:${IMAGE_TAG:-latest}
     environment:
       NODE_ENV: ${NODE_ENV}
-      # ОСТАВЛЯЕМ ТОЛЬКО ДЛЯ СОВМЕСТИМОСТИ
       NEXT_PUBLIC_API_BASE: https://api.stationeden.ru
       NEXT_PUBLIC_WS_BASE: wss://api.stationeden.ru
       NEXT_PUBLIC_ENABLE_TELEGRAM: false
@@ -67,13 +68,16 @@ services:
       test:
         [
           "CMD",
-          "node",
-          "-e",
-          "require('http').get('http://127.0.0.1:3000',r=>process.exit(r.statusCode>=200&&r.statusCode<500?0:1)).on('error',()=>process.exit(1))",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000",
         ]
-      interval: 10s
-      timeout: 3s
-      retries: 15
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     networks: [webnet]
 
   caddy:
@@ -104,6 +108,10 @@ services:
 
 networks:
   webnet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
 
 volumes:
   caddy_data:

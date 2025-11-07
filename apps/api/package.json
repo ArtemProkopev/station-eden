@@ -19,6 +19,7 @@
 		"@nestjs/jwt": "^10.2.0",
 		"@nestjs/passport": "^10.0.2",
 		"@nestjs/platform-express": "^10.0.0",
+		"@nestjs/platform-socket.io": "^10.0.0",
 		"@nestjs/platform-ws": "^10.4.20",
 		"@nestjs/throttler": "^6.1.0",
 		"@nestjs/typeorm": "^11.0.0",
@@ -40,6 +41,7 @@
 		"resend": "^4.0.0",
 		"rimraf": "^3.0.2",
 		"rxjs": "^7.8.2",
+		"socket.io": "^4.8.1",
 		"typeorm": "^0.3.20",
 		"ws": "^8.18.3",
 		"zod": "^3.23.8"
@@ -55,6 +57,7 @@
 		"@types/express": "^5.0.3",
 		"@types/node": "^20.19.14",
 		"@types/passport-jwt": "^4.0.1",
+		"@types/socket.io": "^3.0.2",
 		"@types/ws": "^8.18.1",
 		"cross-env": "^10.0.0",
 		"ts-node": "^10.9.2",

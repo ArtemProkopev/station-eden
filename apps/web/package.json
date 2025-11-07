@@ -15,11 +15,13 @@
 		"next": "14.2.10",
 		"react": "18.3.1",
 		"react-dom": "18.3.1",
+		"socket.io-client": "^4.8.1",
 		"zod": "^3.23.8"
 	},
 	"devDependencies": {
 		"@types/node": "^20.14.9",
 		"@types/react": "^18.3.3",
+		"@types/socket.io-client": "^3.0.0",
 		"rimraf": "^3.0.2",
 		"typescript": "^5.5.4"
 	}

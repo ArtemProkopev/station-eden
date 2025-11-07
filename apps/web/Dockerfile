@@ -2,7 +2,7 @@
 FROM public.ecr.aws/docker/library/node:20-alpine AS build
 WORKDIR /app
 
-RUN apk add --no-cache ca-certificates curl && update-ca-certificates
+RUN apk add --no-cache ca-certificates curl wget && update-ca-certificates
 ENV PNPM_HOME=/root/.local/share/pnpm
 RUN corepack enable
 
@@ -58,6 +58,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+
+# Устанавливаем wget для healthcheck
+RUN apk add --no-cache wget
 
 # ЖЕСТКО ПРОПИСЫВАЕМ ПЕРЕМЕННЫЕ ДЛЯ RUNTIME
 ENV NEXT_PUBLIC_API_BASE=https://api.stationeden.ru
