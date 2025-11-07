@@ -134,9 +134,17 @@ export function useLobby(lobbyIdFromProps?: string) {
 		[profile?.userId, players, lobbySettings.maxPlayers]
 	)
 
+	// Используем переменную окружения для WebSocket base URL
 	const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'ws://localhost:4000'
 	const wsUrl = new URL('/lobby', wsBase).toString()
 	const wsParams = useMemo(() => ({ lobbyId }), [lobbyId])
+
+	console.log('WebSocket config:', {
+		wsBase,
+		wsUrl,
+		wsParams,
+		isProduction: process.env.NODE_ENV === 'production',
+	})
 
 	const { sendMessage: sendWS, isConnected } = useWebSocket(
 		wsUrl,

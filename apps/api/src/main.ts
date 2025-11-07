@@ -1,4 +1,3 @@
-// apps/api/src/main.ts
 import { ValidationPipe } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { WsAdapter } from '@nestjs/platform-ws'
@@ -17,8 +16,11 @@ async function bootstrap() {
 	app.use(helmet())
 	app.use(cookieParser())
 
+	// Обновляем CORS для WebSocket
+	const corsOrigins = process.env.API_CORS_ORIGIN?.split(',') || []
+
 	app.enableCors({
-		origin: process.env.API_CORS_ORIGIN?.split(',') ?? [],
+		origin: corsOrigins,
 		credentials: true,
 		allowedHeaders: [
 			'Content-Type',
@@ -46,6 +48,7 @@ async function bootstrap() {
 
 	const shownHost = host === '::' ? 'localhost' : host
 	console.log(`API listening on http://${shownHost}:${port}`)
+	console.log(`CORS origins: ${corsOrigins.join(', ')}`)
 }
 
 bootstrap()

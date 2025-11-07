@@ -13,6 +13,31 @@ stationeden.ru, www.stationeden.ru {
 
   encode zstd gzip
 
+  # WebSocket proxy - ТОЛЬКО для WebSocket соединений
+  handle /lobby {
+    # Проверяем, это WebSocket upgrade запрос
+    @websocket {
+      header Connection *Upgrade*
+      header Upgrade *websocket*
+    }
+    reverse_proxy @websocket api:4000 {
+      header_up Host {http.request.host}
+      header_up X-Real-IP {http.request.remote}
+      header_up X-Forwarded-For {http.request.remote}
+      header_up X-Forwarded-Proto {http.request.scheme}
+      header_up Connection {http.request.header.Connection}
+      header_up Upgrade {http.request.header.Upgrade}
+    }
+    
+    # Все остальные запросы к /lobby идут на фронтенд
+    reverse_proxy web:3000
+  }
+
+  # Динамические маршруты лобби идут на фронтенд
+  handle /lobby/* {
+    reverse_proxy web:3000
+  }
+
   handle /api* {
     uri strip_prefix /api
     reverse_proxy api:4000
@@ -48,7 +73,22 @@ api.stationeden.ru {
   }
 
   encode zstd gzip
-  reverse_proxy api:4000
+
+  # WebSocket proxy для API домена
+  handle /lobby* {
+    reverse_proxy api:4000 {
+      header_up Host {http.request.host}
+      header_up X-Real-IP {http.request.remote}
+      header_up X-Forwarded-For {http.request.remote}
+      header_up X-Forwarded-Proto {http.request.scheme}
+      header_up Connection {http.request.header.Connection}
+      header_up Upgrade {http.request.header.Upgrade}
+    }
+  }
+
+  handle {
+    reverse_proxy api:4000
+  }
 
   @csrf path /auth/csrf
   header @csrf Cache-Control "no-store, no-cache, must-revalidate"
@@ -63,8 +103,30 @@ api.stationeden.ru {
 }
 
 # ==================== LOCAL ====================
-http://localhost, https://localhost {
+localhost {
   encode zstd gzip
+
+  # WebSocket proxy для localhost
+  handle /lobby {
+    @websocket {
+      header Connection *Upgrade*
+      header Upgrade *websocket*
+    }
+    reverse_proxy @websocket api:4000 {
+      header_up Host {http.request.host}
+      header_up X-Real-IP {http.request.remote}
+      header_up X-Forwarded-For {http.request.remote}
+      header_up X-Forwarded-Proto {http.request.scheme}
+      header_up Connection {http.request.header.Connection}
+      header_up Upgrade {http.request.header.Upgrade}
+    }
+    
+    reverse_proxy web:3000
+  }
+
+  handle /lobby/* {
+    reverse_proxy web:3000
+  }
 
   handle /api* {
     uri strip_prefix /api

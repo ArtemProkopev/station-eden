@@ -1,4 +1,3 @@
-// apps/api/src/lobby/lobby.gateway.ts
 import { Logger } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import {
@@ -44,6 +43,11 @@ type LobbyState = {
 
 @WebSocketGateway({
 	path: '/lobby',
+	cors: {
+		origin: process.env.API_CORS_ORIGIN?.split(',') || [],
+		credentials: true,
+	},
+	transports: ['websocket'],
 })
 export class LobbyGateway
 	implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
@@ -65,43 +69,37 @@ export class LobbyGateway
 			const url = new URL(req.url || '', `http://${req.headers.host}`)
 			const lobbyId = url.searchParams.get('lobbyId') || 'default-lobby'
 
+			// В production требуем валидный JWT
+			const isProduction = process.env.NODE_ENV === 'production'
 			const rawCookie = req.headers.cookie || ''
-			const parsed = cookie.parse(rawCookie || '')
+			const parsed = cookie.parse(rawCookie)
 			const token = parsed['access_token']
 
-			// В DEV допускаем отсутствие/невалидность JWT (чтобы локально не ронять соединение)
-			const devMode = process.env.NODE_ENV !== 'production'
 			let userId: string | undefined
 
 			if (token) {
 				try {
-					const payload = await this.jwt.verifyAsync(token as string, {
+					const payload = await this.jwt.verifyAsync(token, {
 						algorithms: ['HS256'],
-						secret:
-							process.env.JWT_ACCESS_SECRET ||
-							process.env.JWT_SECRET ||
-							'UNSET_SECRET',
+						secret: process.env.JWT_ACCESS_SECRET || 'UNSET_SECRET',
 					})
 					userId = payload?.sub
 				} catch (e: any) {
-					this.log.warn(
-						`WS auth verify failed (lobbyId=${lobbyId}): ${e?.message || e}`
-					)
+					this.log.warn(`WS auth verify failed: ${e?.message || e}`)
 				}
 			}
 
+			// В production блокируем неавторизованные подключения
+			if (!userId && isProduction) {
+				this.log.warn(`Blocking unauthorized WS connection in production`)
+				client.close(4001, 'Unauthorized')
+				return
+			}
+
+			// В development разрешаем анонимные подключения
 			if (!userId) {
-				if (devMode) {
-					userId = `dev-${Math.random().toString(36).slice(2, 10)}`
-					this.log.warn(
-						`WS auth: DEV fallback userId=${userId} (no/invalid token)`
-					)
-				} else {
-					try {
-						client.close(4001, 'Unauthorized')
-					} catch {}
-					return
-				}
+				userId = `dev-${Math.random().toString(36).slice(2, 10)}`
+				this.log.debug(`DEV mode anonymous connection: ${userId}`)
 			}
 
 			client.on('error', (err: any) => {

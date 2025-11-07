@@ -31,19 +31,24 @@ COPY apps/web apps/web
 WORKDIR /app/apps/web
 
 # ---- build-time args / env ----
-ARG NEXT_PUBLIC_API_BASE=/api
+# ЖЕСТКО ПРОПИСЫВАЕМ ПЕРЕМЕННЫЕ ДЛЯ PRODUCTION
+ARG NEXT_PUBLIC_API_BASE=https://api.stationeden.ru
+ARG NEXT_PUBLIC_WS_BASE=wss://api.stationeden.ru
 ARG NEXT_PUBLIC_ENABLE_TELEGRAM=false
 ARG NEXT_PUBLIC_ENABLE_GOOGLE=true
-# Дефолт на CDN, если не передали build-arg
 ARG NEXT_PUBLIC_ASSETS_BASE=https://cdn.assets.stationeden.ru
 
 ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
+ENV NEXT_PUBLIC_WS_BASE=$NEXT_PUBLIC_WS_BASE
 ENV NEXT_PUBLIC_ENABLE_TELEGRAM=$NEXT_PUBLIC_ENABLE_TELEGRAM
 ENV NEXT_PUBLIC_ENABLE_GOOGLE=$NEXT_PUBLIC_ENABLE_GOOGLE
 ENV NEXT_PUBLIC_ASSETS_BASE=$NEXT_PUBLIC_ASSETS_BASE
 
-# (опционально) диагностика во время билда
-# RUN echo "BUILD NEXT_PUBLIC_ASSETS_BASE=$NEXT_PUBLIC_ASSETS_BASE"
+# диагностика
+RUN echo "BUILD ENV:"
+RUN echo "NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE"
+RUN echo "NEXT_PUBLIC_WS_BASE=$NEXT_PUBLIC_WS_BASE"
+RUN echo "NEXT_PUBLIC_ASSETS_BASE=$NEXT_PUBLIC_ASSETS_BASE"
 
 RUN pnpm build
 
@@ -54,9 +59,12 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-# продублировать env для SSR-процесса (с тем же дефолтом)
-ARG NEXT_PUBLIC_ASSETS_BASE=https://cdn.assets.stationeden.ru
-ENV NEXT_PUBLIC_ASSETS_BASE=$NEXT_PUBLIC_ASSETS_BASE
+# ЖЕСТКО ПРОПИСЫВАЕМ ПЕРЕМЕННЫЕ ДЛЯ RUNTIME
+ENV NEXT_PUBLIC_API_BASE=https://api.stationeden.ru
+ENV NEXT_PUBLIC_WS_BASE=wss://api.stationeden.ru
+ENV NEXT_PUBLIC_ENABLE_TELEGRAM=false
+ENV NEXT_PUBLIC_ENABLE_GOOGLE=true
+ENV NEXT_PUBLIC_ASSETS_BASE=https://cdn.assets.stationeden.ru
 
 COPY --from=build /app/apps/web/.next/standalone ./
 COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
