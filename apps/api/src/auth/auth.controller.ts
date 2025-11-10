@@ -35,6 +35,19 @@ interface AuthenticatedRequest extends Request {
 
 type GoogleMode = 'login' | 'register' | 'link'
 
+// утилита разбора "1d/2h/30m" в миллисекунды
+function parseDurationMs(raw: string | undefined, fallbackMs: number) {
+	const s = (raw || '').trim()
+	const m = s.match(/^(\d+)([mhd])$/i)
+	if (!m) return fallbackMs
+	const n = Number(m[1])
+	const u = m[2].toLowerCase()
+	if (u === 'm') return n * 60_000
+	if (u === 'h') return n * 3_600_000
+	if (u === 'd') return n * 86_400_000
+	return fallbackMs
+}
+
 @Controller('auth')
 export class AuthController {
 	constructor(
@@ -56,6 +69,10 @@ export class AuthController {
 	) {
 		const { maxAge, ...rest } = opts || {}
 		res.clearCookie(name, rest)
+	}
+
+	private accessMaxAgeMs() {
+		return parseDurationMs(process.env.JWT_ACCESS_EXPIRES, 15 * 60 * 1000)
 	}
 
 	private googleEnabled() {
@@ -203,7 +220,7 @@ export class AuthController {
 		)
 		res.cookie('access_token', access, {
 			...this.authCookieOpts(),
-			maxAge: 15 * 60 * 1000,
+			maxAge: this.accessMaxAgeMs(),
 		})
 		res.cookie('refresh_token', refreshToken, {
 			...this.authCookieOpts(),
@@ -226,24 +243,27 @@ export class AuthController {
 
 	// ДОБАВЛЕННЫЙ МЕТОД - GET logout для обхода CSRF
 	@Get('logout-get')
-	async logoutGet(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+	async logoutGet(
+		@Req() req: Request,
+		@Res({ passthrough: true }) res: Response
+	) {
 		console.log('=== GET LOGOUT CALLED ===')
-		
+
 		const payload = tryDecode(this.jwt, (req as any).cookies?.access_token)
 		const userId = (payload as any)?.sub
 		const rt = (req as any).cookies?.refresh_token
-		
+
 		console.log('User ID from token:', userId)
-		
+
 		if (userId) {
 			await this.auth.logout(userId, rt)
 		}
-		
+
 		// Очищаем куки
 		this.clearWithSameAttrs(res, 'access_token', this.authCookieOpts())
 		this.clearWithSameAttrs(res, 'refresh_token', this.authCookieOpts())
 		this.clearWithSameAttrs(res, 'preauth', this.preauthCookieOpts())
-		
+
 		return { ok: true }
 	}
 
@@ -288,7 +308,7 @@ export class AuthController {
 			)
 		res.cookie('access_token', access, {
 			...this.authCookieOpts(),
-			maxAge: 15 * 60 * 1000,
+			maxAge: this.accessMaxAgeMs(),
 		})
 		res.cookie('refresh_token', refreshToken, {
 			...this.authCookieOpts(),

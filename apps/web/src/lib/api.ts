@@ -43,7 +43,11 @@ async function ensureCsrfToken(): Promise<string> {
 	throw new Error('CSRF token not available')
 }
 
-async function throwHttpAsApiError(res: Response, context: ErrorContext) {
+// ВАЖНО: всегда бросает => Promise<never>
+async function throwHttpAsApiError(
+	res: Response,
+	context: ErrorContext
+): Promise<never> {
 	const contentType = res.headers.get('content-type') || ''
 	const raw = await res.text().catch(() => '')
 	const json =
@@ -75,6 +79,47 @@ async function throwHttpAsApiError(res: Response, context: ErrorContext) {
 	})
 }
 
+/* ======= авто-ретрай с попыткой refresh ======= */
+let _isRefreshing = false
+async function tryRefreshOnce(): Promise<boolean> {
+	if (_isRefreshing) return false
+	_isRefreshing = true
+	try {
+		await api.refresh()
+		return true
+	} catch {
+		return false
+	} finally {
+		_isRefreshing = false
+	}
+}
+
+// Явно возвращаем Promise<Response>, чтобы res никогда не был undefined
+async function fetchWithRetry(
+	input: RequestInfo | URL,
+	init: RequestInit,
+	context: ErrorContext,
+	isRefreshCall = false
+): Promise<Response> {
+	const res = await fetch(input, init)
+	if (res.ok) return res
+	if (res.status === 401 && !isRefreshCall) {
+		const ok = await tryRefreshOnce()
+		if (ok) {
+			const retried = await fetch(input, init)
+			if (retried.ok) return retried
+			if (retried.status !== 401) {
+				if (!retried.ok) await throwHttpAsApiError(retried, context)
+			}
+			return retried
+		}
+	}
+	await throwHttpAsApiError(res, context)
+	// недостижимо, но нужно для TS, потому что функция аннотирована как возвращающая Response
+	throw new Error('unreachable')
+}
+/* ============================================= */
+
 async function postJSON<T = any>(
 	path: string,
 	body?: unknown,
@@ -82,7 +127,7 @@ async function postJSON<T = any>(
 ): Promise<T> {
 	const token = await ensureCsrfToken()
 
-	const res = await fetch(`${API}${path}`, {
+	const req: RequestInit = {
 		method: 'POST',
 		credentials: 'include',
 		headers: {
@@ -90,7 +135,14 @@ async function postJSON<T = any>(
 			'X-CSRF-Token': token,
 		},
 		body: body ? JSON.stringify(body) : undefined,
-	})
+	}
+
+	const res = await fetchWithRetry(
+		`${API}${path}`,
+		req,
+		context,
+		path === '/auth/refresh'
+	)
 
 	if (!res.ok) {
 		await throwHttpAsApiError(res, context)
@@ -104,11 +156,13 @@ async function getJSON<T = any>(
 	path: string,
 	context: ErrorContext = 'default'
 ): Promise<T> {
-	const res = await fetch(`${API}${path}`, {
+	const req: RequestInit = {
 		method: 'GET',
 		credentials: 'include',
 		cache: 'no-store',
-	})
+	}
+
+	const res = await fetchWithRetry(`${API}${path}`, req, context)
 
 	if (!res.ok) {
 		await throwHttpAsApiError(res, context)
@@ -124,11 +178,13 @@ async function deleteJSON<T = any>(
 ): Promise<T> {
 	const token = await ensureCsrfToken()
 
-	const res = await fetch(`${API}${path}`, {
+	const req: RequestInit = {
 		method: 'DELETE',
 		credentials: 'include',
 		headers: { 'X-CSRF-Token': token },
-	})
+	}
+
+	const res = await fetchWithRetry(`${API}${path}`, req, context)
 
 	if (!res.ok) {
 		await throwHttpAsApiError(res, context)

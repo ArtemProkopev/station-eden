@@ -1,5 +1,6 @@
 // apps/web/src/app/layout.tsx
 import CdnWarning from '@/src/components/CdnWarning'
+import SessionKeepAliveClient from '@/src/components/SessionKeepAliveClient'
 import { cookies } from 'next/headers'
 import './globals.css'
 
@@ -17,6 +18,8 @@ export default function RootLayout({
 				<link rel='icon' href='/favicon.ico?v=2' type='image/x-icon' />
 			</head>
 			<body>
+				{/* keep-alive клиентский компонент работает всегда */}
+				<SessionKeepAliveClient />
 				{/* <Navbar /> */}
 				<main className='container'>{children}</main>
 				{/* <Footer /> */}
