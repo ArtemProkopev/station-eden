@@ -98,7 +98,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 				const id =
 					msg.id ||
 					`srv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-
 				if (seenMsgIdsRef.current.has(id)) break
 				seenMsgIdsRef.current.add(id)
 
@@ -118,8 +117,8 @@ export function useLobby(lobbyIdFromProps?: string) {
 			}
 
 			case 'LOBBY_STATE':
-				// Сервер является источником истины - полностью заменяем состояние
-				setPlayers(data.players || [])
+				// Источник истины — сервер/мок
+				setPlayers(Array.isArray(data.players) ? data.players : [])
 				if (data.settings) setLobbySettings(data.settings)
 				if (data.creatorId) setLobbyCreatorId(data.creatorId)
 				break
@@ -158,7 +157,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 		wsParams
 	)
 
-	// Автоматическое переподключение при разрыве соединения
 	useEffect(() => {
 		if (!isConnected && hasJoinedRef.current) {
 			reconnectTimeoutRef.current = setTimeout(() => {
@@ -175,14 +173,10 @@ export function useLobby(lobbyIdFromProps?: string) {
 		}
 	}, [isConnected, profile?.userId])
 
-	// Очистка ошибки при изменении состояния
 	useEffect(() => {
-		if (isConnected) {
-			setError('')
-		}
+		if (isConnected) setError('')
 	}, [isConnected])
 
-	// Основной эффект для присоединения к лобби
 	useEffect(() => {
 		if (!profile?.userId || isLoading || hasJoinedRef.current) return
 
@@ -191,7 +185,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 			name: profile.username || 'Игрок',
 			missions: (profile as any).missionsCompleted || 0,
 			hours: (profile as any).playTime || 0,
-			avatar: assets.avatar,
+			avatar: assets.avatar, // аватар берём из профиля/ассетов
 			isReady: false,
 		}
 
@@ -201,7 +195,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 		if (success) {
 			hasJoinedRef.current = true
 		} else {
-			// Если отправка не удалась, пробуем снова через 1 секунду
 			setTimeout(() => {
 				hasJoinedRef.current = false
 			}, 1000)
@@ -218,25 +211,39 @@ export function useLobby(lobbyIdFromProps?: string) {
 		setSelectedPlayer(null)
 	}, [])
 
+	const isLobbyCreator = useMemo(
+		() => lobbyCreatorId === profile?.userId,
+		[lobbyCreatorId, profile?.userId]
+	)
+
 	const handleOpenLobbySettings = useCallback(() => {
+		if (!isLobbyCreator) {
+			alert('Только создатель лобби может менять настройки')
+			return
+		}
 		setShowLobbySettingsModal(true)
-	}, [])
+	}, [isLobbyCreator])
 
 	const handleSaveLobbySettings = useCallback(
 		(settings: LobbySettings) => {
 			setLobbySettings(settings)
-			sendWS({ type: 'UPDATE_LOBBY_SETTINGS', settings })
+			// НОВОЕ: пробрасываем __userId для мока, прод игнорирует
+			sendWS({
+				type: 'UPDATE_LOBBY_SETTINGS',
+				settings,
+				__userId: profile?.userId,
+			})
 		},
-		[sendWS]
+		[sendWS, profile?.userId]
 	)
 
 	const handleMutePlayer = useCallback(
-		(playerId: string, muted: boolean) => {},
+		(_playerId: string, _muted: boolean) => {},
 		[]
 	)
 
 	const handleVolumeChange = useCallback(
-		(playerId: string, volume: number) => {},
+		(_playerId: string, _volume: number) => {},
 		[]
 	)
 
@@ -256,6 +263,22 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 	const addNewPlayer = useCallback(
 		(playerData?: { id?: string; name?: string; avatar?: string }) => {
+			// НОВОЕ: «добавление игрока» разрешаем ТОЛЬКО в мок-режиме.
+			const useMock =
+				process.env.NODE_ENV !== 'production' &&
+				typeof window !== 'undefined' &&
+				(new URLSearchParams(window.location.search).get('wsMock') === '1' ||
+					window.localStorage?.getItem('WS_MOCK') === '1' ||
+					process.env.NEXT_PUBLIC_WS_MOCK === 'true' ||
+					process.env.NEXT_PUBLIC_WS_USE_MOCK === 'true')
+
+			if (!useMock) {
+				alert(
+					'Добавление игроков вручную недоступно. Пригласите игрока по ссылке или включите мок-режим для теста.'
+				)
+				return
+			}
+
 			if (playersRef.current.length >= lobbySettingsRef.current.maxPlayers) {
 				alert(`Достигнут лимит игроков: ${lobbySettingsRef.current.maxPlayers}`)
 				return
@@ -272,7 +295,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 				isReady: false,
 			}
 
-			console.log('Adding new player:', newPlayer.name)
+			console.log('Adding new player (mock):', newPlayer.name)
 			sendWS({ type: 'JOIN_LOBBY', player: newPlayer })
 			setShowAddPlayerModal(false)
 		},
@@ -289,7 +312,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 		const isReady = !currentPlayer.isReady
 
-		// Мгновенное локальное обновление
 		setPlayers(prev =>
 			prev.map((p: Player) => (p.id === profile.userId ? { ...p, isReady } : p))
 		)
@@ -305,7 +327,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 	const handleSendMessage = useCallback(
 		(e: React.FormEvent) => {
 			e.preventDefault()
-
 			if (!newMessage.trim() || !profile?.userId) return
 
 			const id = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
@@ -377,7 +398,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 	)
 
 	const lobbyId = lobbyIdFromProps || 'default-lobby'
-	const isLobbyCreator = lobbyCreatorId === profile?.userId
 
 	return {
 		profile,

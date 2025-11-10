@@ -36,7 +36,7 @@ type LobbyState = {
 	settings: LobbySettings
 	players: Map<string, Player>
 	connections: Map<string, Socket>
-	creatorId: string // ID создателя лобби
+	creatorId: string
 }
 
 const DEFAULT_LOBBY_SETTINGS: LobbySettings = {
@@ -81,7 +81,6 @@ export class LobbyGateway
 			const cookies = cookie.parse(rawCookie)
 			const token = cookies['access_token']
 
-			// Проверка авторизации - обязательна для всех подключений
 			if (!token) {
 				this.logger.warn('Unauthorized connection attempt - no token')
 				socket.emit('ERROR', { message: 'Authentication required' })
@@ -103,7 +102,7 @@ export class LobbyGateway
 
 			const userId = payload.sub
 			const username = payload.username
-			let lobbyId = socket.handshake.query.lobbyId as string
+			const lobbyId = (socket.handshake.query.lobbyId as string) || ''
 
 			if (!lobbyId) {
 				this.logger.warn('No lobbyId provided')
@@ -116,55 +115,36 @@ export class LobbyGateway
 			socket.data.username = username
 			socket.data.lobbyId = lobbyId
 
-			// Присоединяем к комнате лобби
 			await socket.join(lobbyId)
 
-			// Инициализируем лобби если не существует
 			if (!this.lobbies.has(lobbyId)) {
 				this.lobbies.set(lobbyId, {
 					settings: { ...DEFAULT_LOBBY_SETTINGS },
 					players: new Map(),
 					connections: new Map(),
-					creatorId: userId, // Первый подключившийся становится создателем
+					creatorId: userId, // первый подключившийся — создатель
 				})
 				this.logger.log(`New lobby created: ${lobbyId} by ${username}`)
 			}
 
 			const lobby = this.lobbies.get(lobbyId)!
 
-			// Проверяем не переполнено ли лобби
 			if (lobby.players.size >= lobby.settings.maxPlayers) {
-				this.logger.warn(
-					`Lobby ${lobbyId} is full, rejecting connection from ${username}`
-				)
+				this.logger.warn(`Lobby ${lobbyId} is full, rejecting ${username}`)
 				socket.emit('ERROR', { message: 'Lobby is full' })
 				socket.disconnect()
 				return
 			}
 
-			// Сохраняем соединение
+			// сохраняем последнее соединение пользователя
 			lobby.connections.set(userId, socket)
 
-			// Если игрок уже есть в лобби, обновляем его соединение
-			const existingPlayer = lobby.players.get(userId)
-			if (existingPlayer) {
-				this.logger.log(
-					`Player reconnected: ${existingPlayer.name} to lobby ${lobbyId}`
-				)
-				// Рассылаем обновленное состояние всем
-				this.server.to(lobbyId).emit('LOBBY_STATE', {
-					players: Array.from(lobby.players.values()),
-					settings: lobby.settings,
-					creatorId: lobby.creatorId,
-				})
-			} else {
-				// Отправляем текущее состояние лобби новому подключению
-				socket.emit('LOBBY_STATE', {
-					players: Array.from(lobby.players.values()),
-					settings: lobby.settings,
-					creatorId: lobby.creatorId,
-				})
-			}
+			// Отдаём состояние лобби
+			socket.emit('LOBBY_STATE', {
+				players: Array.from(lobby.players.values()),
+				settings: lobby.settings,
+				creatorId: lobby.creatorId,
+			})
 
 			this.logger.log(
 				`Player connected: ${username} (${userId}) to lobby ${lobbyId}, players: ${lobby.players.size}`
@@ -178,36 +158,27 @@ export class LobbyGateway
 
 	handleDisconnect(socket: Socket) {
 		const { userId, username, lobbyId } = socket.data
-
 		if (!userId || !lobbyId) return
 
 		const lobby = this.lobbies.get(lobbyId)
 		if (!lobby) return
 
-		// Удаляем соединение
+		// удаляем привязку соединения
 		lobby.connections.delete(userId)
 
-		// Если у игрока больше нет активных соединений, удаляем его из лобби
-		const hasOtherConnections = Array.from(lobby.connections.keys()).some(
-			connUserId => connUserId === userId
-		)
-
-		if (!hasOtherConnections && lobby.players.has(userId)) {
+		if (lobby.players.has(userId)) {
 			const player = lobby.players.get(userId)!
 			lobby.players.delete(userId)
 
-			// Уведомляем всех о выходе игрока
 			this.server.to(lobbyId).emit('PLAYER_LEFT', { playerId: userId })
 			this.logger.log(
 				`Player disconnected: ${player.name} from lobby ${lobbyId}`
 			)
 
-			// Если лобби пустое, удаляем его
 			if (lobby.players.size === 0 && lobby.connections.size === 0) {
 				this.lobbies.delete(lobbyId)
 				this.logger.log(`Lobby ${lobbyId} deleted (empty)`)
 			} else if (lobby.creatorId === userId) {
-				// Если создатель вышел, назначаем нового создателя
 				const remainingPlayers = Array.from(lobby.players.keys())
 				if (remainingPlayers.length > 0) {
 					lobby.creatorId = remainingPlayers[0]
@@ -229,7 +200,6 @@ export class LobbyGateway
 			return
 		}
 
-		// Проверяем не переполнено ли лобби
 		if (lobby.players.size >= lobby.settings.maxPlayers) {
 			socket.emit('ERROR', { message: 'Lobby is full' })
 			return
@@ -237,7 +207,7 @@ export class LobbyGateway
 
 		const player = data.player
 
-		// Используем аутентифицированные данные вместо переданных клиентом
+		// Используем аутентифицированные id/name, остальное — с клиента
 		const authenticatedPlayer: Player = {
 			id: userId,
 			name: username || 'Игрок',
@@ -247,7 +217,6 @@ export class LobbyGateway
 			isReady: player.isReady || false,
 		}
 
-		// Добавляем/обновляем игрока
 		const isNewPlayer = !lobby.players.has(userId)
 		lobby.players.set(userId, authenticatedPlayer)
 
@@ -255,7 +224,6 @@ export class LobbyGateway
 			`Player ${authenticatedPlayer.name} ${isNewPlayer ? 'joined' : 'updated in'} lobby ${lobbyId}`
 		)
 
-		// Рассылаем обновленное состояние всем в лобби
 		this.server.to(lobbyId).emit('LOBBY_STATE', {
 			players: Array.from(lobby.players.values()),
 			settings: lobby.settings,
@@ -265,15 +233,22 @@ export class LobbyGateway
 
 	@SubscribeMessage('SEND_MESSAGE')
 	handleSendMessage(socket: Socket, data: { message: any }) {
-		const { lobbyId, username } = socket.data
+		const { lobbyId, username, userId } = socket.data
+		const lobby = this.lobbies.get(lobbyId)
+		if (!lobby) return
 
-		// Добавляем имя пользователя из аутентификации
+		// НОВОЕ: не-участникам лобби — запрет писать и выход из комнаты
+		if (!lobby.players.has(userId)) {
+			socket.emit('ERROR', { message: 'You are not in this lobby' })
+			socket.leave(lobbyId)
+			return
+		}
+
 		const messageWithAuth = {
 			...data.message,
 			playerName: username || 'Игрок',
 		}
 
-		// Рассылаем сообщение всем в лобби, включая отправителя
 		this.server.to(lobbyId).emit('CHAT_MESSAGE', { message: messageWithAuth })
 	}
 
@@ -284,13 +259,11 @@ export class LobbyGateway
 	) {
 		const { userId, lobbyId } = socket.data
 		const lobby = this.lobbies.get(lobbyId)
-
 		if (!lobby) return
 
 		const playerId = data.playerId || userId
 		const player = lobby.players.get(playerId)
 
-		// Проверяем, что пользователь может изменять только свой статус готовности
 		if (playerId !== userId) {
 			socket.emit('ERROR', {
 				message: 'Cannot change other player ready status',
@@ -300,10 +273,8 @@ export class LobbyGateway
 
 		if (player) {
 			player.isReady = data.isReady
-
 			this.logger.log(`Player ${player.name} ready: ${data.isReady}`)
 
-			// Рассылаем обновленное состояние всем в лобби
 			this.server.to(lobbyId).emit('LOBBY_STATE', {
 				players: Array.from(lobby.players.values()),
 				settings: lobby.settings,
@@ -319,10 +290,8 @@ export class LobbyGateway
 	) {
 		const { userId, lobbyId } = socket.data
 		const lobby = this.lobbies.get(lobbyId)
-
 		if (!lobby) return
 
-		// Проверяем, что только создатель лобби может менять настройки
 		if (lobby.creatorId !== userId) {
 			socket.emit('ERROR', {
 				message: 'Only lobby creator can change settings',
@@ -332,7 +301,6 @@ export class LobbyGateway
 
 		Object.assign(lobby.settings, data.settings)
 
-		// Рассылаем обновленные настройки всем в лобби
 		this.server
 			.to(lobbyId)
 			.emit('LOBBY_SETTINGS_UPDATED', { settings: lobby.settings })
@@ -342,26 +310,34 @@ export class LobbyGateway
 	handlePlayerLeft(socket: Socket, data: { playerId?: string }) {
 		const { userId, lobbyId } = socket.data
 		const lobby = this.lobbies.get(lobbyId)
-
 		if (!lobby) return
 
 		const playerId = data.playerId || userId
 
-		// Проверяем, что пользователь может удалять только себя (если не создатель)
 		if (playerId !== userId && lobby.creatorId !== userId) {
 			socket.emit('ERROR', { message: 'Cannot remove other players' })
 			return
 		}
 
 		const player = lobby.players.get(playerId)
-
 		if (player) {
+			const targetSocket = lobby.connections.get(playerId)
+
 			lobby.players.delete(playerId)
 			lobby.connections.delete(playerId)
 
+			// НОВОЕ: реально выводим игрока из комнаты и перекрываем доступ
+			if (targetSocket) {
+				targetSocket.leave(lobbyId)
+				targetSocket.emit('ERROR', {
+					message: 'You were removed from the lobby',
+				})
+				// При желании можно разорвать соединение полностью:
+				// targetSocket.disconnect(true)
+			}
+
 			this.logger.log(`Player ${player.name} left lobby ${lobbyId}`)
 
-			// Если это создатель, назначаем нового
 			if (lobby.creatorId === playerId && lobby.players.size > 0) {
 				const remainingPlayers = Array.from(lobby.players.keys())
 				lobby.creatorId = remainingPlayers[0]
@@ -370,26 +346,22 @@ export class LobbyGateway
 				)
 			}
 
-			// Рассылаем обновленное состояние всем в лобби
 			this.server.to(lobbyId).emit('LOBBY_STATE', {
 				players: Array.from(lobby.players.values()),
 				settings: lobby.settings,
 				creatorId: lobby.creatorId,
 			})
 
-			// Если лобби пустое, удаляем его
-			if (lobby.players.size === 0) {
+			if (lobby.players.size === 0 && lobby.connections.size === 0) {
 				this.lobbies.delete(lobbyId)
 				this.logger.log(`Lobby ${lobbyId} deleted (empty)`)
 			}
 		}
 	}
 
-	// Вспомогательный метод для получения состояния лобби (для отладки)
 	getLobbyState(lobbyId: string) {
 		const lobby = this.lobbies.get(lobbyId)
 		if (!lobby) return null
-
 		return {
 			players: Array.from(lobby.players.values()),
 			settings: lobby.settings,
@@ -398,7 +370,6 @@ export class LobbyGateway
 		}
 	}
 
-	// Вспомогательный метод для получения всех лобби (для отладки)
 	getAllLobbies() {
 		return Array.from(this.lobbies.entries()).map(([lobbyId, lobby]) => ({
 			lobbyId,

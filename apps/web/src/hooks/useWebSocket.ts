@@ -12,36 +12,30 @@ class MockSocketIO {
 	private lobbyId: string
 	public connected = false
 	public id = `mock-${Math.random().toString(36).slice(2, 9)}`
+	// НОВОЕ: локальное состояние лобби
+	private players = new Map<string, any>()
+	private settings = {
+		maxPlayers: 4,
+		gameMode: 'standard',
+		isPrivate: false,
+		password: '',
+	}
+	private creatorId: string | undefined
 
-	constructor(url: string, options: any) {
-		const u = new URL(url)
-		this.lobbyId = u.searchParams.get('lobbyId') || 'default-lobby'
+	constructor(url: string, _options: any) {
+		// buildUrl() передаёт origin без query — используем дефолтный lobbyId
+		this.lobbyId = 'default-lobby'
 		this.bc = new BroadcastChannel(`mock-socketio:${this.lobbyId}`)
 
 		setTimeout(() => {
 			this.connected = true
 			this.emitEvent('connect')
-
-			// Эмулируем начальное состояние лобби с создателем
-			setTimeout(() => {
-				const creatorPlayer = {
-					id: 'creator-123',
-					name: 'Создатель',
-					missions: 10,
-					hours: 50,
-					isReady: false,
-				}
-
-				this.emitEvent('LOBBY_STATE', {
-					players: [creatorPlayer],
-					settings: {
-						maxPlayers: 4,
-						gameMode: 'standard',
-						isPrivate: false,
-						password: '',
-					},
-				})
-			}, 100)
+			// НОВОЕ: начнём с пустого состояния, ничего не «придумываем»
+			this.emitEvent('LOBBY_STATE', {
+				players: [],
+				settings: this.settings,
+				creatorId: this.creatorId,
+			})
 		}, 200)
 
 		this.bc.onmessage = (event: MessageEvent) => {
@@ -65,32 +59,30 @@ class MockSocketIO {
 
 	emit(event: string, data?: any) {
 		if (event === 'JOIN_LOBBY') {
-			this.bc.postMessage({
-				type: 'PLAYER_JOINED',
-				data: { player: data.player },
+			const p = data.player
+			if (!this.creatorId) this.creatorId = p.id
+			// Мерджим игрока (не затираем аватар/имя)
+			const prev = this.players.get(p.id) || {}
+			this.players.set(p.id, { ...prev, ...p })
+
+			this.bc.postMessage({ type: 'PLAYER_JOINED', data: { player: p } })
+			this.emitEvent('LOBBY_STATE', {
+				players: Array.from(this.players.values()),
+				settings: this.settings,
+				creatorId: this.creatorId,
 			})
-			setTimeout(() => {
-				this.emitEvent('LOBBY_STATE', {
-					players: [data.player],
-					settings: {
-						maxPlayers: 4,
-						gameMode: 'standard',
-						isPrivate: false,
-						password: '',
-					},
-				})
-			}, 50)
 		} else if (event === 'UPDATE_PLAYER_PROFILE') {
+			const p = data.player
+			if (p?.id) {
+				const prev = this.players.get(p.id) || {}
+				this.players.set(p.id, { ...prev, ...p })
+			}
 			this.bc.postMessage({
 				type: 'LOBBY_STATE',
 				data: {
-					players: [data.player],
-					settings: {
-						maxPlayers: 4,
-						gameMode: 'standard',
-						isPrivate: false,
-						password: '',
-					},
+					players: Array.from(this.players.values()),
+					settings: this.settings,
+					creatorId: this.creatorId,
 				},
 			})
 		} else if (event === 'SEND_MESSAGE') {
@@ -99,9 +91,12 @@ class MockSocketIO {
 				data: { message: data.message },
 			})
 			setTimeout(() => {
-				this.emitEvent('MESSAGE_SENT', { messageId: data.message.id })
+				this.emitEvent('MESSAGE_SENT', { messageId: data.message?.id })
 			}, 50)
 		} else if (event === 'TOGGLE_READY') {
+			const ex = this.players.get(data.playerId)
+			if (ex) this.players.set(data.playerId, { ...ex, isReady: data.isReady })
+
 			this.bc.postMessage({
 				type: 'PLAYER_READY',
 				data: {
@@ -109,55 +104,49 @@ class MockSocketIO {
 					isReady: data.isReady,
 				},
 			})
-			setTimeout(() => {
-				this.emitEvent('LOBBY_STATE', {
-					players: [
-						{
-							id: data.playerId,
-							name: 'Игрок',
-							missions: 0,
-							hours: 0,
-							isReady: data.isReady,
-						},
-					],
-					settings: {
-						maxPlayers: 4,
-						gameMode: 'standard',
-						isPrivate: false,
-						password: '',
-					},
-				})
-			}, 50)
+
+			this.emitEvent('LOBBY_STATE', {
+				players: Array.from(this.players.values()),
+				settings: this.settings,
+				creatorId: this.creatorId,
+			})
 		} else if (event === 'UPDATE_LOBBY_SETTINGS') {
+			// Опциональная симуляция прав: если прилетел __userId и он не создатель — ошибка
+			if (
+				this.creatorId &&
+				data?.__userId &&
+				data.__userId !== this.creatorId
+			) {
+				const err = { message: 'Only lobby creator can change settings' }
+				this.bc.postMessage({ type: 'ERROR', data: err })
+				this.emitEvent('ERROR', err)
+				return this
+			}
+			this.settings = { ...this.settings, ...data.settings }
 			this.bc.postMessage({
 				type: 'LOBBY_SETTINGS_UPDATED',
-				data: { settings: data.settings },
+				data: { settings: this.settings },
 			})
-			setTimeout(() => {
-				this.emitEvent('LOBBY_SETTINGS_UPDATE_SUCCESS', {
-					settings: data.settings,
-				})
-				this.emitEvent('LOBBY_STATE', {
-					players: [],
-					settings: data.settings,
-				})
-			}, 50)
+			this.emitEvent('LOBBY_SETTINGS_UPDATE_SUCCESS', {
+				settings: this.settings,
+			})
+			// ВАЖНО: не трогаем players
+			this.emitEvent('LOBBY_STATE', {
+				players: Array.from(this.players.values()),
+				settings: this.settings,
+				creatorId: this.creatorId,
+			})
 		} else if (event === 'PLAYER_LEFT') {
+			if (data?.playerId) this.players.delete(data.playerId)
 			this.bc.postMessage({
 				type: 'PLAYER_LEFT',
 				data: { playerId: data.playerId },
 			})
-			setTimeout(() => {
-				this.emitEvent('LOBBY_STATE', {
-					players: [],
-					settings: {
-						maxPlayers: 4,
-						gameMode: 'standard',
-						isPrivate: false,
-						password: '',
-					},
-				})
-			}, 50)
+			this.emitEvent('LOBBY_STATE', {
+				players: Array.from(this.players.values()),
+				settings: this.settings,
+				creatorId: this.creatorId,
+			})
 		}
 
 		return this
@@ -249,48 +238,30 @@ export const useWebSocket = (
 			setIsConnected(false)
 		}
 
-		// ИЗМЕНЕНИЕ: Правильно формируем сообщение с типом
-		const handleEvent = (data: any) => {
-			console.log('WebSocket event received:', data)
-			// Для событий, которые приходят как объект, добавляем тип
-			if (data && typeof data === 'object') {
-				onMessageRef.current?.(data)
-			}
-		}
-
-		// ИЗМЕНЕНИЕ: Обрабатываем каждое событие отдельно с правильным типом
 		const handleLobbyState = (data: any) => {
 			onMessageRef.current?.({ type: 'LOBBY_STATE', ...data })
 		}
-
 		const handlePlayerJoined = (data: any) => {
 			onMessageRef.current?.({ type: 'PLAYER_JOINED', ...data })
 		}
-
 		const handlePlayerLeft = (data: any) => {
 			onMessageRef.current?.({ type: 'PLAYER_LEFT', ...data })
 		}
-
 		const handleChatMessage = (data: any) => {
 			onMessageRef.current?.({ type: 'CHAT_MESSAGE', ...data })
 		}
-
 		const handlePlayerReady = (data: any) => {
 			onMessageRef.current?.({ type: 'PLAYER_READY', ...data })
 		}
-
 		const handleLobbySettingsUpdated = (data: any) => {
 			onMessageRef.current?.({ type: 'LOBBY_SETTINGS_UPDATED', ...data })
 		}
-
 		const handleMessageSent = (data: any) => {
 			onMessageRef.current?.({ type: 'MESSAGE_SENT', ...data })
 		}
-
 		const handleLobbySettingsUpdateSuccess = (data: any) => {
 			onMessageRef.current?.({ type: 'LOBBY_SETTINGS_UPDATE_SUCCESS', ...data })
 		}
-
 		const handleError = (data: any) => {
 			onMessageRef.current?.({ type: 'ERROR', ...data })
 		}
@@ -299,7 +270,6 @@ export const useWebSocket = (
 		currentSocket.on('disconnect', handleDisconnect)
 		currentSocket.on('connect_error', handleConnectError)
 
-		// Подписываемся на конкретные события с правильными обработчиками
 		currentSocket.on('LOBBY_STATE', handleLobbyState)
 		currentSocket.on('PLAYER_JOINED', handlePlayerJoined)
 		currentSocket.on('PLAYER_LEFT', handlePlayerLeft)
