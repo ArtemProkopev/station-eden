@@ -1,15 +1,16 @@
+// apps/web/src/app/register/page.tsx
 'use client'
 
+import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
+import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
 import GoogleAuthButton from '@/src/components/auth/GoogleAuthButton'
+import { useUsernameGenerator } from '@/src/hooks/useUsernameGenerator'
 import { api, getUserMessage } from '@/src/lib/api'
 import { GOOGLE_ENABLED } from '@/src/lib/flags'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState, memo } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import styles from './page.module.css'
-import { useUsernameGenerator } from '@/src/hooks/useUsernameGenerator'
-import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
-import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
 
 const MemoizedFireflies = memo(FirefliesProfile)
 const MemoizedStars = memo(TwinklingStars)
@@ -105,12 +106,18 @@ export default function RegisterPage() {
 	const [mounted, setMounted] = useState(false)
 	const [shake, setShake] = useState(false)
 
+	// Анти-даблклик: краткий локальный троттлинг.
+	const [genCooldown, setGenCooldown] = useState(false)
+
 	const sp = useSearchParams()
 	const reason = sp.get('reason')
 	const router = useRouter()
 
-	// WebAssembly генератор ников
-	const { generateUsername, loading: generating, isWasmSupported } = useUsernameGenerator()
+	const {
+		generateUsername,
+		loading: generating,
+		isWasmSupported,
+	} = useUsernameGenerator()
 
 	useEffect(() => setMounted(true), [])
 
@@ -133,9 +140,12 @@ export default function RegisterPage() {
 	}
 
 	const handleGenerateUsername = () => {
+		if (genCooldown) return
+		setGenCooldown(true)
 		const newUsername = generateUsername()
 		setUsername(newUsername)
 		if (!userTouched) setUserTouched(true)
+		setTimeout(() => setGenCooldown(false), 120)
 	}
 
 	async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -172,7 +182,7 @@ export default function RegisterPage() {
 			<main className={styles.page}>
 				<MemoizedFireflies />
 				<MemoizedStars />
-				
+
 				<div className={styles.container}>
 					<section className={styles.card} aria-labelledby='reg-title'>
 						<header className={styles.header}>
@@ -196,7 +206,6 @@ export default function RegisterPage() {
 							autoComplete='on'
 							aria-describedby={error ? 'form-error' : undefined}
 						>
-							{/* Email */}
 							<div className={styles.inputGroup}>
 								<label htmlFor='email' className={styles.label}>
 									Email
@@ -217,34 +226,37 @@ export default function RegisterPage() {
 										if (!emailTouched) setEmailTouched(true)
 										setEmail(e.target.value.trimStart())
 									}}
-									className={`${styles.input} ${emailTouched ? (isEmailValid ? styles.valid : styles.invalid) : ''}`}
+									className={`${styles.input} ${
+										emailTouched
+											? isEmailValid
+												? styles.valid
+												: styles.invalid
+											: ''
+									}`}
 									aria-invalid={emailTouched ? !isEmailValid : undefined}
 								/>
 							</div>
 
-							{/* Username с генерацией */}
 							<div className={styles.inputGroup}>
 								<div className={styles.usernameHeader}>
 									<label htmlFor='username' className={styles.label}>
 										Username
 									</label>
 									<button
-										type="button"
+										type='button'
 										onClick={handleGenerateUsername}
-										disabled={generating}
+										disabled={generating || genCooldown}
 										className={styles.generateBtn}
-										title={isWasmSupported ? "Сгенерировать ник с помощью WebAssembly" : "Сгенерировать случайный ник"}
+										title={
+											isWasmSupported
+												? 'Сгенерировать ник с помощью WebAssembly'
+												: 'Сгенерировать случайный ник'
+										}
 									>
-										{generating ? (
-											<>
-												<span style={{ opacity: 0 }}>Генерируем</span>
-											</>
-										) : (
-											'Сгенерировать'
-										)}
+										{generating ? 'Генерируем…' : 'Сгенерировать'}
 									</button>
 								</div>
-								
+
 								<input
 									id='username'
 									name='username'
@@ -261,17 +273,23 @@ export default function RegisterPage() {
 										if (!userTouched) setUserTouched(true)
 										setUsername(e.target.value.trim())
 									}}
-									className={`${styles.input} ${userTouched ? (isUserValid ? styles.valid : styles.invalid) : ''}`}
+									className={`${styles.input} ${
+										userTouched
+											? isUserValid
+												? styles.valid
+												: styles.invalid
+											: ''
+									}`}
 									aria-invalid={userTouched ? !isUserValid : undefined}
 									aria-describedby='user-hint'
 								/>
 
 								<p id='user-hint' className={styles.pwHint}>
-									Доступны латиница, цифры и подчёркивание. Длина — 3–20 символов.
+									Доступны латиница, цифры и подчёркивание. Длина — 3–20
+									символов.
 								</p>
 							</div>
 
-							{/* Пароль */}
 							<div className={styles.inputGroup}>
 								<label htmlFor='password' className={styles.label}>
 									Пароль
@@ -292,7 +310,13 @@ export default function RegisterPage() {
 										}}
 										onKeyDown={handleCapsLock}
 										onKeyUp={handleCapsLock}
-										className={`${styles.input} ${pwTouched ? (isPwValid ? styles.valid : styles.invalid) : ''}`}
+										className={`${styles.input} ${
+											pwTouched
+												? isPwValid
+													? styles.valid
+													: styles.invalid
+												: ''
+										}`}
 										aria-invalid={pwTouched ? !isPwValid : undefined}
 										aria-describedby='pw-hint'
 									/>
@@ -308,7 +332,6 @@ export default function RegisterPage() {
 									</button>
 								</div>
 
-								{/* Индикатор силы */}
 								{pwTouched && password.length > 0 && (
 									<>
 										<div
@@ -328,8 +351,8 @@ export default function RegisterPage() {
 								)}
 
 								<p id='pw-hint' className={styles.pwHint}>
-									Рекомендуем 8+ символов и комбинацию букв разного регистра, цифр
-									и спецсимволов.
+									Рекомендуем 8+ символов и комбинацию букв разного регистра,
+									цифр и спецсимволов.
 								</p>
 
 								{capsOn && (
@@ -337,7 +360,6 @@ export default function RegisterPage() {
 								)}
 							</div>
 
-							{/* Повтор пароля */}
 							<div className={styles.inputGroup}>
 								<label htmlFor='confirm' className={styles.label}>
 									Подтвердите пароль
@@ -358,7 +380,13 @@ export default function RegisterPage() {
 										}}
 										onKeyDown={handleCapsLock}
 										onKeyUp={handleCapsLock}
-										className={`${styles.input} ${confirmTouched ? (confirm.length > 0 && confirm === password ? styles.valid : styles.invalid) : ''}`}
+										className={`${styles.input} ${
+											confirmTouched
+												? confirm.length > 0 && confirm === password
+													? styles.valid
+													: styles.invalid
+												: ''
+										}`}
 										aria-invalid={
 											confirmTouched
 												? !(confirm.length > 0 && confirm === password)
@@ -368,7 +396,9 @@ export default function RegisterPage() {
 									<button
 										type='button'
 										className={styles.toggleBtn}
-										aria-label={showConfirm ? 'Скрыть пароль' : 'Показать пароль'}
+										aria-label={
+											showConfirm ? 'Скрыть пароль' : 'Показать пароль'
+										}
 										aria-pressed={showConfirm}
 										onClick={() => setShowConfirm(s => !s)}
 										title={showConfirm ? 'Скрыть пароль' : 'Показать пароль'}
@@ -423,7 +453,10 @@ export default function RegisterPage() {
 									<span>Или через Google</span>
 								</div>
 								<div className={styles.oauthBlock}>
-									<GoogleAuthButton mode='register' label='Продолжить с Google' />
+									<GoogleAuthButton
+										mode='register'
+										label='Продолжить с Google'
+									/>
 								</div>
 							</>
 						)}

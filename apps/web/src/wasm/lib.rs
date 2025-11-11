@@ -1,5 +1,4 @@
 use wasm_bindgen::prelude::*;
-use core::num::Wrapping;
 
 // ---- быстрый PRNG xoshiro128++ без зависимостей ----
 #[derive(Clone)]
@@ -75,7 +74,6 @@ fn pick_weighted<'a>(rng: &mut Xoshiro128, items: &'a [(&'a str, u16)]) -> &'a s
 #[wasm_bindgen]
 pub struct UsernameGenerator {
     rng: Xoshiro128,
-    counter: Wrapping<u32>,
 }
 
 #[wasm_bindgen]
@@ -96,7 +94,7 @@ impl UsernameGenerator {
             (s0 << 32) | s1
         };
 
-        Self { rng: Xoshiro128::from_seed(seed), counter: Wrapping(0) }
+        Self { rng: Xoshiro128::from_seed(seed) }
     }
 
     #[wasm_bindgen]
