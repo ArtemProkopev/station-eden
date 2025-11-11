@@ -76,3 +76,21 @@ docker-compose.override.yml
 caddy_data/
 caddy_config/
 .vercel/
+
+# ===== Rust/WASM build artifacts (apps/web/src/wasm) =====
+apps/web/src/wasm/target/
+apps/web/src/wasm/**/target/
+apps/web/src/wasm/**/.fingerprint/
+apps/web/src/wasm/**/incremental/
+apps/web/src/wasm/**/build/
+apps/web/src/wasm/**/*.d
+apps/web/src/wasm/**/*.rlib
+apps/web/src/wasm/**/*.rmeta
+
+# Cargo.lock внутри локального wasm-крейта не обязателен — игнорим
+apps/web/src/wasm/Cargo.lock
+
+# ===== Папка public/wasm: игнорим всё, кроме рантайм-артефактов =====
+apps/web/public/wasm/*
+!apps/web/public/wasm/username_generator.js
+!apps/web/public/wasm/username_generator_bg.wasm

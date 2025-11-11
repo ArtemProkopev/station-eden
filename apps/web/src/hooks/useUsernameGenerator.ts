@@ -1,146 +1,94 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+// apps/web/src/hooks/useUsernameGenerator.ts
+import { useCallback, useEffect, useRef, useState } from 'react'
 
-interface UsernameGeneratorInstance {
-    generate_username(): string
-    generate_multiple(count: number): string[]
-    free?(): void
-}
-
-interface WasmModule {
-    UsernameGenerator: new () => UsernameGeneratorInstance
-    generate_username(): string
-}
+type WasmLike = any
 
 export function useUsernameGenerator() {
-    const [wasm, setWasm] = useState<WasmModule | null>(null)
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
-    const [wasmAvailable, setWasmAvailable] = useState(false)
-    const generatorRef = useRef<UsernameGeneratorInstance | null>(null)
+	const [ready, setReady] = useState(false)
+	const genRef = useRef<WasmLike | null>(null)
 
-    useEffect(() => {
-        const loadWasm = async () => {
-            try {
-                setLoading(true)
-                
-                if (typeof WebAssembly === 'undefined') {
-                    throw new Error('WebAssembly не поддерживается в этом браузере')
-                }
+	useEffect(() => {
+		let cancelled = false
+		;(async () => {
+			try {
+				// Не выполнять на сервере/в RSC
+				if (typeof window === 'undefined') return
 
-                const wasmModule = await import(/* @vite-ignore */ 'public/wasm/username_generator.js') as any
-                
-                console.log('WASM module loaded:', wasmModule);
+				// Формируем URL динамически, чтобы Next не резолвил модуль на билде
+				const wasmJsUrl = new URL(
+					'/wasm/username_generator.js',
+					window.location.origin
+				).toString()
 
-                // Пробуем инициализировать через init()
-                if (wasmModule.init && typeof wasmModule.init === 'function') {
-                    const instance = await wasmModule.init()
-                    setWasm(instance)
-                    setWasmAvailable(true)
-                    generatorRef.current = new instance.UsernameGenerator()
-                } 
-                // Или используем напрямую
-                else if (wasmModule.UsernameGenerator) {
-                    setWasm(wasmModule)
-                    setWasmAvailable(true)
-                    generatorRef.current = new wasmModule.UsernameGenerator()
-                } 
-                // Или используем default export
-                else if (wasmModule.default) {
-                    const instance = await wasmModule.default()
-                    setWasm(instance)
-                    setWasmAvailable(true)
-                    generatorRef.current = new instance.UsernameGenerator()
-                }
-                else {
-                    throw new Error('Invalid WASM module format')
-                }
-                
-                setError(null)
-                console.log('WASM initialized successfully');
-                
-            } catch (err) {
-                console.warn('WASM load failed, using fallback:', err)
-                setWasmAvailable(false)
-                setError('WASM недоступен, используется резервный генератор')
-                generatorRef.current = createFallbackGenerator()
-            } finally {
-                setLoading(false)
-            }
-        }
+				const mod: any = await import(/* webpackIgnore: true */ wasmJsUrl)
 
-        loadWasm()
+				const instance =
+					(typeof mod.default === 'function' && (await mod.default())) ||
+					(typeof mod.init === 'function' && (await mod.init())) ||
+					mod
 
-        return () => {
-            if (generatorRef.current?.free) {
-                generatorRef.current.free()
-            }
-        }
-    }, [])
+				const Gen = instance.UsernameGenerator || mod.UsernameGenerator
+				genRef.current = new Gen()
+			} catch (e) {
+				console.warn('WASM load failed, use fallback:', e)
+				genRef.current = {
+					generate_username: () => fallback(),
+					generate_multiple: (n: number) =>
+						Array.from({ length: Math.min(n, 50) }, fallback),
+					free: () => {},
+				}
+			} finally {
+				if (!cancelled) setReady(true)
+			}
+		})()
+		return () => {
+			cancelled = true
+			genRef.current?.free?.()
+		}
+	}, [])
 
-    const generateUsername = useCallback((): string => {
-        if (generatorRef.current) {
-            try {
-                return generatorRef.current.generate_username()
-            } catch (err) {
-                console.error('Error generating username:', err)
-            }
-        }
-        return generateFallbackUsername()
-    }, [])
+	const generateUsername = useCallback((): string => {
+		return genRef.current?.generate_username() ?? fallback()
+	}, [])
 
-    const generateMultiple = useCallback((count: number): string[] => {
-        if (generatorRef.current && count <= 10) {
-            try {
-                return generatorRef.current.generate_multiple(count)
-            } catch (err) {
-                console.error('Error generating multiple usernames:', err)
-            }
-        }
-        return Array.from({ length: Math.min(count, 10) }, () => generateFallbackUsername())
-    }, [])
+	const generateMultiple = useCallback((count: number): string[] => {
+		return (
+			genRef.current?.generate_multiple?.(count) ??
+			Array.from({ length: Math.min(count, 50) }, fallback)
+		)
+	}, [])
 
-    return {
-        generateUsername,
-        generateMultiple,
-        loading,
-        error,
-        isWasmSupported: wasmAvailable
-    }
+	return {
+		generateUsername,
+		generateMultiple,
+		loading: !ready,
+		isWasmSupported: true,
+	}
 }
 
-function createFallbackGenerator(): UsernameGeneratorInstance {
-    return {
-        generate_username: generateFallbackUsername,
-        generate_multiple: (count: number) => 
-            Array.from({ length: Math.min(count, 10) }, generateFallbackUsername)
-    }
-}
-
-function generateFallbackUsername(): string {
-    const adjectives = [
-        'Quantum', 'Cyber', 'Digital', 'Virtual', 'Neo', 'Meta', 'Hyper', 'Ultra',
-        'Alpha', 'Beta', 'Omega', 'Prime', 'Nova', 'Cosmic', 'Solar', 'Lunar'
-    ]
-    
-    const nouns = [
-        'Wolf', 'Eagle', 'Lion', 'Tiger', 'Dragon', 'Phoenix', 'Falcon', 'Hawk',
-        'Panther', 'Fox', 'Bear', 'Shark', 'Rhino', 'Mammoth', 'Griffin'
-    ]
-    
-    const patterns = [
-        () => `${randomItem(adjectives)}${randomItem(nouns)}`,
-        () => `Cyber${randomItem(nouns)}${randomNumber(10, 99)}`,
-        () => `${randomItem(adjectives).toLowerCase()}_${randomItem(nouns).toLowerCase()}`,
-        () => `Quantum${randomItem(nouns)}${randomNumber(100, 999)}`
-    ]
-    
-    return patterns[Math.floor(Math.random() * patterns.length)]()
-}
-
-function randomItem<T>(array: T[]): T {
-    return array[Math.floor(Math.random() * array.length)]
-}
-
-function randomNumber(min: number, max: number): number {
-    return Math.floor(Math.random() * (max - min + 1)) + min
+function fallback(): string {
+	const base = [
+		'ka',
+		'ne',
+		'vi',
+		'ro',
+		'la',
+		'mi',
+		'to',
+		'ra',
+		'xo',
+		'zi',
+		'me',
+		'ly',
+		'na',
+		're',
+	]
+	const rnd = () => Math.floor(Math.random() * base.length)
+	const word =
+		base[rnd()] + base[rnd()] + (Math.random() < 0.3 ? base[rnd()] : '')
+	return (
+		word[0].toUpperCase() +
+		word.slice(1) +
+		(Math.random() < 0.2 ? Math.floor(1 + Math.random() * 999) : '')
+	)
 }

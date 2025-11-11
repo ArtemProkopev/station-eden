@@ -12,7 +12,7 @@
 		"dev": "run-p dev:api dev:web",
 		"dev:nocache": "run-p dev:api dev:web:nocache",
 		"build": "pnpm -r build",
-		"build:wasm": "pnpm --filter @station-eden/web build:wasm",
+		"build:wasm": "pnpm --filter @station-eden/web exec sh -c 'set -e; rimraf public/wasm; mkdir -p public/wasm; CARGO_TARGET_DIR=src/wasm/target cargo build --manifest-path src/wasm/Cargo.toml --release --target wasm32-unknown-unknown; WASM=$(ls -1 src/wasm/target/wasm32-unknown-unknown/release/*.wasm 2>/dev/null | head -n1 || true); if [ -z \"$WASM\" ]; then WASM=$(ls -1 src/wasm/target/wasm32-unknown-unknown/release/deps/*.wasm 2>/dev/null | head -n1 || true); fi; test -n \"$WASM\" && wasm-bindgen --target web --no-typescript --out-dir public/wasm \"$WASM\" || (echo \"No .wasm artifact found in src/wasm/target\" >&2; exit 1)'",
 		"migrate:run": "dotenv -e apps/api/.env.local -- pnpm --filter @station-eden/api run migration:run",
 		"migrate:revert": "dotenv -e apps/api/.env.local -- pnpm --filter @station-eden/api run migration:revert",
 		"clean": "pnpm -r run clean && rimraf node_modules && pnpm store prune",
