@@ -46,6 +46,16 @@ const DEFAULT_LOBBY_SETTINGS: LobbySettings = {
 	password: '',
 }
 
+/** Жёсткие лимиты на уровне сервера */
+const LOBBY_ID_RE = /^[a-zA-Z0-9_-]{3,32}$/
+const HARD_MAX_PLAYERS = 6 // верхний предел при любом client-UI
+const MSG_MAX_LEN = 300
+const MSG_WINDOW_MS = 10_000
+const MSG_MAX_PER_WINDOW = 15
+const JOIN_WINDOW_MS = 10_000
+const JOIN_MAX_PER_IP = 5
+const MAX_CONN_PER_IP_TOTAL = 20
+
 @WebSocketGateway({
 	path: '/lobby',
 	cors: {
@@ -55,7 +65,8 @@ const DEFAULT_LOBBY_SETTINGS: LobbySettings = {
 		],
 		credentials: true,
 	},
-	transports: ['websocket', 'polling'],
+	// Важно: только WebSocket, без polling — совпадает с Caddyfile
+	transports: ['websocket'],
 	pingTimeout: 60000,
 	pingInterval: 25000,
 })
@@ -71,12 +82,97 @@ export class LobbyGateway
 
 	private lobbies = new Map<string, LobbyState>()
 
+	// rate-limit карты
+	private msgBuckets = new Map<string, { windowStart: number; count: number }>() // key = userId
+	private joinBucketsByIp = new Map<
+		string,
+		{ windowStart: number; count: number; conns: number }
+	>() // key = ip
+
+	private now() {
+		return Date.now()
+	}
+
+	private clientIp(socket: Socket) {
+		const xf = (socket.handshake.headers['x-forwarded-for'] as string) || ''
+		const ip =
+			(xf.split(',')[0] || '').trim() || socket.handshake.address || 'unknown'
+		return ip
+	}
+
+	private allowJoinFromIp(ip: string) {
+		const b = this.joinBucketsByIp.get(ip) || {
+			windowStart: this.now(),
+			count: 0,
+			conns: 0,
+		}
+		const t = this.now()
+		if (t - b.windowStart > JOIN_WINDOW_MS) {
+			b.windowStart = t
+			b.count = 0
+		}
+		if (b.count >= JOIN_MAX_PER_IP) return false
+		b.count++
+		this.joinBucketsByIp.set(ip, b)
+		return true
+	}
+
+	private incConn(ip: string) {
+		const b = this.joinBucketsByIp.get(ip) || {
+			windowStart: this.now(),
+			count: 0,
+			conns: 0,
+		}
+		b.conns++
+		this.joinBucketsByIp.set(ip, b)
+		return b.conns
+	}
+	private decConn(ip: string) {
+		const b = this.joinBucketsByIp.get(ip)
+		if (!b) return
+		b.conns = Math.max(0, b.conns - 1)
+		this.joinBucketsByIp.set(ip, b)
+	}
+
+	private allowMessage(userId: string) {
+		const bucket = this.msgBuckets.get(userId) || {
+			windowStart: this.now(),
+			count: 0,
+		}
+		const t = this.now()
+		if (t - bucket.windowStart > MSG_WINDOW_MS) {
+			bucket.windowStart = t
+			bucket.count = 0
+		}
+		if (bucket.count >= MSG_MAX_PER_WINDOW) return false
+		bucket.count++
+		this.msgBuckets.set(userId, bucket)
+		return true
+	}
+
 	afterInit() {
 		this.logger.log('LobbyGateway initialized')
 	}
 
 	async handleConnection(socket: Socket) {
 		try {
+			// 1) ограничим соединения по IP
+			const ip = this.clientIp(socket)
+			if (!this.allowJoinFromIp(ip)) {
+				this.logger.warn(`Join rate-limit by IP ${ip}`)
+				socket.emit('ERROR', { message: 'Too many connections from IP' })
+				socket.disconnect(true)
+				return
+			}
+			const totalConns = this.incConn(ip)
+			if (totalConns > MAX_CONN_PER_IP_TOTAL) {
+				this.logger.warn(`Too many concurrent connections from IP ${ip}`)
+				socket.emit('ERROR', { message: 'Too many concurrent connections' })
+				socket.disconnect(true)
+				return
+			}
+
+			// 2) аутентификация по access_token cookie
 			const rawCookie = socket.handshake.headers.cookie || ''
 			const cookies = cookie.parse(rawCookie)
 			const token = cookies['access_token']
@@ -84,7 +180,7 @@ export class LobbyGateway
 			if (!token) {
 				this.logger.warn('Unauthorized connection attempt - no token')
 				socket.emit('ERROR', { message: 'Authentication required' })
-				socket.disconnect()
+				socket.disconnect(true)
 				return
 			}
 
@@ -93,21 +189,21 @@ export class LobbyGateway
 				payload = await this.jwtService.verifyAsync(token, {
 					secret: process.env.JWT_ACCESS_SECRET!,
 				})
-			} catch (error) {
+			} catch {
 				this.logger.warn('Invalid token provided')
 				socket.emit('ERROR', { message: 'Invalid authentication token' })
-				socket.disconnect()
+				socket.disconnect(true)
 				return
 			}
 
-			const userId = payload.sub
-			const username = payload.username
+			const userId = String(payload.sub || '')
+			const username = String(payload.username || '') || 'Игрок'
 			const lobbyId = (socket.handshake.query.lobbyId as string) || ''
 
-			if (!lobbyId) {
-				this.logger.warn('No lobbyId provided')
-				socket.emit('ERROR', { message: 'Lobby ID is required' })
-				socket.disconnect()
+			if (!lobbyId || !LOBBY_ID_RE.test(lobbyId)) {
+				this.logger.warn(`Invalid lobbyId: "${lobbyId}"`)
+				socket.emit('ERROR', { message: 'Invalid lobby id' })
+				socket.disconnect(true)
 				return
 			}
 
@@ -128,11 +224,16 @@ export class LobbyGateway
 			}
 
 			const lobby = this.lobbies.get(lobbyId)!
+			const effectiveMax = Math.min(
+				lobby.settings.maxPlayers || 4,
+				HARD_MAX_PLAYERS
+			)
 
-			if (lobby.players.size >= lobby.settings.maxPlayers) {
+			if (lobby.players.size >= effectiveMax) {
 				this.logger.warn(`Lobby ${lobbyId} is full, rejecting ${username}`)
 				socket.emit('ERROR', { message: 'Lobby is full' })
-				socket.disconnect()
+				socket.leave(lobbyId)
+				socket.disconnect(true)
 				return
 			}
 
@@ -142,7 +243,7 @@ export class LobbyGateway
 			// Отдаём состояние лобби
 			socket.emit('LOBBY_STATE', {
 				players: Array.from(lobby.players.values()),
-				settings: lobby.settings,
+				settings: { ...lobby.settings, maxPlayers: effectiveMax },
 				creatorId: lobby.creatorId,
 			})
 
@@ -152,12 +253,15 @@ export class LobbyGateway
 		} catch (error) {
 			this.logger.error('Connection error:', error)
 			socket.emit('ERROR', { message: 'Connection failed' })
-			socket.disconnect()
+			socket.disconnect(true)
 		}
 	}
 
 	handleDisconnect(socket: Socket) {
-		const { userId, username, lobbyId } = socket.data
+		const { userId, lobbyId } = socket.data
+		const ip = this.clientIp(socket)
+		this.decConn(ip)
+
 		if (!userId || !lobbyId) return
 
 		const lobby = this.lobbies.get(lobbyId)
@@ -200,21 +304,35 @@ export class LobbyGateway
 			return
 		}
 
-		if (lobby.players.size >= lobby.settings.maxPlayers) {
+		const effectiveMax = Math.min(
+			lobby.settings.maxPlayers || 4,
+			HARD_MAX_PLAYERS
+		)
+		if (lobby.players.size >= effectiveMax) {
 			socket.emit('ERROR', { message: 'Lobby is full' })
 			return
 		}
 
-		const player = data.player
+		const p = data?.player || ({} as Player)
+		const sanitizedName =
+			typeof p.name === 'string' && p.name.trim()
+				? p.name.trim().slice(0, 50)
+				: username || 'Игрок'
 
-		// Используем аутентифицированные id/name, остальное — с клиента
 		const authenticatedPlayer: Player = {
 			id: userId,
-			name: username || 'Игрок',
-			missions: player.missions || 0,
-			hours: player.hours || 0,
-			avatar: player.avatar,
-			isReady: player.isReady || false,
+			name: sanitizedName,
+			missions: Number.isFinite(p.missions)
+				? Math.max(0, Math.min(9999, p.missions))
+				: 0,
+			hours: Number.isFinite(p.hours)
+				? Math.max(0, Math.min(9999, p.hours))
+				: 0,
+			avatar:
+				typeof p.avatar === 'string' && p.avatar.startsWith('http')
+					? p.avatar
+					: undefined,
+			isReady: !!p.isReady,
 		}
 
 		const isNewPlayer = !lobby.players.has(userId)
@@ -226,7 +344,7 @@ export class LobbyGateway
 
 		this.server.to(lobbyId).emit('LOBBY_STATE', {
 			players: Array.from(lobby.players.values()),
-			settings: lobby.settings,
+			settings: { ...lobby.settings, maxPlayers: effectiveMax },
 			creatorId: lobby.creatorId,
 		})
 	}
@@ -237,16 +355,31 @@ export class LobbyGateway
 		const lobby = this.lobbies.get(lobbyId)
 		if (!lobby) return
 
-		// НОВОЕ: не-участникам лобби — запрет писать и выход из комнаты
+		// не-участникам лобби — запрет писать
 		if (!lobby.players.has(userId)) {
 			socket.emit('ERROR', { message: 'You are not in this lobby' })
 			socket.leave(lobbyId)
 			return
 		}
 
+		// rate-limit сообщений
+		if (!this.allowMessage(userId)) {
+			socket.emit('ERROR', { message: 'Too many messages' })
+			return
+		}
+
+		const msg = data?.message ?? {}
+		const textRaw = typeof msg.text === 'string' ? msg.text : ''
+		const text = textRaw.trim().slice(0, MSG_MAX_LEN)
+		if (!text) return
+
 		const messageWithAuth = {
-			...data.message,
+			...msg,
+			text,
+			type: 'player' as const,
+			playerId: userId,
 			playerName: username || 'Игрок',
+			timestamp: new Date().toISOString(),
 		}
 
 		this.server.to(lobbyId).emit('CHAT_MESSAGE', { message: messageWithAuth })
@@ -272,8 +405,8 @@ export class LobbyGateway
 		}
 
 		if (player) {
-			player.isReady = data.isReady
-			this.logger.log(`Player ${player.name} ready: ${data.isReady}`)
+			player.isReady = !!data.isReady
+			this.logger.log(`Player ${player.name} ready: ${player.isReady}`)
 
 			this.server.to(lobbyId).emit('LOBBY_STATE', {
 				players: Array.from(lobby.players.values()),
@@ -299,11 +432,20 @@ export class LobbyGateway
 			return
 		}
 
-		Object.assign(lobby.settings, data.settings)
+		// не даём «выкрутить» выше жёсткого лимита
+		const next = { ...data.settings }
+		if (typeof next.maxPlayers === 'number') {
+			next.maxPlayers = Math.max(2, Math.min(HARD_MAX_PLAYERS, next.maxPlayers))
+		}
 
-		this.server
-			.to(lobbyId)
-			.emit('LOBBY_SETTINGS_UPDATED', { settings: lobby.settings })
+		Object.assign(lobby.settings, next)
+
+		this.server.to(lobbyId).emit('LOBBY_SETTINGS_UPDATED', {
+			settings: {
+				...lobby.settings,
+				maxPlayers: Math.min(lobby.settings.maxPlayers, HARD_MAX_PLAYERS),
+			},
+		})
 	}
 
 	@SubscribeMessage('PLAYER_LEFT')
@@ -326,13 +468,11 @@ export class LobbyGateway
 			lobby.players.delete(playerId)
 			lobby.connections.delete(playerId)
 
-			// НОВОЕ: реально выводим игрока из комнаты и перекрываем доступ
 			if (targetSocket) {
 				targetSocket.leave(lobbyId)
 				targetSocket.emit('ERROR', {
 					message: 'You were removed from the lobby',
 				})
-				// При желании можно разорвать соединение полностью:
 				// targetSocket.disconnect(true)
 			}
 

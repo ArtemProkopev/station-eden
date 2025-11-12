@@ -107,7 +107,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 						id,
 						playerId: msg.playerId ?? 'unknown',
 						playerName: msg.playerName ?? 'Игрок',
-						text: String(msg.text ?? ''),
+						text: String(msg.text ?? '').slice(0, 300),
 						timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
 						type: msg.type ?? 'player',
 					},
@@ -117,7 +117,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 			}
 
 			case 'LOBBY_STATE':
-				// Источник истины — сервер/мок
 				setPlayers(Array.isArray(data.players) ? data.players : [])
 				if (data.settings) setLobbySettings(data.settings)
 				if (data.creatorId) setLobbyCreatorId(data.creatorId)
@@ -185,7 +184,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 			name: profile.username || 'Игрок',
 			missions: (profile as any).missionsCompleted || 0,
 			hours: (profile as any).playTime || 0,
-			avatar: assets.avatar, // аватар берём из профиля/ассетов
+			avatar: assets.avatar,
 			isReady: false,
 		}
 
@@ -227,7 +226,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 	const handleSaveLobbySettings = useCallback(
 		(settings: LobbySettings) => {
 			setLobbySettings(settings)
-			// НОВОЕ: пробрасываем __userId для мока, прод игнорирует
 			sendWS({
 				type: 'UPDATE_LOBBY_SETTINGS',
 				settings,
@@ -263,7 +261,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 	const addNewPlayer = useCallback(
 		(playerData?: { id?: string; name?: string; avatar?: string }) => {
-			// НОВОЕ: «добавление игрока» разрешаем ТОЛЬКО в мок-режиме.
 			const useMock =
 				process.env.NODE_ENV !== 'production' &&
 				typeof window !== 'undefined' &&
@@ -334,7 +331,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 				id,
 				playerId: profile.userId,
 				playerName: profile.username || 'Игрок',
-				text: newMessage.trim(),
+				text: newMessage.trim().slice(0, 300),
 				timestamp: new Date().toISOString(),
 				type: 'player' as const,
 			}

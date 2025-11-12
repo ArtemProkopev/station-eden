@@ -12,7 +12,6 @@ class MockSocketIO {
 	private lobbyId: string
 	public connected = false
 	public id = `mock-${Math.random().toString(36).slice(2, 9)}`
-	// НОВОЕ: локальное состояние лобби
 	private players = new Map<string, any>()
 	private settings = {
 		maxPlayers: 4,
@@ -23,14 +22,12 @@ class MockSocketIO {
 	private creatorId: string | undefined
 
 	constructor(url: string, _options: any) {
-		// buildUrl() передаёт origin без query — используем дефолтный lobbyId
 		this.lobbyId = 'default-lobby'
 		this.bc = new BroadcastChannel(`mock-socketio:${this.lobbyId}`)
 
 		setTimeout(() => {
 			this.connected = true
 			this.emitEvent('connect')
-			// НОВОЕ: начнём с пустого состояния, ничего не «придумываем»
 			this.emitEvent('LOBBY_STATE', {
 				players: [],
 				settings: this.settings,
@@ -61,7 +58,6 @@ class MockSocketIO {
 		if (event === 'JOIN_LOBBY') {
 			const p = data.player
 			if (!this.creatorId) this.creatorId = p.id
-			// Мерджим игрока (не затираем аватар/имя)
 			const prev = this.players.get(p.id) || {}
 			this.players.set(p.id, { ...prev, ...p })
 
@@ -86,9 +82,13 @@ class MockSocketIO {
 				},
 			})
 		} else if (event === 'SEND_MESSAGE') {
+			const msg = { ...data.message }
+			if (typeof msg.text === 'string') {
+				msg.text = msg.text.slice(0, 300)
+			}
 			this.bc.postMessage({
 				type: 'CHAT_MESSAGE',
-				data: { message: data.message },
+				data: { message: msg },
 			})
 			setTimeout(() => {
 				this.emitEvent('MESSAGE_SENT', { messageId: data.message?.id })
@@ -111,7 +111,6 @@ class MockSocketIO {
 				creatorId: this.creatorId,
 			})
 		} else if (event === 'UPDATE_LOBBY_SETTINGS') {
-			// Опциональная симуляция прав: если прилетел __userId и он не создатель — ошибка
 			if (
 				this.creatorId &&
 				data?.__userId &&
@@ -130,7 +129,6 @@ class MockSocketIO {
 			this.emitEvent('LOBBY_SETTINGS_UPDATE_SUCCESS', {
 				settings: this.settings,
 			})
-			// ВАЖНО: не трогаем players
 			this.emitEvent('LOBBY_STATE', {
 				players: Array.from(this.players.values()),
 				settings: this.settings,
@@ -202,7 +200,7 @@ export const useWebSocket = (
 
 		if (useMock) {
 			currentSocket = new MockSocketIO(url, {
-				transports: ['websocket', 'polling'],
+				transports: ['websocket'],
 				withCredentials: true,
 				autoConnect: true,
 			}) as any
@@ -210,7 +208,7 @@ export const useWebSocket = (
 			currentSocket = io(url, {
 				path: '/lobby',
 				query: paramsRef.current,
-				transports: ['websocket', 'polling'],
+				transports: ['websocket'], // важно: без polling (соответствует Caddyfile)
 				withCredentials: true,
 				autoConnect: true,
 				reconnection: true,
@@ -293,8 +291,15 @@ export const useWebSocket = (
 
 	const sendMessage = useCallback((message: WebSocketMessage) => {
 		if (socket.current) {
+			// client-side ограничим длину текстов на всякий случай
+			if (
+				message?.type === 'SEND_MESSAGE' &&
+				typeof message?.message?.text === 'string'
+			) {
+				message.message.text = message.message.text.slice(0, 300)
+			}
 			console.log('Sending WebSocket message:', message.type, message)
-			socket.current.emit(message.type, message)
+			;(socket.current as any).emit(message.type, message)
 			return true
 		}
 		console.warn('WebSocket not connected, message not sent:', message.type)

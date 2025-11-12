@@ -7,46 +7,38 @@ stationeden.ru, www.stationeden.ru {
   tls {
     issuer acme {
       email artemprokopev@internet.ru
-      disable_tlsalpn_challenge
+      # Не отключаем TLS-ALPN, чтобы не сломать выпуск сертификата в контейнере
+      # disable_tlsalpn_challenge
     }
   }
 
   encode zstd gzip
 
-  # WebSocket proxy - ТОЛЬКО для WebSocket соединений
-  handle /lobby {
-    # Проверяем, это WebSocket upgrade запрос
-    @websocket {
-      header Connection *Upgrade*
-      header Upgrade *websocket*
-    }
-    reverse_proxy @websocket api:4000 {
-      header_up Host {http.request.host}
-      header_up X-Real-IP {http.request.remote}
-      header_up X-Forwarded-For {http.request.remote}
-      header_up X-Forwarded-Proto {http.request.scheme}
-      header_up Connection {http.request.header.Connection}
-      header_up Upgrade {http.request.header.Upgrade}
-    }
-    
-    # Все остальные запросы к /lobby идут на фронтенд
-    reverse_proxy web:3000
+  # Socket.IO/WebSocket: весь префикс /lobby уходит на API
+  reverse_proxy /lobby* api:4000 {
+    header_up Host {http.request.host}
+    header_up X-Real-IP {http.request.remote}
+    header_up X-Forwarded-For {http.request.remote}
+    header_up X-Forwarded-Proto {http.request.scheme}
   }
 
-  # Динамические маршруты лобби идут на фронтенд
+  # Динамические страницы лобби рендерит фронтенд
   handle /lobby/* {
     reverse_proxy web:3000
   }
 
+  # REST API под /api
   handle /api* {
     uri strip_prefix /api
     reverse_proxy api:4000
   }
 
+  # Прямой доступ к /auth (если используете прямые маршруты без /api)
   handle /auth* {
     reverse_proxy api:4000
   }
 
+  # CSRF токен никогда не кэшируем
   @csrf path /auth/csrf
   header @csrf Cache-Control "no-store, no-cache, must-revalidate"
   header @csrf Pragma "no-cache"
@@ -56,6 +48,7 @@ stationeden.ru, www.stationeden.ru {
   @wasm path *.wasm
   header @wasm Content-Type "application/wasm"
 
+  # Всё остальное — фронтенд
   handle {
     reverse_proxy web:3000
   }
@@ -72,36 +65,34 @@ api.stationeden.ru {
   tls {
     issuer acme {
       email artemprokopev@internet.ru
-      disable_tlsalpn_challenge
+      # disable_tlsalpn_challenge
     }
   }
 
   encode zstd gzip
 
-  # WebSocket proxy для API домена
-  handle /lobby* {
-    reverse_proxy api:4000 {
-      header_up Host {http.request.host}
-      header_up X-Real-IP {http.request.remote}
-      header_up X-Forwarded-For {http.request.remote}
-      header_up X-Forwarded-Proto {http.request.scheme}
-      header_up Connection {http.request.header.Connection}
-      header_up Upgrade {http.request.header.Upgrade}
-    }
+  # Socket.IO/WebSocket префикс
+  reverse_proxy /lobby* api:4000 {
+    header_up Host {http.request.host}
+    header_up X-Real-IP {http.request.remote}
+    header_up X-Forwarded-For {http.request.remote}
+    header_up X-Forwarded-Proto {http.request.scheme}
   }
 
-  # Правильный MIME для WebAssembly
-  @wasm path *.wasm
-  header @wasm Content-Type "application/wasm"
-
+  # Остальной API
   handle {
     reverse_proxy api:4000
   }
 
+  # CSRF: не кэшируем
   @csrf path /auth/csrf
   header @csrf Cache-Control "no-store, no-cache, must-revalidate"
   header @csrf Pragma "no-cache"
   header @csrf Expires "0"
+
+  # Правильный MIME для Wasm
+  @wasm path *.wasm
+  header @wasm Content-Type "application/wasm"
 
   header {
     Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
@@ -114,46 +105,41 @@ api.stationeden.ru {
 localhost {
   encode zstd gzip
 
-  # WebSocket proxy для localhost
-  handle /lobby {
-    @websocket {
-      header Connection *Upgrade*
-      header Upgrade *websocket*
-    }
-    reverse_proxy @websocket api:4000 {
-      header_up Host {http.request.host}
-      header_up X-Real-IP {http.request.remote}
-      header_up X-Forwarded-For {http.request.remote}
-      header_up X-Forwarded-Proto {http.request.scheme}
-      header_up Connection {http.request.header.Connection}
-      header_up Upgrade {http.request.header.Upgrade}
-    }
-    
-    reverse_proxy web:3000
+  # Socket.IO/WebSocket
+  reverse_proxy /lobby* api:4000 {
+    header_up Host {http.request.host}
+    header_up X-Real-IP {http.request.remote}
+    header_up X-Forwarded-For {http.request.remote}
+    header_up X-Forwarded-Proto {http.request.scheme}
   }
 
+  # Динамические страницы лобби — фронтенд
   handle /lobby/* {
     reverse_proxy web:3000
   }
 
+  # REST API под /api
   handle /api* {
     uri strip_prefix /api
     reverse_proxy api:4000
   }
 
+  # Прямой /auth (если нужен)
   handle /auth* {
     reverse_proxy api:4000
   }
 
+  # CSRF не кэшируем
   @csrf path /auth/csrf
   header @csrf Cache-Control "no-store, no-cache, must-revalidate"
   header @csrf Pragma "no-cache"
   header @csrf Expires "0"
 
-  # Правильный MIME для WebAssembly
+  # Правильный MIME для Wasm
   @wasm path *.wasm
   header @wasm Content-Type "application/wasm"
 
+  # Всё остальное — фронтенд
   handle {
     reverse_proxy web:3000
   }
