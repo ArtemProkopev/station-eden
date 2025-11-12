@@ -26,6 +26,11 @@ async function safeJson(text: string | null): Promise<any | undefined> {
 	}
 }
 
+function hasCookie(name: string): boolean {
+	if (typeof document === 'undefined') return false
+	return document.cookie.split(';').some(c => c.trim().startsWith(`${name}=`))
+}
+
 async function ensureCsrfToken(): Promise<string> {
 	const response = await fetch(`${API}/auth/csrf`, {
 		method: 'GET',
@@ -83,6 +88,8 @@ async function throwHttpAsApiError(
 let _isRefreshing = false
 async function tryRefreshOnce(): Promise<boolean> {
 	if (_isRefreshing) return false
+	// не пытаемся рефрешить, если нет refresh-куки
+	if (!hasCookie('refresh_token')) return false
 	_isRefreshing = true
 	try {
 		await api.refresh()

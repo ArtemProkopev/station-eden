@@ -210,14 +210,18 @@ export class AuthController {
 		@Req() req: Request,
 		@Res({ passthrough: true }) res: Response
 	) {
-		const payload = tryDecode(this.jwt, (req as any).cookies?.access_token)
-		const userId = (payload as any)?.sub || (req.body as any)?.userId
-		const rt = (req as any).cookies?.refresh_token
-		if (!userId || !rt) throw new UnauthorizedException('No refresh')
-		const { access, refreshToken, refreshExpires } = await this.auth.refresh(
-			userId,
-			rt
-		)
+		const rt = (req as any).cookies?.refresh_token as string | undefined
+		if (!rt) throw new UnauthorizedException('No refresh token')
+
+		// НЕ проверяем срок жизни access — читаем sub «как есть»
+		const rawAccess = (req as any).cookies?.access_token as string | undefined
+		const decoded: any = rawAccess ? this.jwt.decode(rawAccess) : null
+		const userId: string | undefined = decoded?.sub
+
+		const { access, refreshToken, refreshExpires } = userId
+			? await this.auth.refresh(userId, rt)
+			: await this.auth.refreshViaTokenOnly(rt)
+
 		res.cookie('access_token', access, {
 			...this.authCookieOpts(),
 			maxAge: this.accessMaxAgeMs(),

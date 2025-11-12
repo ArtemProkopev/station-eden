@@ -149,6 +149,10 @@ export class AuthService {
 		return fresh
 	}
 
+	/**
+	 * Обычный путь: знаем userId и пришедший refresh. Ротируем «самый свежий»
+	 * у пользователя, сверяя хэш и срок.
+	 */
 	async refresh(userId: string, refreshToken: string) {
 		const rec = await this.rtRepo.findOne({
 			where: { userId, revoked: false },
@@ -170,6 +174,44 @@ export class AuthService {
 		const access = this.signAccess(user)
 		const { plain: newRefresh, expires: refreshExpires } =
 			await this.issueRefresh(userId)
+
+		return { access, refreshToken: newRefresh, refreshExpires }
+	}
+
+	/**
+	 * Альтернативный путь: access протух и мы не знаем userId.
+	 * Ищем запись по самому refresh-токену (сравнивая хэш) среди последних активных.
+	 */
+	public async refreshViaTokenOnly(refreshToken: string) {
+		// Берём ограниченное число последних активных записей, чтобы не сканировать всё
+		const candidates = await this.rtRepo.find({
+			where: { revoked: false },
+			order: { createdAt: 'DESC' },
+			take: 200,
+		})
+
+		let rec: RefreshToken | undefined
+		for (const r of candidates) {
+			const ok = await bcrypt.compare(refreshToken, r.tokenHash)
+			if (ok) {
+				rec = r
+				break
+			}
+		}
+
+		if (!rec || rec.expiresAt < new Date()) {
+			throw new UnauthorizedException('Refresh expired')
+		}
+
+		// Ротация: отзываем строго найденный токен
+		await this.rtRepo.update(rec.id, { revoked: true })
+
+		const user = await this.users.findById(rec.userId)
+		if (!user) throw new UnauthorizedException('User not found')
+
+		const access = this.signAccess(user)
+		const { plain: newRefresh, expires: refreshExpires } =
+			await this.issueRefresh(user.id)
 
 		return { access, refreshToken: newRefresh, refreshExpires }
 	}
