@@ -52,6 +52,10 @@ stationeden.ru, www.stationeden.ru {
   header @csrf Pragma "no-cache"
   header @csrf Expires "0"
 
+  # Правильный MIME для WebAssembly
+  @wasm path *.wasm
+  header @wasm Content-Type "application/wasm"
+
   handle {
     reverse_proxy web:3000
   }
@@ -85,6 +89,10 @@ api.stationeden.ru {
       header_up Upgrade {http.request.header.Upgrade}
     }
   }
+
+  # Правильный MIME для WebAssembly
+  @wasm path *.wasm
+  header @wasm Content-Type "application/wasm"
 
   handle {
     reverse_proxy api:4000
@@ -141,6 +149,10 @@ localhost {
   header @csrf Cache-Control "no-store, no-cache, must-revalidate"
   header @csrf Pragma "no-cache"
   header @csrf Expires "0"
+
+  # Правильный MIME для WebAssembly
+  @wasm path *.wasm
+  header @wasm Content-Type "application/wasm"
 
   handle {
     reverse_proxy web:3000

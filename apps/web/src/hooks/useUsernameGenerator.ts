@@ -4,8 +4,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 type WasmModuleApi = {
-	default?: (input?: string | URL | ArrayBuffer) => Promise<unknown> | unknown
-	init?: (input?: string | URL | ArrayBuffer) => Promise<unknown> | unknown
+	default?: (input?: unknown) => Promise<unknown> | unknown
+	init?: (input?: unknown) => Promise<unknown> | unknown
 	UsernameGenerator?: new () => {
 		generate_username(): string
 		generate_multiple?(count: number): any
@@ -14,12 +14,13 @@ type WasmModuleApi = {
 	generate_username?: () => string
 }
 
-// Синглтоны: импорт glue, init wasm и общий инстанс генератора.
+// Синглтоны: импорт glue, init wasm и общий инстанс генератора
 let wasmModOnce: Promise<WasmModuleApi | null> | null = null
 let wasmReadyOnce: Promise<boolean> | null = null
 let sharedGen: {
 	generate_username(): string
 	generate_multiple?(n: number): any
+	free?: () => void
 } | null = null
 let lastInitError: unknown = null
 
@@ -58,7 +59,7 @@ async function importWasmGlue(): Promise<WasmModuleApi | null> {
 	return wasmModOnce
 }
 
-// Явно передаём путь к .wasm. Создаём общий инстанс (класс или функциональный API).
+// Инициализируем wasm новым объектным API; если не поддерживается — откатываемся к старому
 async function ensureWasmInitialized(): Promise<boolean> {
 	if (wasmReadyOnce) return wasmReadyOnce
 	wasmReadyOnce = (async () => {
@@ -67,9 +68,20 @@ async function ensureWasmInitialized(): Promise<boolean> {
 		try {
 			const init = (
 				typeof mod.default === 'function' ? mod.default : mod.init
-			) as ((i?: any) => Promise<unknown> | unknown) | undefined
+			) as ((i?: unknown) => Promise<unknown> | unknown) | undefined
 			const bin = wasmBinaryUrl()
-			if (init) await init(bin || undefined)
+
+			if (init) {
+				try {
+					// Современный интерфейс wasm-bindgen: единый объект
+					// Передаём Response, чтобы wasm-bindgen сам сделал streaming или fallback на bytes.
+					const module_or_path = bin ? await fetch(bin) : undefined
+					await init({ module_or_path })
+				} catch {
+					// Совместимость со старым интерфейсом: путь/URL строкой
+					await init(bin || undefined)
+				}
+			}
 
 			if (typeof mod.UsernameGenerator === 'function') {
 				sharedGen = new mod.UsernameGenerator!()
@@ -97,7 +109,7 @@ async function ensureWasmInitialized(): Promise<boolean> {
 	return wasmReadyOnce
 }
 
-// Фоллбек-ГПСЧ и генератор (без wasm).
+// Фоллбек-ГПСЧ и генератор (без wasm)
 class Xoshiro128 {
 	private s0: number
 	private s1: number
@@ -161,6 +173,7 @@ const ONSETS: ReadonlyArray<[string, number]> = Object.freeze([
 	['sk', 10],
 	['gl', 10],
 ])
+
 const NUCLEI: ReadonlyArray<[string, number]> = Object.freeze([
 	['a', 80],
 	['e', 85],
@@ -180,12 +193,12 @@ const NUCLEI: ReadonlyArray<[string, number]> = Object.freeze([
 	['ir', 15],
 	['ur', 12],
 ])
+
 const CODAE: ReadonlyArray<[string, number]> = Object.freeze([
 	['', 120],
 	['n', 60],
 	['r', 60],
 	['s', 55],
-	['x', 25],
 	['l', 40],
 	['m', 30],
 	['k', 35],
@@ -206,7 +219,7 @@ function pickWeighted(
 	rng: Xoshiro128,
 	tbl: ReadonlyArray<[string, number]>,
 	total: number
-): string {
+) {
 	let r = rng.nextU32() % total
 	for (let i = 0; i < tbl.length; i++) {
 		const [s, w] = tbl[i]
@@ -291,7 +304,7 @@ export function useUsernameGenerator() {
 		})()
 		return () => {
 			cancelled = true
-			// Не освобождаем sharedGen: нужен для HMR/StrictMode.
+			// sharedGen не освобождаем: нужен для HMR/StrictMode
 		}
 	}, [])
 
