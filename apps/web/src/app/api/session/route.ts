@@ -1,8 +1,12 @@
 // apps/web/src/app/api/session/route.ts
 
-const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
-const CSRF_NAME = process.env.NEXT_PUBLIC_CSRF_COOKIE_NAME || 'se_csrf'
+// Используем один и тот же origin API и для SSR, и для клиента.
+// В проде выставь NEXT_PUBLIC_API_BASE = 'https://api.stationeden.ru'
+const API = process.env.NEXT_PUBLIC_API_BASE || 'https://api.stationeden.ru'
 
+/**
+ * Ходим за /auth/me с прокидыванием куки, которые пришли от браузера.
+ */
 async function me(cookieHeader: string) {
 	return fetch(`${API}/auth/me`, {
 		method: 'GET',
@@ -13,10 +17,12 @@ async function me(cookieHeader: string) {
 }
 
 /**
- * Получаем CSRF-токен с учётом текущих cookie.
- * Токен возвращается и в cookie, и в теле ответа { csrf }, мы читаем из тела.
+ * Получаем CSRF-токен и одновременно вытаскиваем se_csrf из Set-Cookie,
+ * чтобы подложить его в cookieHeader для следующего POST.
  */
-async function getCsrf(cookieHeader: string): Promise<string | null> {
+async function getCsrfAndCookieHeader(
+	cookieHeader: string
+): Promise<{ csrf: string | null; cookieHeader: string }> {
 	try {
 		const r = await fetch(`${API}/auth/csrf`, {
 			method: 'GET',
@@ -24,21 +30,44 @@ async function getCsrf(cookieHeader: string): Promise<string | null> {
 			credentials: 'include',
 			cache: 'no-store',
 		})
-		if (!r.ok) return null
+		if (!r.ok) return { csrf: null, cookieHeader }
+
+		// Токен может прийти как { csrf }, так и { ok:true, data:{ csrf } }
 		const json = await r.json().catch(() => undefined)
-		// Ответ может быть как { csrf }, так и { ok: true, data: { csrf } }
-		const token = json?.csrf ?? json?.data?.csrf ?? null
-		return typeof token === 'string' && token ? token : null
+		const token = (json?.csrf ?? json?.data?.csrf) || null
+
+		// Достаём se_csrf из Set-Cookie
+		const setCookie = r.headers.get('set-cookie') || ''
+		const m = setCookie.match(/(?:^|;)\s*se_csrf=([^;]+)/i)
+		const se = m?.[1]
+
+		// Если в исходном cookieHeader не было se_csrf — подложим
+		const hasSe = /(?:^|;\s*)se_csrf=/.test(cookieHeader)
+		const nextCookieHeader =
+			!hasSe && se
+				? cookieHeader
+					? `${cookieHeader}; se_csrf=${se}`
+					: `se_csrf=${se}`
+				: cookieHeader
+
+		return {
+			csrf: typeof token === 'string' && token ? token : null,
+			cookieHeader: nextCookieHeader,
+		}
 	} catch {
-		return null
+		return { csrf: null, cookieHeader }
 	}
 }
 
+/**
+ * POST /auth/refresh c правильными куками и заголовком CSRF.
+ * Здесь важно: одновременно отправляем и cookie se_csrf, и заголовок x-csrf-token.
+ */
 async function refresh(cookieHeader: string) {
-	// Обязательно получаем актуальный CSRF токен перед POST
-	const csrf = await getCsrf(cookieHeader)
+	const { csrf, cookieHeader: cookieWithCsrf } =
+		await getCsrfAndCookieHeader(cookieHeader)
 	if (!csrf) {
-		// Без CSRF не пробуем — вернём псевдо-ответ с 403, чтобы вызывающий код понял, что рефреш невозможен
+		// Без CSRF не пробуем — вернём 403, чтобы вызывающий код понял, что рефреш невозможен
 		return new Response('missing csrf', { status: 403 })
 	}
 
@@ -46,8 +75,8 @@ async function refresh(cookieHeader: string) {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
-			cookie: cookieHeader,
-			'x-csrf-token': csrf,
+			cookie: cookieWithCsrf, // cookieHeader, в который мы подложили se_csrf (если его не было)
+			'x-csrf-token': csrf, // сам токен в заголовке
 		},
 		credentials: 'include',
 		body: '{}',
@@ -74,7 +103,7 @@ export async function GET(req: Request) {
 		// игнорируем и идём дальше
 	}
 
-	// 2) Если нет refresh_token — считаем, что пользователь не авторизован и не пытаемся рефрешить
+	// 2) Если нет refresh_token — пользователь не авторизован, не пытаемся рефрешить
 	if (!hasRefreshCookie) {
 		return new Response(JSON.stringify({ status: 'signed-out' }), {
 			status: 200,
@@ -86,7 +115,11 @@ export async function GET(req: Request) {
 	try {
 		const rr = await refresh(cookieHeader)
 		if (rr.ok) {
-			// После успешного refresh пробуем ещё раз /auth/me
+			// ВАЖНО: этот handler не проксирует Set-Cookie из ответа API в браузер.
+			// Мы просто возвращаем статус. Фактическое продление куки произойдёт
+			// в клиентских запросах к API, где браузер получит Set-Cookie напрямую.
+			//
+			// Попробуем ещё раз /auth/me c тем же cookieHeader (без новых Set-Cookie).
 			const r = await me(cookieHeader)
 			if (r.ok) {
 				const json = await r.json().catch(() => ({}))
