@@ -9,7 +9,7 @@
 		"build": "next build",
 		"start": "next start -p 3000",
 		"lint": "next lint",
-		"build:wasm": "node ../../scripts/build-wasm-simple.js"
+		"build:wasm": "rimraf public/wasm && wasm-pack build ../../packages/username-generator --target web --out-dir ../../apps/web/public/wasm --no-typescript"
 	},
 	"dependencies": {
 		"next": "14.2.10",
