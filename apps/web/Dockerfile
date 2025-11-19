@@ -1,37 +1,50 @@
 # --- build stage ---
-FROM public.ecr.aws/docker/library/node:20-alpine AS build
+FROM node:20-alpine AS build
 WORKDIR /app
 
-RUN apk add --no-cache ca-certificates curl wget && update-ca-certificates
-ENV PNPM_HOME=/root/.local/share/pnpm
+# 1. Устанавливаем системные зависимости (включая Rust для сборки WASM)
+RUN apk add --no-cache ca-certificates curl wget build-base gcc curl \
+    && update-ca-certificates
+
+# Устанавливаем Rust и Cargo
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Устанавливаем wasm-pack
+RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+# Настройка PNPM
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 
-ARG NPM_REGISTRY=https://registry.npmjs.org/
-ENV NPM_CONFIG_REGISTRY=${NPM_REGISTRY}
-
-# манифесты
+# 2. Копируем манифесты (Root + Web + Shared + Rust)
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/web/package.json apps/web/
-COPY apps/api/package.json apps/api/
+COPY packages/shared/package.json packages/shared/
+COPY packages/username-generator/package.json packages/username-generator/
 
-# настройки pnpm
-RUN pnpm config set registry ${NPM_REGISTRY} \
- && pnpm config set store-dir /root/.local/share/pnpm/store \
- && pnpm config set fetch-retries 5 \
- && pnpm config set fetch-retry-factor 2 \
- && pnpm config set fetch-retry-mintimeout 20000 \
- && pnpm config set fetch-retry-maxtimeout 120000 \
- && pnpm config set network-timeout 600000
-
-RUN pnpm fetch || true
+# 3. Устанавливаем JS зависимости
 RUN pnpm install --frozen-lockfile
 
-# исходники web
+# 4. Копируем исходный код
+COPY tsconfig.json .
+COPY packages/shared packages/shared
+COPY packages/username-generator packages/username-generator
 COPY apps/web apps/web
-WORKDIR /app/apps/web
 
-# ---- build-time args / env ----
-# ЖЕСТКО ПРОПИСЫВАЕМ ПЕРЕМЕННЫЕ ДЛЯ PRODUCTION
+# 5. БИЛД (Порядок важен!)
+
+# A. Собираем Shared (типы)
+RUN pnpm --filter @station-eden/shared build
+
+# B. Собираем WASM (Rust)
+# Мы запускаем скрипт из apps/web, он сам найдет код в packages/username-generator
+WORKDIR /app/apps/web
+RUN pnpm build:wasm
+
+# C. Собираем Next.js
+# Передаем ARG для сборки статики
 ARG NEXT_PUBLIC_API_BASE=https://api.stationeden.ru
 ARG NEXT_PUBLIC_WS_BASE=wss://api.stationeden.ru
 ARG NEXT_PUBLIC_ENABLE_TELEGRAM=false
@@ -44,34 +57,28 @@ ENV NEXT_PUBLIC_ENABLE_TELEGRAM=$NEXT_PUBLIC_ENABLE_TELEGRAM
 ENV NEXT_PUBLIC_ENABLE_GOOGLE=$NEXT_PUBLIC_ENABLE_GOOGLE
 ENV NEXT_PUBLIC_ASSETS_BASE=$NEXT_PUBLIC_ASSETS_BASE
 
-# диагностика
-RUN echo "BUILD ENV:"
-RUN echo "NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE"
-RUN echo "NEXT_PUBLIC_WS_BASE=$NEXT_PUBLIC_WS_BASE"
-RUN echo "NEXT_PUBLIC_ASSETS_BASE=$NEXT_PUBLIC_ASSETS_BASE"
-
 RUN pnpm build
 
 # --- runtime stage ---
-FROM public.ecr.aws/docker/library/node:20-alpine AS runtime
+FROM node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-# Устанавливаем wget для healthcheck
 RUN apk add --no-cache wget
 
-# ЖЕСТКО ПРОПИСЫВАЕМ ПЕРЕМЕННЫЕ ДЛЯ RUNTIME
+# Переменные окружения для рантайма
 ENV NEXT_PUBLIC_API_BASE=https://api.stationeden.ru
 ENV NEXT_PUBLIC_WS_BASE=wss://api.stationeden.ru
 ENV NEXT_PUBLIC_ENABLE_TELEGRAM=false
 ENV NEXT_PUBLIC_ENABLE_GOOGLE=true
 ENV NEXT_PUBLIC_ASSETS_BASE=https://cdn.assets.stationeden.ru
 
+# Копируем standalone сборку Next.js
 COPY --from=build /app/apps/web/.next/standalone ./
 COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build /app/apps/web/public ./apps/web/public
 
 EXPOSE 3000
-CMD ["sh","-c","[ -f apps/web/server.js ] && node apps/web/server.js || node apps/web/server.mjs"]
+CMD ["node", "apps/web/server.js"]

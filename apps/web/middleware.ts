@@ -1,49 +1,75 @@
-// apps/web/middleware.ts
 import { NextResponse, type NextRequest } from 'next/server'
 
+// Исключаем API и статику, чтобы CSP не конфликтовала
 export const config = {
-	matcher: ['/profile'], // расширишь — добавь сюда новые защищённые пути
+	matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 }
 
-// важный момент: в проде Edge не достучится до локального API.
-// для дев/самохостинга предпочтительнее nodejs runtime.
 export const runtime = 'nodejs'
 
 export async function middleware(req: NextRequest) {
-	const apiBase = process.env.NEXT_PUBLIC_API_BASE
-	if (!apiBase) {
-		// если отсутствует базовый URL API — пускаем дальше, чтобы не словить вечные редиректы
-		return NextResponse.next()
-	}
+	// --- 1. CSP ---
+	const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
 
-	const cookie = req.headers.get('cookie') || ''
+	// Разрешаем CDN
+	const cspHeader = `
+		default-src 'self';
+		script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+		style-src 'self' 'unsafe-inline';
+		img-src 'self' blob: data: https://cdn.assets.stationeden.ru https://stationeden.ru;
+		font-src 'self';
+		object-src 'none';
+		base-uri 'self';
+		form-action 'self';
+		frame-ancestors 'none';
+		connect-src 'self' https://api.stationeden.ru wss://api.stationeden.ru;
+		upgrade-insecure-requests;
+	`
+		.replace(/\s{2,}/g, ' ')
+		.trim()
 
-	// короткий таймаут (1.5s), чтобы не подвешивать навигацию
-	const ac = new AbortController()
-	const to = setTimeout(() => ac.abort(), 1500)
+	const requestHeaders = new Headers(req.headers)
+	requestHeaders.set('x-nonce', nonce)
+	requestHeaders.set('Content-Security-Policy', cspHeader)
 
-	try {
-		const res = await fetch(`${apiBase}/auth/me`, {
-			headers: { cookie },
-			// credentials в среде middleware роли не играет, но пусть будет
-			credentials: 'include',
-			// чтобы не тащить потенциально закэшированный ответ
-			cache: 'no-store',
-			signal: ac.signal,
-		})
+	// --- 2. Проверка авторизации (только /profile) ---
+	if (req.nextUrl.pathname.startsWith('/profile')) {
+		const apiBase = process.env.NEXT_PUBLIC_API_BASE
+		const cookie = req.headers.get('cookie') || ''
 
-		clearTimeout(to)
+		if (apiBase) {
+			const ac = new AbortController()
+			const to = setTimeout(() => ac.abort(), 1500)
 
-		if (res.ok) {
-			return NextResponse.next()
+			try {
+				const res = await fetch(`${apiBase}/auth/me`, {
+					headers: { cookie },
+					credentials: 'include',
+					cache: 'no-store',
+					signal: ac.signal,
+				})
+				clearTimeout(to)
+
+				if (!res.ok) {
+					throw new Error('Not auth')
+				}
+			} catch {
+				clearTimeout(to)
+				const url = req.nextUrl.clone()
+				url.pathname = '/login'
+				url.searchParams.set('next', req.nextUrl.pathname)
+				return NextResponse.redirect(url)
+			}
 		}
-	} catch {
-		clearTimeout(to)
-		// молча падаем в редирект
 	}
 
-	const url = req.nextUrl.clone()
-	url.pathname = '/login'
-	url.searchParams.set('next', req.nextUrl.pathname) // не хардкодим /profile
-	return NextResponse.redirect(url)
+	const response = NextResponse.next({
+		request: {
+			headers: requestHeaders,
+		},
+	})
+
+	response.headers.set('Content-Security-Policy', cspHeader)
+
+	return response
 }

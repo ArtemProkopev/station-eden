@@ -1,5 +1,5 @@
-// apps/api/src/auth/auth.controller.ts
 import {
+	BadRequestException,
 	Body,
 	Controller,
 	Get,
@@ -15,7 +15,6 @@ import { JwtService } from '@nestjs/jwt'
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler'
 import { randomBytes } from 'crypto'
 import type { Request, Response } from 'express'
-import { OAuth2Client } from 'google-auth-library'
 import { ensureCsrfCookie, getCookieOptions } from '../common'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { AuthService } from './auth.service'
@@ -35,7 +34,6 @@ interface AuthenticatedRequest extends Request {
 
 type GoogleMode = 'login' | 'register' | 'link'
 
-// утилита разбора "1d/2h/30m" в миллисекунды
 function parseDurationMs(raw: string | undefined, fallbackMs: number) {
 	const s = (raw || '').trim()
 	const m = s.match(/^(\d+)([mhd])$/i)
@@ -59,15 +57,29 @@ export class AuthController {
 	private authCookieOpts() {
 		return getCookieOptions(true)
 	}
+
 	private preauthCookieOpts() {
 		return { ...getCookieOptions(true), maxAge: 10 * 60 * 1000 }
 	}
+
+	// Опции для OAuth State: Lax + Domain .stationeden.ru
+	private oauthCookieOpts() {
+		return {
+			httpOnly: true,
+			secure: true,
+			sameSite: 'lax' as const,
+			path: '/',
+			domain: process.env.COOKIE_DOMAIN || '.stationeden.ru',
+			maxAge: 10 * 60 * 1000,
+		} as any
+	}
+
 	private clearWithSameAttrs(
 		res: Response,
 		name: string,
 		opts: Record<string, any>
 	) {
-		const { maxAge, ...rest } = opts || {}
+		const { maxAge, expires, ...rest } = opts || {}
 		res.clearCookie(name, rest)
 	}
 
@@ -78,25 +90,26 @@ export class AuthController {
 	private googleEnabled() {
 		return process.env.ENABLE_GOOGLE_LOGIN === 'true'
 	}
-	private googleClient() {
-		return new OAuth2Client(process.env.GOOGLE_CLIENT_ID!)
-	}
+
 	private makeState(len = 24) {
 		return randomBytes(len).toString('hex')
 	}
+
 	private setStateCookie(res: Response, raw: string) {
-		res.cookie('google_oauth_state', raw, this.preauthCookieOpts())
+		res.cookie('google_oauth_state', raw, this.oauthCookieOpts())
 	}
+
 	private clearStateCookie(res: Response) {
-		this.clearWithSameAttrs(res, 'google_oauth_state', this.preauthCookieOpts())
+		this.clearWithSameAttrs(res, 'google_oauth_state', this.oauthCookieOpts())
 	}
+
 	private webOrigin(): string {
 		const after =
-			process.env.WEB_AFTER_LOGIN_URL || 'http://localhost:3000/profile'
+			process.env.WEB_AFTER_LOGIN_URL || 'https://stationeden.ru/profile'
 		try {
 			return new URL(after).origin
 		} catch {
-			return 'http://localhost:3000'
+			return 'https://stationeden.ru'
 		}
 	}
 	private urlTo(path: string) {
@@ -120,7 +133,6 @@ export class AuthController {
 		const login = dto.login.trim().toLowerCase()
 		const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(login)
 
-		// активная блокировка?
 		const block = await this.brute.isBlocked(login)
 		if (block.blocked) {
 			throw new UnauthorizedException({
@@ -130,7 +142,6 @@ export class AuthController {
 			})
 		}
 
-		// спец-кейс: пользователи без пароля — сразу MFA по email
 		if (isEmail) {
 			const existing = await this.auth['users'].findByEmailWithHash(login)
 			if (existing && !existing.passwordHash) {
@@ -213,7 +224,6 @@ export class AuthController {
 		const rt = (req as any).cookies?.refresh_token as string | undefined
 		if (!rt) throw new UnauthorizedException('No refresh token')
 
-		// НЕ проверяем срок жизни access — читаем sub «как есть»
 		const rawAccess = (req as any).cookies?.access_token as string | undefined
 		const decoded: any = rawAccess ? this.jwt.decode(rawAccess) : null
 		const userId: string | undefined = decoded?.sub
@@ -239,35 +249,26 @@ export class AuthController {
 		const userId = (payload as any)?.sub
 		const rt = (req as any).cookies?.refresh_token
 		if (userId) await this.auth.logout(userId, rt)
+
 		this.clearWithSameAttrs(res, 'access_token', this.authCookieOpts())
 		this.clearWithSameAttrs(res, 'refresh_token', this.authCookieOpts())
 		this.clearWithSameAttrs(res, 'preauth', this.preauthCookieOpts())
 		return { ok: true }
 	}
 
-	// ДОБАВЛЕННЫЙ МЕТОД - GET logout для обхода CSRF
 	@Get('logout-get')
 	async logoutGet(
 		@Req() req: Request,
 		@Res({ passthrough: true }) res: Response
 	) {
-		console.log('=== GET LOGOUT CALLED ===')
-
 		const payload = tryDecode(this.jwt, (req as any).cookies?.access_token)
 		const userId = (payload as any)?.sub
 		const rt = (req as any).cookies?.refresh_token
+		if (userId) await this.auth.logout(userId, rt)
 
-		console.log('User ID from token:', userId)
-
-		if (userId) {
-			await this.auth.logout(userId, rt)
-		}
-
-		// Очищаем куки
 		this.clearWithSameAttrs(res, 'access_token', this.authCookieOpts())
 		this.clearWithSameAttrs(res, 'refresh_token', this.authCookieOpts())
 		this.clearWithSameAttrs(res, 'preauth', this.preauthCookieOpts())
-
 		return { ok: true }
 	}
 
@@ -350,7 +351,9 @@ export class AuthController {
 		const mode: GoogleMode = q?.mode === 'register' ? 'register' : 'login'
 		const nonce = this.makeState()
 		const packed = `${nonce}:${mode}`
+
 		this.setStateCookie(res, packed)
+
 		const params = new URLSearchParams({
 			client_id: process.env.GOOGLE_CLIENT_ID!,
 			redirect_uri: process.env.GOOGLE_REDIRECT_URL!,
@@ -368,65 +371,99 @@ export class AuthController {
 	@Get('google/callback')
 	async googleCallback(@Req() req: Request, @Res() res: Response) {
 		if (!this.googleEnabled()) {
-			res.status(404).send('Google login disabled')
-			return
+			throw new NotFoundException('Google login disabled')
 		}
 		const { code, state } = req.query as { code?: string; state?: string }
 		const stateCookie = (req as any).cookies?.google_oauth_state as
 			| string
 			| undefined
+
 		if (!code || !state || !stateCookie || state !== stateCookie) {
+			console.warn(
+				`[OAuth Error] Mismatch. UrlState: ${state}, CookieState: ${stateCookie}`
+			)
 			this.clearStateCookie(res)
-			res.status(400).send('Invalid OAuth state/code')
-			return
+			throw new BadRequestException(
+				'Invalid OAuth state/code (Cookie mismatch)'
+			)
 		}
+
 		this.clearStateCookie(res)
-		const [, modeRaw] = String(state).split(':')
-		const tokenResp = await fetch('https://oauth2.googleapis.com/token', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-			body: new URLSearchParams({
+
+		try {
+			if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+				throw new Error('Missing GOOGLE_CLIENT_ID/SECRET env vars')
+			}
+
+			// 1. Обмениваем code на токен через нативный fetch
+			const tokenParams = new URLSearchParams({
 				code,
 				client_id: process.env.GOOGLE_CLIENT_ID!,
 				client_secret: process.env.GOOGLE_CLIENT_SECRET!,
 				redirect_uri: process.env.GOOGLE_REDIRECT_URL!,
 				grant_type: 'authorization_code',
-			}),
-		})
-		if (!tokenResp.ok) {
-			const txt = await tokenResp.text()
-			res.status(401).send(`Token exchange failed: ${txt}`)
-			return
+			})
+
+			const tokenResp = await fetch('https://oauth2.googleapis.com/token', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: tokenParams,
+			})
+
+			if (!tokenResp.ok) {
+				const txt = await tokenResp.text()
+				throw new UnauthorizedException(`Google token exchange failed: ${txt}`)
+			}
+
+			const tokens = (await tokenResp.json()) as any
+			const { access_token, id_token } = tokens
+
+			if (!access_token) {
+				throw new UnauthorizedException('No access_token in Google response')
+			}
+
+			// 2. Получаем данные пользователя через userinfo (надежнее, чем локальная верификация id_token)
+			const userResp = await fetch(
+				'https://www.googleapis.com/oauth2/v3/userinfo',
+				{
+					headers: { Authorization: `Bearer ${access_token}` },
+				}
+			)
+
+			if (!userResp.ok) {
+				throw new UnauthorizedException('Failed to fetch Google user info')
+			}
+
+			const googleUser = (await userResp.json()) as any
+			const email = googleUser.email?.toLowerCase()
+			const emailVerified = googleUser.email_verified
+			const sub = googleUser.sub
+
+			if (!email || !emailVerified || !sub) {
+				throw new UnauthorizedException(
+					'Google email not verified or sub missing'
+				)
+			}
+
+			const user = await this.auth.findOrCreateUserByGoogle(sub, email)
+			await this.auth['users'].ensureAdminRoleFor(user.email)
+			const pre = this.auth.signPreauth(user.id, user.email)
+
+			res.cookie('preauth', pre, this.preauthCookieOpts())
+
+			try {
+				await this.auth.startEmailMfa(user.id, user.email)
+			} catch {}
+
+			const verifyUrl = this.urlTo(
+				`/login/verify?email=${encodeURIComponent(user.email)}`
+			)
+			res.redirect(verifyUrl)
+		} catch (error: any) {
+			const msg = error?.message || JSON.stringify(error)
+			console.error('[Google Callback Error]:', msg)
+			throw new InternalServerErrorException(`Google Auth Failed: ${msg}`)
 		}
-		const { id_token } = (await tokenResp.json()) as any
-		if (!id_token) {
-			res.status(401).send('No id_token')
-			return
-		}
-		const ticket = await this.googleClient().verifyIdToken({
-			idToken: id_token,
-			audience: process.env.GOOGLE_CLIENT_ID!,
-		})
-		const payload = ticket.getPayload()
-		const email = payload?.email?.toLowerCase()
-		const emailVerified = payload?.email_verified
-		const sub = String(payload?.sub || '')
-		if (!email || !emailVerified || !sub) {
-			res.status(401).send('Google email not verified or sub missing')
-			return
-		}
-		const user = await this.auth.findOrCreateUserByGoogle(sub, email)
-		await this.auth['users'].ensureAdminRoleFor(user.email)
-		const pre = this.auth.signPreauth(user.id, user.email)
-		res.cookie('preauth', pre, this.preauthCookieOpts())
-		try {
-			await this.auth.startEmailMfa(user.id, user.email)
-		} catch {}
-		const verifyUrl = this.urlTo(
-			`/login/verify?email=${encodeURIComponent(user.email)}`
-		)
-		res.redirect(verifyUrl)
-		return
 	}
 
 	@Get('dev/peek-email-code')

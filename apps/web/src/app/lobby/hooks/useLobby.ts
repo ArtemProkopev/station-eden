@@ -1,3 +1,4 @@
+// apps/web/src/app/lobby/hooks/useLobby.ts
 import { useProfile } from '@/app/profile/hooks/useProfile'
 import { useScrollPrevention } from '@/app/profile/hooks/useScrollPrevention'
 import { useWebSocket } from '@/hooks/useWebSocket'
@@ -5,12 +6,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AddPlayerModal } from '../components/AddPlayerModal/AddPlayerModal'
 import { LobbySettingsModal } from '../components/LobbySettingsModal/LobbySettingsModal'
 import { PlayerManagementModal } from '../components/PlayerManagementModal/PlayerManagementModal'
+// ИСПРАВЛЕНО: Импорт из shared и алиас для Player
 import {
 	ChatMessage,
 	LobbySettings,
-	Player,
-	WebSocketMessage,
-} from '../types/lobby'
+	LobbyPlayer as Player,
+} from '@station-eden/shared'
 
 const DEFAULT_LOBBY_SETTINGS: LobbySettings = {
 	maxPlayers: 4,
@@ -52,6 +53,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 	const [isLoading, setIsLoading] = useState(true)
 	const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
 	const [isPlayerModalOpen, setIsPlayerModalOpen] = useState(false)
+	// ИСПРАВЛЕНО: Уточнение доступа к userId через data
 	const [lobbyCreatorId, setLobbyCreatorId] = useState<string>('')
 	const [error, setError] = useState<string>('')
 
@@ -63,6 +65,9 @@ export function useLobby(lobbyIdFromProps?: string) {
 	const lobbyIdRef = useRef<string>(lobbyIdFromProps || 'default-lobby')
 	const hasJoinedRef = useRef(false)
 	const reconnectTimeoutRef = useRef<NodeJS.Timeout>()
+
+	// Хелпер для получения ID пользователя из новой структуры профиля
+	const currentUserId = profile.data?.id
 
 	useEffect(() => {
 		playersRef.current = players
@@ -76,7 +81,10 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 	useScrollPrevention()
 
-	const handleWebSocketMessage = useCallback((data: WebSocketMessage) => {
+	// Примечание: WebSocketMessage в shared типизирован как { type, payload }.
+	// Здесь используется старая плоская структура. Используем any для data чтобы не ломать логику,
+	// пока бэкенд не будет полностью переведен на структуру { payload }.
+	const handleWebSocketMessage = useCallback((data: any) => {
 		if (!data?.type) return
 
 		switch (data.type) {
@@ -159,7 +167,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 	useEffect(() => {
 		if (!isConnected && hasJoinedRef.current) {
 			reconnectTimeoutRef.current = setTimeout(() => {
-				if (profile?.userId) {
+				if (currentUserId) {
 					hasJoinedRef.current = false
 				}
 			}, 2000)
@@ -170,20 +178,21 @@ export function useLobby(lobbyIdFromProps?: string) {
 				clearTimeout(reconnectTimeoutRef.current)
 			}
 		}
-	}, [isConnected, profile?.userId])
+	}, [isConnected, currentUserId])
 
 	useEffect(() => {
 		if (isConnected) setError('')
 	}, [isConnected])
 
 	useEffect(() => {
-		if (!profile?.userId || isLoading || hasJoinedRef.current) return
+		if (!currentUserId || isLoading || hasJoinedRef.current) return
 
 		const currentUser: Player = {
-			id: profile.userId,
-			name: profile.username || 'Игрок',
-			missions: (profile as any).missionsCompleted || 0,
-			hours: (profile as any).playTime || 0,
+			id: currentUserId,
+			name: profile.data?.username || 'Игрок',
+			// Используем каст, так как этих полей нет в базовом User из shared, но они могут быть в ответе API
+			missions: (profile.data as any)?.missionsCompleted || 0,
+			hours: (profile.data as any)?.playTime || 0,
 			avatar: assets.avatar,
 			isReady: false,
 		}
@@ -198,7 +207,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 				hasJoinedRef.current = false
 			}, 1000)
 		}
-	}, [profile, isLoading, assets.avatar, sendWS])
+	}, [profile.data, isLoading, assets.avatar, sendWS, currentUserId])
 
 	const handlePlayerMenuClick = useCallback((player: Player) => {
 		setSelectedPlayer(player)
@@ -211,8 +220,8 @@ export function useLobby(lobbyIdFromProps?: string) {
 	}, [])
 
 	const isLobbyCreator = useMemo(
-		() => lobbyCreatorId === profile?.userId,
-		[lobbyCreatorId, profile?.userId]
+		() => lobbyCreatorId === currentUserId,
+		[lobbyCreatorId, currentUserId]
 	)
 
 	const handleOpenLobbySettings = useCallback(() => {
@@ -229,10 +238,10 @@ export function useLobby(lobbyIdFromProps?: string) {
 			sendWS({
 				type: 'UPDATE_LOBBY_SETTINGS',
 				settings,
-				__userId: profile?.userId,
+				__userId: currentUserId,
 			})
 		},
-		[sendWS, profile?.userId]
+		[sendWS, currentUserId]
 	)
 
 	const handleMutePlayer = useCallback(
@@ -300,47 +309,47 @@ export function useLobby(lobbyIdFromProps?: string) {
 	)
 
 	const toggleReady = useCallback(() => {
-		if (!profile?.userId) return
+		if (!currentUserId) return
 
 		const currentPlayer = playersRef.current.find(
-			(p: Player) => p.id === profile.userId
+			(p: Player) => p.id === currentUserId
 		)
 		if (!currentPlayer) return
 
 		const isReady = !currentPlayer.isReady
 
 		setPlayers(prev =>
-			prev.map((p: Player) => (p.id === profile.userId ? { ...p, isReady } : p))
+			prev.map((p: Player) => (p.id === currentUserId ? { ...p, isReady } : p))
 		)
 
 		sendWS({
 			type: 'TOGGLE_READY',
-			playerId: profile.userId,
+			playerId: currentUserId,
 			isReady,
 			lobbyId: lobbyIdRef.current,
 		})
-	}, [profile?.userId, sendWS])
+	}, [currentUserId, sendWS])
 
 	const handleSendMessage = useCallback(
 		(e: React.FormEvent) => {
 			e.preventDefault()
-			if (!newMessage.trim() || !profile?.userId) return
+			if (!newMessage.trim() || !currentUserId) return
 
 			const id = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-			const message = {
+			const message: ChatMessage = {
 				id,
-				playerId: profile.userId,
-				playerName: profile.username || 'Игрок',
+				playerId: currentUserId,
+				playerName: profile.data?.username || 'Игрок',
 				text: newMessage.trim().slice(0, 300),
 				timestamp: new Date().toISOString(),
-				type: 'player' as const,
+				type: 'player',
 			}
 
 			if (!seenMsgIdsRef.current.has(id)) {
 				seenMsgIdsRef.current.add(id)
 				setChatMessages(prev => [
 					...prev,
-					{ ...message, timestamp: new Date() },
+					{ ...message, timestamp: new Date() }, // Для локального отображения Date
 				])
 			}
 
@@ -350,7 +359,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 				shouldScrollRef.current = true
 			}
 		},
-		[newMessage, profile, sendWS]
+		[newMessage, profile.data, sendWS, currentUserId]
 	)
 
 	const handleKeyPress = useCallback(
@@ -389,9 +398,8 @@ export function useLobby(lobbyIdFromProps?: string) {
 	}, [loadSavedAssets, loadUserData, checkIconsAvailability])
 
 	const currentUserReadyState = useMemo(
-		() =>
-			players.find((p: Player) => p.id === profile?.userId)?.isReady || false,
-		[players, profile?.userId]
+		() => players.find((p: Player) => p.id === currentUserId)?.isReady || false,
+		[players, currentUserId]
 	)
 
 	const lobbyId = lobbyIdFromProps || 'default-lobby'

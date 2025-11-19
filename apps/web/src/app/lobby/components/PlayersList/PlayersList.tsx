@@ -1,5 +1,5 @@
+import { LobbyPlayer as Player } from '@station-eden/shared'
 import { memo } from 'react'
-import { Player } from '../../types/lobby'
 import styles from './PlayersList.module.css'
 
 interface PlayersListProps {

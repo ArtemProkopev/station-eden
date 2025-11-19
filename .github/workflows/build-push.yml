@@ -89,13 +89,8 @@ jobs:
             echo "==> Cleanup old Docker networks and containers"
             cd ~/station-eden || { mkdir -p ~/station-eden && cd ~/station-eden; }
 
-            # Останавливаем и удаляем контейнеры
             docker compose down 2>/dev/null || true
-
-            # Очищаем сети ПЕРЕД любыми операциями
             docker network prune -f
-
-            # Полная очистка неиспользуемых ресурсов
             docker system prune -f
 
             if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -103,7 +98,7 @@ jobs:
               git checkout main || true
               git reset --hard origin/main
             else
-              echo "Not a git repo. Skipping pull (используется текущее содержимое каталога)."
+              echo "Not a git repo. Skipping pull."
             fi
 
             echo "==> Login to GHCR on server"
@@ -111,53 +106,34 @@ jobs:
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
             set -x
 
-            echo "==> Load /etc/environment (server)"
+            echo "==> Load /etc/environment"
             set +x
             set -a; [ -f /etc/environment ] && . /etc/environment || true; set +a
             set -x
 
-            # ==== образы (namespace/registry/tag) ====
             export GHCR_OWNER="${{ steps.owner.outputs.lc }}"
             export GHCR_REG="ghcr.io"
             export IMAGE_TAG="${{ github.sha }}"
             [ -n "$IMAGE_TAG" ] || IMAGE_TAG="latest"
 
-            # Выбираем compose CLI (всегда с --env-file /etc/environment)
             if docker-compose version >/dev/null 2>&1; then
               COMP="docker-compose --env-file /etc/environment -f docker-compose.yml"
             elif docker compose version >/dev/null 2>&1; then
               COMP="docker compose --env-file /etc/environment -f docker-compose.yml"
             else
-              echo "Neither 'docker-compose' nor 'docker compose' found on the server."
+              echo "Neither 'docker-compose' nor 'docker compose' found."
               exit 1
             fi
 
-            echo "==> Effective image refs (resolved by compose)"
-            $COMP config | awk '/image:/{print}'
-
-            echo "==> Sanity-check: GHCR manifests availability"
-            docker manifest inspect "${GHCR_REG}/${GHCR_OWNER}/station-eden-api:${IMAGE_TAG}" >/dev/null 2>&1 || true
-            docker manifest inspect "${GHCR_REG}/${GHCR_OWNER}/station-eden-web:${IMAGE_TAG}"  >/dev/null 2>&1 || true
-
             echo "==> Pull images"
             if ! $COMP pull; then
-              echo "First pull failed. Fallback to IMAGE_TAG=latest ..."
+              echo "First pull failed. Fallback to latest..."
               export IMAGE_TAG="latest"
-              $COMP config | awk '/image:/{print}'
               $COMP pull
             fi
 
             echo "==> Up containers"
             $COMP up -d --force-recreate
-
-            echo "==> Run DB migrations"
-            API_CID=$($COMP ps -q api || true)
-            if [ -n "${API_CID:-}" ]; then
-              docker exec -i "$API_CID" \
-                node ./node_modules/typeorm/cli.js migration:run -d dist/db/data-source.js
-            else
-              echo "API container not found (compose service name 'api'). Skipping migrations."
-            fi
 
             echo "==> Final cleanup"
             docker system prune -f

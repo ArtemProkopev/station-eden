@@ -1,4 +1,4 @@
-import { ChatMessage } from '../../types/lobby'
+import { ChatMessage } from '@station-eden/shared'
 import styles from './Chat.module.css'
 
 interface ChatProps {
@@ -20,8 +20,10 @@ export default function Chat({
 	onChatScroll,
 	chatContainerRef,
 }: ChatProps) {
-	const formatTime = (timestamp: Date) => {
-		return timestamp.toLocaleTimeString('ru-RU', {
+	// Исправлено: принимает Date или string
+	const formatTime = (timestamp: Date | string) => {
+		const date = new Date(timestamp)
+		return date.toLocaleTimeString('ru-RU', {
 			hour: '2-digit',
 			minute: '2-digit',
 		})

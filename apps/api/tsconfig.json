@@ -1,15 +1,15 @@
 {
+	"extends": "../../tsconfig.json",
 	"compilerOptions": {
 		"module": "commonjs",
 		"target": "es2019",
-		"moduleResolution": "node",
 		"outDir": "dist",
-		"rootDir": "src",
 		"experimentalDecorators": true,
 		"emitDecoratorMetadata": true,
-		"strict": true,
-		"esModuleInterop": true,
-		"skipLibCheck": true,
+		"baseUrl": "./",
+		"paths": {
+			"@station-eden/shared": ["../../packages/shared/src/index.ts"]
+		},
 		"types": ["node", "cookie-parser"],
 		"typeRoots": ["./node_modules/@types", "../../node_modules/@types"]
 	},

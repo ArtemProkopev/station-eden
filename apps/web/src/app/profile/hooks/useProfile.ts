@@ -1,123 +1,166 @@
-import { useState, useCallback } from 'react';
-import { ProfileData, ProfileIconsStatus, ProfileAssets } from '../types';
-import { PROFILE_CONFIG } from '../config';
-import { asset } from '@/lib/asset';
+// apps/web/src/app/profile/hooks/useProfile.ts
+import { asset } from '@/lib/asset'
+import { useCallback, useState } from 'react'
+import { PROFILE_CONFIG } from '../config'
+import { ProfileIconsStatus, ProfileState } from '../types'
+
+// Определяем тип для ассетов локально, так как он нужен только для UI состояния
+type ProfileAssets = {
+	avatar: string
+	frame: string
+}
 
 const migrateToAbsoluteUrl = (url: string | null): string | undefined => {
-  if (!url) return undefined;
-  return url.startsWith('http') ? url : asset(url);
-};
+	if (!url) return undefined
+	return url.startsWith('http') ? url : asset(url)
+}
 
 export const useProfile = () => {
-  const [profile, setProfile] = useState<ProfileData>({ status: 'loading' });
-  const [assets, setAssets] = useState<ProfileAssets>({
-    avatar: asset(PROFILE_CONFIG.DEFAULT.AVATAR),
-    frame: asset(PROFILE_CONFIG.DEFAULT.FRAME),
-  });
-  const [iconsStatus, setIconsStatus] = useState<ProfileIconsStatus>({
-    planet: true,
-    polygon: true,
-    copy: true,
-  });
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+	// ИСПРАВЛЕНО: Используем ProfileState
+	const [profile, setProfile] = useState<ProfileState>({ status: 'loading' })
 
-  // Загрузка сохраненных ассетов при инициализации
-  const loadSavedAssets = useCallback(() => {
-    const savedAvatar = localStorage.getItem(PROFILE_CONFIG.STORAGE_KEYS.AVATAR);
-    const savedFrame = localStorage.getItem(PROFILE_CONFIG.STORAGE_KEYS.FRAME);
+	const [assets, setAssets] = useState<ProfileAssets>({
+		avatar: asset(PROFILE_CONFIG.DEFAULT.AVATAR),
+		frame: asset(PROFILE_CONFIG.DEFAULT.FRAME),
+	})
 
-    const migratedAvatar = migrateToAbsoluteUrl(savedAvatar);
-    const migratedFrame = migrateToAbsoluteUrl(savedFrame);
+	const [iconsStatus, setIconsStatus] = useState<ProfileIconsStatus>({
+		planet: true,
+		polygon: true,
+		copy: true,
+	})
 
-    if (migratedAvatar) {
-      setAssets(prev => ({ ...prev, avatar: migratedAvatar }));
-      localStorage.setItem(PROFILE_CONFIG.STORAGE_KEYS.AVATAR, migratedAvatar);
-    }
+	const [isEditModalOpen, setIsEditModalOpen] = useState(false)
 
-    if (migratedFrame) {
-      setAssets(prev => ({ ...prev, frame: migratedFrame }));
-      localStorage.setItem(PROFILE_CONFIG.STORAGE_KEYS.FRAME, migratedFrame);
-    }
-  }, []);
+	// Загрузка сохраненных ассетов при инициализации
+	const loadSavedAssets = useCallback(() => {
+		try {
+			const savedAvatar = localStorage.getItem(
+				PROFILE_CONFIG.STORAGE_KEYS.AVATAR
+			)
+			const savedFrame = localStorage.getItem(PROFILE_CONFIG.STORAGE_KEYS.FRAME)
 
-  const checkIconsAvailability = useCallback(async () => {
-    const statusUpdates: Partial<ProfileIconsStatus> = {};
-    const toCheck = PROFILE_CONFIG.ASSETS.ICONS;
+			const migratedAvatar = migrateToAbsoluteUrl(savedAvatar)
+			const migratedFrame = migrateToAbsoluteUrl(savedFrame)
 
-    await Promise.allSettled(
-      Object.entries(toCheck).map(async ([key, path]) => {
-        try {
-          await fetch(asset(path), {
-            method: 'GET',
-            cache: 'no-store',
-            mode: 'no-cors',
-          });
-          statusUpdates[key as keyof ProfileIconsStatus] = true;
-        } catch {
-          statusUpdates[key as keyof ProfileIconsStatus] = false;
-        }
-      })
-    );
-    setIconsStatus((prev: ProfileIconsStatus) => ({ ...prev, ...statusUpdates }));
-  }, []);
+			if (migratedAvatar) {
+				setAssets(prev => ({ ...prev, avatar: migratedAvatar }))
+				localStorage.setItem(PROFILE_CONFIG.STORAGE_KEYS.AVATAR, migratedAvatar)
+			}
 
-  const loadUserData = useCallback(async () => {
-    try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
-      const response = await fetch(`${API_BASE}/auth/me`, {
-        credentials: 'include',
-        cache: 'no-store',
-      });
+			if (migratedFrame) {
+				setAssets(prev => ({ ...prev, frame: migratedFrame }))
+				localStorage.setItem(PROFILE_CONFIG.STORAGE_KEYS.FRAME, migratedFrame)
+			}
+		} catch (e) {
+			console.error('Error accessing localStorage', e)
+		}
+	}, [])
 
-      if (response.status === 401) {
-        setProfile({
-          status: 'unauth',
-          message: 'Вы не авторизованы. Войдите в аккаунт, чтобы открыть профиль.',
-        });
-        return;
-      }
+	const checkIconsAvailability = useCallback(async () => {
+		const statusUpdates: Partial<ProfileIconsStatus> = {}
+		const toCheck = PROFILE_CONFIG.ASSETS.ICONS
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+		await Promise.allSettled(
+			Object.entries(toCheck).map(async ([key, path]) => {
+				try {
+					await fetch(asset(path), {
+						method: 'GET',
+						cache: 'no-store',
+						mode: 'no-cors',
+					})
+					statusUpdates[key as keyof ProfileIconsStatus] = true
+				} catch {
+					statusUpdates[key as keyof ProfileIconsStatus] = false
+				}
+			})
+		)
+		setIconsStatus((prev: ProfileIconsStatus) => ({
+			...prev,
+			...statusUpdates,
+		}))
+	}, [])
 
-      const data = await response.json();
-      const payload = data?.data ?? data;
-      const { userId, email, username = null } = payload;
+	const loadUserData = useCallback(async () => {
+		try {
+			const API_BASE =
+				process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+			const response = await fetch(`${API_BASE}/auth/me`, {
+				credentials: 'include',
+				cache: 'no-store',
+			})
 
-      if (typeof userId === 'string' && typeof email === 'string') {
-        setProfile({ status: 'ok', userId, email, username });
-      } else {
-        throw new Error('Некорректный формат ответа сервера');
-      }
-    } catch (error) {
-      console.error('Profile data loading error:', error);
-      setProfile({
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Не удалось загрузить профиль',
-      });
-    }
-  }, []);
+			if (response.status === 401) {
+				setProfile({
+					status: 'unauth',
+					message:
+						'Вы не авторизованы. Войдите в аккаунт, чтобы открыть профиль.',
+				})
+				return
+			}
 
-  const handleSaveProfile = useCallback((newAvatar: string, newFrame: string) => {
-    setAssets({ avatar: newAvatar, frame: newFrame });
-    localStorage.setItem(PROFILE_CONFIG.STORAGE_KEYS.AVATAR, newAvatar);
-    localStorage.setItem(PROFILE_CONFIG.STORAGE_KEYS.FRAME, newFrame);
-  }, []);
+			if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
-  const handleIconError = useCallback((iconName: keyof ProfileIconsStatus) => {
-    setIconsStatus((prev: ProfileIconsStatus) => ({ ...prev, [iconName]: false }));
-  }, []);
+			const data = await response.json()
+			const payload = data?.data ?? data
 
-  return {
-    profile,
-    assets,
-    iconsStatus,
-    isEditModalOpen,
-    loadSavedAssets,
-    checkIconsAvailability,
-    loadUserData,
-    handleSaveProfile,
-    setIconsStatus,
-    setIsEditModalOpen,
-    handleIconError,
-  };
-};
+			// Деструктурируем ответ API
+			const { userId, email, username = null, avatar, frame } = payload
+
+			if (typeof userId === 'string' && typeof email === 'string') {
+				// ИСПРАВЛЕНО: Сохраняем данные в структуру ProfileState (в поле data)
+				setProfile({
+					status: 'ok',
+					data: {
+						id: userId, // API возвращает userId, мапим в id (как в shared User)
+						email,
+						username: username || '',
+						avatar,
+						frame,
+					},
+				})
+			} else {
+				throw new Error('Некорректный формат ответа сервера')
+			}
+		} catch (error) {
+			console.error('Profile data loading error:', error)
+			setProfile({
+				status: 'error',
+				message:
+					error instanceof Error
+						? error.message
+						: 'Не удалось загрузить профиль',
+			})
+		}
+	}, [])
+
+	const handleSaveProfile = useCallback(
+		(newAvatar: string, newFrame: string) => {
+			setAssets({ avatar: newAvatar, frame: newFrame })
+			localStorage.setItem(PROFILE_CONFIG.STORAGE_KEYS.AVATAR, newAvatar)
+			localStorage.setItem(PROFILE_CONFIG.STORAGE_KEYS.FRAME, newFrame)
+		},
+		[]
+	)
+
+	const handleIconError = useCallback((iconName: keyof ProfileIconsStatus) => {
+		setIconsStatus((prev: ProfileIconsStatus) => ({
+			...prev,
+			[iconName]: false,
+		}))
+	}, [])
+
+	return {
+		profile,
+		assets,
+		iconsStatus,
+		isEditModalOpen,
+		loadSavedAssets,
+		checkIconsAvailability,
+		loadUserData,
+		handleSaveProfile,
+		setIconsStatus,
+		setIsEditModalOpen,
+		handleIconError,
+	}
+}

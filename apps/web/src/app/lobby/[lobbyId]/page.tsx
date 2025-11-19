@@ -42,14 +42,27 @@ const LobbyContent = memo(
 			[lobby.players]
 		)
 
+		// ИСПРАВЛЕНО: доступ к ID через data?.id
 		const isCurrentUserSelected = useMemo(
-			() => lobby.selectedPlayer?.id === lobby.profile?.userId,
-			[lobby.selectedPlayer, lobby.profile?.userId]
+			() => lobby.selectedPlayer?.id === lobby.profile.data?.id,
+			[lobby.selectedPlayer, lobby.profile.data?.id]
+		)
+
+		// Адаптируем профиль для TopHUD
+		const topHudProfile = useMemo(
+			() => ({
+				status: lobby.profile.status,
+				userId: lobby.profile.data?.id,
+				email: lobby.profile.data?.email,
+				username: lobby.profile.data?.username,
+				message: lobby.profile.message,
+			}),
+			[lobby.profile]
 		)
 
 		return (
 			<>
-				<MemoizedTopHUD profile={lobby.profile} avatar={lobby.assets.avatar} />
+				<MemoizedTopHUD profile={topHudProfile} avatar={lobby.assets.avatar} />
 
 				<div className={styles.container}>
 					<MemoizedLobbyHeader
@@ -63,7 +76,8 @@ const LobbyContent = memo(
 							<MemoizedPlayersList
 								players={lobby.players}
 								maxPlayers={lobby.lobbySettings.maxPlayers}
-								currentUserId={lobby.profile?.userId}
+								// ИСПРАВЛЕНО: доступ к ID через data?.id
+								currentUserId={lobby.profile.data?.id}
 								onPlayerMenuClick={lobby.handlePlayerMenuClick}
 								onAddPlayer={() => lobby.setShowAddPlayerModal(true)}
 								onToggleReady={lobby.toggleReady}

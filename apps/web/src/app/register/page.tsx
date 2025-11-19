@@ -1,4 +1,3 @@
-// apps/web/src/app/register/page.tsx
 'use client'
 
 import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
@@ -7,13 +6,27 @@ import GoogleAuthButton from '@/src/components/auth/GoogleAuthButton'
 import { useUsernameGenerator } from '@/src/hooks/useUsernameGenerator'
 import { api, getUserMessage } from '@/src/lib/api'
 import { GOOGLE_ENABLED } from '@/src/lib/flags'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { RegisterSchema } from '@station-eden/shared' // Импорт из shared
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { memo, useEffect, useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
 import styles from './page.module.css'
 
 const MemoizedFireflies = memo(FirefliesProfile)
 const MemoizedStars = memo(TwinklingStars)
+
+// Расширяем схему для фронтенда (добавляем confirm password)
+const ClientRegisterSchema = RegisterSchema.extend({
+	confirm: z.string(),
+}).refine(data => data.password === data.confirm, {
+	message: 'Пароли не совпадают',
+	path: ['confirm'],
+})
+
+type ClientRegisterForm = z.infer<typeof ClientRegisterSchema>
 
 function EyeIcon() {
 	return (
@@ -53,9 +66,6 @@ function EyeOffIcon() {
 	)
 }
 
-const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const userRe = /^[a-zA-Z0-9_]{3,20}$/
-
 const hasLower = (s: string) => /[a-z]/.test(s)
 const hasUpper = (s: string) => /[A-Z]/.test(s)
 const hasDigit = (s: string) => /\d/.test(s)
@@ -63,6 +73,7 @@ const hasSpecial = (s: string) => /[^A-Za-z0-9]/.test(s)
 
 function measureStrength(pw: string): number {
 	let score = 0
+	if (!pw) return 0
 	if (pw.length >= 8) score++
 	if (pw.length >= 12) score++
 	if (hasLower(pw)) score++
@@ -87,26 +98,30 @@ function strengthMeta(score: number) {
 }
 
 export default function RegisterPage() {
-	const [email, setEmail] = useState('')
-	const [username, setUsername] = useState('')
-	const [password, setPassword] = useState('')
-	const [confirm, setConfirm] = useState('')
+	// Hook Form заменяет кучу useState
+	const {
+		register,
+		handleSubmit,
+		setValue,
+		watch,
+		trigger,
+		formState: { errors, isValid, isSubmitting },
+	} = useForm<ClientRegisterForm>({
+		resolver: zodResolver(ClientRegisterSchema),
+		mode: 'onChange', // Валидация при вводе
+	})
 
-	const [emailTouched, setEmailTouched] = useState(false)
-	const [userTouched, setUserTouched] = useState(false)
-	const [pwTouched, setPwTouched] = useState(false)
-	const [confirmTouched, setConfirmTouched] = useState(false)
+	// Наблюдаем за значениями для UI логики
+	const password = watch('password', '')
+	const confirm = watch('confirm', '')
+	const username = watch('username', '')
 
 	const [show, setShow] = useState(false)
 	const [showConfirm, setShowConfirm] = useState(false)
-
 	const [capsOn, setCapsOn] = useState(false)
 	const [error, setError] = useState<string | null>(null)
-	const [busy, setBusy] = useState(false)
 	const [mounted, setMounted] = useState(false)
 	const [shake, setShake] = useState(false)
-
-	// Анти-даблклик: краткий локальный троттлинг.
 	const [genCooldown, setGenCooldown] = useState(false)
 
 	const sp = useSearchParams()
@@ -124,13 +139,6 @@ export default function RegisterPage() {
 	const strength = useMemo(() => measureStrength(password), [password])
 	const { percent, label } = useMemo(() => strengthMeta(strength), [strength])
 
-	const isEmailValid = emailRe.test(email)
-	const isUserValid = userRe.test(username)
-	const isPwValid = password.length >= 8
-	const match = confirm.length > 0 && confirm === password
-
-	const canSubmit = isEmailValid && isUserValid && isPwValid && match && !busy
-
 	function handleCapsLock(e: React.KeyboardEvent<HTMLInputElement>) {
 		const on =
 			typeof e.getModifierState === 'function'
@@ -143,25 +151,22 @@ export default function RegisterPage() {
 		if (genCooldown) return
 		setGenCooldown(true)
 		const newUsername = generateUsername()
-		setUsername(newUsername)
-		if (!userTouched) setUserTouched(true)
+		// Устанавливаем значение в форму и запускаем валидацию
+		setValue('username', newUsername, {
+			shouldValidate: true,
+			shouldDirty: true,
+		})
 		setTimeout(() => setGenCooldown(false), 120)
 	}
 
-	async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-		e.preventDefault()
-		if (!canSubmit) {
-			setShake(true)
-			setTimeout(() => setShake(false), 340)
-			return
-		}
+	const onSubmit = async (data: ClientRegisterForm) => {
 		setError(null)
-		setBusy(true)
 		try {
-			const res = await api.register(email, username, password)
+			// data уже типизирована и валидна!
+			const res = await api.register(data.email, data.username, data.password)
 			if ((res as any)?.mfa === 'email_code_sent') {
 				router.replace(
-					`/login/verify?email=${encodeURIComponent(email)}&next=${encodeURIComponent('/profile')}`
+					`/login/verify?email=${encodeURIComponent(data.email)}&next=${encodeURIComponent('/profile')}`
 				)
 				return
 			}
@@ -170,9 +175,13 @@ export default function RegisterPage() {
 			setError(getUserMessage(err, 'register'))
 			setShake(true)
 			setTimeout(() => setShake(false), 340)
-		} finally {
-			setBusy(false)
 		}
+	}
+
+	// Обработчик отправки формы (ошибка валидации)
+	const onError = () => {
+		setShake(true)
+		setTimeout(() => setShake(false), 340)
 	}
 
 	const googleEnabled = GOOGLE_ENABLED
@@ -199,44 +208,37 @@ export default function RegisterPage() {
 						)}
 
 						<form
-							onSubmit={onSubmit}
+							onSubmit={handleSubmit(onSubmit, onError)}
 							className={`${styles.form} ${shake ? styles.isShaking : ''}`}
 							onAnimationEnd={() => shake && setShake(false)}
 							noValidate
 							autoComplete='on'
 							aria-describedby={error ? 'form-error' : undefined}
 						>
+							{/* EMAIL */}
 							<div className={styles.inputGroup}>
 								<label htmlFor='email' className={styles.label}>
 									Email
 								</label>
 								<input
 									id='email'
-									name='email'
-									required
 									type='email'
 									inputMode='email'
-									spellCheck={false}
-									autoCorrect='off'
-									autoCapitalize='none'
 									autoComplete='email'
 									placeholder='Введите свой email'
-									value={email}
-									onChange={e => {
-										if (!emailTouched) setEmailTouched(true)
-										setEmail(e.target.value.trimStart())
-									}}
 									className={`${styles.input} ${
-										emailTouched
-											? isEmailValid
+										errors.email
+											? styles.invalid
+											: watch('email')
 												? styles.valid
-												: styles.invalid
-											: ''
+												: ''
 									}`}
-									aria-invalid={emailTouched ? !isEmailValid : undefined}
+									{...register('email')}
+									aria-invalid={!!errors.email}
 								/>
 							</div>
 
+							{/* USERNAME */}
 							<div className={styles.inputGroup}>
 								<div className={styles.usernameHeader}>
 									<label htmlFor='username' className={styles.label}>
@@ -259,37 +261,33 @@ export default function RegisterPage() {
 
 								<input
 									id='username'
-									name='username'
-									required
 									type='text'
-									inputMode='text'
-									spellCheck={false}
-									autoCorrect='off'
-									autoCapitalize='none'
 									autoComplete='username'
 									placeholder='Придумайте ник (3–20, a–Z, 0–9, _ )'
-									value={username}
-									onChange={e => {
-										if (!userTouched) setUserTouched(true)
-										setUsername(e.target.value.trim())
-									}}
 									className={`${styles.input} ${
-										userTouched
-											? isUserValid
+										errors.username
+											? styles.invalid
+											: username
 												? styles.valid
-												: styles.invalid
-											: ''
+												: ''
 									}`}
-									aria-invalid={userTouched ? !isUserValid : undefined}
+									{...register('username')}
+									aria-invalid={!!errors.username}
 									aria-describedby='user-hint'
 								/>
 
-								<p id='user-hint' className={styles.pwHint}>
-									Доступны латиница, цифры и подчёркивание. Длина — 3–20
-									символов.
-								</p>
+								{/* Показываем ошибку валидации или подсказку */}
+								{errors.username ? (
+									<p className={styles.errorText}>{errors.username.message}</p>
+								) : (
+									<p id='user-hint' className={styles.pwHint}>
+										Доступны латиница, цифры и подчёркивание. Длина — 3–20
+										символов.
+									</p>
+								)}
 							</div>
 
+							{/* PASSWORD */}
 							<div className={styles.inputGroup}>
 								<label htmlFor='password' className={styles.label}>
 									Пароль
@@ -297,34 +295,24 @@ export default function RegisterPage() {
 								<div className={styles.inputWrap}>
 									<input
 										id='password'
-										name='new-password'
-										required
 										type={show ? 'text' : 'password'}
 										autoComplete='new-password'
-										minLength={8}
 										placeholder='Введите пароль (≥8)'
-										value={password}
-										onChange={e => {
-											if (!pwTouched) setPwTouched(true)
-											setPassword(e.target.value)
-										}}
+										className={`${styles.input} ${
+											errors.password
+												? styles.invalid
+												: password
+													? styles.valid
+													: ''
+										}`}
+										{...register('password')}
 										onKeyDown={handleCapsLock}
 										onKeyUp={handleCapsLock}
-										className={`${styles.input} ${
-											pwTouched
-												? isPwValid
-													? styles.valid
-													: styles.invalid
-												: ''
-										}`}
-										aria-invalid={pwTouched ? !isPwValid : undefined}
-										aria-describedby='pw-hint'
+										aria-invalid={!!errors.password}
 									/>
 									<button
 										type='button'
 										className={styles.toggleBtn}
-										aria-label={show ? 'Скрыть пароль' : 'Показать пароль'}
-										aria-pressed={show}
 										onClick={() => setShow(s => !s)}
 										title={show ? 'Скрыть пароль' : 'Показать пароль'}
 									>
@@ -332,14 +320,15 @@ export default function RegisterPage() {
 									</button>
 								</div>
 
-								{pwTouched && password.length > 0 && (
+								{errors.password && (
+									<p className={styles.errorText}>{errors.password.message}</p>
+								)}
+
+								{password.length > 0 && !errors.password && (
 									<>
 										<div
 											className={styles.strengthWrap}
 											data-strength={strength}
-											role='status'
-											aria-live='polite'
-											aria-label={`Надёжность пароля: ${label}`}
 										>
 											<div
 												className={styles.strengthBar}
@@ -350,16 +339,12 @@ export default function RegisterPage() {
 									</>
 								)}
 
-								<p id='pw-hint' className={styles.pwHint}>
-									Рекомендуем 8+ символов и комбинацию букв разного регистра,
-									цифр и спецсимволов.
-								</p>
-
 								{capsOn && (
 									<div className={styles.capsTip}>Включён Caps&nbsp;Lock</div>
 								)}
 							</div>
 
+							{/* CONFIRM PASSWORD */}
 							<div className={styles.inputGroup}>
 								<label htmlFor='confirm' className={styles.label}>
 									Подтвердите пароль
@@ -367,66 +352,48 @@ export default function RegisterPage() {
 								<div className={styles.inputWrap}>
 									<input
 										id='confirm'
-										name='confirm-password'
-										required
 										type={showConfirm ? 'text' : 'password'}
 										autoComplete='new-password'
-										minLength={8}
 										placeholder='Повторите пароль'
-										value={confirm}
-										onChange={e => {
-											if (!confirmTouched) setConfirmTouched(true)
-											setConfirm(e.target.value)
-										}}
+										className={`${styles.input} ${
+											errors.confirm
+												? styles.invalid
+												: confirm
+													? styles.valid
+													: ''
+										}`}
+										{...register('confirm')}
 										onKeyDown={handleCapsLock}
 										onKeyUp={handleCapsLock}
-										className={`${styles.input} ${
-											confirmTouched
-												? confirm.length > 0 && confirm === password
-													? styles.valid
-													: styles.invalid
-												: ''
-										}`}
-										aria-invalid={
-											confirmTouched
-												? !(confirm.length > 0 && confirm === password)
-												: undefined
-										}
 									/>
 									<button
 										type='button'
 										className={styles.toggleBtn}
-										aria-label={
-											showConfirm ? 'Скрыть пароль' : 'Показать пароль'
-										}
-										aria-pressed={showConfirm}
 										onClick={() => setShowConfirm(s => !s)}
-										title={showConfirm ? 'Скрыть пароль' : 'Показать пароль'}
 									>
 										{showConfirm ? <EyeOffIcon /> : <EyeIcon />}
 									</button>
 								</div>
 
-								{confirmTouched && confirm.length > 0 && (
+								{confirm.length > 0 && (
 									<div
-										className={`${styles.matchBadge} ${confirm === password ? styles.show : ''}`}
-										role='status'
-										aria-live='polite'
+										className={`${styles.matchBadge} ${
+											!errors.confirm && confirm === password ? styles.show : ''
+										}`}
 									>
-										{confirm === password
+										{!errors.confirm && confirm === password
 											? 'Пароли совпадают'
-											: 'Пароли не совпадают'}
+											: errors.confirm?.message}
 									</div>
 								)}
 							</div>
 
 							<button
 								type='submit'
-								className={`${styles.button} ${busy ? styles.loading : ''}`}
-								disabled={!canSubmit || busy}
-								aria-disabled={!canSubmit || busy}
+								className={`${styles.button} ${isSubmitting ? styles.loading : ''}`}
+								disabled={!isValid || isSubmitting}
 							>
-								{busy ? 'Создаём аккаунт' : 'СОЗДАТЬ АККАУНТ'}
+								{isSubmitting ? 'Создаём аккаунт' : 'СОЗДАТЬ АККАУНТ'}
 							</button>
 
 							{error && (

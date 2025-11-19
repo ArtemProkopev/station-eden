@@ -1,7 +1,8 @@
-import { ValidationPipe } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
+import { ZodValidationPipe } from 'nestjs-zod'
+import { DataSource } from 'typeorm'
 
 import { AppModule } from './app.module'
 import { ResponseInterceptor } from './common/interceptors/response.interceptor'
@@ -12,9 +13,30 @@ async function bootstrap() {
 		logger: ['error', 'warn', 'log'],
 	})
 
+	// Включаем доверие прокси Caddy (важно для OAuth/Cookies)
+	const expressApp = app.getHttpAdapter().getInstance()
+	expressApp.set('trust proxy', 1)
+
+	// Миграции
+	try {
+		const dataSource = app.get(DataSource)
+		if (dataSource.isInitialized) {
+			console.log('[System] Running database migrations...')
+			await dataSource.runMigrations()
+			console.log('[System] Database migrations completed')
+		} else {
+			console.warn('[System] DataSource not initialized, skipping migrations')
+		}
+	} catch (error) {
+		console.error('[System] Migration failed:', error)
+	}
+
 	app.use(
 		helmet({
 			crossOriginEmbedderPolicy: false,
+			crossOriginResourcePolicy: { policy: 'cross-origin' },
+			// ОТКЛЮЧАЕМ CSP НА API (он мешает OAuth и управляется фронтом)
+			contentSecurityPolicy: false,
 		})
 	)
 	app.use(cookieParser())
@@ -32,13 +54,7 @@ async function bootstrap() {
 		methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 	})
 
-	app.useGlobalPipes(
-		new ValidationPipe({
-			whitelist: true,
-			forbidNonWhitelisted: true,
-			transform: true,
-		})
-	)
+	app.useGlobalPipes(new ZodValidationPipe())
 
 	app.useGlobalInterceptors(new ResponseInterceptor())
 	app.use(CsrfMiddleware as any)
@@ -48,9 +64,8 @@ async function bootstrap() {
 	await app.listen(port, host)
 
 	const shownHost = host === '::' ? 'localhost' : host
-	console.log(`API listening on http://${shownHost}:${port}`)
-	console.log(`CORS origins: ${corsOrigins.join(', ')}`)
-	console.log(`Socket.IO enabled on path /lobby`)
+	console.log(`[System] API listening on http://${shownHost}:${port}`)
+	console.log(`[System] CORS origins: ${corsOrigins.join(', ')}`)
 }
 
 bootstrap()

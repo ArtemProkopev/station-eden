@@ -1,118 +1,136 @@
 // apps/web/src/app/profile/page.tsx
-'use client';
+'use client'
 
-import { useCallback, useEffect, useState } from 'react';
-import { useProfile } from './hooks/useProfile';
-import { useScrollPrevention } from './hooks/useScrollPrevention';
-import { ProfileHeader } from './components/ProfileHeader';
-import { ProfileAvatar } from './components/ProfileAvatar';
-import { ProfileInfo } from './components/ProfileInfo';
-import { ProfileStats } from './components/ProfileStats';
-import EditProfileModal from './components/EditProfileModal';
-import TopHUD from '@/components/TopHUD/TopHUD';
-import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile';
-import { ScaleContainer } from '@/components/ui/ScaleContainer/ScaleContainer';
-import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars';
-import styles from './page.module.css';
+import TopHUD from '@/components/TopHUD/TopHUD'
+import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
+import { ScaleContainer } from '@/components/ui/ScaleContainer/ScaleContainer'
+import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
+import { useCallback, useEffect, useState } from 'react'
+import EditProfileModal from './components/EditProfileModal'
+import { ProfileAvatar } from './components/ProfileAvatar'
+import { ProfileHeader } from './components/ProfileHeader'
+import { ProfileInfo } from './components/ProfileInfo'
+import { ProfileStats } from './components/ProfileStats'
+import { useProfile } from './hooks/useProfile'
+import { useScrollPrevention } from './hooks/useScrollPrevention'
+import styles from './page.module.css'
 
 export default function ProfilePage() {
-  const {
-    profile,
-    assets,
-    iconsStatus,
-    isEditModalOpen,
-    loadSavedAssets,
-    loadUserData,
-    checkIconsAvailability,
-    handleSaveProfile,
-    setIconsStatus,
-    setIsEditModalOpen
-  } = useProfile();
+	const {
+		profile,
+		assets,
+		iconsStatus,
+		isEditModalOpen,
+		loadSavedAssets,
+		loadUserData,
+		checkIconsAvailability,
+		handleSaveProfile,
+		setIconsStatus,
+		setIsEditModalOpen,
+	} = useProfile()
 
-  const [isLoading, setIsLoading] = useState(true);
+	const [isLoading, setIsLoading] = useState(true)
 
-  useScrollPrevention();
+	useScrollPrevention()
 
-  useEffect(() => {
-    const initializeProfile = async () => {
-      console.log('🔄 Starting profile initialization...');
-      setIsLoading(true);
-      
-      try {
-        loadSavedAssets();
-        
-        await Promise.all([
-          checkIconsAvailability(), 
-          loadUserData()
-        ]);
-        
-        console.log('Profile initialization complete');
-      } catch (error) {
-        console.error('Profile initialization failed:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    initializeProfile();
-  }, [loadSavedAssets, checkIconsAvailability, loadUserData]);
+	useEffect(() => {
+		const initializeProfile = async () => {
+			setIsLoading(true)
+			try {
+				loadSavedAssets()
+				await Promise.all([checkIconsAvailability(), loadUserData()])
+			} catch (error) {
+				console.error('Profile initialization failed:', error)
+			} finally {
+				setIsLoading(false)
+			}
+		}
 
-  const handleEditModalOpen = useCallback(() => setIsEditModalOpen(true), []);
-  const handleEditModalClose = useCallback(() => setIsEditModalOpen(false), []);
-  const handleIconError = useCallback((iconName: string) => {
-    setIconsStatus(prev => ({ ...prev, [iconName]: false }));
-  }, []);
+		initializeProfile()
+	}, [loadSavedAssets, checkIconsAvailability, loadUserData])
 
-  // Показываем лоадер пока данные не загружены
-  if (isLoading) {
-    return (
-      <main className={styles.root}>
-        <FirefliesProfile />
-        <TwinklingStars />
-        <TopHUD />
-        <ScaleContainer baseWidth={1200} baseHeight={800} minScale={0.5} maxScale={1}>
-          <div className={styles.loadingContainer}>
-            <div className={styles.loadingSpinner}></div>
-            <p>Загрузка профиля...</p>
-          </div>
-        </ScaleContainer>
-      </main>
-    );
-  }
+	const handleEditModalOpen = useCallback(
+		() => setIsEditModalOpen(true),
+		[setIsEditModalOpen]
+	)
+	const handleEditModalClose = useCallback(
+		() => setIsEditModalOpen(false),
+		[setIsEditModalOpen]
+	)
+	const handleIconError = useCallback(
+		(iconName: string) => {
+			setIconsStatus(prev => ({ ...prev, [iconName]: false }))
+		},
+		[setIconsStatus]
+	)
 
-  return (
-    <main className={styles.root}>
-      <FirefliesProfile />
-      <TwinklingStars />
+	// Формируем объект для TopHUD на лету, чтобы адаптировать новую структуру к его пропсам
+	const topHudProfile = {
+		status: profile.status,
+		userId: profile.data?.id,
+		email: profile.data?.email,
+		username: profile.data?.username,
+		message: profile.message,
+	}
 
-      <TopHUD profile={profile} avatar={assets.avatar} />
+	// Показываем лоадер пока данные не загружены
+	if (isLoading) {
+		return (
+			<main className={styles.root}>
+				<FirefliesProfile />
+				<TwinklingStars />
+				<TopHUD profile={topHudProfile} avatar={assets.avatar} />
+				<ScaleContainer
+					baseWidth={1200}
+					baseHeight={800}
+					minScale={0.5}
+					maxScale={1}
+				>
+					<div className={styles.loadingContainer}>
+						<div className={styles.loadingSpinner}></div>
+						<p>Загрузка профиля...</p>
+					</div>
+				</ScaleContainer>
+			</main>
+		)
+	}
 
-        <ProfileHeader
-          onEditClick={handleEditModalOpen}
-          iconsStatus={iconsStatus}
-          onIconError={handleIconError}
-        />
+	return (
+		<main className={styles.root}>
+			<FirefliesProfile />
+			<TwinklingStars />
 
-        <article className={styles.panel}>
-          <div className={styles.contentGrid}>
-            <ProfileAvatar
-              avatar={assets.avatar}
-              frame={assets.frame}
-              username={profile.username}
-            />
-            <ProfileInfo profile={profile} />
-          </div>
-        </article>
+			{/* Передаем адаптированный объект */}
+			<TopHUD profile={topHudProfile} avatar={assets.avatar} />
 
-        <ProfileStats />
+			<ProfileHeader
+				onEditClick={handleEditModalOpen}
+				iconsStatus={iconsStatus}
+				onIconError={handleIconError}
+			/>
 
-        <EditProfileModal
-          isOpen={isEditModalOpen}
-          onClose={handleEditModalClose}
-          onSave={handleSaveProfile}
-          currentAvatar={assets.avatar}
-          currentFrame={assets.frame}
-        />
-    </main>
-  );
+			<article className={styles.panel}>
+				<div className={styles.contentGrid}>
+					<ProfileAvatar
+						avatar={assets.avatar}
+						frame={assets.frame}
+						// ВАЖНО: Берем username из data
+						username={profile.data?.username}
+					/>
+					{/* Внимание: Убедись, что ProfileInfo внутри тоже умеет работать с profile.data */}
+					<ProfileInfo profile={profile} />
+				</div>
+			</article>
+
+			<ProfileStats />
+
+			<EditProfileModal
+				isOpen={isEditModalOpen}
+				onClose={handleEditModalClose}
+				onSave={handleSaveProfile}
+				currentAvatar={assets.avatar}
+				currentFrame={assets.frame}
+			/>
+		</main>
+	)
 }

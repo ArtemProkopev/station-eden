@@ -1,10 +1,4 @@
-import { IsString } from 'class-validator'
+import { LoginSchema } from '@station-eden/shared'
+import { createZodDto } from 'nestjs-zod'
 
-export class LoginDto {
-	// Email ИЛИ username (общий идентификатор)
-	@IsString()
-	login!: string
-
-	@IsString()
-	password!: string
-}
+export class LoginDto extends createZodDto(LoginSchema) {}
