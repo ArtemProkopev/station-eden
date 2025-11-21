@@ -1,3 +1,4 @@
+// apps/web/next.config.mjs
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -42,10 +43,24 @@ function collectPublicRedirects(CDN) {
 	return redirects
 }
 
-/** @type {import('next').NextConfig} */
 const nextConfig = {
 	output: 'standalone',
-	experimental: { serverActions: { bodySizeLimit: '2mb' } },
+
+	// Включаем сжатие ответа (gzip/brotli) на уровне Next
+	compress: true,
+
+	experimental: {
+		serverActions: { bodySizeLimit: '2mb' },
+
+		// Оптимизация импортов популярных пакетов
+		optimizePackageImports: [
+			'react',
+			'react-dom',
+			'socket.io-client',
+			'react-hook-form',
+			'@hookform/resolvers',
+		],
+	},
 
 	async redirects() {
 		const CDN = process.env.NEXT_PUBLIC_ASSETS_BASE || ''

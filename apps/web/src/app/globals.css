@@ -41,7 +41,7 @@ body {
 			no-repeat,
 		var(--bg);
 	color: var(--text);
-	font: 'RussoOne', sans-serif;
+	font-family: 'RussoOne', sans-serif;
 }
 
 /* =========================

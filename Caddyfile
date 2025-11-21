@@ -12,6 +12,14 @@ stationeden.ru, www.stationeden.ru {
 
   encode zstd gzip
 
+  # Долгий кэш для статики Next и ассетов
+  @nextStatic path /_next/static/* /_next/image/* /favicon.ico
+  header @nextStatic Cache-Control "public, max-age=31536000, immutable"
+
+  # Долгий кэш для ассетов, которые идут с origin (если не через CDN)
+  @assets path /avatars/* /frames/* /icons/* /fonts/* /decor/* /panel.png /roboted.png /login-background.* /register-background.* /main-background.* /lobby-background.* /profile-background.* /settings-background.*
+  header @assets Cache-Control "public, max-age=31536000, immutable"
+
   # Socket.IO/WebSocket
   reverse_proxy /lobby* api:4000 {
     header_up Host {http.request.host}
@@ -120,6 +128,13 @@ api.stationeden.ru {
 # ==================== LOCAL ====================
 localhost {
   encode zstd gzip
+
+  # Долгий кэш для статики Next (локально по желанию можно убрать)
+  @nextStatic path /_next/static/* /_next/image/* /favicon.ico
+  header @nextStatic Cache-Control "public, max-age=31536000, immutable"
+
+  @assets path /avatars/* /frames/* /icons/* /fonts/* /decor/* /panel.png /roboted.png /login-background.* /register-background.* /main-background.* /lobby-background.* /profile-background.* /settings-background.*
+  header @assets Cache-Control "public, max-age=31536000, immutable"
 
   # Socket.IO
   reverse_proxy /lobby* api:4000 {

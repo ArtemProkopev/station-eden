@@ -1,177 +1,27 @@
-'use client'
+// apps/web/src/app/lobby/[lobbyId]/page.tsx
+import { redirect } from 'next/navigation'
+import LobbyPageClient from './LobbyPageClient'
 
-import TopHUD from '@/components/TopHUD/TopHUD'
-import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
-import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
-import { useParams } from 'next/navigation'
-import { memo, useMemo } from 'react'
-import Chat from '../components/Chat/Chat'
-import LobbyHeader from '../components/LobbyHeader/LobbyHeader'
-import LobbyInfo from '../components/LobbyInfo/LobbyInfo'
-import PlayersList from '../components/PlayersList/PlayersList'
-import StartGameButton from '../components/StartGameButton/StartGameButton'
-import { useLobby } from '../hooks/useLobby'
-import styles from '../page.module.css'
-
-const MemoizedFireflies = memo(FirefliesProfile)
-const MemoizedStars = memo(TwinklingStars)
-const MemoizedTopHUD = memo(TopHUD)
-const MemoizedLobbyHeader = memo(LobbyHeader)
-const MemoizedLobbyInfo = memo(LobbyInfo)
-const MemoizedPlayersList = memo(PlayersList)
-const MemoizedStartGameButton = memo(StartGameButton)
-const MemoizedChat = memo(Chat)
-
-const LoadingState = memo(() => (
-	<div className={styles.loadingContainer}>
-		<div className={styles.loadingSpinner}></div>
-		<p>Загрузка лобби...</p>
-	</div>
-))
-
-const LobbyContent = memo(
-	({
-		lobbyId,
-		lobby,
-	}: {
+type Props = {
+	params: {
 		lobbyId: string
-		lobby: ReturnType<typeof useLobby>
-	}) => {
-		const readyPlayersCount = useMemo(
-			() => lobby.players.filter(p => p.isReady).length,
-			[lobby.players]
-		)
-
-		// ИСПРАВЛЕНО: доступ к ID через data?.id
-		const isCurrentUserSelected = useMemo(
-			() => lobby.selectedPlayer?.id === lobby.profile.data?.id,
-			[lobby.selectedPlayer, lobby.profile.data?.id]
-		)
-
-		// Адаптируем профиль для TopHUD
-		const topHudProfile = useMemo(
-			() => ({
-				status: lobby.profile.status,
-				userId: lobby.profile.data?.id,
-				email: lobby.profile.data?.email,
-				username: lobby.profile.data?.username,
-				message: lobby.profile.message,
-			}),
-			[lobby.profile]
-		)
-
-		return (
-			<>
-				<MemoizedTopHUD profile={topHudProfile} avatar={lobby.assets.avatar} />
-
-				<div className={styles.container}>
-					<MemoizedLobbyHeader
-						title='Лобби'
-						lobbyId={lobbyId}
-						isConnected={lobby.isConnected}
-					/>
-
-					<div className={styles.columns}>
-						<div className={styles.leftColumn}>
-							<MemoizedPlayersList
-								players={lobby.players}
-								maxPlayers={lobby.lobbySettings.maxPlayers}
-								// ИСПРАВЛЕНО: доступ к ID через data?.id
-								currentUserId={lobby.profile.data?.id}
-								onPlayerMenuClick={lobby.handlePlayerMenuClick}
-								onAddPlayer={() => lobby.setShowAddPlayerModal(true)}
-								onToggleReady={lobby.toggleReady}
-								currentUserReadyState={lobby.currentUserReadyState}
-							/>
-						</div>
-
-						<div className={styles.centerColumn}>
-							<MemoizedLobbyInfo
-								lobbySettings={lobby.lobbySettings}
-								playersCount={lobby.players.length}
-								onOpenSettings={lobby.handleOpenLobbySettings}
-							/>
-						</div>
-
-						<div className={styles.rightColumn}>
-							<MemoizedChat
-								messages={lobby.chatMessages}
-								newMessage={lobby.newMessage}
-								onMessageChange={lobby.setNewMessage}
-								onSendMessage={lobby.handleSendMessage}
-								onKeyPress={lobby.handleKeyPress}
-								onChatScroll={lobby.handleChatScroll}
-								chatContainerRef={lobby.chatContainerRef}
-							/>
-						</div>
-					</div>
-
-					<div className={styles.bottomSection}>
-						<MemoizedStartGameButton
-							readyPlayersCount={readyPlayersCount}
-							totalPlayersCount={lobby.players.length}
-							isConnected={lobby.isConnected}
-							minPlayersRequired={2}
-						/>
-					</div>
-
-					{lobby.showAddPlayerModal && (
-						<lobby.AddPlayerModal
-							isOpen={lobby.showAddPlayerModal}
-							onClose={() => lobby.setShowAddPlayerModal(false)}
-							onAddPlayer={lobby.addNewPlayer}
-						/>
-					)}
-
-					{lobby.selectedPlayer && (
-						<lobby.PlayerManagementModal
-							player={lobby.selectedPlayer}
-							isOpen={lobby.isPlayerModalOpen}
-							onClose={lobby.handleClosePlayerModal}
-							isLobbyCreator={lobby.isLobbyCreator}
-							isCurrentUser={isCurrentUserSelected}
-							onMutePlayer={lobby.handleMutePlayer}
-							onVolumeChange={lobby.handleVolumeChange}
-							onAddFriend={lobby.handleAddFriend}
-							onRemovePlayer={lobby.handleRemovePlayer}
-						/>
-					)}
-
-					{lobby.showLobbySettingsModal && (
-						<lobby.LobbySettingsModal
-							isOpen={lobby.showLobbySettingsModal}
-							onClose={() => lobby.setShowLobbySettingsModal(false)}
-							currentSettings={lobby.lobbySettings}
-							onSaveSettings={lobby.handleSaveLobbySettings}
-						/>
-					)}
-				</div>
-			</>
-		)
 	}
-)
+}
 
-export default function LobbyPage() {
-	const params = useParams<{ lobbyId: string }>()
-	const lobbyId = params?.lobbyId || 'default-lobby'
-	const lobby = useLobby(lobbyId)
+// Валидация ID лобби: латиница/цифры, длина как у Math.random().toString(36).substring(2, 10)
+function isValidLobbyId(id: string) {
+	// сейчас у тебя длина = 8, но оставим небольшой запас на будущее (3–20)
+	return /^[a-z0-9]{3,20}$/i.test(id)
+}
 
-	if (lobby.isLoading) {
-		return (
-			<main className={styles.page}>
-				<MemoizedFireflies />
-				<MemoizedStars />
-				<MemoizedTopHUD />
-				<LoadingState />
-			</main>
-		)
+export default function LobbyPage({ params }: Props) {
+	const lobbyId = params.lobbyId
+
+	// Если URL кривой /lobby/%%% или кто-то руками сломал ссылку —
+	// отправляем на /lobby, где уже генерится нормальный ID и редиректит дальше
+	if (!isValidLobbyId(lobbyId)) {
+		redirect('/lobby')
 	}
 
-	return (
-		<main className={styles.page}>
-			<MemoizedFireflies />
-			<MemoizedStars />
-			<LobbyContent lobbyId={lobbyId} lobby={lobby} />
-		</main>
-	)
+	return <LobbyPageClient lobbyId={lobbyId} />
 }

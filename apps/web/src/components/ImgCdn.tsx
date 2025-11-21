@@ -6,17 +6,27 @@ import { useEffect, useState } from 'react'
 import { asset, FALLBACK } from '../lib/asset'
 import { useCdnHealth } from '../lib/useCdnHealth'
 
-type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> & {
+type Props = Omit<
+	ImgHTMLAttributes<HTMLImageElement>,
+	'src' | 'loading' | 'decoding'
+> & {
 	src: string
+	/**
+	 * Для ключевых картинок (лого, аватар в HUD, фоновая на первом экране)
+	 * ставим priority={true}, остальное будет lazy.
+	 */
+	priority?: boolean
 }
 
-export default function ImgCdn({ src, ...rest }: Props) {
+export default function ImgCdn({ src, priority, style, ...rest }: Props) {
 	const { isPrimaryHealthy } = useCdnHealth()
 	const isRel = !/^https?:\/\//i.test(src)
 
 	// Собираем primary и fallback варианты
 	const primary = isRel ? asset(src) : src
-	const fallback = isRel ? asset(src).replace(/(https?:\/\/[^/]+)/, FALLBACK) : src.replace(/(https?:\/\/[^/]+)/, FALLBACK)
+	const fallback = isRel
+		? asset(src).replace(/(https?:\/\/[^/]+)/, FALLBACK)
+		: src.replace(/(https?:\/\/[^/]+)/, FALLBACK)
 
 	// Если primary CDN недоступен, сразу используем fallback
 	const [cur, setCur] = useState(isPrimaryHealthy ? primary : fallback)
@@ -29,8 +39,15 @@ export default function ImgCdn({ src, ...rest }: Props) {
 	return (
 		<img
 			src={cur}
+			loading={priority ? 'eager' : 'lazy'}
+			decoding='async'
 			onError={() => {
 				if (cur !== fallback) setCur(fallback)
+			}}
+			style={{
+				maxWidth: '100%',
+				height: 'auto',
+				...style,
 			}}
 			{...rest}
 		/>
