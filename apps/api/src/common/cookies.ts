@@ -1,20 +1,22 @@
-export function getCookieOptions(isHttpOnly = true) {
-	// Поскольку мы за Caddy с HTTPS, Secure обязан быть true для SameSite: none
-	const secure = true
-	const domain = process.env.AUTH_COOKIE_DOMAIN || '.stationeden.ru'
+const COOKIE_SECURE = (process.env.COOKIE_SECURE || '').toLowerCase() === 'true'
 
-	// Используем any, чтобы TypeScript не ругался на partitioned
+export function getCookieOptions(isHttpOnly = true) {
+	const rawDomain = process.env.AUTH_COOKIE_DOMAIN
+	const domain =
+		typeof rawDomain === 'string' && rawDomain.length > 0
+			? rawDomain
+			: undefined
+
 	const options: any = {
 		httpOnly: isHttpOnly,
 		path: '/',
-		secure,
-		// 'none' критически важен для OAuth редиректов
-		sameSite: 'none',
-		domain,
+		secure: COOKIE_SECURE,
+		sameSite: COOKIE_SECURE ? 'none' : 'lax',
 		maxAge: 1000 * 60 * 60 * 24 * 30,
-		// Требование Chrome для сторонних кук (разные поддомены считаются таковыми в контексте iframe/fetch)
-		partitioned: true,
 	}
+
+	if (domain) options.domain = domain
+	if (COOKIE_SECURE) options.partitioned = true
 
 	return options
 }

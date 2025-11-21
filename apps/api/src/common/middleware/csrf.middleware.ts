@@ -2,23 +2,28 @@ import { NextFunction, Request, Response } from 'express'
 import crypto from 'node:crypto'
 
 const CSRF_COOKIE = (process.env.CSRF_COOKIE_NAME || 'se_csrf').trim()
-const CSRF_DOMAIN = process.env.CSRF_COOKIE_DOMAIN || '.stationeden.ru'
+const rawCsrfDomain = process.env.CSRF_COOKIE_DOMAIN
+const CSRF_DOMAIN =
+	typeof rawCsrfDomain === 'string' && rawCsrfDomain.length > 0
+		? rawCsrfDomain
+		: undefined
+
+const COOKIE_SECURE = (process.env.COOKIE_SECURE || '').toLowerCase() === 'true'
 
 export function ensureCsrfCookie(req: Request, res: Response): string {
 	let token = (req as any).cookies?.[CSRF_COOKIE] as string | undefined
 	if (!token) {
 		token = crypto.randomBytes(24).toString('hex')
 
-		// Используем any для поддержки partitioned
 		const opts: any = {
 			httpOnly: false,
-			// 'none' + secure + partitioned = работает везде
-			sameSite: 'none',
-			secure: true,
+			sameSite: COOKIE_SECURE ? 'none' : 'lax',
+			secure: COOKIE_SECURE,
 			path: '/',
-			domain: CSRF_DOMAIN,
-			partitioned: true,
 		}
+
+		if (CSRF_DOMAIN) opts.domain = CSRF_DOMAIN
+		if (COOKIE_SECURE) opts.partitioned = true
 
 		res.cookie(CSRF_COOKIE, token, opts)
 	}
