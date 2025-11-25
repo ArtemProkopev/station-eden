@@ -3,7 +3,7 @@
 
 .root {
   min-height: 100vh;
-  background: url("/settings-background-optimized.webp") center/cover;
+  background: url("https://cdn.assets.stationeden.ru/web/settings-background-optimized.webp") center/cover;
   position: relative;
   overflow: hidden;
   font-family: 'Russo One', sans-serif;

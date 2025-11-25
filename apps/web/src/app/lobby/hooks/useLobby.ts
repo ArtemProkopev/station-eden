@@ -1,6 +1,6 @@
 // apps/web/src/app/lobby/hooks/useLobby.ts
 import { useProfile } from '@/app/profile/hooks/useProfile'
-import { useScrollPrevention } from '@/app/profile/hooks/useScrollPrevention'
+import { useScrollPrevention } from '@/hooks/useScrollPrevention'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AddPlayerModal } from '../components/AddPlayerModal/AddPlayerModal'
