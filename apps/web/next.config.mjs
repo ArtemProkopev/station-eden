@@ -49,6 +49,23 @@ const nextConfig = {
 	// Включаем сжатие ответа (gzip/brotli) на уровне Next
 	compress: true,
 
+	// Настройки для Next.js Image
+	images: {
+		// Разрешаем домены CDN
+		domains: [
+			'cdn.assets.stationeden.ru',
+			// можно добавить другие домены если нужно
+		],
+		// Форматы изображений
+		formats: ['image/webp', 'image/avif'],
+		// Размеры для респонсив images
+		deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+		imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+		// Отключаем встроенную оптимизацию для внешних изображений (они уже оптимизированы на CDN)
+		// Но оставляем для локальных изображений
+		// unoptimized: process.env.NODE_ENV === 'production' // опционально
+	},
+
 	experimental: {
 		serverActions: { bodySizeLimit: '2mb' },
 

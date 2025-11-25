@@ -2,10 +2,18 @@
   position: fixed;
   inset: 0;
   z-index: 0;
-  background-image: url('/main-background.png');
+  background-image: url('https://cdn.assets.stationeden.ru/web/main-background-optimized.webp');
   background-size: cover;
   background-position: right center;
   filter: saturate(110%) brightness(95%);
+  content-visibility: auto;
+}
+
+.bgFx {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
 }
 
 .container {
@@ -53,6 +61,7 @@
   text-shadow: 0 0 12px #63EFFF;
   animation: pulseGlow 2.6s ease-in-out infinite;
   white-space: nowrap;
+  will-change: transform;
 }
 
 .newsSliderContainer {
@@ -82,6 +91,12 @@
   flex-shrink: 0;
 }
 
+.sliderArrowLeft:hover,
+.sliderArrowRight:hover {
+  background: rgba(99, 239, 255, 0.1);
+  transform: scale(1.1);
+}
+
 .newsPanel {
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(12px);
@@ -93,6 +108,7 @@
   position: relative;
   flex: 1;
   font-family: 'RussoOne', sans-serif;
+  content-visibility: auto;
 }
 
 .newsInfo {
@@ -142,36 +158,6 @@
   font-size: 15px;
 }
 
-.sliderControls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(99, 239, 255, 0.2);
-}
-
-.sliderDots {
-  display: flex;
-  gap: 8px;
-}
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
-  border: none;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.activeDot {
-  background: #63EFFF;
-  box-shadow: 0 0 6px rgba(99, 239, 255, 0.8);
-  transform: scale(1.2);
-}
-
 .socialSection {
   position: fixed;
   left: 40px;
@@ -201,15 +187,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(8px);
-}
-
-.socialIcon img {
   width: 50px;
   height: 50px;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(8px);
+  position: relative;
+}
+
+.socialIcon:hover {
+  transform: translateY(-2px);
+  filter: drop-shadow(0 0 8px rgba(99, 239, 255, 0.6));
 }
 
 .menuSection {
@@ -317,5 +304,35 @@
   .socialSection {
     left: 20px;
     bottom: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0 20px;
+    min-width: auto;
+    flex-direction: column;
+    gap: 40px;
+  }
+  
+  .titleLine {
+    font-size: 60px;
+  }
+  
+  .menuItem {
+    width: 300px;
+    font-size: 1.1rem;
+  }
+  
+  .socialSection {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    align-items: center;
+    margin-top: 40px;
+  }
+  
+  .socialIcons {
+    gap: 30px;
   }
 }

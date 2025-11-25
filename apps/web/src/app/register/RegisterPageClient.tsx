@@ -1,422 +1,408 @@
 // apps/web/src/app/register/RegisterPageClient.tsx
 'use client'
 
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+
+// Components
 import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
 import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
 import GoogleAuthButton from '@/src/components/auth/GoogleAuthButton'
+import { EyeIcon, EyeOffIcon } from '@/src/components/ui/Icons'
+
+// Hooks & Utils
 import { useUsernameGenerator } from '@/src/hooks/useUsernameGenerator'
 import { api, getUserMessage } from '@/src/lib/api'
 import { GOOGLE_ENABLED } from '@/src/lib/flags'
-import { zodResolver } from '@hookform/resolvers/zod'
+import { measureStrength, strengthMeta } from '@/src/utils/passwordStrength'
+
+// Schemas
 import { RegisterSchema } from '@station-eden/shared'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { memo, useEffect, useMemo, useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { z } from 'zod'
+
+// Styles
 import styles from './page.module.css'
 
+// Constants
+const FORM_ANIMATION_DURATION = 340
+const USERNAME_COOLDOWN = 120
+
+// Memoized components
 const MemoizedFireflies = memo(FirefliesProfile)
 const MemoizedStars = memo(TwinklingStars)
 
-// Расширяем схему для фронтенда (добавляем confirm password)
+// Extended schema for client
 const ClientRegisterSchema = RegisterSchema.extend({
-	confirm: z.string(),
+  confirm: z.string().min(1, 'Подтверждение пароля обязательно'),
 }).refine(data => data.password === data.confirm, {
-	message: 'Пароли не совпадают',
-	path: ['confirm'],
+  message: 'Пароли не совпадают',
+  path: ['confirm'],
 })
 
 type ClientRegisterForm = z.infer<typeof ClientRegisterSchema>
 
-function EyeIcon() {
-	return (
-		<svg
-			viewBox='0 0 24 24'
-			aria-hidden='true'
-			fill='none'
-			stroke='currentColor'
-			strokeWidth='2.5'
-			strokeLinecap='round'
-			strokeLinejoin='round'
-			focusable='false'
-		>
-			<path d='M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z' />
-			<circle cx='12' cy='12' r='3' />
-		</svg>
-	)
-}
-
-function EyeOffIcon() {
-	return (
-		<svg
-			viewBox='0 0 24 24'
-			aria-hidden='true'
-			fill='none'
-			stroke='currentColor'
-			strokeWidth='2.5'
-			strokeLinecap='round'
-			strokeLinejoin='round'
-			focusable='false'
-		>
-			<path d='M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a21.8 21.8 0 0 1 4.22-4.92' />
-			<path d='M9.88 9.88a3 3 0 1 0 4.24 4.24' />
-			<path d='M10.58 4.1A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.77 21.77 0 0 1-3.12 3.91' />
-			<line x1='1' y1='1' x2='23' y2='23' />
-		</svg>
-	)
-}
-
-const hasLower = (s: string) => /[a-z]/.test(s)
-const hasUpper = (s: string) => /[A-Z]/.test(s)
-const hasDigit = (s: string) => /\d/.test(s)
-const hasSpecial = (s: string) => /[^A-Za-z0-9]/.test(s)
-
-function measureStrength(pw: string): number {
-	let score = 0
-	if (!pw) return 0
-	if (pw.length >= 8) score++
-	if (pw.length >= 12) score++
-	if (hasLower(pw)) score++
-	if (hasUpper(pw)) score++
-	if (hasDigit(pw)) score++
-	if (hasSpecial(pw)) score++
-	return Math.min(5, Math.max(0, score))
-}
-
-function strengthMeta(score: number) {
-	const steps = [0, 20, 40, 65, 85, 100]
-	const labels = [
-		'Очень слабый',
-		'Слабый',
-		'Ниже среднего',
-		'Средний',
-		'Хороший',
-		'Сильный',
-	]
-	const idx = Math.max(0, Math.min(5, score))
-	return { percent: steps[idx], label: labels[idx] }
+interface FormState {
+  showPassword: boolean
+  showConfirmPassword: boolean
+  capsLockOn: boolean
+  error: string | null
+  mounted: boolean
+  shake: boolean
+  genCooldown: boolean
 }
 
 export default function RegisterPageClient() {
-	const {
-		register,
-		handleSubmit,
-		setValue,
-		watch,
-		trigger,
-		formState: { errors, isValid, isSubmitting },
-	} = useForm<ClientRegisterForm>({
-		resolver: zodResolver(ClientRegisterSchema),
-		mode: 'onChange',
-	})
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  
+  // Form state
+  const [formState, setFormState] = useState<FormState>({
+    showPassword: false,
+    showConfirmPassword: false,
+    capsLockOn: false,
+    error: null,
+    mounted: false,
+    shake: false,
+    genCooldown: false,
+  })
 
-	const password = watch('password', '')
-	const confirm = watch('confirm', '')
-	const username = watch('username', '')
+  // Form handling
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    trigger,
+    formState: { errors, isValid, isSubmitting },
+  } = useForm<ClientRegisterForm>({
+    resolver: zodResolver(ClientRegisterSchema),
+    mode: 'onChange',
+  })
 
-	const [show, setShow] = useState(false)
-	const [showConfirm, setShowConfirm] = useState(false)
-	const [capsOn, setCapsOn] = useState(false)
-	const [error, setError] = useState<string | null>(null)
-	const [mounted, setMounted] = useState(false)
-	const [shake, setShake] = useState(false)
-	const [genCooldown, setGenCooldown] = useState(false)
+  // Watched fields
+  const password = watch('password', '')
+  const confirm = watch('confirm', '')
+  const username = watch('username', '')
 
-	const sp = useSearchParams()
-	const reason = sp.get('reason')
-	const router = useRouter()
+  // Hooks
+  const {
+    generateUsername,
+    loading: generating,
+    isWasmSupported,
+  } = useUsernameGenerator()
 
-	const {
-		generateUsername,
-		loading: generating,
-		isWasmSupported,
-	} = useUsernameGenerator()
+  // Effects
+  useEffect(() => {
+    setFormState(prev => ({ ...prev, mounted: true }))
+  }, [])
 
-	useEffect(() => setMounted(true), [])
+  // Memoized values
+  const strength = useMemo(() => measureStrength(password), [password])
+  const strengthInfo = useMemo(() => strengthMeta(strength), [strength])
+  const googleEnabled = GOOGLE_ENABLED
+  const reason = searchParams.get('reason')
 
-	const strength = useMemo(() => measureStrength(password), [password])
-	const { percent, label } = useMemo(() => strengthMeta(strength), [strength])
+  // Event handlers
+  const handleCapsLock = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    const capsOn = e.getModifierState?.('CapsLock') ?? false
+    setFormState(prev => ({ ...prev, capsLockOn: capsOn }))
+  }, [])
 
-	function handleCapsLock(e: React.KeyboardEvent<HTMLInputElement>) {
-		const on =
-			typeof e.getModifierState === 'function'
-				? e.getModifierState('CapsLock')
-				: false
-		setCapsOn(Boolean(on))
-	}
+  const handleGenerateUsername = useCallback(() => {
+    if (formState.genCooldown) return
 
-	const handleGenerateUsername = () => {
-		if (genCooldown) return
-		setGenCooldown(true)
-		const newUsername = generateUsername()
-		setValue('username', newUsername, {
-			shouldValidate: true,
-			shouldDirty: true,
-		})
-		setTimeout(() => setGenCooldown(false), 120)
-	}
+    setFormState(prev => ({ ...prev, genCooldown: true }))
+    const newUsername = generateUsername()
+    
+    setValue('username', newUsername, {
+      shouldValidate: true,
+      shouldDirty: true,
+    })
+    
+    setTimeout(() => {
+      setFormState(prev => ({ ...prev, genCooldown: false }))
+    }, USERNAME_COOLDOWN)
+  }, [formState.genCooldown, generateUsername, setValue])
 
-	const onSubmit = async (data: ClientRegisterForm) => {
-		setError(null)
-		try {
-			const res = await api.register(data.email, data.username, data.password)
-			if ((res as any)?.mfa === 'email_code_sent') {
-				router.replace(
-					`/login/verify?email=${encodeURIComponent(data.email)}&next=${encodeURIComponent('/profile')}`
-				)
-				return
-			}
-			throw new Error('Не удалось запустить подтверждение по почте')
-		} catch (err: any) {
-			setError(getUserMessage(err, 'register'))
-			setShake(true)
-			setTimeout(() => setShake(false), 340)
-		}
-	}
+  const togglePasswordVisibility = useCallback(() => {
+    setFormState(prev => ({ ...prev, showPassword: !prev.showPassword }))
+  }, [])
 
-	const onError = () => {
-		setShake(true)
-		setTimeout(() => setShake(false), 340)
-	}
+  const toggleConfirmPasswordVisibility = useCallback(() => {
+    setFormState(prev => ({ 
+      ...prev, 
+      showConfirmPassword: !prev.showConfirmPassword 
+    }))
+  }, [])
 
-	const googleEnabled = GOOGLE_ENABLED
+  const triggerShake = useCallback(() => {
+    setFormState(prev => ({ ...prev, shake: true }))
+    setTimeout(() => {
+      setFormState(prev => ({ ...prev, shake: false }))
+    }, FORM_ANIMATION_DURATION)
+  }, [])
 
-	return (
-		<main className={styles.page}>
-			<MemoizedFireflies />
-			<MemoizedStars />
+  // Form submission
+  const onSubmit = useCallback(async (data: ClientRegisterForm) => {
+    setFormState(prev => ({ ...prev, error: null }))
+    
+    try {
+      const res = await api.register(data.email, data.username, data.password)
+      
+      if ((res as any)?.mfa === 'email_code_sent') {
+        router.replace(
+          `/login/verify?email=${encodeURIComponent(data.email)}&next=${encodeURIComponent('/profile')}`
+        )
+        return
+      }
+      
+      throw new Error('Не удалось запустить подтверждение по почте')
+    } catch (err: any) {
+      setFormState(prev => ({ 
+        ...prev, 
+        error: getUserMessage(err, 'register') 
+      }))
+      triggerShake()
+    }
+  }, [router, triggerShake])
 
-			<div className={styles.container}>
-				<section className={styles.card} aria-labelledby='reg-title'>
-					<header className={styles.header}>
-						<h1 id='reg-title' className={styles.title}>
-							Регистрация
-						</h1>
-					</header>
+  const onError = useCallback(() => {
+    triggerShake()
+  }, [triggerShake])
 
-					{reason === 'google_no_account' && (
-						<p className={`${styles.notice} ${styles.info}`} role='status'>
-							Такого Google-аккаунта у нас ещё нет — вы можете
-							зарегистрироваться сейчас.
-						</p>
-					)}
+  // Render helpers
+  const renderPasswordStrength = useMemo(() => {
+    if (password.length === 0 || errors.password) return null
 
-					<form
-						onSubmit={handleSubmit(onSubmit, onError)}
-						className={`${styles.form} ${shake ? styles.isShaking : ''}`}
-						onAnimationEnd={() => shake && setShake(false)}
-						noValidate
-						autoComplete='on'
-						aria-describedby={error ? 'form-error' : undefined}
-					>
-						{/* EMAIL */}
-						<div className={styles.inputGroup}>
-							<label htmlFor='email' className={styles.label}>
-								Email
-							</label>
-							<input
-								id='email'
-								type='email'
-								inputMode='email'
-								autoComplete='email'
-								placeholder='Введите свой email'
-								className={`${styles.input} ${
-									errors.email
-										? styles.invalid
-										: watch('email')
-											? styles.valid
-											: ''
-								}`}
-								{...register('email')}
-								aria-invalid={!!errors.email}
-							/>
-						</div>
+    return (
+      <>
+        <div className={styles.strengthWrap} data-strength={strength}>
+          <div
+            className={styles.strengthBar}
+            style={{ width: `${strengthInfo.percent}%` }}
+          />
+        </div>
+        <div className={styles.strengthLabel}>{strengthInfo.label}</div>
+      </>
+    )
+  }, [password, errors.password, strength, strengthInfo])
 
-						{/* USERNAME */}
-						<div className={styles.inputGroup}>
-							<div className={styles.usernameHeader}>
-								<label htmlFor='username' className={styles.label}>
-									Username
-								</label>
-								<button
-									type='button'
-									onClick={handleGenerateUsername}
-									disabled={generating || genCooldown}
-									className={styles.generateBtn}
-									title={
-										isWasmSupported
-											? 'Сгенерировать ник с помощью WebAssembly'
-											: 'Сгенерировать случайный ник'
-									}
-								>
-									{generating ? 'Генерируем…' : 'Сгенерировать'}
-								</button>
-							</div>
+  const renderCapsLockWarning = useMemo(() => {
+    if (!formState.capsLockOn) return null
+    
+    return <div className={styles.capsTip}>Включён Caps&nbsp;Lock</div>
+  }, [formState.capsLockOn])
 
-							<input
-								id='username'
-								type='text'
-								autoComplete='username'
-								placeholder='Придумайте ник (3–20, a–Z, 0–9, _ )'
-								className={`${styles.input} ${
-									errors.username
-										? styles.invalid
-										: username
-											? styles.valid
-											: ''
-								}`}
-								{...register('username')}
-								aria-invalid={!!errors.username}
-								aria-describedby='user-hint'
-							/>
+  const renderPasswordMatch = useMemo(() => {
+    if (confirm.length === 0) return null
 
-							{errors.username ? (
-								<p className={styles.errorText}>{errors.username.message}</p>
-							) : (
-								<p id='user-hint' className={styles.pwHint}>
-									Доступны латиница, цифры и подчёркивание. Длина — 3–20
-									символов.
-								</p>
-							)}
-						</div>
+    const isMatch = !errors.confirm && confirm === password
+    
+    return (
+      <div className={`${styles.matchBadge} ${isMatch ? styles.show : ''}`}>
+        {isMatch ? 'Пароли совпадают' : errors.confirm?.message}
+      </div>
+    )
+  }, [confirm, password, errors.confirm])
 
-						{/* PASSWORD */}
-						<div className={styles.inputGroup}>
-							<label htmlFor='password' className={styles.label}>
-								Пароль
-							</label>
-							<div className={styles.inputWrap}>
-								<input
-									id='password'
-									type={show ? 'text' : 'password'}
-									autoComplete='new-password'
-									placeholder='Введите пароль (≥8)'
-									className={`${styles.input} ${
-										errors.password
-											? styles.invalid
-											: password
-												? styles.valid
-												: ''
-									}`}
-									{...register('password')}
-									onKeyDown={handleCapsLock}
-									onKeyUp={handleCapsLock}
-									aria-invalid={!!errors.password}
-								/>
-								<button
-									type='button'
-									className={styles.toggleBtn}
-									onClick={() => setShow(s => !s)}
-									title={show ? 'Скрыть пароль' : 'Показать пароль'}
-								>
-									{show ? <EyeOffIcon /> : <EyeIcon />}
-								</button>
-							</div>
+  return (
+    <main className={styles.page}>
+      <MemoizedFireflies />
+      <MemoizedStars />
 
-							{errors.password && (
-								<p className={styles.errorText}>{errors.password.message}</p>
-							)}
+      <div className={styles.container}>
+        <section className={styles.card} aria-labelledby='reg-title'>
+          <header className={styles.header}>
+            <h1 id='reg-title' className={styles.title}>
+              Регистрация
+            </h1>
+          </header>
 
-							{password.length > 0 && !errors.password && (
-								<>
-									<div className={styles.strengthWrap} data-strength={strength}>
-										<div
-											className={styles.strengthBar}
-											style={{ width: `${percent}%` }}
-										/>
-									</div>
-									<div className={styles.strengthLabel}>{label}</div>
-								</>
-							)}
+          {reason === 'google_no_account' && (
+            <p className={`${styles.notice} ${styles.info}`} role='status'>
+              Такого Google-аккаунта у нас ещё нет — вы можете
+              зарегистрироваться сейчас.
+            </p>
+          )}
 
-							{capsOn && (
-								<div className={styles.capsTip}>Включён Caps&nbsp;Lock</div>
-							)}
-						</div>
+          <form
+            onSubmit={handleSubmit(onSubmit, onError)}
+            className={`${styles.form} ${formState.shake ? styles.isShaking : ''}`}
+            onAnimationEnd={() => formState.shake && setFormState(prev => ({ ...prev, shake: false }))}
+            noValidate
+            autoComplete='on'
+            aria-describedby={formState.error ? 'form-error' : undefined}
+          >
+            {/* Email Field */}
+            <div className={styles.inputGroup}>
+              <label htmlFor='email' className={styles.label}>
+                Email
+              </label>
+              <input
+                id='email'
+                type='email'
+                inputMode='email'
+                autoComplete='email'
+                placeholder='Введите свой email'
+                className={`${styles.input} ${
+                  errors.email ? styles.invalid : watch('email') ? styles.valid : ''
+                }`}
+                {...register('email')}
+                aria-invalid={!!errors.email}
+              />
+            </div>
 
-						{/* CONFIRM PASSWORD */}
-						<div className={styles.inputGroup}>
-							<label htmlFor='confirm' className={styles.label}>
-								Подтвердите пароль
-							</label>
-							<div className={styles.inputWrap}>
-								<input
-									id='confirm'
-									type={showConfirm ? 'text' : 'password'}
-									autoComplete='new-password'
-									placeholder='Повторите пароль'
-									className={`${styles.input} ${
-										errors.confirm
-											? styles.invalid
-											: confirm
-												? styles.valid
-												: ''
-									}`}
-									{...register('confirm')}
-									onKeyDown={handleCapsLock}
-									onKeyUp={handleCapsLock}
-								/>
-								<button
-									type='button'
-									className={styles.toggleBtn}
-									onClick={() => setShowConfirm(s => !s)}
-								>
-									{showConfirm ? <EyeOffIcon /> : <EyeIcon />}
-								</button>
-							</div>
+            {/* Username Field */}
+            <div className={styles.inputGroup}>
+              <div className={styles.usernameHeader}>
+                <label htmlFor='username' className={styles.label}>
+                  Username
+                </label>
+                <button
+                  type='button'
+                  onClick={handleGenerateUsername}
+                  disabled={generating || formState.genCooldown}
+                  className={styles.generateBtn}
+                  title={
+                    isWasmSupported
+                      ? 'Сгенерировать ник с помощью WebAssembly'
+                      : 'Сгенерировать случайный ник'
+                  }
+                >
+                  {generating ? 'Генерируем…' : 'Сгенерировать'}
+                </button>
+              </div>
 
-							{confirm.length > 0 && (
-								<div
-									className={`${styles.matchBadge} ${
-										!errors.confirm && confirm === password ? styles.show : ''
-									}`}
-								>
-									{!errors.confirm && confirm === password
-										? 'Пароли совпадают'
-										: errors.confirm?.message}
-								</div>
-							)}
-						</div>
+              <input
+                id='username'
+                type='text'
+                autoComplete='username'
+                placeholder='Придумайте ник (3–20, a–Z, 0–9, _ )'
+                className={`${styles.input} ${
+                  errors.username ? styles.invalid : username ? styles.valid : ''
+                }`}
+                {...register('username')}
+                aria-invalid={!!errors.username}
+                aria-describedby='user-hint'
+              />
 
-						<button
-							type='submit'
-							className={`${styles.button} ${isSubmitting ? styles.loading : ''}`}
-							disabled={!isValid || isSubmitting}
-						>
-							{isSubmitting ? 'Создаём аккаунт' : 'СОЗДАТЬ АККАУНТ'}
-						</button>
+              {errors.username ? (
+                <p className={styles.errorText}>{errors.username.message}</p>
+              ) : (
+                <p id='user-hint' className={styles.pwHint}>
+                  Доступны латиница, цифры и подчёркивание. Длина — 3–20 символов.
+                </p>
+              )}
+            </div>
 
-						{error && (
-							<p id='form-error' className={styles.error} role='alert'>
-								{error}
-							</p>
-						)}
-					</form>
+            {/* Password Field */}
+            <div className={styles.inputGroup}>
+              <label htmlFor='password' className={styles.label}>
+                Пароль
+              </label>
+              <div className={styles.inputWrap}>
+                <input
+                  id='password'
+                  type={formState.showPassword ? 'text' : 'password'}
+                  autoComplete='new-password'
+                  placeholder='Введите пароль (≥8)'
+                  className={`${styles.input} ${
+                    errors.password ? styles.invalid : password ? styles.valid : ''
+                  }`}
+                  {...register('password')}
+                  onKeyDown={handleCapsLock}
+                  onKeyUp={handleCapsLock}
+                  aria-invalid={!!errors.password}
+                />
+                <button
+                  type='button'
+                  className={styles.toggleBtn}
+                  onClick={togglePasswordVisibility}
+                  title={formState.showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                >
+                  {formState.showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              </div>
 
-					<p className={styles.swap}>
-						Уже есть аккаунт?{' '}
-						<Link href='/login' className={styles.link}>
-							Войти
-						</Link>
-					</p>
+              {errors.password && (
+                <p className={styles.errorText}>{errors.password.message}</p>
+              )}
 
-					{mounted && googleEnabled && (
-						<>
-							<div
-								className={styles.hr}
-								role='separator'
-								aria-label='Или через Google'
-							>
-								<span>Или через Google</span>
-							</div>
-							<div className={styles.oauthBlock}>
-								<GoogleAuthButton mode='register' label='Продолжить с Google' />
-							</div>
-						</>
-					)}
-				</section>
-			</div>
-		</main>
-	)
+              {renderPasswordStrength}
+              {renderCapsLockWarning}
+            </div>
+
+            {/* Confirm Password Field */}
+            <div className={styles.inputGroup}>
+              <label htmlFor='confirm' className={styles.label}>
+                Подтвердите пароль
+              </label>
+              <div className={styles.inputWrap}>
+                <input
+                  id='confirm'
+                  type={formState.showConfirmPassword ? 'text' : 'password'}
+                  autoComplete='new-password'
+                  placeholder='Повторите пароль'
+                  className={`${styles.input} ${
+                    errors.confirm ? styles.invalid : confirm ? styles.valid : ''
+                  }`}
+                  {...register('confirm')}
+                  onKeyDown={handleCapsLock}
+                  onKeyUp={handleCapsLock}
+                />
+                <button
+                  type='button'
+                  className={styles.toggleBtn}
+                  onClick={toggleConfirmPasswordVisibility}
+                >
+                  {formState.showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              </div>
+
+              {renderPasswordMatch}
+            </div>
+
+            <button
+              type='submit'
+              className={`${styles.button} ${isSubmitting ? styles.loading : ''}`}
+              disabled={!isValid || isSubmitting}
+            >
+              {isSubmitting ? 'Создаём аккаунт' : 'СОЗДАТЬ АККАУНТ'}
+            </button>
+
+            {formState.error && (
+              <p id='form-error' className={styles.error} role='alert'>
+                {formState.error}
+              </p>
+            )}
+          </form>
+
+          <p className={styles.swap}>
+            Уже есть аккаунт?{' '}
+            <Link href='/login' className={styles.link}>
+              Войти
+            </Link>
+          </p>
+
+          {formState.mounted && googleEnabled && (
+            <>
+              <div
+                className={styles.hr}
+                role='separator'
+                aria-label='Или через Google'
+              >
+                <span>Или через Google</span>
+              </div>
+              <div className={styles.oauthBlock}>
+                <GoogleAuthButton mode='register' label='Продолжить с Google' />
+              </div>
+            </>
+          )}
+        </section>
+      </div>
+    </main>
+  )
 }

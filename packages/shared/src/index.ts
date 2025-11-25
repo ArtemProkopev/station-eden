@@ -1,3 +1,4 @@
+// @station-eden/shared - дополняем существующий файл
 import { z } from 'zod'
 
 // ==============================================================================
@@ -115,4 +116,59 @@ export interface UserSettings {
 	language: string
 	sessionHistory: boolean
 	purchaseHistory: boolean
+}
+
+// ==============================================================================
+// 5. CLIENT-SPECIFIC TYPES (Дополнения для клиента)
+// ==============================================================================
+
+/**
+ * Расширенная схема регистрации для клиента (добавляем confirm password)
+ */
+export const ClientRegisterSchema = RegisterSchema.extend({
+  confirm: z.string().min(1, 'Подтверждение пароля обязательно'),
+}).refine(data => data.password === data.confirm, {
+  message: 'Пароли не совпадают',
+  path: ['confirm'],
+})
+
+export type ClientRegisterForm = z.infer<typeof ClientRegisterSchema>
+
+/**
+ * Расширенный пользователь с токеном (для клиентского хранилища)
+ */
+export interface UserData extends User {
+  token: string
+}
+
+/**
+ * Ответ от сервера при логине
+ */
+export interface LoginResponse {
+  mfa?: string
+  email?: string
+  needSetPassword?: boolean
+  user?: User
+  id?: string
+  token?: string
+  access_token?: string
+  username?: string
+  avatar?: string
+}
+
+/**
+ * Данные блокировки аккаунта (для localStorage)
+ */
+export interface LockPayload {
+  login: string
+  lockedUntilIso: string
+}
+
+/**
+ * Информация о блокировке от сервера
+ */
+export interface ServerLockInfo {
+  lockedMinutes?: number
+  lockedUntil?: string
+  attemptsLeft?: number
 }

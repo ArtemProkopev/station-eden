@@ -12,7 +12,7 @@ import { ProfileHeader } from './components/ProfileHeader'
 import { ProfileInfo } from './components/ProfileInfo'
 import { ProfileStats } from './components/ProfileStats'
 import { useProfile } from './hooks/useProfile'
-import { useScrollPrevention } from './hooks/useScrollPrevention'
+import { useScrollPrevention } from '@/hooks/useScrollPrevention'
 import styles from './page.module.css'
 
 export default function ProfilePageClient() {

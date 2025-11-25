@@ -9,18 +9,24 @@
   height: 200px;
   margin-top: 20px;
   margin-right: 160px;
+  /* Оптимизация для GPU */
+  transform: translateZ(0);
+  will-change: transform;
 }
 
-/* Панель как фон */
+/* Панель как фон - оптимизированная версия */
 .panelBackground {
   position: absolute;
   object-fit: contain;
   z-index: 1;
   pointer-events: none;
   margin-top: 320px;
+  /* Предзагрузка и оптимизация */
+  content-visibility: auto;
+  transform: translateZ(0);
 }
 
-/* Кнопка Play поверх панели */
+/* Кнопка Play - оптимизированные анимации */
 .mainPlayButton {
   position: relative;
   width: 360px;
@@ -35,7 +41,10 @@
     rotateY(-20deg)
     scale(1)
     perspective(800px);
-  transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  /* Упрощенная анимация для производительности */
+  transition: 
+    transform 0.4s cubic-bezier(0.25, 1, 0.5, 1),
+    filter 0.3s ease;
   overflow: hidden;
   animation: float3DLeftSmall 4s ease-in-out infinite;
   z-index: 2;
@@ -45,6 +54,9 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  /* GPU оптимизация */
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .mainPlayButton:hover {
@@ -58,7 +70,7 @@
   animation-play-state: paused;
 }
 
-/* Верхняя грань с перспективой */
+/* Верхняя грань - оптимизированная */
 .mainPlayButton .topEdge {
   position: absolute;
   top: -8px;
@@ -73,9 +85,12 @@
   transform-origin: top center;
   z-index: 0;
   transition: all 0.4s ease;
+  /* GPU ускорение */
+  backface-visibility: hidden;
 }
 
-.mainPlayButton:hover .topEdge {
+/* Заменяем :hover на data-attribute для лучшего контроля */
+.mainPlayButton .topEdge[data-hovered="true"] {
   height: 20px;
   background: linear-gradient(85deg,
     rgba(40, 120, 220, 0.8) 0%,
@@ -99,6 +114,8 @@
   display: block;
   transition: all 0.3s ease;
   line-height: 1;
+  /* Оптимизация шрифта */
+  font-display: swap;
 }
 
 .mainPlayButton:hover .playText {
@@ -109,29 +126,7 @@
     0 0 24px #28d8ff;
 }
 
-.stationText {
-  font-family: 'RussoOne', sans-serif;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #b9f4ff;
-  text-shadow: 0 0 4px #28d8ff;
-  letter-spacing: 6px;
-  text-transform: uppercase;
-  opacity: 0.8;
-  margin-top: 8px;
-  position: relative;
-  z-index: 2;
-  transform: translateZ(15px) translateX(-12px) scaleX(0.9);
-  transition: all 0.3s ease;
-  line-height: 1;
-}
-
-.mainPlayButton:hover .stationText {
-  opacity: 1;
-  text-shadow: 0 0 8px #28d8ff;
-}
-
-/* ===== анимации ===== */
+/* ===== ОПТИМИЗИРОВАННЫЕ АНИМАЦИИ ===== */
 @keyframes float3DLeftSmall {
   0%, 100% {
     transform:
@@ -149,7 +144,7 @@
   }
 }
 
-/* Адаптивность для блока с панелью и кнопкой */
+/* Оптимизация для мобильных устройств */
 @media (max-width: 1400px) {
   .panelBackground {
     margin-top: 350px;
@@ -162,6 +157,8 @@
 
   .mainPlayButton {
     margin-top: 90px;
+    /* Упрощаем анимацию на мобильных */
+    animation: none;
   }
 }
 
@@ -169,6 +166,16 @@
   .mainButtonContainer {
     transform: scale(0.8);
     margin-right: 80px;
+  }
+  
+  .mainPlayButton {
+    /* Отключаем сложные трансформации на мобильных */
+    transform: rotate(8deg) scale(1);
+    animation: none;
+  }
+  
+  .mainPlayButton:hover {
+    transform: rotate(8deg) scale(1.05);
   }
 }
 
@@ -182,7 +189,29 @@
     font-size: 2.8rem;
   }
   
-  .stationText {
-    font-size: 1rem;
+  /* Отключаем 3D эффекты на мобильных */
+  .mainPlayButton {
+    transform: none;
+    animation: none;
+  }
+  
+  .mainPlayButton:hover {
+    transform: scale(1.05);
+  }
+  
+  .mainPlayButton .topEdge {
+    display: none; /* Скрываем сложный эффект на мобильных */
+  }
+}
+
+/* Режим reduced-motion для доступности */
+@media (prefers-reduced-motion: reduce) {
+  .mainPlayButton {
+    animation: none;
+    transition: none;
+  }
+  
+  .mainPlayButton:hover {
+    transform: scale(1.05);
   }
 }

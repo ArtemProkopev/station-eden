@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react' // ← ДОБАВЛЕН useRef
 import ImgCdn from '../../../components/ImgCdn'
 import { asset } from '../../../lib/asset'
 import styles from './EditProfileModal.module.css'
@@ -42,6 +42,42 @@ const FRAMES = [
 	asset('/frames/testframe.png'),
 ]
 
+// Хук для предзагрузки изображений
+function useImagePreload(urls: string[]) {
+  useEffect(() => {
+    urls.forEach(url => {
+      const img = new Image()
+      img.src = url
+    })
+  }, [urls])
+}
+
+// Оптимизированный компонент для изображений с ленивой загрузкой
+const LazyImage = ({ src, alt, className, priority = false }: {
+  src: string
+  alt: string
+  className?: string
+  priority?: boolean
+}) => {
+  const [loaded, setLoaded] = useState(priority)
+  
+  useEffect(() => {
+    if (priority) {
+      const img = new Image()
+      img.src = src
+      img.onload = () => setLoaded(true)
+    }
+  }, [src, priority])
+
+  return (
+    <ImgCdn
+      src={src}
+      alt={alt}
+      className={`${className} ${!loaded ? styles.loading : ''}`}
+    />
+  )
+}
+
 // Нормализуем входящее значение к абсолютному URL
 function toAbsolute(url?: string) {
 	if (!url) return undefined
@@ -69,13 +105,43 @@ export default function EditProfileModal({
 	const [selectedFrame, setSelectedFrame] = useState(initialFrame)
 	const [activeTab, setActiveTab] = useState<'avatars' | 'frames'>('avatars')
 
+  // Предзагрузка изображений при открытии модалки
+  useImagePreload([initialAvatar, initialFrame])
+  
+  // Предзагрузка всех изображений при монтировании (осторожно с количеством)
+  useEffect(() => {
+    if (isOpen) {
+      // Предзагружаем только первые несколько изображений каждого типа
+      const avatarsToPreload = AVATARS.slice(0, 4)
+      const framesToPreload = FRAMES.slice(0, 4)
+      
+      ;[...avatarsToPreload, ...framesToPreload].forEach(url => {
+        const img = new Image()
+        img.src = url
+      })
+    }
+  }, [isOpen])
+
 	if (!isOpen) return null
 
 	const handleSave = () => {
-		// Всегда сохраняем абсолютные ссылки (у нас уже так)
 		onSave(selectedAvatar!, selectedFrame!)
 		onClose()
 	}
+
+  // Предзагрузка изображений при смене таба
+  const handleTabChange = (tab: 'avatars' | 'frames') => {
+    setActiveTab(tab)
+    
+    // Предзагружаем изображения для нового таба
+    const urlsToPreload = tab === 'avatars' ? AVATARS.slice(4) : FRAMES.slice(4)
+    setTimeout(() => {
+      urlsToPreload.forEach(url => {
+        const img = new Image()
+        img.src = url
+      })
+    }, 100)
+  }
 
 	return (
 		<div className={styles.modalOverlay} onClick={onClose}>
@@ -90,13 +156,13 @@ export default function EditProfileModal({
 				<div className={styles.tabs}>
 					<button 
 						className={`${styles.tab} ${activeTab === 'avatars' ? styles.activeTab : ''}`}
-						onClick={() => setActiveTab('avatars')}
+						onClick={() => handleTabChange('avatars')}
 					>
 						Аватары
 					</button>
 					<button 
 						className={`${styles.tab} ${activeTab === 'frames' ? styles.activeTab : ''}`}
-						onClick={() => setActiveTab('frames')}
+						onClick={() => handleTabChange('frames')}
 					>
 						Рамки
 					</button>
@@ -107,14 +173,16 @@ export default function EditProfileModal({
 						<h3 className={styles.previewTitle}>Предпросмотр</h3>
 						<div className={styles.previewContainer}>
 							<div className={styles.previewImage}>
-								<ImgCdn
-									src={selectedAvatar!}
+								<LazyImage
+									src={selectedAvatar}
 									alt='Аватар'
+                  priority={true}
 									className={styles.previewAvatar}
 								/>
-								<ImgCdn
-									src={selectedFrame!}
+								<LazyImage
+									src={selectedFrame}
 									alt='Рамка'
+                  priority={true}
 									className={styles.previewFrame}
 								/>
 							</div>
@@ -136,14 +204,19 @@ export default function EditProfileModal({
 							<div>
 								<h3 className={styles.sectionTitle}>Выберите аватар</h3>
 								<div className={styles.grid}>
-									{AVATARS.map(a => (
+									{AVATARS.map((avatar, index) => (
 										<button
-											key={a}
-											className={`${styles.option} ${selectedAvatar === a ? styles.selected : ''}`}
-											onClick={() => setSelectedAvatar(a)}
+											key={avatar}
+											className={`${styles.option} ${selectedAvatar === avatar ? styles.selected : ''}`}
+											onClick={() => setSelectedAvatar(avatar)}
 										>
-											<ImgCdn src={a} alt='Аватар' className={styles.optionImage} />
-											{selectedAvatar === a && <div className={styles.selectedBadge}>✓</div>}
+											<LazyImage 
+                        src={avatar} 
+                        alt='Аватар' 
+                        className={styles.optionImage}
+                        priority={index < 4} // Приоритетная загрузка первых 4
+                      />
+											{selectedAvatar === avatar && <div className={styles.selectedBadge}>✓</div>}
 										</button>
 									))}
 								</div>
@@ -154,14 +227,19 @@ export default function EditProfileModal({
 							<div>
 								<h3 className={styles.sectionTitle}>Выберите рамку</h3>
 								<div className={styles.grid}>
-									{FRAMES.map(f => (
+									{FRAMES.map((frame, index) => (
 										<button
-											key={f}
-											className={`${styles.option} ${selectedFrame === f ? styles.selected : ''}`}
-											onClick={() => setSelectedFrame(f)}
+											key={frame}
+											className={`${styles.option} ${selectedFrame === frame ? styles.selected : ''}`}
+											onClick={() => setSelectedFrame(frame)}
 										>
-											<ImgCdn src={f} alt='Рамка' className={styles.optionImage} />
-											{selectedFrame === f && <div className={styles.selectedBadge}>✓</div>}
+											<LazyImage 
+                        src={frame} 
+                        alt='Рамка' 
+                        className={styles.optionImage}
+                        priority={index < 4} // Приоритетная загрузка первых 4
+                      />
+											{selectedFrame === frame && <div className={styles.selectedBadge}>✓</div>}
 										</button>
 									))}
 								</div>

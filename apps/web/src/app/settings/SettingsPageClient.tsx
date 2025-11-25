@@ -1,6 +1,7 @@
 // apps/web/src/app/settings/SettingsPageClient.tsx
 'use client'
 
+import { useScrollPrevention } from '@/hooks/useScrollPrevention' // ← Обновленный импорт
 import { useEffect, useState } from 'react'
 import TopHUD from '../../components/TopHUD/TopHUD'
 import { ScaleContainer } from '../../components/ui/ScaleContainer/ScaleContainer'
@@ -11,7 +12,6 @@ import {
 	SettingsSidebar,
 	type SettingsSection,
 } from './components/SettingsSidebar/SettingsSidebar'
-import { useScrollPrevention } from './hooks/useScrollPrevention'
 import { useSettings } from './hooks/useSettings'
 import styles from './page.module.css'
 
@@ -28,7 +28,7 @@ export default function SettingsPageClient() {
 		updateSoundSettings,
 	} = useSettings()
 
-	useScrollPrevention()
+	useScrollPrevention() // ← Теперь использует общий хук
 
 	// Инициализация данных
 	useEffect(() => {
