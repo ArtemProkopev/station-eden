@@ -2,8 +2,10 @@
 'use client'
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { zodResolver } from '@hookform/resolvers/zod'
 
 // Components
 import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
@@ -15,10 +17,15 @@ import { EyeIcon, EyeOffIcon, ClockIcon } from '@/src/components/ui/Icons'
 import { useAuthLock } from '@/src/hooks/useAuthLock'
 import { api, getUserMessage } from '@/src/lib/api'
 import { GOOGLE_ENABLED } from '@/src/lib/flags'
-import { isLoginValid } from '@/src/utils/validation'
 import { parseServerInfo } from '@/src/utils/serverInfoParser'
 import { writeLock, clearLock, normLogin } from '@/src/utils/authLock'
-import { UserData, LoginResponse } from '@station-eden/shared' 
+import { 
+  UserData, 
+  LoginResponse, 
+  LoginSchema, 
+  LoginDto,
+  ServerLockInfo 
+} from '@station-eden/shared'
 
 // Styles
 import styles from './page.module.css'
@@ -32,8 +39,6 @@ const MemoizedFireflies = memo(FirefliesProfile)
 const MemoizedStars = memo(TwinklingStars)
 
 interface FormState {
-  login: string
-  password: string
   showPassword: boolean
   error: string | null
   busy: boolean
@@ -47,13 +52,23 @@ export default function LoginPageClient() {
   
   // Form state
   const [formState, setFormState] = useState<FormState>({
-    login: '',
-    password: '',
     showPassword: false,
     error: null,
     busy: false,
     mounted: false,
     shake: false,
+  })
+
+  // Form handling
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors, isValid, isSubmitting },
+    setError,
+  } = useForm<LoginDto>({
+    resolver: zodResolver(LoginSchema),
+    mode: 'onChange',
   })
 
   // Auth lock state
@@ -68,6 +83,10 @@ export default function LoginPageClient() {
 
   const lastLoginRef = useRef<string>('')
 
+  // Watched fields
+  const login = watch('login', '')
+  const password = watch('password', '')
+
   // Effects
   useEffect(() => {
     setFormState(prev => ({ ...prev, mounted: true }))
@@ -79,10 +98,10 @@ export default function LoginPageClient() {
   const googleEnabled = GOOGLE_ENABLED
 
   const canSubmit = useMemo(() => {
-    if (formState.busy) return false
+    if (isSubmitting) return false
     if (locked) return false
-    return isLoginValid(formState.login) && formState.password.length >= 8
-  }, [formState.busy, formState.login, formState.password.length, locked])
+    return isValid && login.length > 0 && password.length >= 1
+  }, [isSubmitting, isValid, login, password, locked])
 
   const progressPct = useMemo(() => {
     if (attemptsLeft == null) return 0
@@ -94,7 +113,7 @@ export default function LoginPageClient() {
 
   // Event handlers
   const handleParseAndSet = useCallback((err: any) => {
-    const info = parseServerInfo(err)
+    const info = parseServerInfo(err) as ServerLockInfo
     
     if (info.attemptsLeft !== undefined) {
       setAttemptsLeft(Number(info.attemptsLeft))
@@ -104,7 +123,7 @@ export default function LoginPageClient() {
       const until = new Date(Date.now() + Number(info.lockedMinutes) * 60 * 1000)
       const iso = until.toISOString()
       setLockedUntilIso(iso)
-      writeLock(lastLoginRef.current || formState.login || 'unknown', iso)
+      writeLock(lastLoginRef.current || login || 'unknown', iso)
     }
     
     if (info.lockedUntil) {
@@ -112,24 +131,16 @@ export default function LoginPageClient() {
       if (!Number.isNaN(parsed)) {
         const iso = new Date(parsed).toISOString()
         setLockedUntilIso(iso)
-        writeLock(lastLoginRef.current || formState.login || 'unknown', iso)
+        writeLock(lastLoginRef.current || login || 'unknown', iso)
       }
     }
-  }, [formState.login, setAttemptsLeft, setLockedUntilIso])
+  }, [login, setAttemptsLeft, setLockedUntilIso])
 
   const triggerShake = useCallback(() => {
     setFormState(prev => ({ ...prev, shake: true }))
     setTimeout(() => {
       setFormState(prev => ({ ...prev, shake: false }))
     }, FORM_ANIMATION_DURATION)
-  }, [])
-
-  const handleLoginChange = useCallback((value: string) => {
-    setFormState(prev => ({ ...prev, login: value.trimStart() }))
-  }, [])
-
-  const handlePasswordChange = useCallback((value: string) => {
-    setFormState(prev => ({ ...prev, password: value }))
   }, [])
 
   const togglePasswordVisibility = useCallback(() => {
@@ -156,19 +167,17 @@ export default function LoginPageClient() {
     router.replace(next)
   }, [router, next])
 
-  const onSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    
+  const onSubmit = useCallback(async (data: LoginDto) => {
     if (!canSubmit) {
       triggerShake()
       return
     }
 
     setFormState(prev => ({ ...prev, error: null, busy: true }))
-    lastLoginRef.current = normLogin(formState.login)
+    lastLoginRef.current = normLogin(data.login)
 
     try {
-      const res = await api.login(formState.login, formState.password)
+      const res = await api.login(data.login, data.password)
       const response = res as LoginResponse
 
       // MFA по email
@@ -188,18 +197,30 @@ export default function LoginPageClient() {
       // Сохраняем данные пользователя
       const userData: UserData = {
         id: response.user?.id || response.id || 'unknown',
-        email: response.user?.email || response.email || formState.login,
-        username: response.user?.username || response.username || formState.login,
+        email: response.user?.email || response.email || data.login,
+        username: response.user?.username || response.username || data.login,
         avatar: response.user?.avatar || response.avatar,
         token: response.token || response.access_token || 'auth-token',
       }
 
       handleSuccessfulLogin(userData)
     } catch (err: any) {
+      const errorMessage = getUserMessage(err, 'login')
       setFormState(prev => ({ 
         ...prev, 
-        error: getUserMessage(err, 'login') 
+        error: errorMessage 
       }))
+      
+      // Устанавливаем ошибку в форму для конкретных полей если нужно
+      if (err.fieldErrors) {
+        Object.entries(err.fieldErrors).forEach(([field, message]) => {
+          setError(field as keyof LoginDto, {
+            type: 'server',
+            message: Array.isArray(message) ? message[0] : String(message),
+          })
+        })
+      }
+      
       handleParseAndSet(err)
       triggerShake()
     } finally {
@@ -207,14 +228,17 @@ export default function LoginPageClient() {
     }
   }, [
     canSubmit, 
-    formState.login, 
-    formState.password, 
     next, 
     router, 
     handleParseAndSet, 
     triggerShake, 
-    handleSuccessfulLogin
+    handleSuccessfulLogin,
+    setError
   ])
+
+  const onError = useCallback(() => {
+    triggerShake()
+  }, [triggerShake])
 
   // Render helpers
   const renderLockPills = useMemo(() => (
@@ -279,7 +303,7 @@ export default function LoginPageClient() {
           {renderLockPills}
 
           <form
-            onSubmit={onSubmit}
+            onSubmit={handleSubmit(onSubmit, onError)}
             className={`${styles.form} ${formState.shake ? styles.isShaking : ''}`}
             onAnimationEnd={() => formState.shake && setFormState(prev => ({ ...prev, shake: false }))}
             noValidate
@@ -297,22 +321,22 @@ export default function LoginPageClient() {
               </label>
               <input
                 id='login'
-                name='login'
-                required
                 type='text'
                 spellCheck={false}
                 autoCorrect='off'
                 autoCapitalize='none'
                 autoComplete='username email'
                 placeholder='Введите email или username'
-                value={formState.login}
-                onChange={e => handleLoginChange(e.target.value)}
                 className={`${styles.input} ${
-                  formState.login.length > 0 && !isLoginValid(formState.login) ? styles.invalid : ''
+                  errors.login ? styles.invalid : login ? styles.valid : ''
                 }`}
-                aria-invalid={formState.login.length > 0 ? !isLoginValid(formState.login) : undefined}
+                {...register('login')}
+                aria-invalid={!!errors.login}
                 disabled={locked}
               />
+              {errors.login && (
+                <p className={styles.errorText}>{errors.login.message}</p>
+              )}
             </div>
 
             {/* Password Field */}
@@ -323,22 +347,14 @@ export default function LoginPageClient() {
               <div className={styles.inputWrap}>
                 <input
                   id='password'
-                  name='current-password'
-                  required
                   type={formState.showPassword ? 'text' : 'password'}
                   autoComplete='current-password'
-                  minLength={8}
-                  placeholder='Введите пароль (≥8)'
-                  value={formState.password}
-                  onChange={e => handlePasswordChange(e.target.value)}
+                  placeholder='Введите пароль'
                   className={`${styles.input} ${
-                    formState.password.length > 0 && formState.password.length < 8
-                      ? styles.invalid
-                      : ''
+                    errors.password ? styles.invalid : password ? styles.valid : ''
                   }`}
-                  aria-invalid={
-                    formState.password.length > 0 ? formState.password.length < 8 : undefined
-                  }
+                  {...register('password')}
+                  aria-invalid={!!errors.password}
                   disabled={locked}
                 />
                 <button
@@ -353,6 +369,9 @@ export default function LoginPageClient() {
                   {formState.showPassword ? <EyeOffIcon /> : <EyeIcon />}
                 </button>
               </div>
+              {errors.password && (
+                <p className={styles.errorText}>{errors.password.message}</p>
+              )}
             </div>
 
             <button

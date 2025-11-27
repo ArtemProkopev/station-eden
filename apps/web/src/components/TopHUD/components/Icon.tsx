@@ -4,7 +4,7 @@
 import React from 'react'
 import styles from './Icon.module.css'
 
-export type IconType = 'rocket' | 'star' | 'avatar'
+export type IconType = 'rocket' | 'star' | 'avatar' | 'bell'
 export type IconSize = 'small' | 'medium' | 'large'
 
 interface IconProps {
@@ -36,12 +36,18 @@ const FALLBACKS: Record<IconType, React.ReactNode> = {
       <path fill="#63EFFF" d="M12 17.3 6.6 20l1.2-6.9L2 9.3l6.9-1L12 2l3.1 6.3 6.9 1-5.8 3.8L17.4 20z"/>
     </svg>
   ),
+  bell: (
+    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+      <title>Колокольчик</title>
+    </svg>
+  ),
 }
 
 const ICON_PATHS: Record<IconType, string> = {
   rocket: '/icons/rocket.svg',
   star: '/icons/star.svg',
   avatar: '/icons/avatar-placeholder.svg',
+  bell: '/icons/bell.svg'
 }
 
 interface IconLoaderProps {

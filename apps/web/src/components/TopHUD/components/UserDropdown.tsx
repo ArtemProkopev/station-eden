@@ -4,7 +4,7 @@
 import React from 'react'
 import styles from './UserDropdown.module.css'
 import { Avatar } from './Avatar'
-import LogoutButton from '../LogoutButton'
+import LogoutButton from './LogoutButton'
 
 interface UserProfile {
   username?: string

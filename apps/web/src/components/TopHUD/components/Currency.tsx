@@ -29,7 +29,7 @@ export function Currency({ value, onAdd, className = '' }: CurrencyProps) {
           type="star" 
           size="small" 
           alt="Звезда" 
-          aria-hidden={true}  // ← Исправлено: boolean вместо string
+          aria-hidden={true}
         />
         
         <button

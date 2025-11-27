@@ -3,7 +3,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import styles from './TopHUD.module.css'
+import styles from './UserDropdown.module.css'
 
 export default function LogoutButton() {
   const [loading, setLoading] = useState(false)
@@ -35,7 +35,7 @@ export default function LogoutButton() {
 
   return (
     <button
-      className={styles.menuItem}
+      className={styles.menuItem} // ← ИСПОЛЬЗУЕМ КЛАСС menuItem
       onClick={handleLogout}
       disabled={loading}
       aria-label="Выйти из аккаунта"

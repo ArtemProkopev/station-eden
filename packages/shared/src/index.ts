@@ -98,7 +98,51 @@ export interface WebSocketMessage<T = any> {
 }
 
 // ==============================================================================
-// 4. SETTINGS (Настройки клиента)
+// 4. NOTIFICATIONS (Уведомления)
+// ==============================================================================
+
+export type NotificationType = 'news' | 'game_invite' | 'system' | 'friend_request'
+
+export interface BaseNotification {
+  id: string
+  type: NotificationType
+  title: string
+  message: string
+  timestamp: Date
+  isRead: boolean
+}
+
+export interface NewsNotification extends BaseNotification {
+  type: 'news'
+  link?: string
+}
+
+export interface GameInviteNotification extends BaseNotification {
+  type: 'game_invite'
+  lobbyId: string
+  inviterName: string
+  inviterId: string
+  gameMode: string
+}
+
+export interface SystemNotification extends BaseNotification {
+  type: 'system'
+}
+
+export interface FriendRequestNotification extends BaseNotification {
+  type: 'friend_request'
+  requesterId: string
+  requesterName: string
+}
+
+export type Notification = 
+  | NewsNotification 
+  | GameInviteNotification 
+  | SystemNotification 
+  | FriendRequestNotification
+
+// ==============================================================================
+// 5. SETTINGS (Настройки клиента)
 // ==============================================================================
 // Если эти настройки хранятся ТОЛЬКО на клиенте (localStorage), их можно оставить в web.
 // Но если планируешь синхронизацию с БД, то держи их здесь.
@@ -119,7 +163,7 @@ export interface UserSettings {
 }
 
 // ==============================================================================
-// 5. CLIENT-SPECIFIC TYPES (Дополнения для клиента)
+// 6. CLIENT-SPECIFIC TYPES (Дополнения для клиента)
 // ==============================================================================
 
 /**

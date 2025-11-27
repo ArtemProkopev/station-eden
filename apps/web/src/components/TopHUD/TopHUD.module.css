@@ -1,8 +1,12 @@
+/* apps/web/src/components/TopHUD/TopHUD.module.css */
 .root > :first-child {
 	position: sticky;
 	top: 0;
 	z-index: 1000;
 	background: transparent;
+	/* Добавляем для лучшего stacking context */
+	isolation: isolate;
+	transform: translateZ(0);
 }
 
 .hud {
@@ -15,6 +19,9 @@
 	box-sizing: border-box;
 	font-family: 'RussoOne', sans-serif;
 	transition: transform 0.3s ease;
+	/* Добавляем для лучшего позиционирования */
+	position: relative;
+	z-index: 1000;
 }
 
 /* НОВОЕ: Обертка для левой части */
@@ -89,163 +96,7 @@
 	transition: all 0.3s ease;
 }
 
-/* Стили для аватара и выпадающего меню */
-.avatarDropdown {
-	position: relative;
-	display: inline-block;
-}
-
-.avatarButton {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-	background: none;
-	border: none;
-	cursor: pointer;
-	padding: 8px;
-	border-radius: 24px;
-	transition: all 0.3s ease;
-	background: rgba(99, 239, 255, 0.04);
-	border: 2px solid #204c72;
-	box-shadow: 0 0 10px #63efff59;
-}
-
-.avatarButton:hover {
-	background: rgba(99, 239, 255, 0.08);
-	box-shadow: 0 0 15px #63efff80;
-}
-
-.avatarContainer {
-	width: 50px;
-	height: 50px;
-	border-radius: 50%;
-	overflow: hidden;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	background: rgba(99, 239, 255, 0.1);
-	border: 2px solid #63efff;
-}
-
-.avatarIcon {
-	width: 100%;
-	height: 100%;
-	object-fit: cover;
-	filter: drop-shadow(0 0 4px rgba(99, 239, 255, 0.7));
-}
-
-.arrow {
-	transition: transform 0.3s ease;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-}
-
-.arrowUp {
-	transform: rotate(180deg);
-}
-
-.dropdownMenu {
-	position: absolute;
-	top: 100%;
-	right: 0;
-	margin-top: 8px;
-	background: rgba(32, 76, 114, 0.95);
-	backdrop-filter: blur(10px);
-	border: 2px solid #63efff;
-	border-radius: 12px;
-	padding: 8px;
-	min-width: 160px;
-	box-shadow: 0 8px 25px rgba(99, 239, 255, 0.2);
-	z-index: 1000;
-	animation: dropdownFade 0.2s ease;
-}
-
-@keyframes dropdownFade {
-	from {
-		opacity: 0;
-		transform: translateY(-10px);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0);
-	}
-}
-
-.menuItem {
-	display: block;
-	width: 100%;
-	padding: 12px 16px;
-	background: none;
-	border: none;
-	color: #63efff;
-	font-family: 'RussoOne', sans-serif;
-	font-size: 16px;
-	text-align: left;
-	cursor: pointer;
-	border-radius: 6px;
-	transition: all 0.3s ease;
-	text-shadow: 0 0 2px rgba(99, 239, 255, 0.9);
-}
-
-.menuItem:hover {
-	background: rgba(99, 239, 255, 0.1);
-	box-shadow: 0 0 8px rgba(99, 239, 255, 0.3);
-}
-
-.menuItem:not(:last-child) {
-	margin-bottom: 4px;
-}
-
-.plusButton {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 45px;
-	height: 45px;
-	background-color: #63efff36;
-	border-radius: 50%;
-	border: none;
-	cursor: pointer;
-	flex-shrink: 0;
-	color: #63efff;
-	font-size: 40px;
-	font-weight: bold;
-	line-height: 1;
-	padding: 0;
-	margin: 0;
-	position: relative;
-	transition: all 0.3s ease;
-}
-
-.plusButton::before {
-	content: '+';
-	display: block;
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	transform: translate(-50%, -50%);
-}
-
-.currencyValue {
-	color: #63efff;
-	font-size: 18px;
-	font-weight: 700;
-	line-height: 1;
-	min-width: 30px;
-}
-
-.userInfo {
-	padding: 8px 12px;
-	color: #63efff;
-	font-family: 'RussoOne', sans-serif;
-	font-size: 14px;
-	border-bottom: 1px solid rgba(99, 239, 255, 0.3);
-	margin-bottom: 4px;
-	text-align: center;
-	text-shadow: 0 0 2px rgba(99, 239, 255, 0.9);
-}
-
+/* Стили для скелетонов */
 .iconSkeleton {
 	width: 34px;
 	height: 34px;
@@ -267,6 +118,16 @@
 .avatarSkeleton {
 	width: 40px;
 	height: 40px;
+	background: #63efff;
+	opacity: 0.3;
+	border-radius: 50%;
+	animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Скелетон для кнопки уведомлений */
+.notificationsSkeleton {
+	width: 50px;
+	height: 50px;
 	background: #63efff;
 	opacity: 0.3;
 	border-radius: 50%;
@@ -315,23 +176,6 @@
 	.backText {
 		font-size: 24px;
 	}
-	.avatarContainer {
-		width: 40px;
-		height: 40px;
-	}
-	.avatarButton {
-		gap: 8px;
-		padding: 6px;
-	}
-	.star {
-		width: 28px;
-		height: 28px;
-	}
-	.plusButton {
-		width: 35px;
-		height: 35px;
-		font-size: 30px;
-	}
 	.hudRight {
 		gap: 40px;
 	}
@@ -341,12 +185,9 @@
 	.currencyContent {
 		gap: 20px;
 	}
-	.dropdownMenu {
-		min-width: 140px;
-	}
-	.menuItem {
-		font-size: 14px;
-		padding: 10px 14px;
+	.notificationsSkeleton {
+		width: 40px;
+		height: 40px;
 	}
 }
 
@@ -366,23 +207,6 @@
 		font-size: 20px;
 		letter-spacing: 0.5px;
 	}
-	.avatarContainer {
-		width: 35px;
-		height: 35px;
-	}
-	.avatarButton {
-		gap: 6px;
-		padding: 4px;
-	}
-	.star {
-		width: 24px;
-		height: 24px;
-	}
-	.plusButton {
-		width: 30px;
-		height: 30px;
-		font-size: 24px;
-	}
 	.hudRight {
 		gap: 30px;
 	}
@@ -393,12 +217,9 @@
 	.currencyContent {
 		gap: 15px;
 	}
-	.dropdownMenu {
-		min-width: 120px;
-	}
-	.menuItem {
-		font-size: 13px;
-		padding: 8px 12px;
+	.notificationsSkeleton {
+		width: 35px;
+		height: 35px;
 	}
 }
 
@@ -417,10 +238,6 @@
 	.backText {
 		font-size: 18px;
 	}
-	.avatarContainer {
-		width: 30px;
-		height: 30px;
-	}
 	.hudRight {
 		gap: 20px;
 	}
@@ -430,9 +247,9 @@
 	.currencyContent {
 		gap: 12px;
 	}
-	.dropdownMenu {
-		min-width: 110px;
-		right: -10px;
+	.notificationsSkeleton {
+		width: 30px;
+		height: 30px;
 	}
 }
 
@@ -447,32 +264,9 @@
 		width: 30px;
 		height: 30px;
 	}
-	.avatarContainer {
+	.notificationsSkeleton {
 		width: 25px;
 		height: 25px;
-	}
-	.avatarButton {
-		gap: 4px;
-	}
-	.arrow svg {
-		width: 10px;
-		height: 6px;
-	}
-	.star {
-		width: 20px;
-		height: 20px;
-	}
-	.plusButton {
-		width: 25px;
-		height: 25px;
-		font-size: 20px;
-	}
-	.dropdownMenu {
-		min-width: 100px;
-	}
-	.menuItem {
-		font-size: 12px;
-		padding: 6px 10px;
 	}
 }
 
@@ -489,9 +283,5 @@
 	.icon {
 		width: 35px;
 		height: 35px;
-	}
-	.avatarContainer {
-		width: 30px;
-		height: 30px;
 	}
 }

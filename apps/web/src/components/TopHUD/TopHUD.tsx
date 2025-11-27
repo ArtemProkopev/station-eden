@@ -1,3 +1,4 @@
+// apps/web/src/components/TopHUD/TopHUD.tsx
 'use client'
 
 import React from 'react'
@@ -6,7 +7,9 @@ import styles from './TopHUD.module.css'
 import { Currency } from './components/Currency'
 import { Icon } from './components/Icon'
 import { UserDropdown } from './components/UserDropdown'
+import { Notifications } from './components/Notifications'
 import { useViewportScale } from './hooks/useViewportScale'
+import { Notification } from '@station-eden/shared'
 
 interface TopHUDProps {
 	profile?: {
@@ -30,6 +33,40 @@ export default function TopHUD({
 	variant = 'default',
 }: TopHUDProps) {
 	const [isDropdownOpen, setIsDropdownOpen] = React.useState(false)
+	const [notifications, setNotifications] = React.useState<Notification[]>([
+		{
+			id: '1',
+			type: 'game_invite',
+			title: 'Приглашение в игру',
+			message: 'Игрок CosmicWarrior приглашает вас в игру',
+			timestamp: new Date(Date.now() - 5 * 60000), 
+			isRead: false,
+			lobbyId: 'lobby-123',
+			inviterName: 'CosmicWarrior',
+			inviterId: 'user-456',
+			gameMode: 'team_deathmatch'
+		},
+		{
+			id: '2',
+			type: 'news',
+			title: 'Новое обновление',
+			message: 'Вышло обновление 1.2 с новыми картами и улучшениями',
+			timestamp: new Date(Date.now() - 2 * 3600000), 
+			isRead: true,
+			link: '/news/update-1.2'
+		},
+		{
+			id: '3',
+			type: 'friend_request',
+			title: 'Запрос в друзья',
+			message: 'SpaceExplorer хочет добавить вас в друзья',
+			timestamp: new Date(Date.now() - 30 * 60000), 
+			isRead: false,
+			requesterId: 'user-789',
+			requesterName: 'SpaceExplorer'
+		}
+	])
+
 	const scale = useViewportScale()
 	const userData = useUserData()
 
@@ -50,6 +87,22 @@ export default function TopHUD({
 	const handleDropdownToggle = () => setIsDropdownOpen(!isDropdownOpen)
 	const handleDropdownClose = () => setIsDropdownOpen(false)
 	const handleAddCurrency = () => console.log('Add currency clicked')
+
+	// Обработчики для уведомлений
+	const handleNotificationAction = (notificationId: string, action: string) => {
+		console.log(`Notification ${notificationId}: ${action}`)
+		// Здесь будет логика обработки действий с уведомлениями
+	}
+
+	const handleMarkAsRead = (notificationId: string) => {
+		setNotifications(prev => 
+			prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n)
+		)
+	}
+
+	const handleDismissNotification = (notificationId: string) => {
+		setNotifications(prev => prev.filter(n => n.id !== notificationId))
+	}
 
 	const hudStyle = {
 		transform: `scale(${scale})`,
@@ -96,9 +149,16 @@ export default function TopHUD({
 				)}
 			</div>
 
-			{/* Правая часть: Валюта и Профиль */}
+			{/* Правая часть: Валюта, Уведомления и Профиль */}
 			<div className={styles.hudRight}>
 				<Currency value={128} onAdd={handleAddCurrency} />
+				
+				<Notifications 
+					notifications={notifications}
+					onNotificationAction={handleNotificationAction}
+					onMarkAsRead={handleMarkAsRead}
+					onDismiss={handleDismissNotification}
+				/>
 
 				<UserDropdown
 					profile={{
@@ -116,7 +176,7 @@ export default function TopHUD({
 	)
 }
 
-// Компонент-скелетон
+// Обновляем скелетон
 function SkeletonTopHUD({ showBackLink }: { showBackLink: boolean }) {
 	return (
 		<>
@@ -136,6 +196,9 @@ function SkeletonTopHUD({ showBackLink }: { showBackLink: boolean }) {
 						<div className={styles.starSkeleton}></div>
 					</div>
 				</div>
+
+				{/* Скелетон для кнопки уведомлений */}
+				<div className={styles.notificationsSkeleton}></div>
 
 				<div className={styles.avatarDropdown}>
 					<button className={styles.avatarButton} disabled aria-hidden='true'>
