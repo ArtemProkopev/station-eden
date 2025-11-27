@@ -18,6 +18,7 @@ interface UserDropdownProps {
   isOpen: boolean
   onToggle: () => void
   onClose: () => void
+  onFriendsClick: () => void
   className?: string
 }
 
@@ -26,7 +27,8 @@ export function UserDropdown({
   avatar, 
   isOpen, 
   onToggle, 
-  onClose, 
+  onClose,
+  onFriendsClick,
   className = '' 
 }: UserDropdownProps) {
   const dropdownRef = React.useRef<HTMLDivElement>(null)
@@ -51,11 +53,12 @@ export function UserDropdown({
     console.log(`Selected: ${action}`)
     onClose()
     
-    // Навигация может быть обработана через router в будущем
     if (action === 'profile') {
       window.location.href = '/profile'
     } else if (action === 'settings') {
       window.location.href = '/settings'
+    } else if (action === 'friends') {
+      onFriendsClick()
     }
   }
 
@@ -127,6 +130,14 @@ export function UserDropdown({
             role="menuitem"
           >
             Настройки
+          </button>
+
+          <button 
+            className={styles.menuItem}
+            onClick={() => handleMenuItemClick('friends')}
+            role="menuitem"
+          >
+            Друзья
           </button>
           
           <hr className={styles.divider} />

@@ -114,6 +114,7 @@ function NewsSlider() {
 export default function HomePage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
@@ -135,6 +136,7 @@ export default function HomePage() {
         setIsAuthenticated(false)
         setUserProfile(null)
       }
+      setIsLoading(false)
     }
 
     checkAuthStatus()
@@ -146,7 +148,7 @@ export default function HomePage() {
     }
 
     window.addEventListener('storage', handleStorageChange)
-    const interval = setInterval(checkAuthStatus, 10000)
+    const interval = setInterval(checkAuthStatus, 5000)
 
     return () => {
       window.removeEventListener('storage', handleStorageChange)
@@ -172,11 +174,12 @@ export default function HomePage() {
 
       <Fireflies />
 
+      {/* TopHUD показываем ТОЛЬКО для авторизованных пользователей */}
       {isAuthenticated && userProfile && (
         <TopHUD
           variant='main'
           profile={{
-            status: 'ok',
+            status: 'ok' as const,
             userId: userProfile.id,
             email: userProfile.email,
             username: userProfile.username,
@@ -195,6 +198,7 @@ export default function HomePage() {
         </section>
 
         <section className={styles.menuSection}>
+          {/* Кнопки регистрации/входа показываем ТОЛЬКО для неавторизованных */}
           {!isAuthenticated && (
             <nav className={styles.sideMenu}>
               <button className={styles.menuItem} onClick={handleRegister}>

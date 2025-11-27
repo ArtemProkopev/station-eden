@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useEffect, useRef } from 'react' // ← ДОБАВЛЕН useRef
+import { useMemo, useState, useEffect, useRef } from 'react'
 import ImgCdn from '../../../components/ImgCdn'
 import { asset } from '../../../lib/asset'
 import styles from './EditProfileModal.module.css'
@@ -39,7 +39,6 @@ const FRAMES = [
 	asset('/frames/frame7.png'),
 	asset('/frames/frame8.png'),
 	asset('/frames/frame9.png'),
-	asset('/frames/testframe.png'),
 ]
 
 // Хук для предзагрузки изображений
@@ -129,11 +128,9 @@ export default function EditProfileModal({
 		onClose()
 	}
 
-  // Предзагрузка изображений при смене таба
   const handleTabChange = (tab: 'avatars' | 'frames') => {
     setActiveTab(tab)
     
-    // Предзагружаем изображения для нового таба
     const urlsToPreload = tab === 'avatars' ? AVATARS.slice(4) : FRAMES.slice(4)
     setTimeout(() => {
       urlsToPreload.forEach(url => {
@@ -172,19 +169,25 @@ export default function EditProfileModal({
 					<div className={styles.previewSection}>
 						<h3 className={styles.previewTitle}>Предпросмотр</h3>
 						<div className={styles.previewContainer}>
-							<div className={styles.previewImage}>
-								<LazyImage
-									src={selectedAvatar}
-									alt='Аватар'
-                  priority={true}
-									className={styles.previewAvatar}
-								/>
-								<LazyImage
-									src={selectedFrame}
-									alt='Рамка'
-                  priority={true}
-									className={styles.previewFrame}
-								/>
+							<div className={styles.previewWrapper}>
+								<div className={styles.previewImage}>
+                  <div className={styles.avatarFrameContainer}>
+                    <div className={styles.avatarImageContainer}>
+                      <LazyImage
+                        src={selectedAvatar}
+                        alt='Аватар'
+                        priority={true}
+                        className={styles.previewAvatar}
+                      />
+                    </div>
+                    <LazyImage
+                      src={selectedFrame}
+                      alt='Рамка'
+                      priority={true}
+                      className={styles.previewFrame}
+                    />
+                  </div>
+								</div>
 							</div>
 							<div className={styles.previewInfo}>
 								<div className={styles.previewItem}>
@@ -214,7 +217,7 @@ export default function EditProfileModal({
                         src={avatar} 
                         alt='Аватар' 
                         className={styles.optionImage}
-                        priority={index < 4} // Приоритетная загрузка первых 4
+                        priority={index < 4} 
                       />
 											{selectedAvatar === avatar && <div className={styles.selectedBadge}>✓</div>}
 										</button>
@@ -237,7 +240,7 @@ export default function EditProfileModal({
                         src={frame} 
                         alt='Рамка' 
                         className={styles.optionImage}
-                        priority={index < 4} // Приоритетная загрузка первых 4
+                        priority={index < 4}
                       />
 											{selectedFrame === frame && <div className={styles.selectedBadge}>✓</div>}
 										</button>

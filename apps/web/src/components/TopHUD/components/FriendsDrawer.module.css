@@ -1,0 +1,376 @@
+/* apps/web/src/components/TopHUD/components/FriendsDrawer.module.css */
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1198;
+  width: 100vw;
+  height: 100vh;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: -400px;
+  width: 380px;
+  height: 100vh;
+  background: rgba(32, 76, 114, 0.95);
+  backdrop-filter: blur(10px);
+  border-left: 2px solid #63efff;
+  box-shadow: -8px 0 25px rgba(99, 239, 255, 0.2);
+  z-index: 1199;
+  transition: right 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Когда открыт чат, сдвигаем drawer немного вправо */
+.drawer.withChat {
+  right: 380px; /* Сдвигаем на ширину чата */
+}
+
+.drawer.open {
+  right: 0;
+}
+
+/* Стили для активного чата */
+.friendItem.activeChat {
+  background: rgba(99, 239, 255, 0.15);
+  border-color: rgba(99, 239, 255, 0.6);
+  box-shadow: 0 0 10px rgba(99, 239, 255, 0.3);
+}
+
+.activeChatBadge {
+  color: #00ff88;
+  font-size: 10px;
+  margin-left: 8px;
+  font-weight: bold;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  border-bottom: 1px solid rgba(99, 239, 255, 0.3);
+}
+
+.title {
+  color: #63efff;
+  font-family: 'RussoOne', sans-serif;
+  font-size: 20px;
+  margin: 0;
+  text-shadow: 0 0 2px rgba(99, 239, 255, 0.9);
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  color: #63efff;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.closeButton:hover {
+  background: rgba(99, 239, 255, 0.1);
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.section {
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  color: #63efff;
+  font-family: 'RussoOne', sans-serif;
+  font-size: 14px;
+  margin: 0 0 12px 0;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.friendsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.friendItem {
+  background: rgba(99, 239, 255, 0.05);
+  border: 1px solid rgba(99, 239, 255, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.friendItem:hover {
+  background: rgba(99, 239, 255, 0.1);
+  border-color: rgba(99, 239, 255, 0.4);
+}
+
+.friendMain {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.friendAvatar {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.avatarImage {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #63efff;
+}
+
+.avatarPlaceholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(99, 239, 255, 0.2);
+  border: 2px solid #63efff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #63efff;
+  font-family: 'RussoOne', sans-serif;
+  font-size: 16px;
+}
+
+.statusIndicator {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #1e486e;
+}
+
+.statusIndicator.online {
+  background: #00ff88;
+}
+
+.statusIndicator.offline {
+  background: #666;
+}
+
+.statusIndicator.away {
+  background: #ffaa00;
+}
+
+.statusIndicator.in_game {
+  background: #ff4757;
+}
+
+.friendInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.friendName {
+  color: #63efff;
+  font-family: 'RussoOne', sans-serif;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.friendStatus {
+  color: #63efff;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.friendActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chatButton {
+  background: none;
+  border: none;
+  color: #63efff;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chatButton:hover {
+  background: rgba(99, 239, 255, 0.1);
+}
+
+.chatIcon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.8;
+  transition: all 0.3s ease;
+}
+
+.chatButton:hover .chatIcon {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.menuButton {
+  background: none;
+  border: none;
+  color: #63efff;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  font-size: 16px;
+}
+
+.menuButton:hover {
+  background: rgba(99, 239, 255, 0.1);
+}
+
+.contextMenu {
+  position: absolute;
+  top: 100%;
+  right: 8px;
+  background: #1e486e;
+  border: 1px solid #63efff;
+  border-radius: 6px;
+  padding: 4px;
+  min-width: 140px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1200;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: #63efff;
+  font-family: 'RussoOne', sans-serif;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.menuIcon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+.menuItem:hover:not(:disabled) {
+  background: rgba(99, 239, 255, 0.1);
+}
+
+.menuItem:hover:not(:disabled) .menuIcon {
+  opacity: 1;
+}
+
+.menuItem:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.menuItem.danger {
+  color: #ff4757;
+}
+
+.menuItem.danger:hover {
+  background: rgba(255, 71, 87, 0.1);
+}
+
+.emptyState {
+  text-align: center;
+  padding: 60px 20px;
+  color: #63efff;
+}
+
+.emptyIcon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.emptyText {
+  font-family: 'RussoOne', sans-serif;
+  font-size: 16px;
+  margin: 0 0 8px 0;
+}
+
+.emptySubtext {
+  font-size: 12px;
+  opacity: 0.7;
+  margin: 0;
+}
+
+/* Стилизация скроллбара */
+.content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.content::-webkit-scrollbar-track {
+  background: rgba(32, 76, 114, 0.3);
+  border-radius: 3px;
+}
+
+.content::-webkit-scrollbar-thumb {
+  background: rgba(99, 239, 255, 0.3);
+  border-radius: 3px;
+}
+
+.content::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 239, 255, 0.5);
+}
+
+/* Адаптивность */
+@media (max-width: 480px) {
+  .drawer {
+    width: 100vw;
+    right: -100vw;
+  }
+  
+  .drawer.open {
+    right: 0;
+  }
+  
+  .drawer.withChat {
+    right: 100vw;
+  }
+}

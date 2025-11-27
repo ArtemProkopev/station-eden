@@ -35,7 +35,7 @@ export default function LogoutButton() {
 
   return (
     <button
-      className={styles.menuItem} // ← ИСПОЛЬЗУЕМ КЛАСС menuItem
+      className={styles.menuItem}
       onClick={handleLogout}
       disabled={loading}
       aria-label="Выйти из аккаунта"

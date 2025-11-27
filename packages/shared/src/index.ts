@@ -163,7 +163,27 @@ export interface UserSettings {
 }
 
 // ==============================================================================
-// 6. CLIENT-SPECIFIC TYPES (Дополнения для клиента)
+// 6. FRIENDS (Друзья)
+// ==============================================================================
+
+export interface Friend {
+  id: string
+  username: string
+  email: string
+  avatar?: string
+  status: 'online' | 'offline' | 'away' | 'in_game'
+  lastSeen?: Date
+  isFavorite?: boolean
+}
+
+export interface FriendsState {
+  friends: Friend[]
+  pendingRequests: FriendRequestNotification[]
+  isLoading: boolean
+}
+
+// ==============================================================================
+// 7. CLIENT-SPECIFIC TYPES (Дополнения для клиента)
 // ==============================================================================
 
 /**

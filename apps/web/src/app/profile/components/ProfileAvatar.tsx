@@ -26,12 +26,14 @@ export const ProfileAvatar = ({ avatar, frame, username }: ProfileAvatarProps) =
             className={styles.leavesImage}
           />
         </div>
-        <div className={styles.avatarContainer}>
-          <ImgCdn
-            src={avatar}
-            alt={`Аватар пользователя ${username || ''}`}
-            className={styles.avatar}
-          />
+        <div className={styles.avatarFrameContainer}>
+          <div className={styles.avatarImageContainer}>
+            <ImgCdn
+              src={avatar}
+              alt={`Аватар пользователя ${username || ''}`}
+              className={styles.avatar}
+            />
+          </div>
           <ImgCdn
             src={frame}
             alt='Рамка профиля'
