@@ -1,243 +1,300 @@
+// apps/web/src/app/page.tsx
 'use client'
 
-import { useRouter } from 'next/navigation'
-import { useEffect, useState, useCallback } from 'react'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
 import TopHUD from '../components/TopHUD/TopHUD'
 import { Fireflies } from '../components/ui/Fireflies/FirefliesMain'
 import PanelWithPlayButton from '../components/ui/PanelWithPlayButton/PanelWithPlayButton'
 import styles from './home.module.css'
 
+const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+
 interface UserProfile {
-  id: string
-  email: string
-  username: string
-  avatar?: string
+	id: string
+	email: string
+	username: string
+	avatar?: string
 }
 
 const NEWS_DATA = [
-  {
-    id: 1,
-    title: 'ОБНОВЛЕНИЕ ЭКИПАЖА',
-    date: '2025-12-10',
-    content: 'Уже сегодня в игре появится три новые роли!',
-    highlight: 'Разнообразие — ключ к выживанию',
-  },
-  {
-    id: 2,
-    title: 'НОВЫЙ РЕЖИМ ИГРЫ',
-    date: '2025-11-28',
-    content: 'Добавлен кооперативный режим для 4 игроков',
-    highlight: 'Выживайте вместе с друзьями',
-  },
-  {
-    id: 3,
-    title: 'ОБНОВЛЕНИЕ БАЛАНСА',
-    date: '2025-11-15',
-    content: 'Переработана система характеристик персонажей',
-    highlight: 'Справедливость для всех ролей',
-  },
+	{
+		id: 1,
+		title: 'ОБНОВЛЕНИЕ ЭКИПАЖА',
+		date: '2025-12-10',
+		content: 'Уже сегодня в игре появится три новые роли!',
+		highlight: 'Разнообразие — ключ к выживанию',
+	},
+	{
+		id: 2,
+		title: 'НОВЫЙ РЕЖИМ ИГРЫ',
+		date: '2025-11-28',
+		content: 'Добавлен кооперативный режим для 4 игроков',
+		highlight: 'Выживайте вместе с друзьями',
+	},
+	{
+		id: 3,
+		title: 'ОБНОВЛЕНИЕ БАЛАНСА',
+		date: '2025-11-15',
+		content: 'Переработана система характеристик персонажей',
+		highlight: 'Справедливость для всех ролей',
+	},
 ] as const
 
 const SOCIAL_ICONS = [
-  { 
-    href: 'https://t.me/your-channel', 
-    icon: '/icons/telegram.svg', 
-    alt: 'Telegram' 
-  },
-  { 
-    href: 'https://tiktok.com/@your-account', 
-    icon: '/icons/tiktok.svg', 
-    alt: 'TikTok' 
-  },
-  { 
-    href: 'https://discord.gg/your-server', 
-    icon: '/icons/discord.svg', 
-    alt: 'Discord' 
-  }
+	{
+		href: 'https://t.me/your-channel',
+		icon: '/icons/telegram.svg',
+		alt: 'Telegram',
+	},
+	{
+		href: 'https://tiktok.com/@your-account',
+		icon: '/icons/tiktok.svg',
+		alt: 'TikTok',
+	},
+	{
+		href: 'https://discord.gg/your-server',
+		icon: '/icons/discord.svg',
+		alt: 'Discord',
+	},
 ] as const
 
+async function fetchProfile(): Promise<UserProfile | null> {
+	try {
+		// 1. Пытаемся получить текущего пользователя
+		let r = await fetch(`${API}/auth/me`, {
+			method: 'GET',
+			credentials: 'include',
+			cache: 'no-store',
+		})
+
+		// 2. Если access-токен протух — пробуем refresh
+		if (r.status === 401) {
+			const refreshResp = await fetch(`${API}/auth/refresh`, {
+				method: 'POST',
+				credentials: 'include',
+			})
+
+			if (!refreshResp.ok) {
+				return null
+			}
+
+			// 3. После успешного refresh ещё раз получаем профиль
+			r = await fetch(`${API}/auth/me`, {
+				method: 'GET',
+				credentials: 'include',
+				cache: 'no-store',
+			})
+		}
+
+		if (!r.ok) return null
+
+		const raw = await r.json()
+		const data = raw?.data ?? raw
+
+		if (!data?.userId || !data?.email) return null
+
+		const profile: UserProfile = {
+			id: data.userId,
+			email: data.email,
+			username: data.username ?? data.email.split('@')[0],
+			avatar: data.avatar,
+		}
+
+		return profile
+	} catch (e) {
+		console.error('Error fetching profile:', e)
+		return null
+	}
+}
+
 function NewsSlider() {
-  const [currentIndex, setCurrentIndex] = useState(0)
+	const [currentIndex, setCurrentIndex] = useState(0)
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentIndex(prev => (prev + 1) % NEWS_DATA.length)
-    }, 7000)
-    return () => clearInterval(interval)
-  }, [])
+	useEffect(() => {
+		const interval = setInterval(() => {
+			setCurrentIndex(prev => (prev + 1) % NEWS_DATA.length)
+		}, 7000)
+		return () => clearInterval(interval)
+	}, [])
 
-  const nextNews = useCallback(() => {
-    setCurrentIndex(prev => (prev + 1) % NEWS_DATA.length)
-  }, [])
+	const nextNews = useCallback(() => {
+		setCurrentIndex(prev => (prev + 1) % NEWS_DATA.length)
+	}, [])
 
-  const prevNews = useCallback(() => {
-    setCurrentIndex(prev => (prev - 1 + NEWS_DATA.length) % NEWS_DATA.length)
-  }, [])
+	const prevNews = useCallback(() => {
+		setCurrentIndex(prev => (prev - 1 + NEWS_DATA.length) % NEWS_DATA.length)
+	}, [])
 
-  const currentNews = NEWS_DATA[currentIndex]
+	const currentNews = NEWS_DATA[currentIndex]
 
-  return (
-    <div className={styles.newsSliderContainer}>
-      <button 
-        className={styles.sliderArrowLeft} 
-        onClick={prevNews}
-        aria-label="Предыдущая новость"
-      >
-        ‹
-      </button>
+	return (
+		<div className={styles.newsSliderContainer}>
+			<button
+				className={styles.sliderArrowLeft}
+				onClick={prevNews}
+				aria-label='Предыдущая новость'
+			>
+				‹
+			</button>
 
-      <div className={styles.newsPanel}>
-        <div className={styles.newsHeader}>
-          <span className={styles.newsTitle}>{currentNews.title}</span>
-          <span className={styles.newsDate}>
-            Дата: {currentNews.date}
-          </span>
-        </div>
-        <div className={styles.newsContent}>
-          <p className={styles.newsInfo}>{currentNews.content}</p>
-          <p className={styles.newsHighlight}>{currentNews.highlight}</p>
-        </div>
-      </div>
+			<div className={styles.newsPanel}>
+				<div className={styles.newsHeader}>
+					<span className={styles.newsTitle}>{currentNews.title}</span>
+					<span className={styles.newsDate}>Дата: {currentNews.date}</span>
+				</div>
+				<div className={styles.newsContent}>
+					<p className={styles.newsInfo}>{currentNews.content}</p>
+					<p className={styles.newsHighlight}>{currentNews.highlight}</p>
+				</div>
+			</div>
 
-      <button 
-        className={styles.sliderArrowRight} 
-        onClick={nextNews}
-        aria-label="Следующая новость"
-      >
-        ›
-      </button>
-    </div>
-  )
+			<button
+				className={styles.sliderArrowRight}
+				onClick={nextNews}
+				aria-label='Следующая новость'
+			>
+				›
+			</button>
+		</div>
+	)
 }
 
 export default function HomePage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const router = useRouter()
+	const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+	const [isLoading, setIsLoading] = useState(true)
+	const router = useRouter()
 
-  useEffect(() => {
-    const checkAuthStatus = () => {
-      const token = localStorage.getItem('authToken')
-      const userData = localStorage.getItem('userData')
+	useEffect(() => {
+		let alive = true
 
-      if (token && userData) {
-        try {
-          const parsedUserData: UserProfile = JSON.parse(userData)
-          setIsAuthenticated(true)
-          setUserProfile(parsedUserData)
-        } catch (error) {
-          console.error('Error parsing user data:', error)
-          setIsAuthenticated(false)
-          setUserProfile(null)
-        }
-      } else {
-        setIsAuthenticated(false)
-        setUserProfile(null)
-      }
-      setIsLoading(false)
-    }
+		const load = async () => {
+			const profile = await fetchProfile()
+			if (!alive) return
+			setUserProfile(profile)
+			setIsLoading(false)
+		}
 
-    checkAuthStatus()
+		// первоначальная загрузка
+		load()
 
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'authToken' || e.key === 'userData') {
-        checkAuthStatus()
-      }
-    }
+		// Оптимистичное обновление при смене сессии (logout/login с других страниц)
+		const handleSessionChanged = () => {
+			if (!alive) return
+			// сразу считаем, что пользователь разлогинен => HUD прячем
+			setUserProfile(null)
+			setIsLoading(false)
+			// и параллельно перепроверяем на сервере
+			load()
+		}
 
-    window.addEventListener('storage', handleStorageChange)
-    const interval = setInterval(checkAuthStatus, 5000)
+		const onVisibility = () => {
+			if (document.visibilityState === 'visible') {
+				load()
+			}
+		}
 
-    return () => {
-      window.removeEventListener('storage', handleStorageChange)
-      clearInterval(interval)
-    }
-  }, [])
+		const onFocus = () => {
+			load()
+		}
 
-  const handlePlayClick = useCallback(() => {
-    if (isAuthenticated) {
-      router.push('/lobby')
-    } else {
-      router.push('/login')
-    }
-  }, [router, isAuthenticated])
+		window.addEventListener('session-changed', handleSessionChanged)
+		document.addEventListener('visibilitychange', onVisibility)
+		window.addEventListener('focus', onFocus)
 
-  const handleRegister = () => router.push('/register')
-  const handleLogin = () => router.push('/login')
+		return () => {
+			alive = false
+			window.removeEventListener('session-changed', handleSessionChanged)
+			document.removeEventListener('visibilitychange', onVisibility)
+			window.removeEventListener('focus', onFocus)
+		}
+	}, [])
 
-  return (
-    <>
-      <div className={styles.bg} aria-hidden />
-      <div className={styles.bgFx} aria-hidden />
+	const isAuthenticated = !!userProfile
 
-      <Fireflies />
+	const handlePlayClick = useCallback(() => {
+		if (isAuthenticated) {
+			router.push('/lobby')
+		} else {
+			router.push('/login')
+		}
+	}, [router, isAuthenticated])
 
-      {/* TopHUD показываем ТОЛЬКО для авторизованных пользователей */}
-      {isAuthenticated && userProfile && (
-        <TopHUD
-          variant='main'
-          profile={{
-            status: 'ok' as const,
-            userId: userProfile.id,
-            email: userProfile.email,
-            username: userProfile.username,
-          }}
-          avatar={userProfile.avatar}
-        />
-      )}
+	const handleRegister = () => router.push('/register')
+	const handleLogin = () => router.push('/login')
 
-      <div className={styles.container}>
-        <section className={styles.leftSection}>
-          <div className={styles.stationTitle}>
-            <div className={styles.titleLine}>Станция Эдем</div>
-          </div>
+	return (
+		<>
+			<div className={styles.bg} aria-hidden />
+			<div className={styles.bgFx} aria-hidden />
 
-          <NewsSlider />
-        </section>
+			<Fireflies />
 
-        <section className={styles.menuSection}>
-          {/* Кнопки регистрации/входа показываем ТОЛЬКО для неавторизованных */}
-          {!isAuthenticated && (
-            <nav className={styles.sideMenu}>
-              <button className={styles.menuItem} onClick={handleRegister}>
-                ЗАРЕГИСТРИРОВАТЬСЯ
-              </button>
-              <button className={styles.menuItem} onClick={handleLogin}>
-                ВОЙТИ
-              </button>
-            </nav>
-          )}
+			{/* TopHUD показываем ТОЛЬКО для авторизованных пользователей */}
+			{isAuthenticated && userProfile && (
+				<TopHUD
+					variant='main'
+					profile={{
+						status: 'ok' as const,
+						userId: userProfile.id,
+						email: userProfile.email,
+						username: userProfile.username,
+					}}
+					avatar={userProfile.avatar}
+				/>
+			)}
 
-          <PanelWithPlayButton onPlayClick={handlePlayClick} />
-        </section>
+			<div className={styles.container}>
+				<section className={styles.leftSection}>
+					<div className={styles.stationTitle}>
+						<div className={styles.titleLine}>Станция Эдем</div>
+					</div>
 
-        <div className={styles.socialSection}>
-          <p className={styles.socialText}>Мы в социальных сетях:</p>
-          <div className={styles.socialIcons}>
-            {SOCIAL_ICONS.map((item) => (
-              <a
-                key={item.alt}
-                href={item.href}
-                className={styles.socialIcon}
-                target='_blank'
-                rel='noopener noreferrer'
-                aria-label={item.alt}
-              >
-                <Image 
-                  src={item.icon} 
-                  alt={item.alt}
-                  width={50}
-                  height={50}
-                  quality={75}
-                  loading="lazy"
-                />
-              </a>
-            ))}
-          </div>
-        </div>
-      </div>
-    </>
-  )
+					<NewsSlider />
+				</section>
+
+				<section className={styles.menuSection}>
+					{/* Кнопки регистрации/входа показываем ТОЛЬКО для неавторизованных */}
+					{!isAuthenticated && !isLoading && (
+						<nav className={styles.sideMenu}>
+							<button className={styles.menuItem} onClick={handleRegister}>
+								ЗАРЕГИСТРИРОВАТЬСЯ
+							</button>
+							<button className={styles.menuItem} onClick={handleLogin}>
+								ВОЙТИ
+							</button>
+						</nav>
+					)}
+
+					<PanelWithPlayButton onPlayClick={handlePlayClick} />
+				</section>
+
+				<div className={styles.socialSection}>
+					<p className={styles.socialText}>Мы в социальных сетях:</p>
+					<div className={styles.socialIcons}>
+						{SOCIAL_ICONS.map(item => (
+							<a
+								key={item.alt}
+								href={item.href}
+								className={styles.socialIcon}
+								target='_blank'
+								rel='noopener noreferrer'
+								aria-label={item.alt}
+							>
+								<Image
+									src={item.icon}
+									alt={item.alt}
+									width={50}
+									height={50}
+									quality={75}
+									loading='lazy'
+								/>
+							</a>
+						))}
+					</div>
+				</div>
+			</div>
+		</>
+	)
 }

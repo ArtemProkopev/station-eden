@@ -1,3 +1,4 @@
+// apps/api/src/auth/auth.controller.ts
 import {
 	BadRequestException,
 	Body,
@@ -62,16 +63,44 @@ export class AuthController {
 		return { ...getCookieOptions(true), maxAge: 10 * 60 * 1000 }
 	}
 
-	// Опции для OAuth State: Lax + Domain .stationeden.ru
+	/**
+	 * Опции для OAuth state-куки.
+	 *
+	 * - В production:
+	 *   - secure: true
+	 *   - domain: AUTH_COOKIE_DOMAIN или .stationeden.ru
+	 * - В development (localhost):
+	 *   - secure: false (иначе в http не поставится)
+	 *   - domain НЕ задаём, чтобы кука была host-only (localhost)
+	 */
 	private oauthCookieOpts() {
-		return {
+		const isProd = process.env.NODE_ENV === 'production'
+		const authDomain =
+			process.env.AUTH_COOKIE_DOMAIN ||
+			process.env.COOKIE_DOMAIN ||
+			'.stationeden.ru'
+
+		const base: any = {
 			httpOnly: true,
-			secure: true,
 			sameSite: 'lax' as const,
 			path: '/',
-			domain: process.env.COOKIE_DOMAIN || '.stationeden.ru',
-			maxAge: 10 * 60 * 1000,
-		} as any
+			maxAge: 10 * 60 * 1000, // 10 минут
+		}
+
+		if (isProd) {
+			base.secure = true
+			base.domain = authDomain
+		} else {
+			// Dev / localhost
+			base.secure = false
+			// domain не указываем, чтобы не ломать localhost
+			// если очень надо — можно явно задать AUTH_COOKIE_DOMAIN для dev
+			if (process.env.AUTH_COOKIE_DOMAIN) {
+				base.domain = process.env.AUTH_COOKIE_DOMAIN
+			}
+		}
+
+		return base
 	}
 
 	private clearWithSameAttrs(
@@ -112,6 +141,7 @@ export class AuthController {
 			return 'https://stationeden.ru'
 		}
 	}
+
 	private urlTo(path: string) {
 		return this.webOrigin() + path
 	}
@@ -395,7 +425,6 @@ export class AuthController {
 				throw new Error('Missing GOOGLE_CLIENT_ID/SECRET env vars')
 			}
 
-			// 1. Обмениваем code на токен через нативный fetch
 			const tokenParams = new URLSearchParams({
 				code,
 				client_id: process.env.GOOGLE_CLIENT_ID!,
@@ -416,13 +445,12 @@ export class AuthController {
 			}
 
 			const tokens = (await tokenResp.json()) as any
-			const { access_token, id_token } = tokens
+			const { access_token } = tokens
 
 			if (!access_token) {
 				throw new UnauthorizedException('No access_token in Google response')
 			}
 
-			// 2. Получаем данные пользователя через userinfo (надежнее, чем локальная верификация id_token)
 			const userResp = await fetch(
 				'https://www.googleapis.com/oauth2/v3/userinfo',
 				{

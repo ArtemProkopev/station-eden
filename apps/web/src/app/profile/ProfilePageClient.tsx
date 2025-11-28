@@ -5,6 +5,8 @@ import TopHUD from '@/components/TopHUD/TopHUD'
 import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
 import { ScaleContainer } from '@/components/ui/ScaleContainer/ScaleContainer'
 import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
+import { useScrollPrevention } from '@/hooks/useScrollPrevention'
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import EditProfileModal from './components/EditProfileModal'
 import { ProfileAvatar } from './components/ProfileAvatar'
@@ -12,8 +14,9 @@ import { ProfileHeader } from './components/ProfileHeader'
 import { ProfileInfo } from './components/ProfileInfo'
 import { ProfileStats } from './components/ProfileStats'
 import { useProfile } from './hooks/useProfile'
-import { useScrollPrevention } from '@/hooks/useScrollPrevention'
 import styles from './page.module.css'
+
+const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
 
 export default function ProfilePageClient() {
 	const {
@@ -30,24 +33,67 @@ export default function ProfilePageClient() {
 	} = useProfile()
 
 	const [isLoading, setIsLoading] = useState(true)
+	const router = useRouter()
 
 	useScrollPrevention()
 
 	useEffect(() => {
+		let cancelled = false
+
 		const initializeProfile = async () => {
 			setIsLoading(true)
 			try {
+				// 1. Проверяем, что пользователь авторизован
+				let r = await fetch(`${API}/auth/me`, {
+					method: 'GET',
+					credentials: 'include',
+					cache: 'no-store',
+				})
+
+				// пытаемся автообновить access-токен, если протух
+				if (r.status === 401) {
+					const refreshResp = await fetch(`${API}/auth/refresh`, {
+						method: 'POST',
+						credentials: 'include',
+					})
+
+					if (refreshResp.ok) {
+						r = await fetch(`${API}/auth/me`, {
+							method: 'GET',
+							credentials: 'include',
+							cache: 'no-store',
+						})
+					}
+				}
+
+				// если всё ещё не ок — редирект на логин и выходим
+				if (!r.ok) {
+					if (!cancelled) {
+						router.replace('/login?from=/profile')
+					}
+					return
+				}
+
+				if (cancelled) return
+
+				// 2. Если авторизован — грузим профиль как раньше
 				loadSavedAssets()
 				await Promise.all([checkIconsAvailability(), loadUserData()])
 			} catch (error) {
 				console.error('Profile initialization failed:', error)
 			} finally {
-				setIsLoading(false)
+				if (!cancelled) {
+					setIsLoading(false)
+				}
 			}
 		}
 
 		initializeProfile()
-	}, [loadSavedAssets, checkIconsAvailability, loadUserData])
+
+		return () => {
+			cancelled = true
+		}
+	}, [loadSavedAssets, checkIconsAvailability, loadUserData, router])
 
 	const handleEditModalOpen = useCallback(
 		() => setIsEditModalOpen(true),

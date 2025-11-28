@@ -1,3 +1,4 @@
+// apps/web/src/components/Navbar.tsx
 'use client'
 
 import Link from 'next/link'
@@ -17,16 +18,35 @@ function classNames(...xs: Array<string | false | undefined>) {
 
 async function getSessionDirect(): Promise<Session> {
 	try {
-		const r = await fetch(`${API}/auth/me`, {
+		let r = await fetch(`${API}/auth/me`, {
 			method: 'GET',
-			credentials: 'include', // важно: браузер отправит httpOnly-куки на api.*
+			credentials: 'include',
 			cache: 'no-store',
 		})
+
+		if (r.status === 401) {
+			const refreshResp = await fetch(`${API}/auth/refresh`, {
+				method: 'POST',
+				credentials: 'include',
+			})
+
+			if (!refreshResp.ok) {
+				return { status: 'signed-out' }
+			}
+
+			r = await fetch(`${API}/auth/me`, {
+				method: 'GET',
+				credentials: 'include',
+				cache: 'no-store',
+			})
+		}
+
 		if (!r.ok) return { status: 'signed-out' }
 
 		const raw = await r.json()
 		const data = raw?.data ?? raw
 		if (data?.email) return { status: 'signed-in', email: data.email }
+
 		return { status: 'signed-out' }
 	} catch {
 		return { status: 'signed-out' }
@@ -37,9 +57,14 @@ export default function Navbar() {
 	const [session, setSession] = useState<Session>({ status: 'loading' })
 	const pathname = usePathname()
 
-	// На этих путях всегда показываем гостевое меню, независимо от сессии
+	if (!pathname) return null
+
+	// На главной странице навбар не показываем, чтобы не конфликтовать с HUD
+	if (pathname === '/') {
+		return null
+	}
+
 	const isAuthPage = useMemo(() => {
-		if (!pathname) return false
 		return (
 			pathname === '/login' ||
 			pathname.startsWith('/login') ||
@@ -66,10 +91,11 @@ export default function Navbar() {
 			const s = await getSessionDirect()
 			if (alive) setSession(s)
 		}
-		// обновлять при смене фокуса вкладки и наших кастомных событиях
+
 		const onVisibility = () => {
 			if (document.visibilityState === 'visible') onChange()
 		}
+
 		window.addEventListener('session-changed', onChange as EventListener)
 		document.addEventListener('visibilitychange', onVisibility)
 		window.addEventListener('focus', onChange)
@@ -87,7 +113,6 @@ export default function Navbar() {
 		[pathname]
 	)
 
-	// Если это /login или /register — принудительно гостевое меню
 	const effectiveSession: Session = isAuthPage
 		? { status: 'signed-out' }
 		: session
@@ -171,7 +196,6 @@ export default function Navbar() {
 										Участники
 									</Link>
 								</li>
-								{/* Кнопка "Выйти" находится в /profile */}
 							</>
 						)}
 					</ul>

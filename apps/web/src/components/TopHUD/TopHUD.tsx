@@ -1,17 +1,17 @@
 // apps/web/src/components/TopHUD/TopHUD.tsx
 'use client'
 
+import { Friend, Notification } from '@station-eden/shared'
 import React from 'react'
 import { useUserData } from '../../hooks/useUserData'
 import styles from './TopHUD.module.css'
-import { Currency } from './components/Currency'
-import { Icon } from './components/Icon'
-import { UserDropdown } from './components/UserDropdown'
-import { Notifications } from './components/Notifications'
-import { FriendsDrawer } from './components/FriendsDrawer'
 import { ChatWindow } from './components/ChatWindow'
+import { Currency } from './components/Currency'
+import { FriendsDrawer } from './components/FriendsDrawer'
+import { Icon } from './components/Icon'
+import { Notifications } from './components/Notifications'
+import { UserDropdown } from './components/UserDropdown'
 import { useViewportScale } from './hooks/useViewportScale'
-import { Notification, Friend } from '@station-eden/shared'
 
 interface TopHUDProps {
 	profile?: {
@@ -29,6 +29,9 @@ interface TopHUDProps {
 	variant?: 'default' | 'main'
 }
 
+const FALLBACK_AVATAR = '/avatars/avatar1.png'
+const GUEST_USERNAME = 'Гость'
+
 export default function TopHUD({
 	profile,
 	avatar,
@@ -36,58 +39,59 @@ export default function TopHUD({
 }: TopHUDProps) {
 	const [isDropdownOpen, setIsDropdownOpen] = React.useState(false)
 	const [isFriendsDrawerOpen, setIsFriendsDrawerOpen] = React.useState(false)
-	const [activeChat, setActiveChat] = React.useState<{friendId: string, friendName: string} | null>(null)
-	
-	// Моковые данные для уведомлений
+	const [activeChat, setActiveChat] = React.useState<{
+		friendId: string
+		friendName: string
+	} | null>(null)
+
 	const [notifications, setNotifications] = React.useState<Notification[]>([
 		{
 			id: '1',
 			type: 'game_invite',
 			title: 'Приглашение в игру',
 			message: 'Игрок CosmicWarrior приглашает вас в игру',
-			timestamp: new Date(Date.now() - 5 * 60000), 
+			timestamp: new Date(Date.now() - 5 * 60000),
 			isRead: false,
 			lobbyId: 'lobby-123',
 			inviterName: 'CosmicWarrior',
 			inviterId: 'user-456',
-			gameMode: 'team_deathmatch'
+			gameMode: 'team_deathmatch',
 		},
 		{
 			id: '2',
 			type: 'news',
 			title: 'Новое обновление',
 			message: 'Вышло обновление 1.2 с новыми картами и улучшениями',
-			timestamp: new Date(Date.now() - 2 * 3600000), 
+			timestamp: new Date(Date.now() - 2 * 3600000),
 			isRead: true,
-			link: '/news/update-1.2'
+			link: '/news/update-1.2',
 		},
 		{
 			id: '3',
 			type: 'friend_request',
 			title: 'Запрос в друзья',
 			message: 'SpaceExplorer хочет добавить вас в друзья',
-			timestamp: new Date(Date.now() - 30 * 60000), 
+			timestamp: new Date(Date.now() - 30 * 60000),
 			isRead: false,
 			requesterId: 'user-789',
-			requesterName: 'SpaceExplorer'
-		}
+			requesterName: 'SpaceExplorer',
+		},
 	])
 
-	// Моковые данные для друзей
 	const [friends, setFriends] = React.useState<Friend[]>([
 		{
 			id: 'friend-1',
 			username: 'CosmicWarrior',
 			email: 'cosmic@example.com',
 			status: 'online',
-			isFavorite: true
+			isFavorite: true,
 		},
 		{
-			id: 'friend-2', 
+			id: 'friend-2',
 			username: 'SpaceExplorer',
 			email: 'space@example.com',
 			status: 'in_game',
-			isFavorite: true
+			isFavorite: true,
 		},
 		{
 			id: 'friend-3',
@@ -100,40 +104,55 @@ export default function TopHUD({
 			username: 'GalaxyHunter',
 			email: 'galaxy@example.com',
 			status: 'offline',
-			lastSeen: new Date(Date.now() - 2 * 3600000)
+			lastSeen: new Date(Date.now() - 2 * 3600000),
 		},
 		{
 			id: 'friend-5',
 			username: 'NebulaRunner',
 			email: 'nebula@example.com',
-			status: 'online'
+			status: 'online',
 		},
 		{
 			id: 'friend-6',
 			username: 'QuantumPilot',
 			email: 'quantum@example.com',
 			status: 'offline',
-			lastSeen: new Date(Date.now() - 24 * 3600000)
-		}
+			lastSeen: new Date(Date.now() - 24 * 3600000),
+		},
 	])
 
 	const scale = useViewportScale()
 	const userData = useUserData()
 
-	const finalAvatar = avatar || userData.avatar
-	const finalProfile = profile || {
-		status:
-			userData.status === 'ok'
-				? 'ok'
-				: userData.status === 'error'
-					? 'error'
-					: 'loading',
-		username: userData.username,
-		email: userData.email,
-		userId: userData.userId,
-	}
+	const finalProfile = React.useMemo(() => {
+		if (profile) {
+			return {
+				status: profile.status,
+				userId: profile.userId,
+				email: profile.email,
+				username: profile.username ?? undefined,
+			}
+		}
 
-	// Мемоизируем обработчики чтобы предотвратить лишние рендеры
+		if (userData.status === 'ok' || userData.status === 'error') {
+			return {
+				status: userData.status,
+				userId: userData.userId,
+				email: userData.email,
+				username: userData.username ?? GUEST_USERNAME,
+			}
+		}
+
+		return {
+			status: 'loading' as const,
+			userId: undefined,
+			email: undefined,
+			username: undefined,
+		}
+	}, [profile, userData])
+
+	const finalAvatar = avatar || userData.avatar || FALLBACK_AVATAR
+
 	const handleDropdownToggle = React.useCallback(() => {
 		setIsDropdownOpen(prev => !prev)
 	}, [])
@@ -141,28 +160,31 @@ export default function TopHUD({
 	const handleDropdownClose = React.useCallback(() => {
 		setIsDropdownOpen(false)
 	}, [])
-	
-	// Обработчики для валюты
+
 	const handleAddCurrency = React.useCallback(() => {
 		console.log('Add currency clicked')
 	}, [])
 
-	// Обработчики для уведомлений
-	const handleNotificationAction = React.useCallback((notificationId: string, action: string) => {
-		console.log(`Notification ${notificationId}: ${action}`)
-	}, [])
+	const handleNotificationAction = React.useCallback(
+		(notificationId: string, action: string) => {
+			console.log(`Notification ${notificationId}: ${action}`)
+		},
+		[]
+	)
 
 	const handleMarkAsRead = React.useCallback((notificationId: string) => {
-		setNotifications(prev => 
-			prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n)
+		setNotifications(prev =>
+			prev.map(n => (n.id === notificationId ? { ...n, isRead: true } : n))
 		)
 	}, [])
 
-	const handleDismissNotification = React.useCallback((notificationId: string) => {
-		setNotifications(prev => prev.filter(n => n.id !== notificationId))
-	}, [])
+	const handleDismissNotification = React.useCallback(
+		(notificationId: string) => {
+			setNotifications(prev => prev.filter(n => n.id !== notificationId))
+		},
+		[]
+	)
 
-	// Обработчики для друзей
 	const handleFriendsClick = React.useCallback(() => {
 		setIsFriendsDrawerOpen(true)
 		setIsDropdownOpen(false)
@@ -172,23 +194,24 @@ export default function TopHUD({
 		console.log('Friend clicked:', friend.username)
 	}, [])
 
-	const handleStartChat = React.useCallback((friendId: string) => {
-		console.log('Start chat with:', friendId)
-		const friend = friends.find(f => f.id === friendId)
-		if (friend) {
-			setActiveChat({
-				friendId: friend.id,
-				friendName: friend.username
-			})
-		}
-	}, [friends])
+	const handleStartChat = React.useCallback(
+		(friendId: string) => {
+			console.log('Start chat with:', friendId)
+			const friend = friends.find(f => f.id === friendId)
+			if (friend) {
+				setActiveChat({
+					friendId: friend.id,
+					friendName: friend.username,
+				})
+			}
+		},
+		[friends]
+	)
 
-	// Обработчик закрытия чата (только чат)
 	const handleCloseChat = React.useCallback(() => {
 		setActiveChat(null)
 	}, [])
 
-	// Обработчик закрытия FriendsDrawer (и чата, если открыт)
 	const handleFriendsDrawerClose = React.useCallback(() => {
 		setIsFriendsDrawerOpen(false)
 		if (activeChat) {
@@ -209,8 +232,7 @@ export default function TopHUD({
 		transformOrigin: 'top center',
 	} as React.CSSProperties
 
-	// Скелетон при загрузке
-	if (userData.status === 'loading') {
+	if (!profile && userData.status === 'loading') {
 		return (
 			<header
 				className={styles.hud}
@@ -229,7 +251,6 @@ export default function TopHUD({
 				style={hudStyle}
 				aria-label='Верхняя панель управления'
 			>
-				{/* Левая часть: Навигация (или пустой блок для сохранения layout) */}
 				<div className={styles.leftSection}>
 					{variant === 'default' && (
 						<nav aria-label='Основная навигация'>
@@ -250,11 +271,10 @@ export default function TopHUD({
 					)}
 				</div>
 
-				{/* Правая часть: Валюта, Уведомления и Профиль */}
 				<div className={styles.hudRight}>
 					<Currency value={128} onAdd={handleAddCurrency} />
-					
-					<Notifications 
+
+					<Notifications
 						notifications={notifications}
 						onNotificationAction={handleNotificationAction}
 						onMarkAsRead={handleMarkAsRead}
@@ -263,7 +283,7 @@ export default function TopHUD({
 
 					<UserDropdown
 						profile={{
-							username: finalProfile.username || undefined,
+							username: finalProfile.username || GUEST_USERNAME,
 							email: finalProfile.email,
 							userId: finalProfile.userId,
 						}}
@@ -274,7 +294,6 @@ export default function TopHUD({
 						onFriendsClick={handleFriendsClick}
 					/>
 
-					{/* Панель друзей */}
 					<FriendsDrawer
 						isOpen={isFriendsDrawerOpen}
 						onClose={handleFriendsDrawerClose}
@@ -289,7 +308,6 @@ export default function TopHUD({
 				</div>
 			</header>
 
-			{/* Окно чата - рендерится слева */}
 			<ChatWindow
 				isOpen={!!activeChat}
 				onClose={handleCloseChat}
@@ -300,7 +318,6 @@ export default function TopHUD({
 	)
 }
 
-// Компонент-скелетон
 function SkeletonTopHUD({ showBackLink }: { showBackLink: boolean }) {
 	return (
 		<>
@@ -321,7 +338,6 @@ function SkeletonTopHUD({ showBackLink }: { showBackLink: boolean }) {
 					</div>
 				</div>
 
-				{/* Скелетон для кнопки уведомлений */}
 				<div className={styles.notificationsSkeleton}></div>
 
 				<div className={styles.avatarDropdown}>
