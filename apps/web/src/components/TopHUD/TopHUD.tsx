@@ -24,7 +24,7 @@ interface TopHUDProps {
 	avatar?: string
 	/**
 	 * 'default' - показывает кнопку "На главную" (для внутренних страниц)
-	 * 'main' - скрывает кнопку "На главную" (для главной страницы)
+	 * 'main'    - скрывает кнопку "На главную" (для главной страницы)
 	 */
 	variant?: 'default' | 'main'
 }
@@ -44,41 +44,44 @@ export default function TopHUD({
 		friendName: string
 	} | null>(null)
 
-	const [notifications, setNotifications] = React.useState<Notification[]>([
-		{
-			id: '1',
-			type: 'game_invite',
-			title: 'Приглашение в игру',
-			message: 'Игрок CosmicWarrior приглашает вас в игру',
-			timestamp: new Date(Date.now() - 5 * 60000),
-			isRead: false,
-			lobbyId: 'lobby-123',
-			inviterName: 'CosmicWarrior',
-			inviterId: 'user-456',
-			gameMode: 'team_deathmatch',
-		},
-		{
-			id: '2',
-			type: 'news',
-			title: 'Новое обновление',
-			message: 'Вышло обновление 1.2 с новыми картами и улучшениями',
-			timestamp: new Date(Date.now() - 2 * 3600000),
-			isRead: true,
-			link: '/news/update-1.2',
-		},
-		{
-			id: '3',
-			type: 'friend_request',
-			title: 'Запрос в друзья',
-			message: 'SpaceExplorer хочет добавить вас в друзья',
-			timestamp: new Date(Date.now() - 30 * 60000),
-			isRead: false,
-			requesterId: 'user-789',
-			requesterName: 'SpaceExplorer',
-		},
-	])
+	// ленивые инициализации
+	const [notifications, setNotifications] = React.useState<Notification[]>(
+		() => [
+			{
+				id: '1',
+				type: 'game_invite',
+				title: 'Приглашение в игру',
+				message: 'Игрок CosmicWarrior приглашает вас в игру',
+				timestamp: new Date(Date.now() - 5 * 60_000),
+				isRead: false,
+				lobbyId: 'lobby-123',
+				inviterName: 'CosmicWarrior',
+				inviterId: 'user-456',
+				gameMode: 'team_deathmatch',
+			},
+			{
+				id: '2',
+				type: 'news',
+				title: 'Новое обновление',
+				message: 'Вышло обновление 1.2 с новыми картами и улучшениями',
+				timestamp: new Date(Date.now() - 2 * 3_600_000),
+				isRead: true,
+				link: '/news/update-1.2',
+			},
+			{
+				id: '3',
+				type: 'friend_request',
+				title: 'Запрос в друзья',
+				message: 'SpaceExplorer хочет добавить вас в друзья',
+				timestamp: new Date(Date.now() - 30 * 60_000),
+				isRead: false,
+				requesterId: 'user-789',
+				requesterName: 'SpaceExplorer',
+			},
+		]
+	)
 
-	const [friends, setFriends] = React.useState<Friend[]>([
+	const [friends, setFriends] = React.useState<Friend[]>(() => [
 		{
 			id: 'friend-1',
 			username: 'CosmicWarrior',
@@ -104,7 +107,7 @@ export default function TopHUD({
 			username: 'GalaxyHunter',
 			email: 'galaxy@example.com',
 			status: 'offline',
-			lastSeen: new Date(Date.now() - 2 * 3600000),
+			lastSeen: new Date(Date.now() - 2 * 3_600_000),
 		},
 		{
 			id: 'friend-5',
@@ -117,7 +120,7 @@ export default function TopHUD({
 			username: 'QuantumPilot',
 			email: 'quantum@example.com',
 			status: 'offline',
-			lastSeen: new Date(Date.now() - 24 * 3600000),
+			lastSeen: new Date(Date.now() - 24 * 3_600_000),
 		},
 	])
 
@@ -214,10 +217,8 @@ export default function TopHUD({
 
 	const handleFriendsDrawerClose = React.useCallback(() => {
 		setIsFriendsDrawerOpen(false)
-		if (activeChat) {
-			setActiveChat(null)
-		}
-	}, [activeChat])
+		setActiveChat(null)
+	}, [])
 
 	const handleViewProfile = React.useCallback((friendId: string) => {
 		window.location.href = `/profile/${friendId}`
@@ -227,10 +228,14 @@ export default function TopHUD({
 		setFriends(prev => prev.filter(f => f.id !== friendId))
 	}, [])
 
-	const hudStyle = {
-		transform: `scale(${scale})`,
-		transformOrigin: 'top center',
-	} as React.CSSProperties
+	const hudStyle = React.useMemo(
+		() =>
+			({
+				transform: `scale(${scale})`,
+				transformOrigin: 'top center',
+			}) as React.CSSProperties,
+		[scale]
+	)
 
 	if (!profile && userData.status === 'loading') {
 		return (
@@ -294,26 +299,32 @@ export default function TopHUD({
 						onFriendsClick={handleFriendsClick}
 					/>
 
-					<FriendsDrawer
-						isOpen={isFriendsDrawerOpen}
-						onClose={handleFriendsDrawerClose}
-						friends={friends}
-						onFriendClick={handleFriendClick}
-						onStartChat={handleStartChat}
-						onViewProfile={handleViewProfile}
-						onRemoveFriend={handleRemoveFriend}
-						activeChatId={activeChat?.friendId}
-						onCloseChat={handleCloseChat}
-					/>
+					{/* Drawer существует в DOM только пока открыт */}
+					{isFriendsDrawerOpen && (
+						<FriendsDrawer
+							isOpen={true}
+							onClose={handleFriendsDrawerClose}
+							friends={friends}
+							onFriendClick={handleFriendClick}
+							onStartChat={handleStartChat}
+							onViewProfile={handleViewProfile}
+							onRemoveFriend={handleRemoveFriend}
+							activeChatId={activeChat?.friendId}
+							onCloseChat={handleCloseChat}
+						/>
+					)}
 				</div>
 			</header>
 
-			<ChatWindow
-				isOpen={!!activeChat}
-				onClose={handleCloseChat}
-				friendId={activeChat?.friendId || ''}
-				friendName={activeChat?.friendName || ''}
-			/>
+			{/* Чат монтируется только когда есть активный собеседник */}
+			{activeChat && (
+				<ChatWindow
+					isOpen={true}
+					onClose={handleCloseChat}
+					friendId={activeChat.friendId}
+					friendName={activeChat.friendName}
+				/>
+			)}
 		</>
 	)
 }
