@@ -62,14 +62,12 @@ const SOCIAL_ICONS = [
 
 async function fetchProfile(): Promise<UserProfile | null> {
 	try {
-		// 1. Пытаемся получить текущего пользователя
 		let r = await fetch(`${API}/auth/me`, {
 			method: 'GET',
 			credentials: 'include',
 			cache: 'no-store',
 		})
 
-		// 2. Если access-токен протух — пробуем refresh
 		if (r.status === 401) {
 			const refreshResp = await fetch(`${API}/auth/refresh`, {
 				method: 'POST',
@@ -80,7 +78,6 @@ async function fetchProfile(): Promise<UserProfile | null> {
 				return null
 			}
 
-			// 3. После успешного refresh ещё раз получаем профиль
 			r = await fetch(`${API}/auth/me`, {
 				method: 'GET',
 				credentials: 'include',
@@ -176,16 +173,12 @@ export default function HomePage() {
 			setIsLoading(false)
 		}
 
-		// первоначальная загрузка
 		load()
 
-		// Оптимистичное обновление при смене сессии (logout/login с других страниц)
 		const handleSessionChanged = () => {
 			if (!alive) return
-			// сразу считаем, что пользователь разлогинен => HUD прячем
 			setUserProfile(null)
 			setIsLoading(false)
-			// и параллельно перепроверяем на сервере
 			load()
 		}
 
@@ -231,7 +224,6 @@ export default function HomePage() {
 
 			<Fireflies />
 
-			{/* TopHUD показываем ТОЛЬКО для авторизованных пользователей */}
 			{isAuthenticated && userProfile && (
 				<TopHUD
 					variant='main'
@@ -255,7 +247,6 @@ export default function HomePage() {
 				</section>
 
 				<section className={styles.menuSection}>
-					{/* Кнопки регистрации/входа показываем ТОЛЬКО для неавторизованных */}
 					{!isAuthenticated && !isLoading && (
 						<nav className={styles.sideMenu}>
 							<button className={styles.menuItem} onClick={handleRegister}>

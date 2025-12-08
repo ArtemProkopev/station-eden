@@ -15,7 +15,11 @@ export default function LobbyInfo({
 	return (
 		<div className={styles.robotBlock}>
 			<div className={styles.robotImageContainer}>
-				<img src='/roboted-optimized.webp' alt='Robot' className={styles.robotImage} />
+				<img
+					src='https://cdn.assets.stationeden.ru/web/roboted-optimized.webp'
+					alt='Robot'
+					className={styles.robotImage}
+				/>
 			</div>
 
 			<div className={styles.currentSettings}>
