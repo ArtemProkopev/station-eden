@@ -1,7 +1,12 @@
+// apps/web/src/app/lobby/components/Chat/Chat.tsx
 import { ChatMessage } from '@station-eden/shared'
+import type React from 'react'
+import { useCallback, useState } from 'react'
+import VoicePanel from '../VoicePanel/VoicePanel'
 import styles from './Chat.module.css'
 
 interface ChatProps {
+	lobbyId: string
 	messages: ChatMessage[]
 	newMessage: string
 	onMessageChange: (message: string) => void
@@ -12,6 +17,7 @@ interface ChatProps {
 }
 
 export default function Chat({
+	lobbyId,
 	messages,
 	newMessage,
 	onMessageChange,
@@ -20,7 +26,20 @@ export default function Chat({
 	onChatScroll,
 	chatContainerRef,
 }: ChatProps) {
-	// Исправлено: принимает Date или string
+	const [activeTab, setActiveTab] = useState<'text' | 'voice'>('text')
+
+	// индикатор "в голосе кто-то есть" для вкладки (без числа)
+	const [hasVoiceActivity, setHasVoiceActivity] = useState(false)
+
+	const handleVoiceStatsChange = useCallback(
+		(stats: { participantsCount: number; someoneSpeaking: boolean }) => {
+			// индикатор просто по факту наличия участников
+			setHasVoiceActivity(stats.participantsCount > 0)
+		},
+		[]
+	)
+
+	// принимает Date или string
 	const formatTime = (timestamp: Date | string) => {
 		const date = new Date(timestamp)
 		return date.toLocaleTimeString('ru-RU', {
@@ -31,49 +50,86 @@ export default function Chat({
 
 	return (
 		<div className={styles.chatBlock}>
-			<h2 className={styles.blockTitle}>Чат</h2>
-
-			<div
-				className={styles.chatMessagesContainer}
-				ref={chatContainerRef}
-				onScroll={onChatScroll}
-			>
-				<div className={styles.chatMessages}>
-					{messages.map(message => (
-						<div
-							key={message.id}
-							className={`${styles.chatMessage} ${message.type === 'system' ? styles.systemMessage : ''}`}
-						>
-							<div className={styles.chatMessageHeader}>
-								<span className={styles.chatName}>{message.playerName}</span>
-								<span className={styles.chatTime}>
-									{formatTime(message.timestamp)}
-								</span>
-							</div>
-							<p className={styles.chatText}>{message.text}</p>
-						</div>
-					))}
-				</div>
+			{/* Вкладки переключения */}
+			<div className={styles.tabsHeader}>
+				<button
+					type='button'
+					className={`${styles.tabButton} ${
+						activeTab === 'text' ? styles.tabButtonActive : ''
+					}`}
+					onClick={() => setActiveTab('text')}
+				>
+					Текстовый чат
+				</button>
+				<button
+					type='button'
+					className={`${styles.tabButton} ${
+						activeTab === 'voice' ? styles.tabButtonActive : ''
+					} ${hasVoiceActivity ? styles.tabButtonHasVoice : ''}`}
+					onClick={() => setActiveTab('voice')}
+				>
+					Голосовой чат
+				</button>
 			</div>
 
-			<form onSubmit={onSendMessage} className={styles.chatForm}>
-				<input
-					type='text'
-					value={newMessage}
-					onChange={e => onMessageChange(e.target.value.slice(0, 300))}
-					onKeyPress={onKeyPress}
-					placeholder='Написать сообщение...'
-					className={styles.chatInput}
-					maxLength={300}
-				/>
-				<button
-					type='submit'
-					className={styles.sendButton}
-					disabled={!newMessage.trim()}
-				>
-					→
-				</button>
-			</form>
+			{activeTab === 'text' ? (
+				<>
+					<h2 className={styles.blockTitle}>Чат</h2>
+
+					<div
+						className={styles.chatMessagesContainer}
+						ref={chatContainerRef}
+						onScroll={onChatScroll}
+					>
+						<div className={styles.chatMessages}>
+							{messages.map(message => (
+								<div
+									key={message.id}
+									className={`${styles.chatMessage} ${
+										message.type === 'system' ? styles.systemMessage : ''
+									}`}
+								>
+									<div className={styles.chatMessageHeader}>
+										<span className={styles.chatName}>
+											{message.playerName}
+										</span>
+										<span className={styles.chatTime}>
+											{formatTime(message.timestamp)}
+										</span>
+									</div>
+									<p className={styles.chatText}>{message.text}</p>
+								</div>
+							))}
+						</div>
+					</div>
+
+					<form onSubmit={onSendMessage} className={styles.chatForm}>
+						<input
+							type='text'
+							value={newMessage}
+							onChange={e => onMessageChange(e.target.value.slice(0, 300))}
+							onKeyPress={onKeyPress}
+							placeholder='Написать сообщение...'
+							className={styles.chatInput}
+							maxLength={300}
+						/>
+						<button
+							type='submit'
+							className={styles.sendButton}
+							disabled={!newMessage.trim()}
+						>
+							→
+						</button>
+					</form>
+				</>
+			) : (
+				<div className={styles.voiceTab}>
+					<VoicePanel
+						lobbyId={lobbyId}
+						onStatsChange={handleVoiceStatsChange}
+					/>
+				</div>
+			)}
 		</div>
 	)
 }

@@ -280,9 +280,20 @@ export class AuthController {
 		const rt = (req as any).cookies?.refresh_token
 		if (userId) await this.auth.logout(userId, rt)
 
-		this.clearWithSameAttrs(res, 'access_token', this.authCookieOpts())
-		this.clearWithSameAttrs(res, 'refresh_token', this.authCookieOpts())
-		this.clearWithSameAttrs(res, 'preauth', this.preauthCookieOpts())
+		const authOpts = this.authCookieOpts()
+		const preauthOpts = this.preauthCookieOpts()
+
+		// Очищаем куки с теми же атрибутами, что и при установке
+		this.clearWithSameAttrs(res, 'access_token', authOpts)
+		this.clearWithSameAttrs(res, 'refresh_token', authOpts)
+		this.clearWithSameAttrs(res, 'preauth', preauthOpts)
+
+		// Дополнительная подстраховка: чистим без domain/secure, если вдруг
+		// старые куки были с другими атрибутами
+		res.clearCookie('access_token', { path: '/' })
+		res.clearCookie('refresh_token', { path: '/' })
+		res.clearCookie('preauth', { path: '/' })
+
 		return { ok: true }
 	}
 
@@ -296,9 +307,17 @@ export class AuthController {
 		const rt = (req as any).cookies?.refresh_token
 		if (userId) await this.auth.logout(userId, rt)
 
-		this.clearWithSameAttrs(res, 'access_token', this.authCookieOpts())
-		this.clearWithSameAttrs(res, 'refresh_token', this.authCookieOpts())
-		this.clearWithSameAttrs(res, 'preauth', this.preauthCookieOpts())
+		const authOpts = this.authCookieOpts()
+		const preauthOpts = this.preauthCookieOpts()
+
+		this.clearWithSameAttrs(res, 'access_token', authOpts)
+		this.clearWithSameAttrs(res, 'refresh_token', authOpts)
+		this.clearWithSameAttrs(res, 'preauth', preauthOpts)
+
+		res.clearCookie('access_token', { path: '/' })
+		res.clearCookie('refresh_token', { path: '/' })
+		res.clearCookie('preauth', { path: '/' })
+
 		return { ok: true }
 	}
 

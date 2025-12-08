@@ -95,7 +95,9 @@ const LobbyContent = memo(
 						</div>
 
 						<div className={styles.rightColumn}>
+							{/* ВАЖНО: здесь только Chat. VoicePanel рендерится внутри Chat во вкладке. */}
 							<MemoizedChat
+								lobbyId={lobbyId}
 								messages={lobby.chatMessages}
 								newMessage={lobby.newMessage}
 								onMessageChange={lobby.setNewMessage}

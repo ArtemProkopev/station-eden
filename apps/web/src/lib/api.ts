@@ -48,7 +48,6 @@ async function ensureCsrfToken(): Promise<string> {
 	throw new Error('CSRF token not available')
 }
 
-// ВАЖНО: всегда бросает => Promise<never>
 async function throwHttpAsApiError(
 	res: Response,
 	context: ErrorContext
@@ -84,11 +83,20 @@ async function throwHttpAsApiError(
 	})
 }
 
-/* ======= авто-ретрай с попыткой refresh ======= */
+// Хранилище для флага принудительного логаута
+function isForcedLogout(): boolean {
+	if (typeof window === 'undefined') return false
+	return !!(window as any).__FORCED_LOGOUT__
+}
+
 let _isRefreshing = false
 async function tryRefreshOnce(): Promise<boolean> {
+	// Если был принудительный логаут — никогда больше не рефрешим
+	if (isForcedLogout()) {
+		return false
+	}
+
 	if (_isRefreshing) return false
-	// не пытаемся рефрешить, если нет refresh-куки
 	if (!hasCookie('refresh_token')) return false
 	_isRefreshing = true
 	try {
@@ -101,16 +109,28 @@ async function tryRefreshOnce(): Promise<boolean> {
 	}
 }
 
-// Явно возвращаем Promise<Response>, чтобы res никогда не был undefined
 async function fetchWithRetry(
 	input: RequestInfo | URL,
 	init: RequestInit,
 	context: ErrorContext,
-	isRefreshCall = false
+	isRefreshCall = false,
+	skipRetry = false
 ): Promise<Response> {
 	const res = await fetch(input, init)
+
+	// Если это запрос на logout и статус не 200, не пытаемся ретраить
+	if (typeof input === 'string' && input.includes('/auth/logout') && !res.ok) {
+		// Для logout мы не хотим ретраить даже если skipRetry=false
+		return res
+	}
+
 	if (res.ok) return res
-	if (res.status === 401 && !isRefreshCall) {
+
+	// Авто-ретрай при 401 только если:
+	// - это НЕ refresh запрос
+	// - НЕ принудительный логаут
+	// - НЕ просили пропустить ретрай
+	if (res.status === 401 && !isRefreshCall && !skipRetry && !isForcedLogout()) {
 		const ok = await tryRefreshOnce()
 		if (ok) {
 			const retried = await fetch(input, init)
@@ -121,16 +141,16 @@ async function fetchWithRetry(
 			return retried
 		}
 	}
+
 	await throwHttpAsApiError(res, context)
-	// недостижимо, но нужно для TS, потому что функция аннотирована как возвращающая Response
 	throw new Error('unreachable')
 }
-/* ============================================= */
 
 async function postJSON<T = any>(
 	path: string,
 	body?: unknown,
-	context: ErrorContext = 'default'
+	context: ErrorContext = 'default',
+	skipRetry = false
 ): Promise<T> {
 	const token = await ensureCsrfToken()
 
@@ -148,7 +168,8 @@ async function postJSON<T = any>(
 		`${API}${path}`,
 		req,
 		context,
-		path === '/auth/refresh'
+		path === '/auth/refresh',
+		skipRetry
 	)
 
 	if (!res.ok) {
@@ -229,7 +250,10 @@ export const api = {
 	refresh: (userId?: string) =>
 		postJSON('/auth/refresh', userId ? { userId } : undefined, 'default'),
 
-	logout: () => postJSON('/auth/logout', {}, 'default'),
+	logout: () => postJSON('/auth/logout', {}, 'default', true), // skipRetry = true
+
+	// Добавляем GET версию логаута как fallback
+	logoutGet: () => getJSON('/auth/logout-get', 'default'),
 
 	me: () => getJSON('/auth/me', 'default'),
 
@@ -239,6 +263,9 @@ export const api = {
 		getJSON(`/users/${encodeURIComponent(id)}`, 'default'),
 	deleteUser: (id: string) =>
 		deleteJSON(`/users/${encodeURIComponent(id)}`, 'default'),
+
+	// Экспортируем hasCookie для использования в других модулях
+	hasCookie,
 }
 
 export { getUserMessage }

@@ -11,7 +11,7 @@ export async function middleware(req: NextRequest) {
 	// --- 1. CSP ---
 	const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
 
-	// Разрешаем CDN
+	// Разрешаем CDN и LiveKit
 	const cspHeader = `
 		default-src 'self';
 		script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
@@ -22,7 +22,14 @@ export async function middleware(req: NextRequest) {
 		base-uri 'self';
 		form-action 'self';
 		frame-ancestors 'none';
-		connect-src 'self' https://api.stationeden.ru wss://api.stationeden.ru;
+		connect-src
+			'self'
+			https://api.stationeden.ru
+			wss://api.stationeden.ru
+			https://station-eden-sfs0reyp.livekit.cloud
+			wss://station-eden-sfs0reyp.livekit.cloud
+			https://*.livekit.cloud
+			wss://*.livekit.cloud;
 		upgrade-insecure-requests;
 	`
 		.replace(/\s{2,}/g, ' ')

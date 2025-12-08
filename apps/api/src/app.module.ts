@@ -1,3 +1,4 @@
+// apps/api/src/app.module.ts
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { APP_FILTER } from '@nestjs/core'
@@ -16,24 +17,40 @@ import { EnvSchema } from './config/env.schema'
 import { LobbyModule } from './lobby/lobby.module'
 import { User } from './users/user.entity'
 import { UsersModule } from './users/users.module'
+import { VoiceModule } from './voice/voice.module'
 
 function resolveEnvPaths(): string[] {
-	const rootEnv = path.resolve(process.cwd(), '../../.env')
-	const localEnv = path.resolve(process.cwd(), '.env')
+	const cwd = process.cwd()
+	const rootEnv = path.resolve(cwd, '../../.env')
+	const rootEnvLocal = path.resolve(cwd, '../../.env.local')
+	const apiEnv = path.resolve(cwd, '.env')
+	const apiEnvLocal = path.resolve(cwd, '.env.local')
+
 	const paths: string[] = []
+
+	// Базовые .env (корневой и локальный для apps/api)
 	if (fs.existsSync(rootEnv)) paths.push(rootEnv)
-	if (fs.existsSync(localEnv)) paths.push(localEnv)
+	if (fs.existsSync(apiEnv)) paths.push(apiEnv)
+
+	// В dev-режиме также подключаем .env.local файлы
+	const nodeEnv = process.env.NODE_ENV || 'development'
+	if (nodeEnv !== 'production') {
+		if (fs.existsSync(rootEnvLocal)) paths.push(rootEnvLocal)
+		if (fs.existsSync(apiEnvLocal)) paths.push(apiEnvLocal)
+	}
+
 	if (paths.length === 0) {
 		console.warn(
-			'[config] .env not found at:',
+			'[config] .env/.env.local not found at:',
 			rootEnv,
 			'or',
-			localEnv,
+			apiEnv,
 			'— relying on process.env only'
 		)
 	} else {
-		console.log('[config] loaded .env from:', paths.join(', '))
+		console.log('[config] loaded env files (in order):', paths.join(', '))
 	}
+
 	return paths
 }
 
@@ -81,6 +98,7 @@ function resolveEnvPaths(): string[] {
 		AuthModule,
 		UsersModule,
 		LobbyModule,
+		VoiceModule,
 	],
 	providers: [{ provide: APP_FILTER, useClass: NotFoundExceptionFilter }],
 })

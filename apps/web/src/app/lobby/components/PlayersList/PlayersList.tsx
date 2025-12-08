@@ -1,3 +1,4 @@
+// apps/web/src/app/lobby/components/PlayersList/PlayersList.tsx
 import { LobbyPlayer as Player } from '@station-eden/shared'
 import { memo } from 'react'
 import styles from './PlayersList.module.css'
@@ -32,6 +33,7 @@ export default memo(function PlayersList({
 					{players.map(player => (
 						<div
 							key={player.id}
+							data-player-id={player.id}
 							className={`${styles.playerCard} ${player.isReady ? styles.ready : ''}`}
 						>
 							<div className={styles.playerInfo}>
@@ -56,6 +58,17 @@ export default memo(function PlayersList({
 										{player.missions} миссий | {player.hours} ч
 									</p>
 								</div>
+
+								{/* Индикатор голоса — минимальный */}
+								<div className={styles.voiceStatus}>
+									<span className={styles.voiceDot} />
+									<div className={styles.voiceBars} aria-hidden='true'>
+										<span />
+										<span />
+										<span />
+									</div>
+								</div>
+
 								{player.isReady && (
 									<span className={styles.readyBadge}>Готов</span>
 								)}

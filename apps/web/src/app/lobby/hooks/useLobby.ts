@@ -2,16 +2,15 @@
 import { useProfile } from '@/app/profile/hooks/useProfile'
 import { useScrollPrevention } from '@/hooks/useScrollPrevention'
 import { useWebSocket } from '@/hooks/useWebSocket'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AddPlayerModal } from '../components/AddPlayerModal/AddPlayerModal'
-import { LobbySettingsModal } from '../components/LobbySettingsModal/LobbySettingsModal'
-import { PlayerManagementModal } from '../components/PlayerManagementModal/PlayerManagementModal'
-// ИСПРАВЛЕНО: Импорт из shared и алиас для Player
 import {
 	ChatMessage,
 	LobbySettings,
 	LobbyPlayer as Player,
 } from '@station-eden/shared'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AddPlayerModal } from '../components/AddPlayerModal/AddPlayerModal'
+import { LobbySettingsModal } from '../components/LobbySettingsModal/LobbySettingsModal'
+import { PlayerManagementModal } from '../components/PlayerManagementModal/PlayerManagementModal'
 
 const DEFAULT_LOBBY_SETTINGS: LobbySettings = {
 	maxPlayers: 4,
@@ -53,7 +52,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 	const [isLoading, setIsLoading] = useState(true)
 	const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
 	const [isPlayerModalOpen, setIsPlayerModalOpen] = useState(false)
-	// ИСПРАВЛЕНО: Уточнение доступа к userId через data
 	const [lobbyCreatorId, setLobbyCreatorId] = useState<string>('')
 	const [error, setError] = useState<string>('')
 
@@ -66,24 +64,23 @@ export function useLobby(lobbyIdFromProps?: string) {
 	const hasJoinedRef = useRef(false)
 	const reconnectTimeoutRef = useRef<NodeJS.Timeout>()
 
-	// Хелпер для получения ID пользователя из новой структуры профиля
+	// Хелпер для получения ID пользователя из профиля
 	const currentUserId = profile.data?.id
 
 	useEffect(() => {
 		playersRef.current = players
 	}, [players])
+
 	useEffect(() => {
 		lobbySettingsRef.current = lobbySettings
 	}, [lobbySettings])
+
 	useEffect(() => {
 		lobbyIdRef.current = lobbyIdFromProps || 'default-lobby'
 	}, [lobbyIdFromProps])
 
 	useScrollPrevention()
 
-	// Примечание: WebSocketMessage в shared типизирован как { type, payload }.
-	// Здесь используется старая плоская структура. Используем any для data чтобы не ломать логику,
-	// пока бэкенд не будет полностью переведен на структуру { payload }.
 	const handleWebSocketMessage = useCallback((data: any) => {
 		if (!data?.type) return
 
@@ -144,6 +141,9 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 			case 'ERROR':
 				console.error('Server error:', data.message)
+
+				// Просто сохраняем ошибку для UI и больше НИЧЕГО не делаем.
+				// Никаких logout / redirect здесь быть не должно.
 				setError(data.message || 'Произошла ошибка')
 				break
 		}
@@ -184,30 +184,30 @@ export function useLobby(lobbyIdFromProps?: string) {
 		if (isConnected) setError('')
 	}, [isConnected])
 
+	// Подключаемся к лобби, когда есть соединение и загружен профиль
 	useEffect(() => {
-		if (!currentUserId || isLoading || hasJoinedRef.current) return
+		if (isConnected && !hasJoinedRef.current && currentUserId && profile.data) {
+			const currentUser: Player = {
+				id: currentUserId,
+				name: profile.data.username || 'Игрок',
+				missions: (profile.data as any)?.missionsCompleted || 0,
+				hours: (profile.data as any)?.playTime || 0,
+				avatar: assets.avatar,
+				isReady: false,
+			}
 
-		const currentUser: Player = {
-			id: currentUserId,
-			name: profile.data?.username || 'Игрок',
-			// Используем каст, так как этих полей нет в базовом User из shared, но они могут быть в ответе API
-			missions: (profile.data as any)?.missionsCompleted || 0,
-			hours: (profile.data as any)?.playTime || 0,
-			avatar: assets.avatar,
-			isReady: false,
+			console.log('Sending JOIN_LOBBY for user:', currentUser.name)
+			const success = sendWS({ type: 'JOIN_LOBBY', player: currentUser })
+
+			if (success) {
+				hasJoinedRef.current = true
+			} else {
+				setTimeout(() => {
+					hasJoinedRef.current = false
+				}, 1000)
+			}
 		}
-
-		console.log('Sending JOIN_LOBBY for user:', currentUser.name)
-		const success = sendWS({ type: 'JOIN_LOBBY', player: currentUser })
-
-		if (success) {
-			hasJoinedRef.current = true
-		} else {
-			setTimeout(() => {
-				hasJoinedRef.current = false
-			}, 1000)
-		}
-	}, [profile.data, isLoading, assets.avatar, sendWS, currentUserId])
+	}, [profile.data, isConnected, assets.avatar, sendWS, currentUserId])
 
 	const handlePlayerMenuClick = useCallback((player: Player) => {
 		setSelectedPlayer(player)
@@ -349,7 +349,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 				seenMsgIdsRef.current.add(id)
 				setChatMessages(prev => [
 					...prev,
-					{ ...message, timestamp: new Date() }, // Для локального отображения Date
+					{ ...message, timestamp: new Date() },
 				])
 			}
 

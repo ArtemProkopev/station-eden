@@ -52,6 +52,11 @@ const RawEnvSchema = z.object({
 	// Resend
 	RESEND_API_KEY: z.string().optional(),
 	EMAIL_FROM: z.string().optional(),
+
+	// --- LiveKit ---
+	LIVEKIT_URL: z.string().url().optional(),
+	LIVEKIT_API_KEY: z.string().optional(),
+	LIVEKIT_API_SECRET: z.string().optional(),
 })
 
 export const EnvSchema = RawEnvSchema.transform(env => ({
