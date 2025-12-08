@@ -96,6 +96,7 @@ const LobbyContent = memo(
 
 						<div className={styles.rightColumn}>
 							<MemoizedChat
+								lobbyId={lobbyId}
 								messages={lobby.chatMessages}
 								newMessage={lobby.newMessage}
 								onMessageChange={lobby.setNewMessage}

@@ -1,4 +1,6 @@
+// apps/api/src/lobby/lobby.gateway.ts
 import { Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
 import {
 	OnGatewayConnection,
@@ -46,9 +48,8 @@ const DEFAULT_LOBBY_SETTINGS: LobbySettings = {
 	password: '',
 }
 
-/** Жёсткие лимиты на уровне сервера */
 const LOBBY_ID_RE = /^[a-zA-Z0-9_-]{3,32}$/
-const HARD_MAX_PLAYERS = 6 // верхний предел при любом client-UI
+const HARD_MAX_PLAYERS = 6
 const MSG_MAX_LEN = 300
 const MSG_WINDOW_MS = 10_000
 const MSG_MAX_PER_WINDOW = 15
@@ -65,7 +66,6 @@ const MAX_CONN_PER_IP_TOTAL = 20
 		],
 		credentials: true,
 	},
-	// Важно: только WebSocket, без polling — совпадает с Caddyfile
 	transports: ['websocket'],
 	pingTimeout: 60000,
 	pingInterval: 25000,
@@ -78,16 +78,17 @@ export class LobbyGateway
 	@WebSocketServer()
 	private server!: Server
 
-	constructor(private readonly jwtService: JwtService) {}
+	constructor(
+		private readonly jwtService: JwtService,
+		private readonly configService: ConfigService
+	) {}
 
 	private lobbies = new Map<string, LobbyState>()
-
-	// rate-limit карты
-	private msgBuckets = new Map<string, { windowStart: number; count: number }>() // key = userId
+	private msgBuckets = new Map<string, { windowStart: number; count: number }>()
 	private joinBucketsByIp = new Map<
 		string,
 		{ windowStart: number; count: number; conns: number }
-	>() // key = ip
+	>()
 
 	private now() {
 		return Date.now()
@@ -156,7 +157,6 @@ export class LobbyGateway
 
 	async handleConnection(socket: Socket) {
 		try {
-			// 1) ограничим соединения по IP
 			const ip = this.clientIp(socket)
 			if (!this.allowJoinFromIp(ip)) {
 				this.logger.warn(`Join rate-limit by IP ${ip}`)
@@ -172,14 +172,35 @@ export class LobbyGateway
 				return
 			}
 
-			// 2) аутентификация по access_token cookie
 			const rawCookie = socket.handshake.headers.cookie || ''
-			const cookies = cookie.parse(rawCookie)
-			const token = cookies['access_token']
+			const cookies = rawCookie ? cookie.parse(rawCookie) : {}
+
+			const accessCookieName =
+				this.configService.get<string>('ACCESS_TOKEN_COOKIE_NAME') ||
+				'access_token'
+
+			const token = cookies[accessCookieName]
 
 			if (!token) {
-				this.logger.warn('Unauthorized connection attempt - no token')
+				this.logger.warn(
+					`Unauthorized WS connection attempt - no "${accessCookieName}" cookie. Cookies: ${
+						rawCookie || '<empty>'
+					}`
+				)
 				socket.emit('ERROR', { message: 'Authentication required' })
+				socket.disconnect(true)
+				return
+			}
+
+			const jwtSecret =
+				this.configService.get<string>('JWT_ACCESS_SECRET') ||
+				this.configService.get<string>('JWT_SECRET')
+
+			if (!jwtSecret) {
+				this.logger.error(
+					'JWT secret is not configured (JWT_ACCESS_SECRET / JWT_SECRET)'
+				)
+				socket.emit('ERROR', { message: 'Server auth configuration error' })
 				socket.disconnect(true)
 				return
 			}
@@ -187,10 +208,12 @@ export class LobbyGateway
 			let payload: any
 			try {
 				payload = await this.jwtService.verifyAsync(token, {
-					secret: process.env.JWT_ACCESS_SECRET!,
+					secret: jwtSecret,
 				})
-			} catch {
-				this.logger.warn('Invalid token provided')
+			} catch (err) {
+				this.logger.warn(
+					`Invalid WS token provided: ${(err as Error).message || err}`
+				)
 				socket.emit('ERROR', { message: 'Invalid authentication token' })
 				socket.disconnect(true)
 				return
@@ -199,6 +222,13 @@ export class LobbyGateway
 			const userId = String(payload.sub || '')
 			const username = String(payload.username || '') || 'Игрок'
 			const lobbyId = (socket.handshake.query.lobbyId as string) || ''
+
+			if (!userId) {
+				this.logger.warn('WS token payload has no "sub" (user id)')
+				socket.emit('ERROR', { message: 'Invalid authentication token' })
+				socket.disconnect(true)
+				return
+			}
 
 			if (!lobbyId || !LOBBY_ID_RE.test(lobbyId)) {
 				this.logger.warn(`Invalid lobbyId: "${lobbyId}"`)
@@ -218,7 +248,7 @@ export class LobbyGateway
 					settings: { ...DEFAULT_LOBBY_SETTINGS },
 					players: new Map(),
 					connections: new Map(),
-					creatorId: userId, // первый подключившийся — создатель
+					creatorId: userId,
 				})
 				this.logger.log(`New lobby created: ${lobbyId} by ${username}`)
 			}
@@ -237,10 +267,8 @@ export class LobbyGateway
 				return
 			}
 
-			// сохраняем последнее соединение пользователя
 			lobby.connections.set(userId, socket)
 
-			// Отдаём состояние лобби
 			socket.emit('LOBBY_STATE', {
 				players: Array.from(lobby.players.values()),
 				settings: { ...lobby.settings, maxPlayers: effectiveMax },
@@ -267,7 +295,6 @@ export class LobbyGateway
 		const lobby = this.lobbies.get(lobbyId)
 		if (!lobby) return
 
-		// удаляем привязку соединения
 		lobby.connections.delete(userId)
 
 		if (lobby.players.has(userId)) {
@@ -339,7 +366,9 @@ export class LobbyGateway
 		lobby.players.set(userId, authenticatedPlayer)
 
 		this.logger.log(
-			`Player ${authenticatedPlayer.name} ${isNewPlayer ? 'joined' : 'updated in'} lobby ${lobbyId}`
+			`Player ${authenticatedPlayer.name} ${
+				isNewPlayer ? 'joined' : 'updated in'
+			} lobby ${lobbyId}`
 		)
 
 		this.server.to(lobbyId).emit('LOBBY_STATE', {
@@ -355,14 +384,12 @@ export class LobbyGateway
 		const lobby = this.lobbies.get(lobbyId)
 		if (!lobby) return
 
-		// не-участникам лобби — запрет писать
 		if (!lobby.players.has(userId)) {
 			socket.emit('ERROR', { message: 'You are not in this lobby' })
 			socket.leave(lobbyId)
 			return
 		}
 
-		// rate-limit сообщений
 		if (!this.allowMessage(userId)) {
 			socket.emit('ERROR', { message: 'Too many messages' })
 			return
@@ -432,7 +459,6 @@ export class LobbyGateway
 			return
 		}
 
-		// не даём «выкрутить» выше жёсткого лимита
 		const next = { ...data.settings }
 		if (typeof next.maxPlayers === 'number') {
 			next.maxPlayers = Math.max(2, Math.min(HARD_MAX_PLAYERS, next.maxPlayers))
@@ -473,7 +499,6 @@ export class LobbyGateway
 				targetSocket.emit('ERROR', {
 					message: 'You were removed from the lobby',
 				})
-				// targetSocket.disconnect(true)
 			}
 
 			this.logger.log(`Player ${player.name} left lobby ${lobbyId}`)

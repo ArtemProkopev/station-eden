@@ -1,12 +1,21 @@
+// apps/web/src/hooks/useWebSocket.ts
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { io, Socket } from 'socket.io-client'
+import { io } from 'socket.io-client'
+import { isForcedLogout } from '../lib/websocketUtils'
 
 interface WebSocketMessage {
 	type: string
 	[key: string]: any
 }
 
-class MockSocketIO {
+// Общий интерфейс для WebSocket/MockSocket
+interface CommonSocket {
+	on(event: string, callback: (data: any) => void): CommonSocket
+	emit(event: string, data?: any): CommonSocket
+	disconnect(): void
+}
+
+class MockSocketIO implements CommonSocket {
 	private listeners: Map<string, ((data: any) => void)[]> = new Map()
 	private bc: BroadcastChannel
 	private lobbyId: string
@@ -46,7 +55,7 @@ class MockSocketIO {
 		callbacks.forEach(callback => callback(data))
 	}
 
-	on(event: string, callback: (data: any) => void) {
+	on(event: string, callback: (data: any) => void): MockSocketIO {
 		if (!this.listeners.has(event)) {
 			this.listeners.set(event, [])
 		}
@@ -54,7 +63,7 @@ class MockSocketIO {
 		return this
 	}
 
-	emit(event: string, data?: any) {
+	emit(event: string, data?: any): MockSocketIO {
 		if (event === 'JOIN_LOBBY') {
 			const p = data.player
 			if (!this.creatorId) this.creatorId = p.id
@@ -150,7 +159,7 @@ class MockSocketIO {
 		return this
 	}
 
-	disconnect() {
+	disconnect(): void {
 		this.connected = false
 		this.bc.close()
 		this.emitEvent('disconnect', 'io client disconnect')
@@ -162,8 +171,9 @@ export const useWebSocket = (
 	onMessage: (data: WebSocketMessage) => void,
 	params?: Record<string, string | number | boolean | undefined>
 ) => {
-	const socket = useRef<Socket | MockSocketIO | null>(null)
+	const socket = useRef<CommonSocket | null>(null)
 	const [isConnected, setIsConnected] = useState(false)
+	const shouldReconnectRef = useRef(true)
 
 	const onMessageRef = useRef(onMessage)
 	useEffect(() => {
@@ -193,77 +203,132 @@ export const useWebSocket = (
 
 	const useMock = !isProd && (urlMockFlag || lsMockFlag || envMockFlag)
 
-	useEffect(() => {
-		const url = buildUrl()
+	const forceDisconnect = useCallback(() => {
+		console.log('[useWebSocket] Force disconnecting WebSocket')
+		shouldReconnectRef.current = false
 
-		let currentSocket: Socket | MockSocketIO
+		if (socket.current) {
+			socket.current.disconnect()
+			socket.current = null
+		}
+
+		setIsConnected(false)
+	}, [])
+
+	useEffect(() => {
+		// Если был принудительный логаут, не подключаемся
+		if (isForcedLogout()) {
+			console.log('[useWebSocket] Skipping connection due to forced logout')
+			return
+		}
+
+		const url = buildUrl()
+		let currentSocket: CommonSocket
 
 		if (useMock) {
 			currentSocket = new MockSocketIO(url, {
 				transports: ['websocket'],
 				withCredentials: true,
 				autoConnect: true,
-			}) as any
+			})
 		} else {
-			currentSocket = io(url, {
+			const ioSocket = io(url, {
 				path: '/lobby',
 				query: paramsRef.current,
-				transports: ['websocket'], // важно: без polling (соответствует Caddyfile)
+				transports: ['websocket'],
 				withCredentials: true,
 				autoConnect: true,
-				reconnection: true,
-				reconnectionAttempts: Infinity,
+				reconnection: shouldReconnectRef.current,
+				reconnectionAttempts: 5,
 				reconnectionDelay: 1000,
 				reconnectionDelayMax: 5000,
 				timeout: 20000,
-			})
+			}) as unknown as CommonSocket
+
+			currentSocket = ioSocket
 		}
 
 		socket.current = currentSocket
 
 		const handleConnect = () => {
-			console.log('WebSocket connected')
+			console.log('[useWebSocket] WebSocket connected')
 			setIsConnected(true)
 		}
 
 		const handleDisconnect = (reason: string) => {
-			console.log('WebSocket disconnected:', reason)
+			console.log(`[useWebSocket] WebSocket disconnected: ${reason}`)
 			setIsConnected(false)
+
+			// Если это нормальное закрытие или аутентификация не удалась, не переподключаемся
+			if (reason === 'io server disconnect' || reason.includes('auth')) {
+				console.log(
+					'[useWebSocket] Not reconnecting (server disconnect or auth error)'
+				)
+				shouldReconnectRef.current = false
+				return
+			}
+
+			// Если был принудительный логаут, не переподключаемся
+			if (isForcedLogout()) {
+				console.log('[useWebSocket] Not reconnecting due to forced logout')
+				shouldReconnectRef.current = false
+				return
+			}
 		}
 
 		const handleConnectError = (error: Error) => {
-			console.error('WebSocket connection error:', error)
+			console.error('[useWebSocket] WebSocket connection error:', error)
 			setIsConnected(false)
 		}
 
 		const handleLobbyState = (data: any) => {
 			onMessageRef.current?.({ type: 'LOBBY_STATE', ...data })
 		}
+
 		const handlePlayerJoined = (data: any) => {
 			onMessageRef.current?.({ type: 'PLAYER_JOINED', ...data })
 		}
+
 		const handlePlayerLeft = (data: any) => {
 			onMessageRef.current?.({ type: 'PLAYER_LEFT', ...data })
 		}
+
 		const handleChatMessage = (data: any) => {
 			onMessageRef.current?.({ type: 'CHAT_MESSAGE', ...data })
 		}
+
 		const handlePlayerReady = (data: any) => {
 			onMessageRef.current?.({ type: 'PLAYER_READY', ...data })
 		}
+
 		const handleLobbySettingsUpdated = (data: any) => {
 			onMessageRef.current?.({ type: 'LOBBY_SETTINGS_UPDATED', ...data })
 		}
+
 		const handleMessageSent = (data: any) => {
 			onMessageRef.current?.({ type: 'MESSAGE_SENT', ...data })
 		}
+
 		const handleLobbySettingsUpdateSuccess = (data: any) => {
 			onMessageRef.current?.({ type: 'LOBBY_SETTINGS_UPDATE_SUCCESS', ...data })
 		}
+
 		const handleError = (data: any) => {
+			console.error('[useWebSocket] Server error:', data.message)
+
+			// Если ошибка аутентификации, закрываем соединение и дальше не пробуем
+			if (
+				data.message === 'Authentication required' ||
+				data.message === 'Invalid authentication token'
+			) {
+				console.log('[useWebSocket] Authentication error, closing connection')
+				forceDisconnect()
+			}
+
 			onMessageRef.current?.({ type: 'ERROR', ...data })
 		}
 
+		// Подписки
 		currentSocket.on('connect', handleConnect)
 		currentSocket.on('disconnect', handleDisconnect)
 		currentSocket.on('connect_error', handleConnectError)
@@ -281,30 +346,68 @@ export const useWebSocket = (
 		)
 		currentSocket.on('ERROR', handleError)
 
+		// Событие логаута
+		const handleLogout = () => {
+			console.log('[useWebSocket] Logout event received, disconnecting')
+			forceDisconnect()
+		}
+
+		const handleSessionChanged = (e: Event) => {
+			const customEvent = e as CustomEvent
+			if (customEvent.detail?.loggedIn === false) {
+				console.log(
+					'[useWebSocket] Session changed to logged out, disconnecting'
+				)
+				forceDisconnect()
+			}
+		}
+
+		window.addEventListener('logout', handleLogout)
+		window.addEventListener('session-changed', handleSessionChanged)
+
 		return () => {
+			window.removeEventListener('logout', handleLogout)
+			window.removeEventListener('session-changed', handleSessionChanged)
+
 			if (currentSocket) {
 				currentSocket.disconnect()
 				socket.current = null
 			}
 		}
-	}, [buildUrl, useMock])
+	}, [buildUrl, useMock, forceDisconnect])
 
-	const sendMessage = useCallback((message: WebSocketMessage) => {
-		if (socket.current) {
-			// client-side ограничим длину текстов на всякий случай
-			if (
-				message?.type === 'SEND_MESSAGE' &&
-				typeof message?.message?.text === 'string'
-			) {
-				message.message.text = message.message.text.slice(0, 300)
+	const sendMessage = useCallback(
+		(message: WebSocketMessage) => {
+			// Если был принудительный логаут, не отправляем сообщения
+			if (isForcedLogout()) {
+				console.log('[useWebSocket] Cannot send message - forced logout')
+				return false
 			}
-			console.log('Sending WebSocket message:', message.type, message)
-			;(socket.current as any).emit(message.type, message)
-			return true
-		}
-		console.warn('WebSocket not connected, message not sent:', message.type)
-		return false
-	}, [])
+
+			if (!socket.current || !isConnected) {
+				console.warn('[useWebSocket] Cannot send message - not connected')
+				return false
+			}
+
+			try {
+				// client-side ограничим длину текстов
+				if (
+					message?.type === 'SEND_MESSAGE' &&
+					typeof message?.message?.text === 'string'
+				) {
+					message.message.text = message.message.text.slice(0, 300)
+				}
+
+				console.log('Sending WebSocket message:', message.type, message)
+				socket.current.emit(message.type, message)
+				return true
+			} catch (error) {
+				console.error('[useWebSocket] Failed to send message:', error)
+				return false
+			}
+		},
+		[isConnected]
+	)
 
 	return { sendMessage, isConnected }
 }

@@ -1,338 +1,455 @@
 .playersBlock {
-  flex: 1;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(12px);
-  border-radius: 16px;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  border: 2px solid #63EFFF;
-  position: relative;
-  overflow: hidden;
-  height: 600px;
-  width: 100%;
-  max-height: 600px;
-  min-height: 600px;
+	flex: 1;
+	background: rgba(255, 255, 255, 0.1);
+	backdrop-filter: blur(12px);
+	border-radius: 16px;
+	padding: 24px;
+	display: flex;
+	flex-direction: column;
+	border: 2px solid #63efff;
+	position: relative;
+	overflow: hidden;
+	height: 600px;
+	width: 100%;
+	max-height: 600px;
+	min-height: 600px;
 }
 
 .blockTitle {
-  font-size: 24px;
-  font-weight: 600;
-  margin-bottom: 20px;
-  text-align: center;
-  color: #63EFFF;
-  text-shadow: 0 0 8px rgba(99, 239, 255, 0.6);
-  position: relative;
-  z-index: 1;
-  height: 40px;
-  flex-shrink: 0;
+	font-size: 24px;
+	font-weight: 600;
+	margin-bottom: 20px;
+	text-align: center;
+	color: #63efff;
+	text-shadow: 0 0 8px rgba(99, 239, 255, 0.6);
+	position: relative;
+	z-index: 1;
+	height: 40px;
+	flex-shrink: 0;
 }
 
 .playersListContainer {
-  background: rgba(0, 0, 0, 0.25);
-  border: 2px solid #63EFFF;
-  border-radius: 12px;
-  padding: 16px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  z-index: 1;
-  min-height: 0;
-  overflow: hidden;
+	background: rgba(0, 0, 0, 0.25);
+	border: 2px solid #63efff;
+	border-radius: 12px;
+	padding: 16px;
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	position: relative;
+	z-index: 1;
+	min-height: 0;
+	overflow: hidden;
 }
 
 .playersList {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  height: 100%;
-  overflow-y: auto;
-  padding-right: 4px;
-  flex: 1;
-  min-height: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	height: 100%;
+	overflow-y: auto;
+	padding-right: 4px;
+	flex: 1;
+	min-height: 0;
 }
 
 .playersList::-webkit-scrollbar {
-  width: 6px;
+	width: 6px;
 }
 
 .playersList::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
+	background: rgba(255, 255, 255, 0.1);
+	border-radius: 3px;
 }
 
 .playersList::-webkit-scrollbar-thumb {
-  background: #63EFFF;
-  border-radius: 3px;
+	background: #63efff;
+	border-radius: 3px;
 }
 
 .playersList::-webkit-scrollbar-thumb:hover {
-  background: #4FD8FF;
+	background: #4fd8ff;
 }
 
 .playerCard {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  transition: background 0.2s ease;
-  min-height: 70px;
-  height: 70px;
-  flex-shrink: 0;
+	background: rgba(255, 255, 255, 0.08);
+	border-radius: 12px;
+	padding: 14px 16px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	transition:
+		background 0.2s ease,
+		border 0.18s ease,
+		box-shadow 0.18s ease,
+		transform 0.15s ease;
+	min-height: 70px;
+	height: 70px;
+	flex-shrink: 0;
+	border: 1px solid rgba(99, 239, 255, 0.4);
 }
 
 .playerCard:hover {
-  background: rgba(255, 255, 255, 0.2);
+	background: rgba(255, 255, 255, 0.13);
 }
 
+/* состояние «игрок готов» */
 .playerCard.ready {
-  border-left: 3px solid #4CAF50;
-  background: rgba(76, 175, 80, 0.1);
+	border-left: 3px solid #4caf50;
+	background: rgba(76, 175, 80, 0.12);
+}
+
+/* 🔊 Подсветка говорящего игрока + мягкая вибрация рамки */
+.playerCard:global(.player-speaking) {
+	border: 2px solid #63efff !important;
+	box-shadow: 0 0 10px rgba(99, 239, 255, 0.7) !important;
+	animation: playerSpeakingShake 0.24s ease-in-out infinite alternate;
+	background: rgba(3, 18, 30, 0.96);
 }
 
 .playerInfo {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex: 1;
+	min-width: 0;
 }
 
 .playerAvatar {
-  width: 45px;
-  height: 45px;
-  border-radius: 50%;
-  background: rgba(99, 239, 255, 0.3);
-  border: 1px solid #63EFFF;
-  flex-shrink: 0;
-  box-shadow: 0 0 8px rgba(99, 239, 255, 0.4);
+	width: 45px;
+	height: 45px;
+	border-radius: 50%;
+	background: rgba(99, 239, 255, 0.3);
+	border: 1px solid #63efff;
+	flex-shrink: 0;
+	box-shadow: 0 0 8px rgba(99, 239, 255, 0.4);
 }
 
 .playerDetails {
-  flex: 1;
-  min-width: 0;
+	flex: 1;
+	min-width: 0;
 }
 
 .playerName {
-  font-weight: 500;
-  color: #63EFFF;
-  text-shadow: 0 0 6px rgba(99, 239, 255, 0.4);
-  margin-bottom: 4px;
-  font-size: 16px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 200px;
+	font-weight: 500;
+	color: #63efff;
+	text-shadow: 0 0 6px rgba(99, 239, 255, 0.4);
+	margin-bottom: 4px;
+	font-size: 16px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 200px;
 }
 
 .playerStats {
-  font-size: 14px;
-  color: #63EFFF;
-  text-shadow: 0 0 4px rgba(99, 239, 255, 0.4);
-  opacity: 0.9;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 200px;
+	font-size: 14px;
+	color: #63efff;
+	text-shadow: 0 0 4px rgba(99, 239, 255, 0.4);
+	opacity: 0.9;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 200px;
+}
+
+/* -------- Индикатор голоса на карточке -------- */
+
+.voiceStatus {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-left: 8px;
+	flex-shrink: 0;
+}
+
+.voiceDot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: radial-gradient(
+		circle,
+		rgba(99, 239, 255, 0.8),
+		rgba(0, 120, 180, 0.9)
+	);
+	box-shadow: 0 0 6px rgba(99, 239, 255, 0.7);
+	opacity: 0.3;
+	transition:
+		opacity 0.16s ease,
+		transform 0.16s ease,
+		box-shadow 0.16s ease;
+}
+
+/* контейнер «полосок» */
+.voiceBars {
+	display: flex;
+	align-items: flex-end;
+	justify-content: center;
+	gap: 2px;
+	width: 14px;
+	height: 10px;
+}
+
+.voiceBars span {
+	display: block;
+	width: 3px;
+	border-radius: 999px;
+	background: rgba(99, 239, 255, 0.3);
+	transform-origin: bottom center;
+	transform: scaleY(0.25);
+	transition:
+		background 0.16s ease,
+		transform 0.16s ease;
+}
+
+/* когда игрок говорит — аккуратный эквалайзер */
+
+.playerCard:global(.player-speaking) .voiceDot {
+	opacity: 1;
+	transform: scale(1.05);
+	box-shadow: 0 0 10px rgba(99, 239, 255, 0.8);
+	background: radial-gradient(circle, #63efff, #24b5ff);
+}
+
+.playerCard:global(.player-speaking) .voiceBars span:nth-child(1) {
+	background: rgba(99, 239, 255, 0.9);
+	animation: voiceBarPulse 0.5s ease-in-out infinite;
+}
+
+.playerCard:global(.player-speaking) .voiceBars span:nth-child(2) {
+	background: rgba(99, 239, 255, 0.85);
+	animation: voiceBarPulse 0.46s ease-in-out infinite;
+	animation-delay: 0.06s;
+}
+
+.playerCard:global(.player-speaking) .voiceBars span:nth-child(3) {
+	background: rgba(99, 239, 255, 0.8);
+	animation: voiceBarPulse 0.42s ease-in-out infinite;
+	animation-delay: 0.12s;
 }
 
 .readyBadge {
-  background: rgba(76, 175, 80, 0.2);
-  color: #4CAF50;
-  padding: 4px 8px;
-  border-radius: 10px;
-  font-size: 12px;
-  margin-left: 8px;
-  border: 1px solid rgba(76, 175, 80, 0.3);
-  font-family: 'RussoOne', sans-serif;
-  text-transform: lowercase;
+	background: rgba(76, 175, 80, 0.18);
+	color: #4caf50;
+	padding: 4px 8px;
+	border-radius: 10px;
+	font-size: 12px;
+	margin-left: 8px;
+	border: 1px solid rgba(76, 175, 80, 0.3);
+	font-family: 'RussoOne', sans-serif;
+	text-transform: lowercase;
 }
 
 .dots {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  padding: 8px 12px;
-  color: rgba(255, 255, 255, 0.7);
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 16px;
-  line-height: 1;
-  flex-shrink: 0;
-  margin-left: 8px;
+	background: rgba(255, 255, 255, 0.1);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-radius: 6px;
+	padding: 8px 12px;
+	color: rgba(255, 255, 255, 0.7);
+	cursor: pointer;
+	transition:
+		background 0.16s ease,
+		color 0.16s ease;
+	font-size: 16px;
+	line-height: 1;
+	flex-shrink: 0;
+	margin-left: 8px;
 }
 
 .dots:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-  transform: scale(1.05);
+	background: rgba(255, 255, 255, 0.16);
+	color: white;
 }
 
 .playerActions {
-  display: flex;
-  gap: 12px;
-  margin-top: 16px;
-  flex-shrink: 0;
-  height: 50px;
+	display: flex;
+	gap: 12px;
+	margin-top: 16px;
+	flex-shrink: 0;
+	height: 50px;
 }
 
 .addPlayerBtn,
 .readyBtn {
-  background: rgba(99, 239, 255, 0.1);
-  border: 2px solid #63EFFF;
-  color: #63EFFF;
-  font-weight: 500;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  z-index: 1;
-  font-family: 'RussoOne', sans-serif;
-  text-transform: lowercase;
-  text-shadow: 0 0 6px rgba(99, 239, 255, 0.6);
-  flex: 1;
-  height: 100%;
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+	background: rgba(99, 239, 255, 0.1);
+	border: 2px solid #63efff;
+	color: #63efff;
+	font-weight: 500;
+	border-radius: 12px;
+	cursor: pointer;
+	transition:
+		background 0.18s ease,
+		box-shadow 0.18s ease,
+		border-color 0.18s ease;
+	position: relative;
+	z-index: 1;
+	font-family: 'RussoOne', sans-serif;
+	text-transform: lowercase;
+	text-shadow: 0 0 6px rgba(99, 239, 255, 0.6);
+	flex: 1;
+	height: 100%;
+	font-size: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .addPlayerBtn:hover,
 .readyBtn:hover:not(:disabled) {
-  background: rgba(99, 239, 255, 0.15);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99, 239, 255, 0.3);
+	background: rgba(99, 239, 255, 0.16);
+	box-shadow: 0 4px 10px rgba(99, 239, 255, 0.25);
 }
 
 .readyBtn {
-  background: rgba(76, 175, 80, 0.1);
-  border: 2px solid #4CAF50;
-  color: #4CAF50;
-  text-shadow: 0 0 6px rgba(76, 175, 80, 0.6);
+	background: rgba(76, 175, 80, 0.1);
+	border: 2px solid #4caf50;
+	color: #4caf50;
+	text-shadow: 0 0 6px rgba(76, 175, 80, 0.6);
 }
 
 .readyBtn:hover:not(:disabled) {
-  background: rgba(76, 175, 80, 0.15);
-  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+	background: rgba(76, 175, 80, 0.16);
+	box-shadow: 0 4px 10px rgba(76, 175, 80, 0.25);
 }
 
 .readyBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
+	opacity: 0.5;
+	cursor: not-allowed;
+	box-shadow: none;
 }
 
 .emptyState {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: rgba(255, 255, 255, 0.6);
-  text-align: center;
-  padding: 40px 20px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	color: rgba(255, 255, 255, 0.6);
+	text-align: center;
+	padding: 40px 20px;
 }
 
 .emptyState p {
-  margin: 0;
+	margin: 0;
+}
+
+/* -------- Анимации (минимальные) -------- */
+
+@keyframes voiceBarPulse {
+	0% {
+		transform: scaleY(0.3);
+	}
+	40% {
+		transform: scaleY(1);
+	}
+	80% {
+		transform: scaleY(0.45);
+	}
+	100% {
+		transform: scaleY(0.6);
+	}
+}
+
+@keyframes playerSpeakingShake {
+	0% {
+		transform: translate3d(0, 0, 0);
+	}
+	100% {
+		transform: translate3d(0.5px, -0.5px, 0);
+	}
 }
 
 /* Адаптивность */
 @media (max-width: 1200px) {
-  .playersBlock {
-    height: 500px;
-    min-height: 500px;
-    max-height: 500px;
-  }
+	.playersBlock {
+		height: 500px;
+		min-height: 500px;
+		max-height: 500px;
+	}
 }
 
 @media (max-width: 1024px) {
-  .playersBlock {
-    height: 450px;
-    min-height: 450px;
-    max-height: 450px;
-    padding: 20px;
-  }
+	.playersBlock {
+		height: 450px;
+		min-height: 450px;
+		max-height: 450px;
+		padding: 20px;
+	}
 }
 
 @media (max-width: 768px) {
-  .playersBlock {
-    height: 350px;
-    min-height: 350px;
-    max-height: 350px;
-    padding: 16px;
-  }
-  
-  .playerAvatar {
-    width: 35px;
-    height: 35px;
-  }
-  
-  .playerName {
-    font-size: 14px;
-    max-width: 150px;
-  }
-  
-  .playerStats {
-    font-size: 12px;
-    max-width: 150px;
-  }
-  
-  .playerActions {
-    height: 45px;
-  }
-  
-  .addPlayerBtn,
-  .readyBtn {
-    font-size: 15px;
-  }
+	.playersBlock {
+		height: 350px;
+		min-height: 350px;
+		max-height: 350px;
+		padding: 16px;
+	}
+
+	.playerAvatar {
+		width: 35px;
+		height: 35px;
+	}
+
+	.playerName {
+		font-size: 14px;
+		max-width: 150px;
+	}
+
+	.playerStats {
+		font-size: 12px;
+		max-width: 150px;
+	}
+
+	.playerActions {
+		height: 45px;
+	}
+
+	.addPlayerBtn,
+	.readyBtn {
+		font-size: 15px;
+	}
 }
 
 @media (max-width: 480px) {
-  .playersBlock {
-    height: 300px;
-    min-height: 300px;
-    max-height: 300px;
-    padding: 12px;
-  }
-  
-  .playerCard {
-    padding: 12px;
-    min-height: 60px;
-    height: 60px;
-  }
-  
-  .playerAvatar {
-    width: 30px;
-    height: 30px;
-  }
-  
-  .playerName {
-    font-size: 13px;
-    max-width: 120px;
-  }
-  
-  .playerStats {
-    font-size: 11px;
-    max-width: 120px;
-  }
-  
-  .playerActions {
-    height: 40px;
-  }
-  
-  .addPlayerBtn,
-  .readyBtn {
-    font-size: 14px;
-  }
-  
-  .emptyState {
-    padding: 20px 10px;
-    font-size: 14px;
-  }
+	.playersBlock {
+		height: 300px;
+		min-height: 300px;
+		max-height: 300px;
+		padding: 12px;
+	}
+
+	.playerCard {
+		padding: 12px;
+		min-height: 60px;
+		height: 60px;
+	}
+
+	.playerAvatar {
+		width: 30px;
+		height: 30px;
+	}
+
+	.playerName {
+		font-size: 13px;
+		max-width: 120px;
+	}
+
+	.playerStats {
+		font-size: 11px;
+		max-width: 120px;
+	}
+
+	.playerActions {
+		height: 40px;
+	}
+
+	.addPlayerBtn,
+	.readyBtn {
+		font-size: 14px;
+	}
+
+	.emptyState {
+		padding: 20px 10px;
+		font-size: 14px;
+	}
 }

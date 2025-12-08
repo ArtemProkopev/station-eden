@@ -1,193 +1,202 @@
 .page {
-  position: relative;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: white;
-  background-image: url("https://cdn.assets.stationeden.ru/web/lobby-background-optimized.webp");
-  background-size: cover;
-  background-position: center;
-  font-family: 'RussoOne', sans-serif;
+	position: relative;
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	color: white;
+	background-image: url('https://cdn.assets.stationeden.ru/web/lobby-background-optimized.webp');
+	background-size: cover;
+	background-position: center;
+	font-family: 'RussoOne', sans-serif;
 }
 
 .container {
-  width: 100%;
-  max-width: 1400px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 32px;
-  padding: 20px;
+	width: 100%;
+	max-width: 1400px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 32px;
+	padding: 20px;
 }
 
 .columns {
-  display: flex;
-  flex-direction: row;
-  gap: 5rem;
-  width: 100%;
-  min-height: 600px;
+	display: flex;
+	flex-direction: row;
+	gap: 5rem;
+	width: 100%;
+	min-height: 600px;
 }
 
 .leftColumn,
 .rightColumn {
-  flex: 1;
-  height: 600px;
-  min-height: 600px;
-  max-height: 600px;
+	flex: 1;
+	height: 600px;
+	min-height: 600px;
+	max-height: 600px;
 }
 
 .centerColumn {
-  flex: 0.8;
-  height: 600px;
-  min-height: 600px;
+	flex: 0.8;
+	height: 600px;
+	min-height: 600px;
 }
 
 .bottomSection {
-  width: 100%;
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 0;
-  max-width: 400px;
-  height: 60px;
-  flex-shrink: 0;
+	width: 100%;
+	display: flex;
+	justify-content: flex-end;
+	margin-top: 0;
+	max-width: 400px;
+	height: 60px;
+	flex-shrink: 0;
 }
 
 .loadingContainer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  color: #63EFFF;
-  text-shadow: 0 0 8px rgba(99, 239, 255, 0.6);
-  height: 100vh;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 16px;
+	color: #63efff;
+	text-shadow: 0 0 8px rgba(99, 239, 255, 0.6);
+	height: 100vh;
 }
 
 .loadingSpinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid rgba(99, 239, 255, 0.3);
-  border-left: 4px solid #63EFFF;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+	width: 40px;
+	height: 40px;
+	border: 4px solid rgba(99, 239, 255, 0.3);
+	border-left: 4px solid #63efff;
+	border-radius: 50%;
+	animation: spin 1s linear infinite;
+}
+
+.voicePanelWrapper {
+	margin-left: 16px;
+	flex: 1;
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+	0% {
+		transform: rotate(0deg);
+	}
+	100% {
+		transform: rotate(360deg);
+	}
 }
 
 @media (max-width: 1400px) {
-  .columns {
-    gap: 3rem;
-  }
+	.columns {
+		gap: 3rem;
+	}
 }
 
 @media (max-width: 1200px) {
-  .columns {
-    gap: 2rem;
-  }
-  
-  .leftColumn,
-  .rightColumn,
-  .centerColumn {
-    height: 500px;
-    min-height: 500px;
-    max-height: 500px;
-  }
+	.columns {
+		gap: 2rem;
+	}
+
+	.leftColumn,
+	.rightColumn,
+	.centerColumn {
+		height: 500px;
+		min-height: 500px;
+		max-height: 500px;
+	}
 }
 
 @media (max-width: 1024px) {
-  .page {
-    padding: 20px;
-  }
-  
-  .container {
-    gap: 24px;
-    padding: 15px;
-  }
-  
-  .columns {
-    gap: 1.5rem;
-  }
-  
-  .leftColumn,
-  .rightColumn,
-  .centerColumn {
-    height: 450px;
-    min-height: 450px;
-    max-height: 450px;
-  }
+	.page {
+		padding: 20px;
+	}
+
+	.container {
+		gap: 24px;
+		padding: 15px;
+	}
+
+	.columns {
+		gap: 1.5rem;
+	}
+
+	.leftColumn,
+	.rightColumn,
+	.centerColumn {
+		height: 450px;
+		min-height: 450px;
+		max-height: 450px;
+	}
 }
 
 @media (max-width: 768px) {
-  .page {
-    padding: 16px;
-    justify-content: flex-start;
-    min-height: 100vh;
-    height: auto;
-  }
-  
-  .container {
-    padding: 10px;
-    gap: 20px;
-  }
-  
-  .columns {
-    flex-direction: column;
-    gap: 1.5rem;
-    min-height: auto;
-  }
-  
-  .leftColumn,
-  .rightColumn {
-    height: 350px;
-    min-height: 350px;
-    max-height: 350px;
-  }
-  
-  .centerColumn {
-    order: -1;
-    height: 250px;
-    min-height: 250px;
-  }
-  
-  .bottomSection {
-    max-width: 100%;
-    justify-content: center;
-    height: 50px;
-  }
+	.page {
+		padding: 16px;
+		justify-content: flex-start;
+		min-height: 100vh;
+		height: auto;
+	}
+
+	.container {
+		padding: 10px;
+		gap: 20px;
+	}
+
+	.columns {
+		flex-direction: column;
+		gap: 1.5rem;
+		min-height: auto;
+	}
+
+	.leftColumn,
+	.rightColumn {
+		height: 350px;
+		min-height: 350px;
+		max-height: 350px;
+	}
+
+	.centerColumn {
+		order: -1;
+		height: 250px;
+		min-height: 250px;
+	}
+
+	.bottomSection {
+		max-width: 100%;
+		justify-content: center;
+		height: 50px;
+	}
 }
 
 @media (max-width: 480px) {
-  .page {
-    padding: 12px;
-  }
-  
-  .container {
-    padding: 5px;
-    gap: 16px;
-  }
-  
-  .columns {
-    gap: 1rem;
-  }
-  
-  .leftColumn,
-  .rightColumn {
-    height: 300px;
-    min-height: 300px;
-    max-height: 300px;
-  }
-  
-  .centerColumn {
-    height: 200px;
-    min-height: 200px;
-  }
-  
-  .bottomSection {
-    height: 45px;
-  }
+	.page {
+		padding: 12px;
+	}
+
+	.container {
+		padding: 5px;
+		gap: 16px;
+	}
+
+	.columns {
+		gap: 1rem;
+	}
+
+	.leftColumn,
+	.rightColumn {
+		height: 300px;
+		min-height: 300px;
+		max-height: 300px;
+	}
+
+	.centerColumn {
+		height: 200px;
+		min-height: 200px;
+	}
+
+	.bottomSection {
+		height: 45px;
+	}
 }

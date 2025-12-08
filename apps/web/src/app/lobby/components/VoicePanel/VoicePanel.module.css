@@ -1,0 +1,450 @@
+/* apps/web/src/app/lobby/components/VoicePanel/VoicePanel.module.css */
+/* Голосовой блок в стиле чата (неон + стекло) */
+
+.voiceBlock {
+	position: relative;
+	padding: 16px 20px;
+	border-radius: 16px;
+	border: 2px solid #63efff;
+	background: rgba(255, 255, 255, 0.08);
+	backdrop-filter: blur(12px);
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 10px;
+	min-height: 80px;
+	overflow: hidden;
+	box-shadow: 0 0 18px rgba(99, 239, 255, 0.15);
+	z-index: 1;
+	max-width: 100%;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+/* Акцент при активности (кто-то говорит) */
+.voiceActive {
+	box-shadow: 0 0 18px rgba(99, 239, 255, 0.5);
+	border-color: #63efff;
+}
+
+/* -------- Верх: иконка-анимация и заголовок -------- */
+
+.headerRow {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-width: 0;
+}
+
+/* Только анимация без квадратного фона */
+
+.loader {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 44px;
+	gap: 4px;
+	flex-shrink: 0;
+}
+
+.bar {
+	display: inline-block;
+	width: 3px;
+	height: 20px;
+	background-color: rgba(255, 255, 255, 0.5);
+	border-radius: 10px;
+	animation: scale-up4 1s linear infinite;
+}
+
+.bar:nth-child(2) {
+	height: 35px;
+	margin: 0 5px;
+	animation-delay: 0.25s;
+}
+
+.bar:nth-child(3) {
+	animation-delay: 0.5s;
+}
+
+@keyframes scale-up4 {
+	20% {
+		background-color: #ffffff;
+		transform: scaleY(1.5);
+	}
+
+	40% {
+		transform: scaleY(1);
+	}
+}
+
+.titleColumn {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+}
+
+.title {
+	font-size: 14px;
+	font-weight: 600;
+	color: #63efff;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	text-shadow: 0 0 8px rgba(99, 239, 255, 0.6);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.participantsLabel {
+	font-size: 12px;
+	color: rgba(230, 250, 255, 0.9);
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	white-space: nowrap;
+	text-shadow: 0 0 4px rgba(99, 239, 255, 0.4);
+}
+
+.participantsLabel::before {
+	content: '';
+	width: 6px;
+	height: 6px;
+	border-radius: 999px;
+	background: #63efff;
+	box-shadow: 0 0 6px rgba(99, 239, 255, 0.8);
+}
+
+.participantsLabelEmpty {
+	color: rgba(180, 200, 220, 0.7);
+	text-shadow: none;
+}
+
+.participantsLabelEmpty::before {
+	display: none;
+}
+
+/* -------- Средняя строка: статус -------- */
+
+.statusRow {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	min-width: 0;
+}
+
+.statusBadge {
+	padding: 4px 14px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	border: 1px solid transparent;
+	background: rgba(0, 0, 0, 0.4);
+	text-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+	white-space: nowrap;
+}
+
+.statusBadge--connected {
+	border-color: rgba(99, 239, 255, 0.9);
+	color: #c9fdff;
+	background: rgba(99, 239, 255, 0.16);
+	box-shadow: 0 0 10px rgba(99, 239, 255, 0.5);
+}
+
+.statusBadge--disconnected {
+	border-color: rgba(255, 152, 168, 0.9);
+	color: #ffe1ea;
+	background: rgba(255, 88, 120, 0.2);
+	box-shadow: 0 0 10px rgba(255, 120, 150, 0.4);
+}
+
+.connectionStatus {
+	font-size: 11px;
+	color: rgba(220, 240, 255, 0.9);
+	text-align: left;
+	max-width: 100%;
+	line-height: 1.4;
+	text-shadow: 0 0 4px rgba(99, 239, 255, 0.3);
+}
+
+/* -------- Низ: кнопки -------- */
+
+.buttonsRow {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 10px;
+	min-width: 0;
+}
+
+/* Ошибка */
+
+.error {
+	font-size: 12px;
+	color: #fecaca;
+	padding: 8px 10px;
+	border-radius: 8px;
+	background: rgba(40, 0, 10, 0.9);
+	border: 1px solid #fb7185;
+	margin-top: 4px;
+	text-shadow: 0 0 4px rgba(0, 0, 0, 0.7);
+}
+
+/* === Глитч-кнопка JOIN в цвете #63efff === */
+
+.glitchButton,
+.glitchButton::after {
+	padding: 10px 32px;
+	font-size: 14px;
+	font-family: 'RussoOne', sans-serif;
+	letter-spacing: 0.08em;
+	border-radius: 8px;
+	border: 1px solid transparent;
+	color: #e5ffff;
+	background-color: transparent;
+	position: relative;
+	cursor: pointer;
+	text-transform: uppercase;
+	white-space: nowrap;
+	flex-shrink: 1;
+	max-width: 100%;
+}
+
+.glitchButton::after {
+	--move1: inset(50% 50% 50% 50%);
+	--move2: inset(31% 0 40% 0);
+	--move3: inset(39% 0 15% 0);
+	--move4: inset(45% 0 40% 0);
+	--move5: inset(45% 0 6% 0);
+	--move6: inset(14% 0 61% 0);
+
+	clip-path: var(--move1);
+	content: attr(data-text);
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	display: block;
+	color: #63efff;
+	text-shadow: 0 0 10px rgba(99, 239, 255, 0.7);
+	border-radius: 8px;
+	border: 1px solid rgba(99, 239, 255, 0.6);
+}
+
+.glitchButton:hover::after {
+	animation: glitch_4011 1s;
+	animation-timing-function: steps(2, end);
+	text-shadow:
+		-3px -3px 0px #63efff,
+		3px 3px 0px #e94be8;
+	background-color: transparent;
+}
+
+.glitchButton:hover {
+	box-shadow: 0px 10px 14px -8px rgba(99, 239, 255, 0.8);
+}
+
+.glitchButton:disabled,
+.glitchButton:disabled::after {
+	opacity: 0.5;
+	cursor: not-allowed;
+	animation: none;
+	box-shadow: none;
+}
+
+/* === Кнопки управления (Mute / Self / Leave) в стиле submit-button === */
+
+.controlButton {
+	position: relative;
+	padding: 0.5em 1.4em;
+	font-size: 12px;
+	font-family: 'RussoOne', sans-serif;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: hsla(192, 100%, 88%, 0.9);
+	background: linear-gradient(
+		90deg,
+		transparent 0%,
+		rgba(99, 239, 255, 0.25) 27%,
+		rgba(99, 239, 255, 0.25) 63%,
+		transparent 100%
+	);
+	border: 1px solid #63efff;
+	clip-path: polygon(0 0, 85% 0%, 100% 0, 100% 15%, 100% 90%, 91% 100%, 0 100%);
+	cursor: pointer;
+	transition:
+		box-shadow 0.2s ease,
+		background 0.2s ease,
+		color 0.2s ease;
+	white-space: nowrap;
+	flex-shrink: 1;
+	max-width: 100%;
+	background-color: transparent;
+}
+
+.controlButton:hover {
+	color: #ffffff;
+	box-shadow: 0 0 16px rgba(99, 239, 255, 0.7);
+}
+
+.controlButton:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+	box-shadow: none;
+}
+
+/* Активная (self monitor включен) */
+
+.controlButtonActive {
+	background: linear-gradient(
+		90deg,
+		transparent 0%,
+		rgba(34, 197, 94, 0.35) 27%,
+		rgba(34, 197, 94, 0.35) 63%,
+		transparent 100%
+	);
+	border-color: #22c55e;
+	color: #dcfce7;
+}
+
+/* Muted */
+
+.controlButtonMuted {
+	background: linear-gradient(
+		90deg,
+		transparent 0%,
+		rgba(248, 113, 113, 0.4) 27%,
+		rgba(248, 113, 113, 0.4) 63%,
+		transparent 100%
+	);
+	border-color: #fb7185;
+	color: #ffe4e6;
+}
+
+/* Опасная (Leave) */
+
+.controlButtonDanger {
+	background: linear-gradient(
+		90deg,
+		transparent 0%,
+		rgba(248, 113, 113, 0.45) 30%,
+		rgba(248, 113, 113, 0.45) 70%,
+		transparent 100%
+	);
+	border-color: #fb7185;
+	color: #ffe1e8;
+}
+
+/* Группа дополнительных действий */
+
+.actionGroup {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+/* Анимация для глитч */
+
+@keyframes glitch_4011 {
+	0% {
+		clip-path: var(--move1);
+		transform: translate(0px, -10px);
+	}
+
+	10% {
+		clip-path: var(--move2);
+		transform: translate(-10px, 10px);
+	}
+
+	20% {
+		clip-path: var(--move3);
+		transform: translate(10px, 0px);
+	}
+
+	30% {
+		clip-path: var(--move4);
+		transform: translate(-10px, 10px);
+	}
+
+	40% {
+		clip-path: var(--move5);
+		transform: translate(10px, -10px);
+	}
+
+	50% {
+		clip-path: var(--move6);
+		transform: translate(-10px, 10px);
+	}
+
+	60% {
+		clip-path: var(--move1);
+		transform: translate(10px, -10px);
+	}
+
+	70% {
+		clip-path: var(--move3);
+		transform: translate(-10px, 10px);
+	}
+
+	80% {
+		clip-path: var(--move2);
+		transform: translate(10px, -10px);
+	}
+
+	90% {
+		clip-path: var(--move4);
+		transform: translate(-10px, 10px);
+	}
+
+	100% {
+		clip-path: var(--move1);
+		transform: translate(0);
+	}
+}
+
+/* Адаптивность */
+
+@media (max-width: 900px) {
+	.voiceBlock {
+		padding: 14px;
+		gap: 8px;
+	}
+
+	.statusRow {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+}
+
+@media (max-width: 600px) {
+	.voiceBlock {
+		padding: 12px;
+		gap: 8px;
+	}
+
+	.loader {
+		height: 38px;
+	}
+
+	.title {
+		font-size: 13px;
+	}
+
+	.glitchButton,
+	.glitchButton::after {
+		font-size: 12px;
+		padding: 8px 20px;
+	}
+
+	.controlButton {
+		font-size: 11px;
+		padding: 0.45em 1.1em;
+	}
+}
