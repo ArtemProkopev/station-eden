@@ -45,6 +45,8 @@ export default function VoicePanel({
 	onStatsChange,
 }: VoicePanelProps) {
 	const [room, setRoom] = useState<Room | null>(null)
+	const roomRef = useRef<Room | null>(null)
+
 	const [joining, setJoining] = useState(false)
 	const [joined, setJoined] = useState(false)
 	const [muted, setMuted] = useState(false)
@@ -52,7 +54,6 @@ export default function VoicePanel({
 	const [participants, setParticipants] = useState<UiParticipant[]>([])
 	const [error, setError] = useState<string>('')
 	const [audioBlocked, setAudioBlocked] = useState(false)
-	const [showAudioUnlockBanner, setShowAudioUnlockBanner] = useState(false)
 
 	// audio-элементы для удалённых участников: participantSid -> [HTMLAudioElement]
 	const audioElementsRef = useRef<Map<string, HTMLAudioElement[]>>(new Map())
@@ -102,7 +103,7 @@ export default function VoicePanel({
 		}
 	}, [])
 
-	// отдаём статистику наверх (для таба "голосовой чат")
+	// отдаём статистику наверх (для таба "голосовой чат" в Chat)
 	useEffect(() => {
 		if (!onStatsChange) return
 		const participantsCount = participants.length
@@ -225,17 +226,9 @@ export default function VoicePanel({
 			}
 
 			try {
+				// ВАЖНО: не вызываем audioEl.play() вручную.
+				// LiveKit будет управлять воспроизведением через startAudio / внутренние механизмы.
 				track.attach(audioEl)
-
-				const playResult = audioEl.play()
-				if (playResult && typeof (playResult as any).catch === 'function') {
-					;(playResult as Promise<void>).catch((err: unknown) => {
-						console.warn('[voice] audioEl.play blocked:', err)
-						// если браузер заблокировал воспроизведение — покажем кнопку/баннер
-						setAudioBlocked(true)
-						setShowAudioUnlockBanner(true)
-					})
-				}
 			} catch (e) {
 				console.error('[voice] attach audio error:', e)
 				audioEl.remove()
@@ -248,6 +241,12 @@ export default function VoicePanel({
 			audioElementsRef.current.set(participantSid, [...existing, audioEl])
 
 			console.log(`[voice] Audio attached successfully for ${participantSid}`)
+
+			// Если по какой-то причине canPlaybackAudio = false, показываем кнопку
+			const r = roomRef.current
+			if (r && !r.canPlaybackAudio) {
+				setAudioBlocked(true)
+			}
 		},
 		[]
 	)
@@ -286,9 +285,10 @@ export default function VoicePanel({
 
 	// --- self monitor (слышать себя) ---
 	const enableSelfMonitor = useCallback(() => {
-		if (!room) return
+		const r = roomRef.current
+		if (!r) return
 
-		const lp = room.localParticipant
+		const lp = r.localParticipant
 		const pub = lp.getTrackPublication(Track.Source.Microphone)
 		const track = (pub?.track as LocalAudioTrack | undefined) ?? null
 
@@ -344,7 +344,7 @@ export default function VoicePanel({
 
 		selfMonitorTrackRef.current = track
 		selfMonitorAudioRef.current = audioEl
-	}, [room])
+	}, [])
 
 	const disableSelfMonitor = useCallback(() => {
 		const track = selfMonitorTrackRef.current
@@ -390,7 +390,6 @@ export default function VoicePanel({
 			})
 
 			r.on(RoomEvent.ActiveSpeakersChanged, () => {
-				// список говорящих меняется — обновляем флажок isSpeaking
 				updateParticipants(r)
 			})
 
@@ -421,14 +420,13 @@ export default function VoicePanel({
 				}
 			})
 
-			// autoplay-политика: LiveKit рекомендует слушать это событие
+			// autoplay-политика
 			r.on(RoomEvent.AudioPlaybackStatusChanged, () => {
-				const blocked = !r.canPlaybackAudio
-				setAudioBlocked(blocked)
-				setShowAudioUnlockBanner(blocked)
+				const canPlay = r.canPlaybackAudio
+				setAudioBlocked(!canPlay)
 				console.log(
 					'[voice] AudioPlaybackStatusChanged, canPlaybackAudio=',
-					r.canPlaybackAudio
+					canPlay
 				)
 			})
 
@@ -438,7 +436,6 @@ export default function VoicePanel({
 				setMuted(false)
 				setParticipants([])
 				setAudioBlocked(false)
-				setShowAudioUnlockBanner(false)
 				syncSpeakingToPlayersList([])
 			})
 		},
@@ -450,53 +447,14 @@ export default function VoicePanel({
 		]
 	)
 
-	// --- общий хендлер "разблокировать звук" ---
-	const handleUnlockAudio = useCallback(async () => {
-		if (!room) return
-
-		try {
-			await room.startAudio()
-			console.log(
-				'[voice] manual startAudio, canPlaybackAudio =',
-				room.canPlaybackAudio
-			)
-
-			// пробуем ещё раз проиграть все audio-элементы
-			audioElementsRef.current.forEach(els => {
-				els.forEach(el => {
-					try {
-						const p = el.play()
-						if (p && typeof (p as any).catch === 'function') {
-							;(p as Promise<void>).catch(err => {
-								console.warn('[voice] manual audioEl.play blocked:', err)
-							})
-						}
-					} catch (err) {
-						console.warn('[voice] manual audioEl.play error:', err)
-					}
-				})
-			})
-
-			const blockedNow = !room.canPlaybackAudio
-			setAudioBlocked(blockedNow)
-			setShowAudioUnlockBanner(blockedNow)
-		} catch (err) {
-			console.warn('[voice] manual startAudio failed:', err)
-			setAudioBlocked(true)
-			setShowAudioUnlockBanner(true)
-		}
-	}, [room])
-
 	// --- Подключение к голосовому чату ---
 	const joinVoice = useCallback(async () => {
 		if (joining || joined) return
 
 		setError('')
 		setJoining(true)
-		setAudioBlocked(false)
-		setShowAudioUnlockBanner(false)
 
-		// перед подключением очищаем предыдущие audio-элементы
+		// очищаем предыдущие audio-элементы
 		try {
 			audioElementsRef.current.forEach(els => {
 				els.forEach(el => {
@@ -548,7 +506,6 @@ export default function VoicePanel({
 
 			attachListeners(newRoom)
 
-			// основной коннект
 			await newRoom.connect(connectUrl, token, {
 				autoSubscribe: true,
 			})
@@ -558,16 +515,15 @@ export default function VoicePanel({
 				newRoom.localParticipant.identity
 			)
 
+			roomRef.current = newRoom
 			setRoom(newRoom)
 			setJoined(true)
 			updateParticipants(newRoom)
 
-			// стартуем аудио (внутри onClick кнопки connect → это уже user gesture)
+			// стартуем аудио в рамках onClick-ивента
 			try {
 				await newRoom.startAudio()
-				const blocked = !newRoom.canPlaybackAudio
-				setAudioBlocked(blocked)
-				setShowAudioUnlockBanner(blocked)
+				setAudioBlocked(!newRoom.canPlaybackAudio)
 				console.log(
 					'[voice] Audio started, canPlaybackAudio =',
 					newRoom.canPlaybackAudio
@@ -575,10 +531,9 @@ export default function VoicePanel({
 			} catch (e: unknown) {
 				console.warn('[voice] startAudio blocked:', e)
 				setAudioBlocked(true)
-				setShowAudioUnlockBanner(true)
 			}
 
-			// включаем микрофон, чтобы нас слышали другие
+			// включаем микрофон
 			try {
 				await newRoom.localParticipant.setMicrophoneEnabled(true)
 				setMuted(false)
@@ -590,11 +545,11 @@ export default function VoicePanel({
 		} catch (e: any) {
 			console.error('[voice] join error:', e)
 			setError(e?.message || 'Ошибка подключения к голосовому чату')
+			roomRef.current = null
 			setJoined(false)
 			setRoom(null)
 			setParticipants([])
 			setAudioBlocked(false)
-			setShowAudioUnlockBanner(false)
 			syncSpeakingToPlayersList([])
 		} finally {
 			setJoining(false)
@@ -610,7 +565,8 @@ export default function VoicePanel({
 
 	// --- Отключение от голосового чата ---
 	const leaveVoice = useCallback(async () => {
-		if (!room) return
+		const r = roomRef.current
+		if (!r) return
 
 		console.log('[voice] Leaving voice chat')
 
@@ -619,7 +575,7 @@ export default function VoicePanel({
 			setSelfMonitor(false)
 
 			try {
-				await room.localParticipant.setMicrophoneEnabled(false)
+				await r.localParticipant.setMicrophoneEnabled(false)
 			} catch (e: unknown) {
 				console.warn('[voice] error while disabling mic on leave:', e)
 			}
@@ -644,22 +600,24 @@ export default function VoicePanel({
 		}
 
 		try {
-			room.disconnect()
+			r.disconnect()
+			r.removeAllListeners()
 		} catch (e) {
 			console.warn('[voice] error while disconnecting room:', e)
 		}
 
+		roomRef.current = null
 		setRoom(null)
 		setJoined(false)
 		setMuted(false)
 		setParticipants([])
 		setAudioBlocked(false)
-		setShowAudioUnlockBanner(false)
 		syncSpeakingToPlayersList([])
-	}, [room, disableSelfMonitor, syncSpeakingToPlayersList])
+	}, [disableSelfMonitor, syncSpeakingToPlayersList])
 
 	const toggleMute = useCallback(async () => {
-		if (!room) return
+		const r = roomRef.current
+		if (!r) return
 
 		try {
 			const nextMuted = !muted
@@ -669,16 +627,17 @@ export default function VoicePanel({
 				setSelfMonitor(false)
 			}
 
-			await room.localParticipant.setMicrophoneEnabled(!nextMuted)
+			await r.localParticipant.setMicrophoneEnabled(!nextMuted)
 			setMuted(nextMuted)
 			console.log(`[voice] Microphone ${nextMuted ? 'muted' : 'unmuted'}`)
 		} catch (e: unknown) {
 			console.error('[voice] toggleMute error:', e)
 		}
-	}, [room, muted, disableSelfMonitor])
+	}, [muted, disableSelfMonitor])
 
 	const toggleSelfMonitor = useCallback(async () => {
-		if (!room) return
+		const r = roomRef.current
+		if (!r) return
 
 		try {
 			if (selfMonitor) {
@@ -689,7 +648,7 @@ export default function VoicePanel({
 
 			if (muted) {
 				try {
-					await room.localParticipant.setMicrophoneEnabled(true)
+					await r.localParticipant.setMicrophoneEnabled(true)
 					setMuted(false)
 				} catch (e: unknown) {
 					console.error('[voice] failed to enable mic for self monitor:', e)
@@ -701,7 +660,7 @@ export default function VoicePanel({
 		} catch (e: unknown) {
 			console.error('[voice] toggleSelfMonitor error:', e)
 		}
-	}, [room, selfMonitor, muted, enableSelfMonitor, disableSelfMonitor])
+	}, [selfMonitor, muted, enableSelfMonitor, disableSelfMonitor])
 
 	// cleanup при размонтировании компонента
 	useEffect(() => {
@@ -728,23 +687,24 @@ export default function VoicePanel({
 				audioElementsRef.current.clear()
 			} catch {}
 
-			if (room) {
+			const r = roomRef.current
+			if (r) {
 				try {
-					room.localParticipant.setMicrophoneEnabled(false)
+					r.localParticipant.setMicrophoneEnabled(false)
 				} catch {}
 				try {
-					room.disconnect()
+					r.disconnect()
+					r.removeAllListeners()
 				} catch {}
 			}
+
+			roomRef.current = null
 
 			try {
 				syncSpeakingToPlayersList([])
 			} catch {}
-
-			setAudioBlocked(false)
-			setShowAudioUnlockBanner(false)
 		}
-	}, [room, disableSelfMonitor, syncSpeakingToPlayersList])
+	}, [disableSelfMonitor, syncSpeakingToPlayersList])
 
 	// ---- вычисления для UI ----
 	const participantsCount = participants.length
@@ -773,27 +733,6 @@ export default function VoicePanel({
 				someoneSpeaking ? styles.voiceActive : ''
 			}`}
 		>
-			{showAudioUnlockBanner && (
-				<div className={styles.audioBanner}>
-					<div className={styles.audioBannerContent}>
-						<span className={styles.audioBannerTitle}>
-							Браузер заблокировал звук
-						</span>
-						<span className={styles.audioBannerText}>
-							Нажмите «Включить звук», чтобы разрешить воспроизведение аудио для
-							голосового чата.
-						</span>
-					</div>
-					<button
-						type='button'
-						className={styles.audioBannerButton}
-						onClick={handleUnlockAudio}
-					>
-						Включить звук
-					</button>
-				</div>
-			)}
-
 			<div className={styles.headerRow}>
 				<div className={styles.loader} aria-hidden='true'>
 					<span className={styles.bar} />
@@ -859,7 +798,22 @@ export default function VoicePanel({
 						{audioBlocked && (
 							<button
 								className={styles.controlButton}
-								onClick={handleUnlockAudio}
+								onClick={async () => {
+									const r = roomRef.current
+									if (!r) return
+									try {
+										await r.startAudio()
+										const canPlay = r.canPlaybackAudio
+										setAudioBlocked(!canPlay)
+										console.log(
+											'[voice] manual startAudio, canPlaybackAudio =',
+											canPlay
+										)
+									} catch (err: unknown) {
+										console.warn('[voice] manual startAudio failed:', err)
+										setAudioBlocked(true)
+									}
+								}}
 							>
 								Включить звук
 							</button>
