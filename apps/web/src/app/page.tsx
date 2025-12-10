@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react'
 import TopHUD from '../components/TopHUD/TopHUD'
 import { Fireflies } from '../components/ui/Fireflies/FirefliesMain'
 import PanelWithPlayButton from '../components/ui/PanelWithPlayButton/PanelWithPlayButton'
+import TargetCursor from '../components/ui/TargetCursor'
 import styles from './home.module.css'
 
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
@@ -219,6 +220,13 @@ export default function HomePage() {
 
 	return (
 		<>
+			{/* Кастомный курсор для главной */}
+			<TargetCursor
+				spinDuration={2}
+				hideDefaultCursor={true}
+				parallaxOn={true}
+			/>
+
 			<div className={styles.bg} aria-hidden />
 			<div className={styles.bgFx} aria-hidden />
 
@@ -249,10 +257,16 @@ export default function HomePage() {
 				<section className={styles.menuSection}>
 					{!isAuthenticated && !isLoading && (
 						<nav className={styles.sideMenu}>
-							<button className={styles.menuItem} onClick={handleRegister}>
+							<button
+								className={`${styles.menuItem} cursor-target`}
+								onClick={handleRegister}
+							>
 								ЗАРЕГИСТРИРОВАТЬСЯ
 							</button>
-							<button className={styles.menuItem} onClick={handleLogin}>
+							<button
+								className={`${styles.menuItem} cursor-target`}
+								onClick={handleLogin}
+							>
 								ВОЙТИ
 							</button>
 						</nav>

@@ -38,7 +38,7 @@ function PanelWithPlayButton({
 			/>
 
 			<button
-				className={styles.mainPlayButton}
+				className={`${styles.mainPlayButton} cursor-target`}
 				onClick={handlePlayClick}
 				onMouseEnter={handleMouseEnter}
 				onMouseLeave={handleMouseLeave}
