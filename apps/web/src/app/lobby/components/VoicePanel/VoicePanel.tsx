@@ -858,24 +858,19 @@ export default function VoicePanel({
 
 	// ---- вычисления для UI ----
 	const participantsCount = participants.length
-	const hasParticipants = participantsCount > 0
+	const hasParticipantsInRoom = participantsCount > 0
+	// "есть участники" считаем только когда мы реально в комнате
+	const hasParticipants = joined && hasParticipantsInRoom
 
-	const participantsLabel = !hasParticipants
-		? 'Никого в голосовом чате'
-		: participantsCount === 1
-			? '1 игрок в голосе'
-			: `${participantsCount} игрока в голосе`
+	const participantsLabel = !joined
+		? 'Подключитесь, чтобы увидеть, кто в голосе'
+		: !hasParticipantsInRoom
+			? 'Никого в голосе'
+			: participantsCount === 1
+				? '1 игрок в голосе'
+				: `${participantsCount} игрока в голосе`
 
 	const someoneSpeaking = participants.some(p => p.isSpeaking)
-
-	const statusText = !joined
-		? 'Нажмите «Подключиться», чтобы войти в голосовой чат'
-		: muted
-			? 'Вы в голосе, микрофон выключен'
-			: 'Вы в голосе, говорите свободно'
-
-	const joinLabel = joining ? 'Подключение...' : 'Подключиться'
-	const joinDataText = joining ? 'WAIT' : 'JOIN'
 
 	return (
 		<div
@@ -892,7 +887,7 @@ export default function VoicePanel({
 
 				<div className={styles.headerMain}>
 					<div className={styles.titleColumn}>
-						<span className={styles.title}>Голосовой чат</span>
+						<span className={styles.title}>Голос</span>
 						<span
 							className={`${styles.participantsLabel} ${
 								!hasParticipants
@@ -916,38 +911,68 @@ export default function VoicePanel({
 				</div>
 			</div>
 
-			<div className={styles.statusRow}>
-				<span className={styles.connectionStatus}>{statusText}</span>
-			</div>
-
 			<div
 				className={`${styles.buttonsRow} ${
-					!joined ? styles.buttonsRowCentered : ''
+					!joined ? styles.buttonsRowCentered : styles.buttonsRowJoined
 				}`}
 			>
 				{!joined ? (
-					<button
-						className={styles.glitchButton}
-						onClick={joinVoice}
-						disabled={joining}
-						data-text={joinDataText}
-					>
-						{joinLabel}
-					</button>
+					joining ? (
+						<div className={styles.connectingWrapper}>
+							<div
+								className={styles.connectingGlitch}
+								data-glitch='Подключение'
+							>
+								Подключение
+								<span className={styles.connectingDots}>
+									<span className={styles.connectingDot}>.</span>
+									<span className={styles.connectingDot}>.</span>
+									<span className={styles.connectingDot}>.</span>
+								</span>
+							</div>
+						</div>
+					) : (
+						<button
+							className={styles.glitchButton}
+							onClick={joinVoice}
+							disabled={joining}
+							data-text='JOIN'
+						>
+							Подключиться
+						</button>
+					)
 				) : (
 					<>
-						<button
-							className={`${styles.controlButton} ${
-								muted ? styles.controlButtonMuted : ''
-							}`}
-							onClick={toggleMute}
-						>
-							{muted ? 'Включить микрофон' : 'Выключить микрофон'}
-						</button>
+						<div className={styles.buttonsGroupLeft}>
+							<button
+								className={`${styles.controlButton} ${
+									muted ? styles.controlButtonMuted : ''
+								}`}
+								onClick={toggleMute}
+							>
+								{muted ? 'Микрофон вкл.' : 'Микрофон выкл.'}
+							</button>
+
+							<button
+								className={`${styles.controlButton} ${
+									selfMonitor ? styles.controlButtonActive : ''
+								}`}
+								onClick={toggleSelfMonitor}
+							>
+								{selfMonitor ? 'Скрыть себя' : 'Слышать себя'}
+							</button>
+
+							<button
+								className={`${styles.controlButton} ${styles.controlButtonDanger}`}
+								onClick={leaveVoice}
+							>
+								Выйти
+							</button>
+						</div>
 
 						{audioBlocked && (
 							<button
-								className={styles.controlButton}
+								className={`${styles.controlButton} ${styles.audioButtonRight}`}
 								onClick={async () => {
 									const r = roomRef.current
 									if (!r) return
@@ -968,23 +993,6 @@ export default function VoicePanel({
 								Включить звук
 							</button>
 						)}
-
-						<div className={styles.actionGroup}>
-							<button
-								className={`${styles.controlButton} ${
-									selfMonitor ? styles.controlButtonActive : ''
-								}`}
-								onClick={toggleSelfMonitor}
-							>
-								{selfMonitor ? 'Скрыть себя' : 'Слышать себя'}
-							</button>
-							<button
-								className={`${styles.controlButton} ${styles.controlButtonDanger}`}
-								onClick={leaveVoice}
-							>
-								Выйти
-							</button>
-						</div>
 					</>
 				)}
 			</div>

@@ -112,9 +112,10 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
-	white-space: nowrap;
+	white-space: normal;
 	text-shadow: 0 0 4px rgba(99, 239, 255, 0.4);
 	position: relative;
+	max-width: 220px;
 }
 
 /* точка-индикатор: базовое состояние (для есть-игроки) */
@@ -132,6 +133,7 @@
 		opacity 0.16s ease,
 		transform 0.16s ease,
 		box-shadow 0.16s ease;
+	margin-top: 0px;
 }
 
 /* когда никого нет — точка вообще не рисуется, текст встаёт строго под заголовком */
@@ -232,6 +234,27 @@
 
 .buttonsRowCentered {
 	justify-content: center;
+}
+
+/* когда в голосе — кнопки в один ряд */
+
+.buttonsRowJoined {
+	justify-content: space-between;
+}
+
+/* левая группа кнопок (микрофон / self / выйти) */
+
+.buttonsGroupLeft {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: 8px;
+}
+
+/* правая кнопка "Включить звук" */
+
+.audioButtonRight {
+	margin-left: auto;
 }
 
 /* Ошибка */
@@ -461,6 +484,155 @@
 	}
 }
 
+/* --- Состояние "Подключение" с глитч-эффектом и анимацией точек --- */
+
+.connectingWrapper {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 36px;
+	flex: 1 1 auto;
+}
+
+.connectingGlitch {
+	position: relative;
+	font-size: 14px;
+	font-weight: 700;
+	line-height: 1.2;
+	color: #e5ffff;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	font-family: 'RussoOne', sans-serif;
+	z-index: 1;
+	animation: connectingShift 1s ease-in-out infinite alternate;
+}
+
+.connectingGlitch::before,
+.connectingGlitch::after {
+	display: block;
+	content: attr(data-glitch);
+	position: absolute;
+	top: 0;
+	left: 0;
+	opacity: 0.8;
+}
+
+.connectingGlitch::before {
+	animation: connectingGlitch 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) both
+		infinite;
+	color: #63efff; /* голубой как свечение кнопки */
+	z-index: -1;
+}
+
+.connectingGlitch::after {
+	animation: connectingGlitch 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) reverse
+		both infinite;
+	color: #e94be8; /* розовый как обводка/тень кнопки */
+	z-index: -2;
+}
+
+.connectingDots {
+	display: inline-flex;
+	margin-left: 2px;
+	min-width: 16px;
+}
+
+.connectingDot {
+	opacity: 0;
+	animation: connectingDotsBlink 1.2s infinite;
+}
+
+.connectingDot:nth-child(2) {
+	animation-delay: 0.2s;
+}
+
+.connectingDot:nth-child(3) {
+	animation-delay: 0.4s;
+}
+
+@keyframes connectingGlitch {
+	0% {
+		transform: translate(0);
+	}
+
+	20% {
+		transform: translate(-3px, 3px);
+	}
+
+	40% {
+		transform: translate(-3px, -3px);
+	}
+
+	60% {
+		transform: translate(3px, 3px);
+	}
+
+	80% {
+		transform: translate(3px, -3px);
+	}
+
+	to {
+		transform: translate(0);
+	}
+}
+
+@keyframes connectingShift {
+	0%,
+	40%,
+	44%,
+	58%,
+	61%,
+	65%,
+	69%,
+	73%,
+	100% {
+		transform: skewX(0deg);
+	}
+
+	41% {
+		transform: skewX(10deg);
+	}
+
+	42% {
+		transform: skewX(-10deg);
+	}
+
+	59% {
+		transform: skewX(40deg) skewY(10deg);
+	}
+
+	60% {
+		transform: skewX(-40deg) skewY(-10deg);
+	}
+
+	63% {
+		transform: skewX(10deg) skewY(-5deg);
+	}
+
+	70% {
+		transform: skewX(-50deg) skewY(-20deg);
+	}
+
+	71% {
+		transform: skewX(10deg) skewY(-10deg);
+	}
+}
+
+@keyframes connectingDotsBlink {
+	0%,
+	20% {
+		opacity: 0;
+	}
+	30%,
+	60% {
+		opacity: 1;
+	}
+	70%,
+	100% {
+		opacity: 0;
+	}
+}
+
 /* --- Баннер "браузер заблокировал звук" --- */
 
 .audioBanner {
@@ -529,6 +701,14 @@
 .audioBannerButton:active {
 	transform: translateY(0);
 	box-shadow: 0 0 8px rgba(255, 138, 101, 0.8);
+}
+
+/* убираем квадратный синий outline у кнопок */
+
+.glitchButton:focus,
+.controlButton:focus,
+.audioBannerButton:focus {
+	outline: none;
 }
 
 /* Адаптивность */
