@@ -59,7 +59,7 @@ export default memo(function PlayersList({
 									</p>
 								</div>
 
-								{/* Индикатор голоса — минимальный */}
+								{/* Индикатор голоса / mute: только кружок + полоски */}
 								<div className={styles.voiceStatus}>
 									<span className={styles.voiceDot} />
 									<div className={styles.voiceBars} aria-hidden='true'>

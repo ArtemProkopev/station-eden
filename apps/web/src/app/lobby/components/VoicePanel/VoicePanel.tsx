@@ -18,6 +18,7 @@ type UiParticipant = {
 	identity: string
 	isSpeaking: boolean
 	isLocal: boolean
+	isMuted: boolean
 }
 
 const LIVEKIT_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL
@@ -74,10 +75,11 @@ export default function VoicePanel({
 			cards.forEach(card => {
 				card.classList.remove('player-speaking')
 				card.removeAttribute('data-voice-active')
+				card.removeAttribute('data-voice-muted')
 			})
 
 			list.forEach(p => {
-				if (!p.isSpeaking || !p.identity) return
+				if (!p.identity) return
 
 				let id = p.identity
 
@@ -93,7 +95,11 @@ export default function VoicePanel({
 					`[data-player-id="${id}"]`
 				)
 
-				if (card) {
+				if (!card) return
+
+				card.dataset.voiceMuted = p.isMuted ? '1' : '0'
+
+				if (p.isSpeaking && !p.isMuted) {
 					card.classList.add('player-speaking')
 					card.dataset.voiceActive = '1'
 				}
@@ -183,22 +189,64 @@ export default function VoicePanel({
 		(r: Room) => {
 			const list: UiParticipant[] = []
 
-			const lp = r.localParticipant
+			const lp: any = r.localParticipant
 			if (lp) {
+				const audioLevel = typeof lp.audioLevel === 'number' ? lp.audioLevel : 0
+				// более чувствительный и быстрый порог
+				const speakingFlag =
+					audioLevel > 0.003 ||
+					(typeof lp.isSpeaking === 'boolean' && lp.isSpeaking)
+
+				const micPub =
+					typeof lp.getTrackPublication === 'function'
+						? lp.getTrackPublication(Track.Source.Microphone)
+						: undefined
+				const track = (micPub?.track as LocalAudioTrack | undefined) ?? null
+				const trackMuted = !!(
+					(track as any)?.isMuted ??
+					(track as any)?.muted ??
+					micPub?.isMuted
+				)
+				const micEnabledFlag =
+					typeof lp.isMicrophoneEnabled === 'boolean'
+						? lp.isMicrophoneEnabled
+						: !trackMuted
+				const isMuted = !micEnabledFlag || trackMuted
+
 				list.push({
 					sid: lp.sid,
 					identity: lp.identity || 'Вы',
-					isSpeaking: (lp as any).isSpeaking ?? false,
+					isSpeaking: speakingFlag && !isMuted,
 					isLocal: true,
+					isMuted,
 				})
 			}
 
 			r.remoteParticipants.forEach(p => {
+				const rp: any = p
+				const audioLevel = typeof rp.audioLevel === 'number' ? rp.audioLevel : 0
+				const speakingFlag =
+					audioLevel > 0.003 ||
+					(typeof rp.isSpeaking === 'boolean' && rp.isSpeaking)
+
+				const micPub =
+					typeof rp.getTrackPublication === 'function'
+						? rp.getTrackPublication(Track.Source.Microphone)
+						: undefined
+				const track = micPub?.track as any
+				const trackMuted = !!(track?.isMuted ?? track?.muted ?? micPub?.isMuted)
+				const micEnabledFlag =
+					typeof rp.isMicrophoneEnabled === 'boolean'
+						? rp.isMicrophoneEnabled
+						: !trackMuted
+				const isMuted = !micEnabledFlag || trackMuted
+
 				list.push({
-					sid: p.sid,
-					identity: p.identity || 'Игрок',
-					isSpeaking: (p as any).isSpeaking ?? false,
+					sid: rp.sid,
+					identity: rp.identity || 'Игрок',
+					isSpeaking: speakingFlag && !isMuted,
 					isLocal: false,
+					isMuted,
 				})
 			})
 
@@ -420,6 +468,14 @@ export default function VoicePanel({
 				}
 			})
 
+			// mute / unmute трека (для обновления mute-состояния)
+			;(r as any).on?.(RoomEvent.TrackMuted, () => {
+				updateParticipants(r)
+			})
+			;(r as any).on?.(RoomEvent.TrackUnmuted, () => {
+				updateParticipants(r)
+			})
+
 			// autoplay-политика
 			r.on(RoomEvent.AudioPlaybackStatusChanged, () => {
 				const canPlay = r.canPlaybackAudio
@@ -538,9 +594,11 @@ export default function VoicePanel({
 				await newRoom.localParticipant.setMicrophoneEnabled(true)
 				setMuted(false)
 				console.log('[voice] Microphone enabled')
+				updateParticipants(newRoom)
 			} catch (e: unknown) {
 				console.error('[voice] failed to enable microphone:', e)
 				setMuted(true)
+				updateParticipants(newRoom)
 			}
 		} catch (e: any) {
 			console.error('[voice] join error:', e)
@@ -620,20 +678,52 @@ export default function VoicePanel({
 		if (!r) return
 
 		try {
-			const nextMuted = !muted
+			const lp: any = r.localParticipant
+
+			const micPub = lp.getTrackPublication
+				? lp.getTrackPublication(Track.Source.Microphone)
+				: undefined
+			const track = micPub?.track as LocalAudioTrack | undefined
+			const trackMuted = !!(
+				(track as any)?.isMuted ??
+				(track as any)?.muted ??
+				micPub?.isMuted
+			)
+
+			const isMicEnabledFromRoom =
+				typeof lp.isMicrophoneEnabled === 'boolean'
+					? lp.isMicrophoneEnabled
+					: !trackMuted
+
+			const nextEnabled = !isMicEnabledFromRoom
+			const nextMuted = !nextEnabled
 
 			if (nextMuted) {
 				disableSelfMonitor()
 				setSelfMonitor(false)
 			}
 
-			await r.localParticipant.setMicrophoneEnabled(!nextMuted)
+			await r.localParticipant.setMicrophoneEnabled(nextEnabled)
+
+			if (track) {
+				try {
+					if (nextMuted) {
+						await track.mute()
+					} else {
+						await track.unmute()
+					}
+				} catch (trackErr) {
+					console.warn('[voice] toggleMute track mute/unmute failed:', trackErr)
+				}
+			}
+
 			setMuted(nextMuted)
+			updateParticipants(r)
 			console.log(`[voice] Microphone ${nextMuted ? 'muted' : 'unmuted'}`)
 		} catch (e: unknown) {
 			console.error('[voice] toggleMute error:', e)
 		}
-	}, [muted, disableSelfMonitor])
+	}, [disableSelfMonitor, updateParticipants])
 
 	const toggleSelfMonitor = useCallback(async () => {
 		const r = roomRef.current
@@ -650,6 +740,7 @@ export default function VoicePanel({
 				try {
 					await r.localParticipant.setMicrophoneEnabled(true)
 					setMuted(false)
+					updateParticipants(r)
 				} catch (e: unknown) {
 					console.error('[voice] failed to enable mic for self monitor:', e)
 				}
@@ -660,7 +751,24 @@ export default function VoicePanel({
 		} catch (e: unknown) {
 			console.error('[voice] toggleSelfMonitor error:', e)
 		}
-	}, [selfMonitor, muted, enableSelfMonitor, disableSelfMonitor])
+	}, [
+		selfMonitor,
+		muted,
+		enableSelfMonitor,
+		disableSelfMonitor,
+		updateParticipants,
+	])
+
+	// Периодический опрос audioLevel для более "живого" индикатора (ближе к Discord)
+	useEffect(() => {
+		if (!joined) return
+		const id = setInterval(() => {
+			const r = roomRef.current
+			if (!r) return
+			updateParticipants(r)
+		}, 120) // ~8 раз в секунду
+		return () => clearInterval(id)
+	}, [joined, updateParticipants])
 
 	// cleanup при размонтировании компонента
 	useEffect(() => {

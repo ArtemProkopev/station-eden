@@ -102,9 +102,7 @@
 	background: rgba(76, 175, 80, 0.12);
 }
 
-/* === ГОВОРЯЩИЙ ИГРОК ===
-   только одна аккуратная мятная рамка, как у «СКРЫТЬ СЕБЯ»
-*/
+/* === ГОВОРЯЩИЙ ИГРОК === */
 
 .playerCard[data-voice-active='1'] {
 	border-width: 2px;
@@ -112,14 +110,10 @@
 	box-shadow: 0 0 10px rgba(42, 245, 152, 0.45);
 }
 
-/* лёгкий акцент на аватаре */
-
 .playerCard[data-voice-active='1'] .playerAvatar {
 	border-color: #2af598;
 	box-shadow: 0 0 8px rgba(42, 245, 152, 0.6);
 }
-
-/* имя и статы чуть ярче, без перегруза */
 
 .playerCard[data-voice-active='1'] .playerName {
 	color: #eafff7;
@@ -178,7 +172,7 @@
 	max-width: 200px;
 }
 
-/* ===== МИНИМАЛЬНЫЙ ИНДИКАТОР ГОЛОСА ===== */
+/* ===== МИНИ-ИНДИКАТОР ГОЛОСА / MUTE ===== */
 
 .voiceStatus {
 	display: flex;
@@ -188,7 +182,7 @@
 	flex-shrink: 0;
 }
 
-/* маленькая точка — состояние микрофона */
+/* базовое: синий тусклый кружок */
 
 .voiceDot {
 	width: 8px;
@@ -208,7 +202,7 @@
 		background 0.06s ease;
 }
 
-/* при голосе — мягкий мятный */
+/* при голосе — зелёный яркий */
 
 .playerCard[data-voice-active='1'] .voiceDot {
 	opacity: 1;
@@ -217,7 +211,7 @@
 	background: radial-gradient(circle, #2af598, #16a34a);
 }
 
-/* три статичных полоски, без дерганий */
+/* три статичных полоски */
 
 .voiceBars {
 	display: flex;
@@ -243,6 +237,19 @@
 .playerCard[data-voice-active='1'] .voiceBars span {
 	background: rgba(42, 245, 152, 0.9);
 	transform: scaleY(0.85);
+}
+
+/* mute — красный кружок, полоски приглушены */
+
+.playerCard[data-voice-muted='1'] .voiceDot {
+	opacity: 1;
+	background: radial-gradient(circle, #f97373, #b91c1c);
+	box-shadow: 0 0 8px rgba(248, 113, 113, 0.9);
+}
+
+.playerCard[data-voice-muted='1'] .voiceBars span {
+	background: rgba(248, 113, 113, 0.9);
+	transform: scaleY(0.3);
 }
 
 .readyBadge {

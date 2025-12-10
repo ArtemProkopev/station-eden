@@ -72,10 +72,9 @@ export default function Chat({
 				</button>
 			</div>
 
-			{activeTab === 'text' ? (
+			{/* Текстовый чат: без заголовка "Чат", сразу список сообщений */}
+			{activeTab === 'text' && (
 				<>
-					<h2 className={styles.blockTitle}>Чат</h2>
-
 					<div
 						className={styles.chatMessagesContainer}
 						ref={chatContainerRef}
@@ -122,14 +121,16 @@ export default function Chat({
 						</button>
 					</form>
 				</>
-			) : (
-				<div className={styles.voiceTab}>
-					<VoicePanel
-						lobbyId={lobbyId}
-						onStatsChange={handleVoiceStatsChange}
-					/>
-				</div>
 			)}
+
+			{/* VoicePanel всегда смонтирован, просто скрывается вне своей вкладки */}
+			<div
+				className={`${styles.voiceTab} ${
+					activeTab === 'voice' ? '' : styles.voiceTabHidden
+				}`}
+			>
+				<VoicePanel lobbyId={lobbyId} onStatsChange={handleVoiceStatsChange} />
+			</div>
 		</div>
 	)
 }

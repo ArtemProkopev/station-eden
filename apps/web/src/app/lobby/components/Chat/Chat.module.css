@@ -51,10 +51,21 @@
 	box-shadow: 0 0 10px rgba(99, 239, 255, 0.5);
 }
 
+/* если индикатор активности в голосе — можно подсветить таб (класс использует Chat.tsx) */
+.tabButtonHasVoice {
+	box-shadow: 0 0 14px rgba(99, 239, 255, 0.8);
+}
+
+/* Контейнер голосовой вкладки */
 .voiceTab {
 	flex: 1;
 	display: flex;
 	flex-direction: column;
+}
+
+/* Прячем блок с VoicePanel, но не размонтируем компонент */
+.voiceTabHidden {
+	display: none;
 }
 
 .blockTitle {
