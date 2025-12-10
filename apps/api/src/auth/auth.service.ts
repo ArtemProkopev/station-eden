@@ -236,13 +236,13 @@ export class AuthService {
 		return { ok: true }
 	}
 
-	// ===== Email MFA =====
+	// ===== Email MFA / reset =====
 
 	private rand6(): string {
 		return Math.floor(100000 + Math.random() * 900000).toString()
 	}
 
-	/** Создаёт и отправляет одноразовый код на почту (10 минут) */
+	/** Создаёт и отправляет одноразовый код на почту (10 минут) для входа */
 	public async startEmailMfa(userId: string, email: string) {
 		const code = this.rand6()
 		const expires = new Date(Date.now() + 10 * 60 * 1000)
@@ -253,7 +253,18 @@ export class AuthService {
 		return { expires }
 	}
 
-	/** Проверка кода + (опционально) установка пароля + выдача токенов */
+	/** Код для сброса пароля (использует ту же таблицу email_codes) */
+	public async startPasswordReset(userId: string, email: string) {
+		const code = this.rand6()
+		const expires = new Date(Date.now() + 10 * 60 * 1000)
+		await this.emailCodeRepo.save(
+			this.emailCodeRepo.create({ userId, email, code, expiresAt: expires })
+		)
+		await this.emailer.sendPasswordResetCode(email, code)
+		return { expires }
+	}
+
+	/** Проверка кода + (опционально) установка/смена пароля + выдача токенов */
 	public async verifyEmailCode(
 		userId: string,
 		email: string,
@@ -274,8 +285,8 @@ export class AuthService {
 		const user = await this.users.findById(userId)
 		if (!user) throw new UnauthorizedException('User not found')
 
-		// Если пароль ещё не задан — можно задать прямо сейчас
-		if (!user.passwordHash && newPassword) {
+		// Если прилетел новый пароль — всегда обновляем хэш (и для первого логина, и для сброса)
+		if (newPassword) {
 			if (newPassword.length < 8) {
 				throw new BadRequestException('Password must be at least 8 characters')
 			}

@@ -18,20 +18,11 @@ import { randomBytes } from 'crypto'
 import type { Request, Response } from 'express'
 import { ensureCsrfCookie, getCookieOptions } from '../common'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
+import type { AuthenticatedRequest } from '../common/interfaces/authenticated-request.interface'
 import { AuthService } from './auth.service'
 import { BruteForceService } from './brute-force.service'
 import { LoginDto } from './dto/login.dto'
 import { RegisterDto } from './dto/register.dto'
-
-interface AuthenticatedRequest extends Request {
-	user?: {
-		sub: string
-		email: string
-		username?: string
-		avatar?: string
-		frame?: string
-	}
-}
 
 type GoogleMode = 'login' | 'register' | 'link'
 
@@ -70,7 +61,7 @@ export class AuthController {
 	 *   - secure: true
 	 *   - domain: AUTH_COOKIE_DOMAIN или .stationeden.ru
 	 * - В development (localhost):
-	 *   - secure: false (иначе в http не поставится)
+	 *   - secure: false
 	 *   - domain НЕ задаём, чтобы кука была host-only (localhost)
 	 */
 	private oauthCookieOpts() {
@@ -246,6 +237,36 @@ export class AuthController {
 		return { mfa: 'email_code_sent', email: result.user.email }
 	}
 
+	/** Забыли пароль: отправка кода на email, без утечки наличия аккаунта */
+	@UseGuards(ThrottlerGuard)
+	@Throttle({ default: { limit: 10, ttl: 300000 } })
+	@Post('forgot-password')
+	async forgotPassword(
+		@Body() body: { email: string },
+		@Res({ passthrough: true }) res: Response
+	) {
+		const raw = (body.email || '').trim().toLowerCase()
+		if (!raw) {
+			throw new BadRequestException('Email is required')
+		}
+
+		const user = await this.auth['users'].findByEmail(raw)
+
+		if (user) {
+			const pre = this.auth.signPreauth(user.id, user.email)
+			res.cookie('preauth', pre, this.preauthCookieOpts())
+			try {
+				await this.auth.startPasswordReset(user.id, user.email)
+			} catch {
+				// проглатываем, но не раскрываем детали наружу
+			}
+			return { mfa: 'email_code_sent', email: user.email }
+		}
+
+		// Всегда отвечаем одинаково, чтобы не было user-enumeration
+		return { mfa: 'email_code_sent', email: raw }
+	}
+
 	@Post('refresh')
 	async refresh(
 		@Req() req: Request,
@@ -323,14 +344,19 @@ export class AuthController {
 
 	@UseGuards(JwtAuthGuard)
 	@Get('me')
-	me(@Req() req: AuthenticatedRequest) {
+	async me(@Req() req: AuthenticatedRequest) {
 		if (!req.user) throw new UnauthorizedException('User not found in request')
+
+		// ВАЖНО: берём свежие данные из БД, а не из payload access-токена,
+		// чтобы никнейм / аватар / рамка не «залипали» после обновления профиля.
+		const user = await this.auth['users'].findByIdOrFail(req.user.sub)
+
 		return {
-			userId: req.user.sub,
-			email: req.user.email,
-			username: req.user.username,
-			avatar: req.user.avatar,
-			frame: req.user.frame,
+			userId: user.id,
+			email: user.email,
+			username: user.username,
+			avatar: user.avatar,
+			frame: user.frame,
 		}
 	}
 

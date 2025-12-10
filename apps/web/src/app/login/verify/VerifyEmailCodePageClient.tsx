@@ -31,6 +31,7 @@ function EyeIcon() {
 		</svg>
 	)
 }
+
 function EyeOffIcon() {
 	return (
 		<svg
@@ -136,14 +137,12 @@ export default function VerifyEmailCodePageClient() {
 	}, [code, mode])
 
 	const title =
-		mode === 'set_password'
-			? 'Подтвердите email и задайте пароль'
-			: 'Подтверждение входа'
+		mode === 'set_password' ? 'Установка пароля' : 'Подтверждение входа'
 
 	return (
 		<>
 			<div className={styles.bg} aria-hidden />
-			<MemoizedFireflies />
+			Ó <MemoizedFireflies />
 			<MemoizedStars />
 			<main className={styles.container}>
 				<section className={styles.card} aria-labelledby='verify-title'>
@@ -154,7 +153,17 @@ export default function VerifyEmailCodePageClient() {
 					</header>
 
 					<p className={styles.lead} id='lead'>
-						Мы отправили 6-значный код на <b>{email}</b>.
+						{mode === 'set_password' ? (
+							<>
+								Аккаунт уже создан по адресу <b>{email}</b>.
+								<br />
+								Введите код из письма и задайте пароль.
+							</>
+						) : (
+							<>
+								Мы отправили 6-значный код на <b>{email}</b>.
+							</>
+						)}
 					</p>
 
 					<form

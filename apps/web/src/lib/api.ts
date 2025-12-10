@@ -247,6 +247,14 @@ export const api = {
 
 	resendEmailCode: () => postJSON('/auth/resend-email-code', {}, 'login'),
 
+	/** Забыли пароль */
+	forgotPassword: (email: string) =>
+		postJSON<{ mfa?: string; email?: string }>(
+			'/auth/forgot-password',
+			{ email },
+			'login'
+		),
+
 	refresh: (userId?: string) =>
 		postJSON('/auth/refresh', userId ? { userId } : undefined, 'default'),
 

@@ -4,7 +4,6 @@ import { useCallback, useState } from 'react'
 import { PROFILE_CONFIG } from '../config'
 import { ProfileIconsStatus, ProfileState } from '../types'
 
-// Определяем тип для ассетов локально, так как он нужен только для UI состояния
 type ProfileAssets = {
 	avatar: string
 	frame: string
@@ -15,8 +14,9 @@ const migrateToAbsoluteUrl = (url: string | null): string | undefined => {
 	return url.startsWith('http') ? url : asset(url)
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+
 export const useProfile = () => {
-	// ИСПРАВЛЕНО: Используем ProfileState
 	const [profile, setProfile] = useState<ProfileState>({ status: 'loading' })
 
 	const [assets, setAssets] = useState<ProfileAssets>({
@@ -32,7 +32,17 @@ export const useProfile = () => {
 
 	const [isEditModalOpen, setIsEditModalOpen] = useState(false)
 
-	// Загрузка сохраненных ассетов при инициализации
+	// модалка смены ника
+	const [isUsernameModalOpen, setIsUsernameModalOpen] = useState(false)
+
+	const openUsernameModal = useCallback(() => {
+		setIsUsernameModalOpen(true)
+	}, [])
+
+	const closeUsernameModal = useCallback(() => {
+		setIsUsernameModalOpen(false)
+	}, [])
+
 	const loadSavedAssets = useCallback(() => {
 		try {
 			const savedAvatar = localStorage.getItem(
@@ -83,8 +93,6 @@ export const useProfile = () => {
 
 	const loadUserData = useCallback(async () => {
 		try {
-			const API_BASE =
-				process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
 			const response = await fetch(`${API_BASE}/auth/me`, {
 				credentials: 'include',
 				cache: 'no-store',
@@ -104,15 +112,13 @@ export const useProfile = () => {
 			const data = await response.json()
 			const payload = data?.data ?? data
 
-			// Деструктурируем ответ API
 			const { userId, email, username = null, avatar, frame } = payload
 
 			if (typeof userId === 'string' && typeof email === 'string') {
-				// ИСПРАВЛЕНО: Сохраняем данные в структуру ProfileState (в поле data)
 				setProfile({
 					status: 'ok',
 					data: {
-						id: userId, // API возвращает userId, мапим в id (как в shared User)
+						id: userId,
 						email,
 						username: username || '',
 						avatar,
@@ -143,11 +149,72 @@ export const useProfile = () => {
 		[]
 	)
 
-	const handleIconError = useCallback((iconName: keyof ProfileIconsStatus) => {
-		setIconsStatus((prev: ProfileIconsStatus) => ({
-			...prev,
-			[iconName]: false,
-		}))
+	/**
+	 * Обновление никнейма на сервере и в локальном состоянии профиля
+	 * Вариант A: используем PUT /users/profile
+	 */
+	const updateUsername = useCallback(async (newUsername: string) => {
+		const value = newUsername.trim()
+		if (!value) {
+			throw new Error('Введите никнейм')
+		}
+
+		const res = await fetch(`${API_BASE}/users/profile`, {
+			method: 'PUT',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			credentials: 'include',
+			body: JSON.stringify({ username: value }),
+		})
+
+		if (!res.ok) {
+			let msg = 'Не удалось сохранить никнейм. Попробуйте ещё раз позже.'
+			try {
+				const data = await res.json()
+				const serverMessage = (data as any)?.message
+				if (serverMessage) {
+					msg = Array.isArray(serverMessage)
+						? serverMessage.join(', ')
+						: serverMessage
+				}
+			} catch {
+				// ignore parse error, оставляем дефолтный текст
+			}
+			throw new Error(msg)
+		}
+
+		// ответ контроллера updateProfile:
+		// { ok: true, avatar, frame, username, usernameChangedAt }
+		const data = await res.json()
+		const usernameFromServer =
+			(data as any)?.username ?? (data as any)?.data?.username ?? value
+
+		setProfile(prev => {
+			if (prev.status !== 'ok' || !prev.data) return prev
+			return {
+				...prev,
+				data: {
+					...prev.data,
+					username: usernameFromServer,
+				},
+			}
+		})
+	}, [])
+
+	/**
+	 * Обработчик ошибок иконок.
+	 * Тип параметра — string, чтобы совпадал с пропсом ProfileHeader.
+	 */
+	const handleIconError = useCallback((iconName: string) => {
+		setIconsStatus((prev: ProfileIconsStatus) => {
+			if (!(iconName in prev)) return prev
+			const key = iconName as keyof ProfileIconsStatus
+			return {
+				...prev,
+				[key]: false,
+			}
+		})
 	}, [])
 
 	return {
@@ -155,12 +222,16 @@ export const useProfile = () => {
 		assets,
 		iconsStatus,
 		isEditModalOpen,
+		isUsernameModalOpen,
 		loadSavedAssets,
 		checkIconsAvailability,
 		loadUserData,
 		handleSaveProfile,
 		setIconsStatus,
 		setIsEditModalOpen,
+		openUsernameModal,
+		closeUsernameModal,
+		updateUsername,
 		handleIconError,
 	}
 }

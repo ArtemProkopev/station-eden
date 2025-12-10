@@ -13,6 +13,7 @@ import { ProfileAvatar } from './components/ProfileAvatar'
 import { ProfileHeader } from './components/ProfileHeader'
 import { ProfileInfo } from './components/ProfileInfo'
 import { ProfileStats } from './components/ProfileStats'
+import { UsernameModal } from './components/UsernameModal'
 import { useProfile } from './hooks/useProfile'
 import styles from './page.module.css'
 
@@ -24,12 +25,17 @@ export default function ProfilePageClient() {
 		assets,
 		iconsStatus,
 		isEditModalOpen,
+		isUsernameModalOpen,
 		loadSavedAssets,
 		loadUserData,
 		checkIconsAvailability,
 		handleSaveProfile,
 		setIconsStatus,
 		setIsEditModalOpen,
+		openUsernameModal,
+		closeUsernameModal,
+		updateUsername,
+		handleIconError,
 	} = useProfile()
 
 	const [isLoading, setIsLoading] = useState(true)
@@ -43,14 +49,12 @@ export default function ProfilePageClient() {
 		const initializeProfile = async () => {
 			setIsLoading(true)
 			try {
-				// 1. Проверяем, что пользователь авторизован
 				let r = await fetch(`${API}/auth/me`, {
 					method: 'GET',
 					credentials: 'include',
 					cache: 'no-store',
 				})
 
-				// пытаемся автообновить access-токен, если протух
 				if (r.status === 401) {
 					const refreshResp = await fetch(`${API}/auth/refresh`, {
 						method: 'POST',
@@ -66,7 +70,6 @@ export default function ProfilePageClient() {
 					}
 				}
 
-				// если всё ещё не ок — редирект на логин и выходим
 				if (!r.ok) {
 					if (!cancelled) {
 						router.replace('/login?from=/profile')
@@ -76,7 +79,6 @@ export default function ProfilePageClient() {
 
 				if (cancelled) return
 
-				// 2. Если авторизован — грузим профиль как раньше
 				loadSavedAssets()
 				await Promise.all([checkIconsAvailability(), loadUserData()])
 			} catch (error) {
@@ -103,14 +105,7 @@ export default function ProfilePageClient() {
 		() => setIsEditModalOpen(false),
 		[setIsEditModalOpen]
 	)
-	const handleIconError = useCallback(
-		(iconName: string) => {
-			setIconsStatus(prev => ({ ...prev, [iconName]: false }))
-		},
-		[setIconsStatus]
-	)
 
-	// Формируем объект для TopHUD на лету
 	const topHudProfile = {
 		status: profile.status,
 		userId: profile.data?.id,
@@ -119,7 +114,6 @@ export default function ProfilePageClient() {
 		message: profile.message,
 	}
 
-	// Показываем лоадер пока данные не загружены
 	if (isLoading) {
 		return (
 			<main className={styles.root}>
@@ -160,6 +154,7 @@ export default function ProfilePageClient() {
 						avatar={assets.avatar}
 						frame={assets.frame}
 						username={profile.data?.username}
+						onChangeUsernameClick={openUsernameModal}
 					/>
 					<ProfileInfo profile={profile} />
 				</div>
@@ -173,6 +168,13 @@ export default function ProfilePageClient() {
 				onSave={handleSaveProfile}
 				currentAvatar={assets.avatar}
 				currentFrame={assets.frame}
+			/>
+
+			<UsernameModal
+				isOpen={isUsernameModalOpen}
+				onClose={closeUsernameModal}
+				currentUsername={profile.data?.username ?? ''}
+				onSave={updateUsername}
 			/>
 		</main>
 	)

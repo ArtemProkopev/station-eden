@@ -1,5 +1,24 @@
+// packages/shared/src/index.ts
 // @station-eden/shared - дополняем существующий файл
 import { z } from 'zod'
+
+// ==============================================================================
+// 0. ZOD GLOBAL ERROR MAP (убираем дефолтные сообщения валидации)
+// ==============================================================================
+
+z.setErrorMap(() => {
+	// Возвращаем пустую строку — UI получает факт ошибки, но без текста
+	return { message: '' }
+})
+
+// ==============================================================================
+// 0. COMMON TYPES
+// ==============================================================================
+
+/**
+ * Строка с датой в формате ISO (для полей, которые приходят/уходят по сети как string)
+ */
+export type ISODateString = string
 
 // ==============================================================================
 // 1. AUTH & USERS (Авторизация и Пользователи)
@@ -7,29 +26,22 @@ import { z } from 'zod'
 
 /**
  * Схема для Входа (Login)
- * Объединяет требования API: поле login (email или username) и password
+ * Минимальная валидация, сообщения нам не нужны — ошибки под полями не показываем.
  */
 export const LoginSchema = z.object({
-	login: z.string().min(1, 'Введите email или имя пользователя'),
-	password: z.string().min(1, 'Введите пароль'),
+	login: z.string().trim().min(1),
+	password: z.string().min(1),
 })
 
 /**
  * Схема для Регистрации (Register)
- * Перенесли валидацию из API (class-validator) в Zod
+ * Перенесли валидацию из API (class-validator) в Zod.
+ * Сообщения валидации глобально глушатся через setErrorMap.
  */
 export const RegisterSchema = z.object({
-	email: z.string().email('Некорректный формат email'),
-	username: z
-		.string()
-		.regex(
-			/^[a-zA-Z0-9_]{3,20}$/,
-			"Username: 3–20 символов, латиница, цифры или '_'"
-		),
-	password: z
-		.string()
-		.min(8, 'Пароль должен быть не менее 8 символов')
-		.max(72, 'Пароль слишком длинный'),
+	email: z.string().email(),
+	username: z.string().regex(/^[a-zA-Z0-9_]{3,20}$/),
+	password: z.string().min(8).max(72),
 })
 
 // Генерируем TypeScript типы из схем
@@ -84,7 +96,7 @@ export interface ChatMessage {
 	playerId: string
 	playerName: string
 	text: string
-	timestamp: Date | string // String, т.к. по сети даты летают строками
+	timestamp: Date | ISODateString // String, т.к. по сети даты летают строками
 	type?: 'system' | 'player'
 }
 
@@ -92,7 +104,7 @@ export interface ChatMessage {
 // 3. WEBSOCKETS & SYSTEM
 // ==============================================================================
 
-export interface WebSocketMessage<T = any> {
+export interface WebSocketMessage<T = unknown> {
 	type: string
 	payload: T
 }
@@ -101,45 +113,49 @@ export interface WebSocketMessage<T = any> {
 // 4. NOTIFICATIONS (Уведомления)
 // ==============================================================================
 
-export type NotificationType = 'news' | 'game_invite' | 'system' | 'friend_request'
+export type NotificationType =
+	| 'news'
+	| 'game_invite'
+	| 'system'
+	| 'friend_request'
 
 export interface BaseNotification {
-  id: string
-  type: NotificationType
-  title: string
-  message: string
-  timestamp: Date
-  isRead: boolean
+	id: string
+	type: NotificationType
+	title: string
+	message: string
+	timestamp: Date | ISODateString
+	isRead: boolean
 }
 
 export interface NewsNotification extends BaseNotification {
-  type: 'news'
-  link?: string
+	type: 'news'
+	link?: string
 }
 
 export interface GameInviteNotification extends BaseNotification {
-  type: 'game_invite'
-  lobbyId: string
-  inviterName: string
-  inviterId: string
-  gameMode: string
+	type: 'game_invite'
+	lobbyId: string
+	inviterName: string
+	inviterId: string
+	gameMode: string
 }
 
 export interface SystemNotification extends BaseNotification {
-  type: 'system'
+	type: 'system'
 }
 
 export interface FriendRequestNotification extends BaseNotification {
-  type: 'friend_request'
-  requesterId: string
-  requesterName: string
+	type: 'friend_request'
+	requesterId: string
+	requesterName: string
 }
 
-export type Notification = 
-  | NewsNotification 
-  | GameInviteNotification 
-  | SystemNotification 
-  | FriendRequestNotification
+export type Notification =
+	| NewsNotification
+	| GameInviteNotification
+	| SystemNotification
+	| FriendRequestNotification
 
 // ==============================================================================
 // 5. SETTINGS (Настройки клиента)
@@ -167,19 +183,19 @@ export interface UserSettings {
 // ==============================================================================
 
 export interface Friend {
-  id: string
-  username: string
-  email: string
-  avatar?: string
-  status: 'online' | 'offline' | 'away' | 'in_game'
-  lastSeen?: Date
-  isFavorite?: boolean
+	id: string
+	username: string
+	email: string
+	avatar?: string
+	status: 'online' | 'offline' | 'away' | 'in_game'
+	lastSeen?: Date | ISODateString
+	isFavorite?: boolean
 }
 
 export interface FriendsState {
-  friends: Friend[]
-  pendingRequests: FriendRequestNotification[]
-  isLoading: boolean
+	friends: Friend[]
+	pendingRequests: FriendRequestNotification[]
+	isLoading: boolean
 }
 
 // ==============================================================================
@@ -188,12 +204,12 @@ export interface FriendsState {
 
 /**
  * Расширенная схема регистрации для клиента (добавляем confirm password)
+ * Сообщения валидации глобально пустые, UI сам показывает подсказки.
  */
 export const ClientRegisterSchema = RegisterSchema.extend({
-  confirm: z.string().min(1, 'Подтверждение пароля обязательно'),
+	confirm: z.string().min(1),
 }).refine(data => data.password === data.confirm, {
-  message: 'Пароли не совпадают',
-  path: ['confirm'],
+	path: ['confirm'],
 })
 
 export type ClientRegisterForm = z.infer<typeof ClientRegisterSchema>
@@ -202,37 +218,37 @@ export type ClientRegisterForm = z.infer<typeof ClientRegisterSchema>
  * Расширенный пользователь с токеном (для клиентского хранилища)
  */
 export interface UserData extends User {
-  token: string
+	token: string
 }
 
 /**
  * Ответ от сервера при логине
  */
 export interface LoginResponse {
-  mfa?: string
-  email?: string
-  needSetPassword?: boolean
-  user?: User
-  id?: string
-  token?: string
-  access_token?: string
-  username?: string
-  avatar?: string
+	mfa?: string
+	email?: string
+	needSetPassword?: boolean
+	user?: User
+	id?: string
+	token?: string
+	access_token?: string
+	username?: string
+	avatar?: string
 }
 
 /**
  * Данные блокировки аккаунта (для localStorage)
  */
 export interface LockPayload {
-  login: string
-  lockedUntilIso: string
+	login: string
+	lockedUntilIso: ISODateString
 }
 
 /**
  * Информация о блокировке от сервера
  */
 export interface ServerLockInfo {
-  lockedMinutes?: number
-  lockedUntil?: string
-  attemptsLeft?: number
+	lockedMinutes?: number
+	lockedUntil?: ISODateString
+	attemptsLeft?: number
 }
