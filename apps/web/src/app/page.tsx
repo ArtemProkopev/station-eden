@@ -1,16 +1,37 @@
 // apps/web/src/app/page.tsx
 'use client'
 
+import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
-import TopHUD from '../components/TopHUD/TopHUD'
-import { Fireflies } from '../components/ui/Fireflies/FirefliesMain'
-import PanelWithPlayButton from '../components/ui/PanelWithPlayButton/PanelWithPlayButton'
-import TargetCursor from '../components/ui/TargetCursor'
 import styles from './home.module.css'
 
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+
+// Ленивая подгрузка тяжёлых компонентов
+const TopHUD = dynamic(() => import('../components/TopHUD/TopHUD'), {
+	ssr: false,
+})
+
+const Fireflies = dynamic(
+	() =>
+		import('../components/ui/Fireflies/FirefliesMain').then(m => m.Fireflies),
+	{
+		ssr: false,
+	}
+)
+
+const PanelWithPlayButton = dynamic(
+	() => import('../components/ui/PanelWithPlayButton/PanelWithPlayButton'),
+	{
+		ssr: false,
+	}
+)
+
+const TargetCursor = dynamic(() => import('../components/ui/TargetCursor'), {
+	ssr: false,
+})
 
 interface UserProfile {
 	id: string
@@ -220,7 +241,6 @@ export default function HomePage() {
 
 	return (
 		<>
-			{/* Кастомный курсор для главной */}
 			<TargetCursor
 				spinDuration={2}
 				hideDefaultCursor={true}
