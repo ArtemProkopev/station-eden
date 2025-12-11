@@ -1,4 +1,5 @@
 // apps/web/src/lib/api.ts
+import { isForcedLogout } from './authUtils'
 import { getCsrfToken } from './csrf'
 import {
 	ApiError,
@@ -37,6 +38,7 @@ async function ensureCsrfToken(): Promise<string> {
 		credentials: 'include',
 		cache: 'no-store',
 	})
+	// Небольшая пауза, чтобы браузер успел записать Set-Cookie
 	await new Promise(r => setTimeout(r, 100))
 	const tokenFromCookie = getCsrfToken(CSRF_NAME)
 	if (tokenFromCookie) return tokenFromCookie
@@ -83,21 +85,18 @@ async function throwHttpAsApiError(
 	})
 }
 
-// Хранилище для флага принудительного логаута
-function isForcedLogout(): boolean {
-	if (typeof window === 'undefined') return false
-	return !!(window as any).__FORCED_LOGOUT__
-}
-
+// Флаг, чтобы не запускать несколько refresh одновременно
 let _isRefreshing = false
+
 async function tryRefreshOnce(): Promise<boolean> {
-	// Если был принудительный логаут — никогда больше не рефрешим
+	// Если был принудительный логаут — никогда не рефрешим автоматически
 	if (isForcedLogout()) {
 		return false
 	}
 
 	if (_isRefreshing) return false
-	if (!hasCookie('refresh_token')) return false
+
+	// Не смотрим на refresh_token из document.cookie — он HttpOnly
 	_isRefreshing = true
 	try {
 		await api.refresh()
@@ -120,7 +119,6 @@ async function fetchWithRetry(
 
 	// Если это запрос на logout и статус не 200, не пытаемся ретраить
 	if (typeof input === 'string' && input.includes('/auth/logout') && !res.ok) {
-		// Для logout мы не хотим ретраить даже если skipRetry=false
 		return res
 	}
 
@@ -260,10 +258,14 @@ export const api = {
 
 	logout: () => postJSON('/auth/logout', {}, 'default', true), // skipRetry = true
 
-	// Добавляем GET версию логаута как fallback
+	// GET-версия логаута как fallback
 	logoutGet: () => getJSON('/auth/logout-get', 'default'),
 
+	// Жёсткий /auth/me, с JwtGuard + авто-refresh
 	me: () => getJSON('/auth/me', 'default'),
+
+	// Мягкий /auth/session — всегда 200, без 401
+	session: () => getJSON('/auth/session', 'default'),
 
 	// Админка пользователей
 	users: () => getJSON('/users', 'default'),
@@ -272,7 +274,7 @@ export const api = {
 	deleteUser: (id: string) =>
 		deleteJSON(`/users/${encodeURIComponent(id)}`, 'default'),
 
-	// Экспортируем hasCookie для использования в других модулях
+	// Экспортируем hasCookie как вспомогательную утилиту (для не-критичных кейсов)
 	hasCookie,
 }
 

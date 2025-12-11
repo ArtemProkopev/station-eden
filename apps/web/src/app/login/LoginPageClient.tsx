@@ -16,6 +16,7 @@ import { ClockIcon, EyeIcon, EyeOffIcon } from '@/src/components/ui/Icons'
 // Hooks & Utils
 import { useAuthLock } from '@/src/hooks/useAuthLock'
 import { api, getUserMessage } from '@/src/lib/api'
+import { clearForcedLogoutFlags } from '@/src/lib/authUtils'
 import { GOOGLE_ENABLED } from '@/src/lib/flags'
 import { clearLock, normLogin, writeLock } from '@/src/utils/authLock'
 import { parseServerInfo } from '@/src/utils/serverInfoParser'
@@ -160,6 +161,9 @@ export default function LoginPageClient() {
 
 	const handleSuccessfulLogin = useCallback(
 		(userData: UserData) => {
+			// Сбрасываем флаги принудительного логаута / отключения keep-alive
+			clearForcedLogoutFlags()
+
 			if (typeof window !== 'undefined') {
 				localStorage.setItem('authToken', userData.token)
 				localStorage.setItem('userData', JSON.stringify(userData))

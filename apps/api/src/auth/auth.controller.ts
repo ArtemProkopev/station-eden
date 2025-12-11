@@ -309,8 +309,7 @@ export class AuthController {
 		this.clearWithSameAttrs(res, 'refresh_token', authOpts)
 		this.clearWithSameAttrs(res, 'preauth', preauthOpts)
 
-		// Дополнительная подстраховка: чистим без domain/secure, если вдруг
-		// старые куки были с другими атрибутами
+		// Дополнительная подстраховка: чистим без domain/secure
 		res.clearCookie('access_token', { path: '/' })
 		res.clearCookie('refresh_token', { path: '/' })
 		res.clearCookie('preauth', { path: '/' })
@@ -342,13 +341,69 @@ export class AuthController {
 		return { ok: true }
 	}
 
+	/**
+	 * Мягкий эндпоинт для проверки сессии:
+	 * - всегда 200
+	 * - без JwtAuthGuard и без 401
+	 * - если access_token валиден — возвращаем user
+	 * - если нет токена / протух / битый — просто signed-out
+	 */
+	@Get('session')
+	async session(@Req() req: Request) {
+		const rawAccess = (req as any).cookies?.access_token as string | undefined
+
+		if (!rawAccess) {
+			return {
+				status: 'signed-out',
+				user: null,
+			}
+		}
+
+		try {
+			const payload: any = this.jwt.verify(rawAccess, {
+				secret: process.env.JWT_ACCESS_SECRET,
+			})
+
+			const userId: string | undefined = payload?.sub
+			if (!userId) {
+				return {
+					status: 'signed-out',
+					user: null,
+				}
+			}
+
+			const user = await this.auth['users'].findById(userId)
+			if (!user) {
+				return {
+					status: 'signed-out',
+					user: null,
+				}
+			}
+
+			return {
+				status: 'signed-in',
+				user: {
+					userId: user.id,
+					email: user.email,
+					username: user.username,
+					avatar: user.avatar,
+					frame: user.frame,
+				},
+			}
+		} catch {
+			return {
+				status: 'signed-out',
+				user: null,
+			}
+		}
+	}
+
 	@UseGuards(JwtAuthGuard)
 	@Get('me')
 	async me(@Req() req: AuthenticatedRequest) {
 		if (!req.user) throw new UnauthorizedException('User not found in request')
 
-		// ВАЖНО: берём свежие данные из БД, а не из payload access-токена,
-		// чтобы никнейм / аватар / рамка не «залипали» после обновления профиля.
+		// ВАЖНО: берём свежие данные из БД, а не из payload access-токена
 		const user = await this.auth['users'].findByIdOrFail(req.user.sub)
 
 		return {
@@ -422,7 +477,7 @@ export class AuthController {
 	async google(@Req() req: Request, @Res() res: Response) {
 		if (!this.googleEnabled())
 			throw new NotFoundException('Google login disabled')
-		const q = req.query as any
+		const q = (req.query as any) || {}
 		const mode: GoogleMode = q?.mode === 'register' ? 'register' : 'login'
 		const nonce = this.makeState()
 		const packed = `${nonce}:${mode}`

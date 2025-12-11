@@ -4,21 +4,10 @@
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef } from 'react'
 import { api } from '../lib/api'
+import { isForcedLogout, isUserAuthenticated } from '../lib/authUtils'
 
 const DEFAULT_INTERVAL = 10 * 60 * 1000 // 10 минут
 const MIN_REFRESH_GAP = 10 * 1000 // 10 секунд
-
-// Вспомогательная функция для проверки куки
-function hasCookie(name: string): boolean {
-	if (typeof document === 'undefined') return false
-	return document.cookie.split(';').some(c => c.trim().startsWith(`${name}=`))
-}
-
-// Проверка флага принудительного логаута
-function isForcedLogout(): boolean {
-	if (typeof window === 'undefined') return false
-	return !!(window as any).__FORCED_LOGOUT__
-}
 
 export function useSessionKeepAlive() {
 	const lastCallRef = useRef(0)
@@ -29,6 +18,16 @@ export function useSessionKeepAlive() {
 		// На страницах логина/регистрации keep-alive не нужен
 		if (!pathname) return
 		if (pathname.startsWith('/login') || pathname.startsWith('/register')) {
+			return
+		}
+
+		// Если принудительно разлогинены — не стартуем цикл
+		if (typeof window !== 'undefined' && isForcedLogout()) {
+			return
+		}
+
+		// Если пользователь не авторизован (по нашему локальному признаку) — не стартуем
+		if (typeof window !== 'undefined' && !isUserAuthenticated()) {
 			return
 		}
 
@@ -80,13 +79,6 @@ export function useSessionKeepAlive() {
 				return
 			}
 
-			// Проверяем наличие refresh_token
-			if (!hasCookie('refresh_token')) {
-				console.info('[keep-alive] No refresh token found, stopping loop')
-				stopLoop()
-				return
-			}
-
 			const now = Date.now()
 			const delta = now - lastCallRef.current
 
@@ -117,7 +109,7 @@ export function useSessionKeepAlive() {
 				}
 
 				// Другие ошибки просто логируем
-				console.warn('[keep-alive] Refresh failed:', e.message || e)
+				console.warn('[keep-alive] Refresh failed:', e?.message || e)
 			}
 		}
 
@@ -145,7 +137,7 @@ export function useSessionKeepAlive() {
 			}
 		}
 
-		// Подписываемся на события
+		// Подписки
 		document.addEventListener('visibilitychange', onVisibilityChange)
 		window.addEventListener('logout', handleLogoutEvent)
 		window.addEventListener('session-changed', handleSessionChanged)

@@ -4,48 +4,28 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-
-const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+import { api } from '../lib/api'
 
 type Session =
 	| { status: 'loading' }
 	| { status: 'signed-out' }
-	| { status: 'signed-in'; email: string }
+	| { status: 'signed-in'; email?: string }
 
 function classNames(...xs: Array<string | false | undefined>) {
 	return xs.filter(Boolean).join(' ')
 }
 
-async function getSessionDirect(): Promise<Session> {
+// Мягкая проверка сессии через /auth/session:
+// - всегда 200
+// - никаких 401/refresh для гостей
+async function getSessionSoft(): Promise<Session> {
 	try {
-		let r = await fetch(`${API}/auth/me`, {
-			method: 'GET',
-			credentials: 'include',
-			cache: 'no-store',
-		})
+		const resp: any = await api.session()
 
-		if (r.status === 401) {
-			const refreshResp = await fetch(`${API}/auth/refresh`, {
-				method: 'POST',
-				credentials: 'include',
-			})
-
-			if (!refreshResp.ok) {
-				return { status: 'signed-out' }
-			}
-
-			r = await fetch(`${API}/auth/me`, {
-				method: 'GET',
-				credentials: 'include',
-				cache: 'no-store',
-			})
+		if (resp?.status === 'signed-in') {
+			const email: string | undefined = resp?.user?.email
+			return email ? { status: 'signed-in', email } : { status: 'signed-in' }
 		}
-
-		if (!r.ok) return { status: 'signed-out' }
-
-		const raw = await r.json()
-		const data = raw?.data ?? raw
-		if (data?.email) return { status: 'signed-in', email: data.email }
 
 		return { status: 'signed-out' }
 	} catch {
@@ -76,7 +56,7 @@ export default function Navbar() {
 	useEffect(() => {
 		let cancelled = false
 		;(async () => {
-			const s = await getSessionDirect()
+			const s = await getSessionSoft()
 			if (!cancelled) setSession(s)
 		})()
 		return () => {
@@ -88,7 +68,7 @@ export default function Navbar() {
 		let alive = true
 		async function onChange() {
 			if (!alive) return
-			const s = await getSessionDirect()
+			const s = await getSessionSoft()
 			if (alive) setSession(s)
 		}
 

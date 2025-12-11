@@ -33,7 +33,7 @@ stationeden.ru, www.stationeden.ru {
     reverse_proxy web:3000
   }
 
-  # REST API под /api
+  # REST API под /api (всё остальное)
   handle /api* {
     uri strip_prefix /api
     reverse_proxy api:4000 {
@@ -149,7 +149,7 @@ localhost {
     reverse_proxy web:3000
   }
 
-  # API
+  # API (всё остальное)
   handle /api* {
     uri strip_prefix /api
     reverse_proxy api:4000 {

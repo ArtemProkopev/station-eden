@@ -5,9 +5,8 @@ import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
+import { api } from '../lib/api'
 import styles from './home.module.css'
-
-const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
 
 // Ленивая подгрузка тяжёлых компонентов
 const TopHUD = dynamic(() => import('../components/TopHUD/TopHUD'), {
@@ -82,48 +81,34 @@ const SOCIAL_ICONS = [
 	},
 ] as const
 
+// Мягкая проверка сессии через /auth/session:
+// - всегда 200, без 401/403
+// - status: 'signed-in' | 'signed-out'
 async function fetchProfile(): Promise<UserProfile | null> {
 	try {
-		let r = await fetch(`${API}/auth/me`, {
-			method: 'GET',
-			credentials: 'include',
-			cache: 'no-store',
-		})
+		const session: any = await api.session()
 
-		if (r.status === 401) {
-			const refreshResp = await fetch(`${API}/auth/refresh`, {
-				method: 'POST',
-				credentials: 'include',
-			})
-
-			if (!refreshResp.ok) {
-				return null
-			}
-
-			r = await fetch(`${API}/auth/me`, {
-				method: 'GET',
-				credentials: 'include',
-				cache: 'no-store',
-			})
+		if (session?.status !== 'signed-in' || !session?.user) {
+			return null
 		}
 
-		if (!r.ok) return null
+		const user = session.user
+		const id: string | undefined = user.userId ?? user.id ?? user.sub
+		const email: string | undefined = user.email
 
-		const raw = await r.json()
-		const data = raw?.data ?? raw
-
-		if (!data?.userId || !data?.email) return null
+		if (!id || !email) return null
 
 		const profile: UserProfile = {
-			id: data.userId,
-			email: data.email,
-			username: data.username ?? data.email.split('@')[0],
-			avatar: data.avatar,
+			id,
+			email,
+			username:
+				typeof user.username === 'string' ? user.username : email.split('@')[0],
+			avatar: user.avatar,
 		}
 
 		return profile
-	} catch (e) {
-		console.error('Error fetching profile:', e)
+	} catch {
+		// Любые ошибки → просто считаем, что гость, без красных ошибок в консоли
 		return null
 	}
 }

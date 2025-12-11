@@ -4,58 +4,12 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useState } from 'react'
 import { api } from '../../../lib/api'
+import { clearClientAuthData, setForcedLogout } from '../../../lib/authUtils'
 import {
 	clearWebSocketCache,
 	closeAllWebSockets,
 } from '../../../lib/websocketUtils'
 import styles from './UserDropdown.module.css'
-
-// Функция для надежной очистки кук
-const clearAllCookies = () => {
-	try {
-		const cookies = document.cookie.split(';')
-		const domain = window.location.hostname.includes('stationeden.ru')
-			? '.stationeden.ru'
-			: window.location.hostname
-
-		cookies.forEach(cookie => {
-			const eqPos = cookie.indexOf('=')
-			const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim()
-
-			// Очищаем все куки аутентификации
-			if (name && name !== 'theme' && name !== 'locale') {
-				// Основной домен
-				document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
-				// С доменом для поддоменов
-				document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${domain};`
-				// Дополнительные пути для безопасности
-				document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/api;`
-				document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/auth;`
-			}
-		})
-	} catch (error) {
-		console.error('[logout] Error clearing cookies:', error)
-	}
-}
-
-// Функция для очистки хранилища
-const clearAllStorage = () => {
-	try {
-		// Очищаем localStorage (кроме некоторых настроек)
-		const preserveKeys = ['theme', 'locale', 'lastPath']
-		const allKeys = Object.keys(localStorage)
-		allKeys.forEach(key => {
-			if (!preserveKeys.includes(key)) {
-				localStorage.removeItem(key)
-			}
-		})
-
-		// Очищаем sessionStorage полностью
-		sessionStorage.clear()
-	} catch (error) {
-		console.error('[logout] Error clearing storage:', error)
-	}
-}
 
 export default function LogoutButton() {
 	const [loading, setLoading] = useState(false)
@@ -68,12 +22,8 @@ export default function LogoutButton() {
 		console.log('[logout] Starting logout process...')
 		setLoading(true)
 
-		// 1. Устанавливаем глобальные флаги для блокировки keep-alive
-		if (typeof window !== 'undefined') {
-			;(window as any).__FORCED_LOGOUT__ = true
-			;(window as any).__SESSION_KEEP_ALIVE_DISABLED__ = true
-			;(window as any).__LOGOUT_IN_PROGRESS__ = true
-		}
+		// 1. Устанавливаем глобальные флаги для блокировки keep-alive и ретраев
+		setForcedLogout()
 
 		// 2. Закрываем все WebSocket соединения
 		console.log('[logout] Closing WebSocket connections...')
@@ -113,14 +63,11 @@ export default function LogoutButton() {
 			}
 		}
 
-		// 6. Всегда выполняем клиентскую очистку
+		console.log('[logout] API logout result:', logoutSuccess ? 'ok' : 'failed')
+
+		// 6. Всегда выполняем клиентскую очистку (куки, storages, события)
 		console.log('[logout] Performing client-side cleanup...')
-
-		// Очищаем куки
-		clearAllCookies()
-
-		// Очищаем хранилища
-		clearAllStorage()
+		clearClientAuthData()
 
 		// 7. Очищаем WebSocket кэш
 		try {
@@ -129,7 +76,7 @@ export default function LogoutButton() {
 			console.warn('[logout] WebSocket cache clearing failed:', cacheError)
 		}
 
-		// 8. Дополнительная очистка кеша
+		// 8. Дополнительная очистка кеша Service Worker
 		try {
 			if ('caches' in window) {
 				const cacheNames = await caches.keys()
@@ -140,13 +87,8 @@ export default function LogoutButton() {
 			console.warn('[logout] Cache clearing failed:', cacheError)
 		}
 
-		// 9. Отправляем финальные события
+		// 9. Финальные события
 		try {
-			// Событие для обновления UI
-			window.dispatchEvent(new Event('auth-cleared'))
-			window.dispatchEvent(new Event('storage'))
-
-			// Если это вкладка с аудио/видео - останавливаем медиа
 			if ('speechSynthesis' in window) {
 				window.speechSynthesis.cancel()
 			}
@@ -156,7 +98,6 @@ export default function LogoutButton() {
 		console.log('[logout] Redirecting...')
 		setLoading(false)
 
-		// Маленькая задержка для гарантии очистки
 		setTimeout(() => {
 			const timestamp = Date.now()
 
@@ -167,7 +108,7 @@ export default function LogoutButton() {
 				// Иначе используем router для плавного перехода
 				router.push(`/?logout=${timestamp}&cleared=1&ws=closed`)
 
-				// Страховка на случай если router не сработает
+				// Страховка, если router не сработает
 				setTimeout(() => {
 					if (window.location.pathname !== '/') {
 						window.location.href = `/?logout=${timestamp}&ws=closed`
