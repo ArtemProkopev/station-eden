@@ -1,4 +1,3 @@
-// apps/web/src/app/lobby/[lobbyId]/LobbyPageClient.tsx
 'use client'
 
 import TopHUD from '@/components/TopHUD/TopHUD'
@@ -114,6 +113,9 @@ const LobbyContent = memo(
 							totalPlayersCount={lobby.players.length}
 							isConnected={lobby.isConnected}
 							minPlayersRequired={2}
+							lobbyId={lobbyId}
+							lobbySettings={lobby.lobbySettings}
+							players={lobby.players}
 						/>
 					</div>
 

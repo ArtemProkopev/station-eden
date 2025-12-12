@@ -1,0 +1,202 @@
+.votingContainer {
+  background: rgba(255, 102, 102, 0.1);
+  border: 2px solid #ff6666;
+  border-radius: 16px;
+  padding: 20px;
+  margin-top: 20px;
+  animation: votingAppear 0.5s ease;
+}
+
+@keyframes votingAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.votingHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.votingTitle {
+  color: #ff6666;
+  margin: 0;
+  font-size: 20px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-shadow: 0 0 8px rgba(255, 102, 102, 0.6);
+}
+
+.votingTimer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.timerCircle {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 2px solid #ff6666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 102, 102, 0.1);
+}
+
+.timerText {
+  color: #ff6666;
+  font-size: 20px;
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
+}
+
+.timerLabel {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+}
+
+.votingContent {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.votingDescription {
+  color: white;
+  font-size: 16px;
+  text-align: center;
+  margin: 0 0 25px 0;
+  line-height: 1.5;
+}
+
+.candidatesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+.candidateCard {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 102, 102, 0.3);
+  border-radius: 12px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.candidateCard:hover:not(.voted) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 102, 102, 0.6);
+  transform: translateY(-2px);
+}
+
+.candidateCard.voted {
+  border-color: #66ff99;
+  background: rgba(102, 255, 153, 0.1);
+}
+
+.candidateAvatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #ff6666;
+}
+
+.candidateCard.voted .candidateAvatar {
+  border-color: #66ff99;
+}
+
+.candidateAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarPlaceholder {
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 102, 102, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff6666;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.candidateCard.voted .avatarPlaceholder {
+  background: rgba(102, 255, 153, 0.1);
+  color: #66ff99;
+}
+
+.candidateInfo {
+  text-align: center;
+  width: 100%;
+}
+
+.candidateName {
+  color: white;
+  margin: 0 0 8px 0;
+  font-size: 16px;
+}
+
+.candidateStats {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+.stat {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+}
+
+.voteBadge {
+  background: rgba(102, 255, 153, 0.2);
+  color: #66ff99;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid #66ff99;
+}
+
+.voteButton {
+  width: 100%;
+  padding: 10px;
+  background: rgba(255, 102, 102, 0.2);
+  border: 1px solid #ff6666;
+  color: #ff6666;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: bold;
+}
+
+.voteButton:hover {
+  background: rgba(255, 102, 102, 0.3);
+}
+
+@media (max-width: 768px) {
+  .votingHeader {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+  }
+  
+  .candidatesGrid {
+    grid-template-columns: 1fr;
+  }
+}

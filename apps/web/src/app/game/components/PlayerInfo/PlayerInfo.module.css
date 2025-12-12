@@ -1,0 +1,282 @@
+.playerInfoContainer {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  padding: 25px;
+  border: 2px solid #63efff;
+  height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+.loadingMessage {
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  padding: 40px;
+  font-size: 18px;
+}
+
+.playerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.title {
+  color: #63efff;
+  margin: 0;
+  font-size: 24px;
+  text-shadow: 0 0 8px rgba(99, 239, 255, 0.6);
+}
+
+.statusBadges {
+  display: flex;
+  gap: 10px;
+}
+
+.capsuleBadge,
+.roleBadge {
+  font-size: 14px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: bold;
+}
+
+.capsuleBadge {
+  background: rgba(99, 239, 255, 0.2);
+  color: #63efff;
+  border: 1px solid #63efff;
+}
+
+.roleBadge {
+  background: rgba(156, 39, 176, 0.2);
+  color: #9c27b0;
+  border: 1px solid #9c27b0;
+}
+
+.cardsSection {
+  flex: 1;
+  margin-bottom: 20px;
+}
+
+.sectionTitle {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 18px;
+  margin: 0 0 15px 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 15px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+.cardsGrid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cardsGrid::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.cardsGrid::-webkit-scrollbar-thumb {
+  background: #63efff;
+  border-radius: 3px;
+}
+
+.card {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(99, 239, 255, 0.3);
+  border-radius: 12px;
+  padding: 15px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.card:hover {
+  border-color: #63efff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(99, 239, 255, 0.2);
+}
+
+.card.revealed {
+  border-color: #66ff99;
+  background: rgba(102, 255, 153, 0.05);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.cardType {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.revealedBadge {
+  font-size: 11px;
+  background: rgba(102, 255, 153, 0.2);
+  color: #66ff99;
+  padding: 3px 8px;
+  border-radius: 12px;
+}
+
+.cardTitle {
+  color: white;
+  margin: 0 0 8px 0;
+  font-size: 16px;
+}
+
+.cardDescription {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  line-height: 1.4;
+  margin: 0 0 10px 0;
+}
+
+.bonus,
+.penalty {
+  font-size: 13px;
+  margin: 5px 0;
+  padding-left: 10px;
+  position: relative;
+}
+
+.bonus {
+  color: #66ff99;
+}
+
+.bonus::before {
+  content: '+';
+  position: absolute;
+  left: 0;
+}
+
+.penalty {
+  color: #ff6666;
+}
+
+.penalty::before {
+  content: '-';
+  position: absolute;
+  left: 0;
+}
+
+.revealButton,
+.abilityButton,
+.useAbilityButton {
+  width: 100%;
+  padding: 8px;
+  margin-top: 10px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.revealButton {
+  background: rgba(99, 239, 255, 0.2);
+  color: #63efff;
+  border: 1px solid #63efff;
+}
+
+.revealButton:hover {
+  background: rgba(99, 239, 255, 0.3);
+}
+
+.abilityButton {
+  background: rgba(156, 39, 176, 0.2);
+  color: #9c27b0;
+  border: 1px solid #9c27b0;
+}
+
+.abilityButton:hover {
+  background: rgba(156, 39, 176, 0.3);
+}
+
+.revealPrompt {
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid #ffc107;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.revealPrompt p {
+  color: #ffc107;
+  margin: 0 0 15px 0;
+  text-align: center;
+  font-weight: bold;
+}
+
+.revealOptions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.revealOption {
+  padding: 10px 20px;
+  background: rgba(255, 193, 7, 0.2);
+  border: 1px solid #ffc107;
+  color: #ffc107;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.revealOption:hover {
+  background: rgba(255, 193, 7, 0.3);
+}
+
+.abilitiesSection {
+  margin-top: 20px;
+}
+
+.abilitiesList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.abilityCard {
+  background: rgba(156, 39, 176, 0.1);
+  border: 1px solid #9c27b0;
+  border-radius: 12px;
+  padding: 15px;
+}
+
+.abilityCard h4 {
+  color: #9c27b0;
+  margin: 0 0 8px 0;
+  font-size: 16px;
+}
+
+.abilityCard p {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  margin: 0 0 10px 0;
+}
+
+.useAbilityButton {
+  background: #9c27b0;
+  color: white;
+  border: none;
+}
+
+.useAbilityButton:hover {
+  background: #7b1fa2;
+}

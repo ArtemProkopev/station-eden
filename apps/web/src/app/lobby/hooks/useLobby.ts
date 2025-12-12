@@ -298,7 +298,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 				missions: Math.floor(Math.random() * 50),
 				hours: Math.floor(Math.random() * 200),
 				avatar: playerData?.avatar,
-				isReady: false,
+				isReady: true,
 			}
 
 			console.log('Adding new player (mock):', newPlayer.name)

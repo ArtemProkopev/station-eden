@@ -1,0 +1,145 @@
+.crisisContainer {
+  background: rgba(0, 0, 0, 0.5);
+  border: 2px solid;
+  border-radius: 16px;
+  padding: 20px;
+  margin-top: 20px;
+  animation: crisisAppear 0.5s ease;
+}
+
+@keyframes crisisAppear {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.crisisHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.crisisTitle {
+  margin: 0;
+  font-size: 18px;
+  text-shadow: 0 0 8px rgba(99, 239, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.crisisTimer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.timerBar {
+  width: 100px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.timerFill {
+  height: 100%;
+  transition: width 1s linear;
+}
+
+.timerText {
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  min-width: 30px;
+}
+
+.crisisContent {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.crisisDescription {
+  color: white;
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0 0 20px 0;
+}
+
+.crisisInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+}
+
+.infoItem {
+  display: flex;
+  gap: 10px;
+}
+
+.infoLabel {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  min-width: 80px;
+}
+
+.infoValue {
+  color: white;
+  font-size: 14px;
+  flex: 1;
+}
+
+.solutionsSection {
+  margin-top: 20px;
+}
+
+.solutionsTitle {
+  color: white;
+  font-size: 16px;
+  margin: 0 0 15px 0;
+}
+
+.solutionsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.solutionButton {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid;
+  color: white;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.solutionButton:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  .crisisHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+  
+  .solutionsGrid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,99 @@
+.header {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  padding: 20px 30px;
+  border: 2px solid #63efff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.gameInfo {
+  display: flex;
+  gap: 30px;
+}
+
+.gameId,
+.round,
+.phase {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.label {
+  color: rgba(99, 239, 255, 0.7);
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.value {
+  color: #63efff;
+  font-size: 24px;
+  font-weight: 600;
+  text-shadow: 0 0 8px rgba(99, 239, 255, 0.6);
+}
+
+.phaseContainer {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+}
+
+.timer {
+  position: relative;
+}
+
+.timerCircle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 3px solid #63efff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(99, 239, 255, 0.1);
+  box-shadow: 0 0 20px rgba(99, 239, 255, 0.3);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(99, 239, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(99, 239, 255, 0.5);
+  }
+}
+
+.timerText {
+  color: #63efff;
+  font-size: 24px;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    gap: 20px;
+    padding: 15px;
+  }
+  
+  .gameInfo {
+    justify-content: space-between;
+    width: 100%;
+  }
+  
+  .timerCircle {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .timerText {
+    font-size: 18px;
+  }
+}

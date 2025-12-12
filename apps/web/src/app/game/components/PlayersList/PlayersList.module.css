@@ -1,0 +1,167 @@
+.playersList {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  padding: 20px;
+  border: 2px solid #63efff;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  color: #63efff;
+  font-size: 20px;
+  margin: 0 0 20px 0;
+  text-align: center;
+  text-shadow: 0 0 8px rgba(99, 239, 255, 0.6);
+}
+
+.playersContainer {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.playerCard {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(99, 239, 255, 0.2);
+  border-radius: 12px;
+  padding: 15px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.playerCard:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(99, 239, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.playerCard.currentUser {
+  border-color: #66ff99;
+  background: rgba(102, 255, 153, 0.05);
+}
+
+.playerCard.ejected {
+  opacity: 0.6;
+  border-color: #ff6666;
+  background: rgba(255, 102, 102, 0.05);
+}
+
+.playerHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #63efff;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarPlaceholder {
+  width: 100%;
+  height: 100%;
+  background: rgba(99, 239, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #63efff;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.playerInfo {
+  flex: 1;
+}
+
+.username {
+  color: white;
+  margin: 0 0 5px 0;
+  font-size: 16px;
+}
+
+.status {
+  display: flex;
+  gap: 8px;
+}
+
+.alive,
+.inCapsule,
+.ejectedStatus {
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 12px;
+}
+
+.alive {
+  background: rgba(102, 255, 153, 0.2);
+  color: #66ff99;
+}
+
+.inCapsule {
+  background: rgba(99, 239, 255, 0.2);
+  color: #63efff;
+}
+
+.ejectedStatus {
+  background: rgba(255, 102, 102, 0.2);
+  color: #ff6666;
+}
+
+.playerStats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.statLabel {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statValue {
+  color: #63efff;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.revealedBadge {
+  background: rgba(255, 193, 7, 0.2);
+  color: #ffc107;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 12px;
+}
+
+.roleBadge {
+  background: rgba(156, 39, 176, 0.2);
+  color: #9c27b0;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  text-align: center;
+  margin-top: 8px;
+}
