@@ -63,6 +63,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 	const lobbyIdRef = useRef<string>(lobbyIdFromProps || 'default-lobby')
 	const hasJoinedRef = useRef(false)
 	const reconnectTimeoutRef = useRef<NodeJS.Timeout>()
+	const didInitRef = useRef(false)
 
 	// Хелпер для получения ID пользователя из профиля
 	const currentUserId = profile.data?.id
@@ -384,32 +385,28 @@ export function useLobby(lobbyIdFromProps?: string) {
 	})
 
 	/**
-	 * Инициализация лобби:
-	 * 1) Сначала грузим пользователя (сервер — источник истины)
-	 * 2) Потом подтягиваем локальный fallback-кэш по userId
-	 * 3) Потом проверяем иконки
+	 * Инициализация лобби (одноразово):
+	 * 1) грузим пользователя (сервер — источник истины)
+	 * 2) иконки грузим фоном (не блокируют)
 	 *
-	 * ВАЖНО: loadSavedAssets теперь требует userId — поэтому НЕ вызываем её без аргумента.
+	 * ВАЖНО: не включаем loadSavedAssets в deps — иначе будет цикл,
+	 * т.к. loadSavedAssets в useProfile зависит от profile и меняет identity.
 	 */
 	useEffect(() => {
+		if (didInitRef.current) return
+		didInitRef.current = true
+
 		let cancelled = false
 
 		const init = async () => {
 			try {
 				setIsLoading(true)
 
-				// 1) Грузим профиль
 				await loadUserData()
 				if (cancelled) return
 
-				// 2) Если userId уже появился — грузим кэш
-				const uid = profile.data?.id
-				if (uid) {
-					loadSavedAssets(uid)
-				}
-
-				// 3) Иконки
-				await checkIconsAvailability()
+				// Иконки НЕ блокируют лобби
+				checkIconsAvailability().catch(() => {})
 			} finally {
 				if (!cancelled) setIsLoading(false)
 			}
@@ -420,9 +417,17 @@ export function useLobby(lobbyIdFromProps?: string) {
 		return () => {
 			cancelled = true
 		}
-		// намеренно НЕ добавляем profile.data в deps,
-		// чтобы не было циклов при setProfile внутри loadUserData()
-	}, [loadSavedAssets, loadUserData, checkIconsAvailability])
+	}, [loadUserData, checkIconsAvailability])
+
+	/**
+	 * Подтягиваем локальный кэш ассетов отдельно, когда появился userId.
+	 * Это безопасно и не вызывает цикл init-эффекта.
+	 */
+	useEffect(() => {
+		const uid = profile.data?.id
+		if (!uid) return
+		loadSavedAssets(uid)
+	}, [profile.data?.id, loadSavedAssets])
 
 	const currentUserReadyState = useMemo(
 		() => players.find((p: Player) => p.id === currentUserId)?.isReady || false,
