@@ -1,5 +1,6 @@
 import {
 	BadRequestException,
+	ConflictException,
 	Injectable,
 	UnauthorizedException,
 } from '@nestjs/common'
@@ -95,8 +96,26 @@ export class AuthService {
 			this.users.findByUsername(username),
 		])
 
-		if (byEmail) throw new UnauthorizedException('Email already used')
-		if (byName) throw new UnauthorizedException('Username already used')
+		/**
+		 * ВАЖНО:
+		 * byEmail может существовать как "oauth-only" пользователь:
+		 * - passwordHash = null
+		 * - username = null
+		 *
+		 * Такой email формально "занят", но пользователю нужно объяснить правильный сценарий:
+		 * - вход через Google
+		 * - или восстановление/установка пароля через email-код
+		 */
+		if (byEmail) {
+			if (!byEmail.passwordHash) {
+				throw new ConflictException(
+					'Аккаунт с этим email уже существует (создан через OAuth/код). Войдите через Google или используйте восстановление пароля.'
+				)
+			}
+			throw new ConflictException('Email already used')
+		}
+
+		if (byName) throw new ConflictException('Username already used')
 
 		const passwordHash = await bcrypt.hash(password, 10)
 		await this.users.create({ email, username, passwordHash, role: 'user' })
