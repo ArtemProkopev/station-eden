@@ -2,187 +2,58 @@
   email artemprokopev@internet.ru
 }
 
-# ==================== PROD: основной домен ====================
+http://stationeden.ru, http://www.stationeden.ru, http://api.stationeden.ru {
+  redir https://{host}{uri} permanent
+}
+
 stationeden.ru, www.stationeden.ru {
-  tls {
-    issuer acme {
-      email artemprokopev@internet.ru
-    }
-  }
-
   encode zstd gzip
 
-  # Долгий кэш для статики Next и ассетов
-  @nextStatic path /_next/static/* /_next/image/* /favicon.ico
+  @nextStatic {
+    path /_next/static/* /_next/image/* /favicon.ico
+  }
   header @nextStatic Cache-Control "public, max-age=31536000, immutable"
 
-  # Долгий кэш для ассетов, которые идут с origin (если не через CDN)
-  @assets path /avatars/* /frames/* /icons/* /fonts/* /decor/* /panel.png /roboted.png /login-background.* /register-background.* /main-background.* /lobby-background.* /profile-background.* /settings-background.*
+  @assets {
+    path /avatars/* /frames/* /icons/* /fonts/* /decor/*
+    path /panel.png /roboted.png /login-background.* /register-background.* /main-background.* /lobby-background.* /profile-background.* /settings-background.*
+  }
   header @assets Cache-Control "public, max-age=31536000, immutable"
 
-  # Socket.IO/WebSocket
-  reverse_proxy /lobby* api:4000 {
-    header_up Host {http.request.host}
-    header_up X-Real-IP {http.request.remote}
-    header_up X-Forwarded-For {http.request.remote}
-    header_up X-Forwarded-Proto {http.request.scheme}
-  }
-
-  # Динамические страницы лобби
-  handle /lobby/* {
-    reverse_proxy web:3000
-  }
-
-  # REST API под /api (всё остальное)
-  handle /api* {
+  handle /api/* {
     uri strip_prefix /api
-    reverse_proxy api:4000 {
-      header_up Host {http.request.host}
-      header_up X-Real-IP {http.request.remote}
-      header_up X-Forwarded-For {http.request.remote}
-      header_up X-Forwarded-Proto {http.request.scheme}
-    }
+    reverse_proxy api:4000
   }
 
-  # Прямой доступ к /auth
-  handle /auth* {
-    reverse_proxy api:4000 {
-      header_up Host {http.request.host}
-      header_up X-Real-IP {http.request.remote}
-      header_up X-Forwarded-For {http.request.remote}
-      header_up X-Forwarded-Proto {http.request.scheme}
-    }
+  handle /auth/* {
+    reverse_proxy api:4000
   }
 
-  # CSRF токен
-  @csrf path /auth/csrf
+  @csrf {
+    path /auth/csrf
+  }
   header @csrf Cache-Control "no-store, no-cache, must-revalidate"
   header @csrf Pragma "no-cache"
   header @csrf Expires "0"
 
-  # WASM
-  @wasm path *.wasm
-  header @wasm Content-Type "application/wasm"
-
-  # Фронтенд
   handle {
     reverse_proxy web:3000
   }
 
   header {
-    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     X-Content-Type-Options "nosniff"
     Referrer-Policy "strict-origin-when-cross-origin"
   }
 }
 
-# ==================== PROD: отдельный API-хост ====================
 api.stationeden.ru {
-  tls {
-    issuer acme {
-      email artemprokopev@internet.ru
-    }
-  }
-
   encode zstd gzip
 
-  # Socket.IO
-  reverse_proxy /lobby* api:4000 {
-    header_up Host {http.request.host}
-    header_up X-Real-IP {http.request.remote}
-    header_up X-Forwarded-For {http.request.remote}
-    header_up X-Forwarded-Proto {http.request.scheme}
-  }
-
-  # API
   handle {
-    reverse_proxy api:4000 {
-      header_up Host {http.request.host}
-      header_up X-Real-IP {http.request.remote}
-      header_up X-Forwarded-For {http.request.remote}
-      header_up X-Forwarded-Proto {http.request.scheme}
-    }
+    reverse_proxy api:4000
   }
 
-  # CSRF
-  @csrf path /auth/csrf
-  header @csrf Cache-Control "no-store, no-cache, must-revalidate"
-  header @csrf Pragma "no-cache"
-  header @csrf Expires "0"
-
-  # WASM
-  @wasm path *.wasm
-  header @wasm Content-Type "application/wasm"
-
-  header {
-    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-    X-Content-Type-Options "nosniff"
-    Referrer-Policy "strict-origin-when-cross-origin"
-    
-    # ИСПРАВЛЕНИЕ CORP (для favicon и картинок)
-    Cross-Origin-Resource-Policy "cross-origin"
-    Access-Control-Allow-Origin "https://stationeden.ru"
-  }
-}
-
-# ==================== LOCAL ====================
-localhost {
-  encode zstd gzip
-
-  # Долгий кэш для статики Next (локально по желанию можно убрать)
-  @nextStatic path /_next/static/* /_next/image/* /favicon.ico
-  header @nextStatic Cache-Control "public, max-age=31536000, immutable"
-
-  @assets path /avatars/* /frames/* /icons/* /fonts/* /decor/* /panel.png /roboted.png /login-background.* /register-background.* /main-background.* /lobby-background.* /profile-background.* /settings-background.*
-  header @assets Cache-Control "public, max-age=31536000, immutable"
-
-  # Socket.IO
-  reverse_proxy /lobby* api:4000 {
-    header_up Host {http.request.host}
-    header_up X-Real-IP {http.request.remote}
-    header_up X-Forwarded-For {http.request.remote}
-    header_up X-Forwarded-Proto {http.request.scheme}
-  }
-
-  # Lobby Frontend
-  handle /lobby/* {
-    reverse_proxy web:3000
-  }
-
-  # API (всё остальное)
-  handle /api* {
-    uri strip_prefix /api
-    reverse_proxy api:4000 {
-      header_up Host {http.request.host}
-      header_up X-Forwarded-Proto {http.request.scheme}
-    }
-  }
-
-  # Auth
-  handle /auth* {
-    reverse_proxy api:4000 {
-      header_up Host {http.request.host}
-      header_up X-Forwarded-Proto {http.request.scheme}
-    }
-  }
-
-  # CSRF
-  @csrf path /auth/csrf
-  header @csrf Cache-Control "no-store, no-cache, must-revalidate"
-  header @csrf Pragma "no-cache"
-  header @csrf Expires "0"
-
-  # WASM
-  @wasm path *.wasm
-  header @wasm Content-Type "application/wasm"
-
-  # Frontend
-  handle {
-    reverse_proxy web:3000
-  }
-
-  header {
-    X-Content-Type-Options "nosniff"
-    Referrer-Policy "strict-origin-when-cross-origin"
-  }
+  header Access-Control-Allow-Origin "https://stationeden.ru"
+  header Access-Control-Allow-Credentials "true"
+  header X-Content-Type-Options "nosniff"
 }

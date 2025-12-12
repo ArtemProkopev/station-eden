@@ -106,9 +106,11 @@ jobs:
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
             set -x
 
-            echo "==> Load /etc/environment"
+            echo "==> Load .env file"
             set +x
-            set -a; [ -f /etc/environment ] && . /etc/environment || true; set +a
+            set -a
+            [ -f .env ] && source .env
+            set +a
             set -x
 
             export GHCR_OWNER="${{ steps.owner.outputs.lc }}"
@@ -117,9 +119,9 @@ jobs:
             [ -n "$IMAGE_TAG" ] || IMAGE_TAG="latest"
 
             if docker-compose version >/dev/null 2>&1; then
-              COMP="docker-compose --env-file /etc/environment -f docker-compose.yml"
+              COMP="docker-compose --env-file .env -f docker-compose.yml"
             elif docker compose version >/dev/null 2>&1; then
-              COMP="docker compose --env-file /etc/environment -f docker-compose.yml"
+              COMP="docker compose --env-file .env -f docker-compose.yml"
             else
               echo "Neither 'docker-compose' nor 'docker compose' found."
               exit 1
