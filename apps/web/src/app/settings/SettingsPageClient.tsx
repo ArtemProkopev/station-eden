@@ -1,8 +1,8 @@
 // apps/web/src/app/settings/SettingsPageClient.tsx
 'use client'
 
-import { useScrollPrevention } from '@/hooks/useScrollPrevention' // ← Обновленный импорт
-import { useEffect, useState } from 'react'
+import { useScrollPrevention } from '@/hooks/useScrollPrevention'
+import { useEffect, useMemo, useState } from 'react'
 import TopHUD from '../../components/TopHUD/TopHUD'
 import { ScaleContainer } from '../../components/ui/ScaleContainer/ScaleContainer'
 import type { SoundSettingsType } from './components/sections/SoundSettings/SoundSettings'
@@ -28,20 +28,44 @@ export default function SettingsPageClient() {
 		updateSoundSettings,
 	} = useSettings()
 
-	useScrollPrevention() // ← Теперь использует общий хук
+	useScrollPrevention()
 
 	// Инициализация данных
 	useEffect(() => {
+		let cancelled = false
+
 		const initializeData = async () => {
 			try {
 				await loadUserData()
-				loadSettings()
+				if (!cancelled) loadSettings()
 			} catch (error) {
 				console.error('Settings initialization failed:', error)
 			}
 		}
+
 		initializeData()
+		return () => {
+			cancelled = true
+		}
 	}, [loadUserData, loadSettings])
+
+	// Приводим ProfileState → формат, который ждёт TopHUD
+	const topHudProfile = useMemo(
+		() => ({
+			status: profile.status,
+			userId: profile.data?.id,
+			email: profile.data?.email,
+			username: profile.data?.username,
+			message: profile.message,
+		}),
+		[
+			profile.status,
+			profile.data?.id,
+			profile.data?.email,
+			profile.data?.username,
+			profile.message,
+		]
+	)
 
 	const handleVolumeChange = (type: keyof SoundSettingsType, value: number) => {
 		updateSoundSettings({ [type]: value })
@@ -73,7 +97,7 @@ export default function SettingsPageClient() {
 
 	return (
 		<main className={styles.root}>
-			<TopHUD profile={profile} avatar={avatar} />
+			<TopHUD profile={topHudProfile} avatar={avatar} />
 
 			<ScaleContainer
 				baseWidth={1200}

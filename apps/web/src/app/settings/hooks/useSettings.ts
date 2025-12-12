@@ -2,15 +2,11 @@
 'use client'
 
 import { asset } from '@/lib/asset'
-// Импортируем правильные типы из shared
 import { SoundSettings, UserSettings } from '@station-eden/shared'
-// Импортируем локальный UI-тип для профиля
+import { useCallback, useState } from 'react'
+import { PROFILE_CONFIG, avatarKey } from '../../profile/config'
 import { ProfileState } from '../../profile/types'
 
-import { useCallback, useState } from 'react'
-import { PROFILE_CONFIG } from '../../profile/config'
-
-// Используем UserSettings вместо SettingsType
 const DEFAULT_SETTINGS: UserSettings = {
 	sound: {
 		masterVolume: 63,
@@ -24,31 +20,61 @@ const DEFAULT_SETTINGS: UserSettings = {
 	purchaseHistory: true,
 }
 
-const migrateToAbsoluteUrl = (url: string | null): string | undefined => {
+const migrateToAbsoluteUrl = (
+	url: string | null | undefined
+): string | undefined => {
 	if (!url) return undefined
 	return url.startsWith('http') ? url : asset(url)
 }
 
+type MePayloadLike = any
+
+function unwrapAny<T = any>(v: any): T {
+	if (!v || typeof v !== 'object') return v as T
+	if ('data' in v && v.data && typeof v.data === 'object') return v.data as T
+	if ('status' in v && v.status === 'signed-in' && v.user) return v.user as T
+	if ('user' in v && v.user && typeof v.user === 'object') return v.user as T
+	return v as T
+}
+
+function pickString(v: any): string | null {
+	return typeof v === 'string' && v.trim() ? v : null
+}
+
 export function useSettings() {
 	const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS)
-	// Используем ProfileState (бывший ProfileData)
 	const [profile, setProfile] = useState<ProfileState>({ status: 'loading' })
-	const [avatar, setAvatar] = useState<string>('/icons/avatar-placeholder.svg')
+	const [avatar, setAvatar] = useState<string>(
+		asset(PROFILE_CONFIG.DEFAULT.AVATAR)
+	)
 
-	const loadSavedAvatar = useCallback(() => {
+	/**
+	 * Грузим аватар из:
+	 * 1) server avatar (если есть)
+	 * 2) localStorage per-user key (profile_avatar:<userId>)
+	 * 3) дефолт
+	 */
+	const loadSavedAvatar = useCallback((userId?: string) => {
 		try {
-			const savedAvatar = localStorage.getItem(
+			const uid = pickString(userId) || null
+
+			// старые ключи оставим как fallback (на всякий)
+			const legacyAvatar = localStorage.getItem(
 				PROFILE_CONFIG.STORAGE_KEYS.AVATAR
 			)
-			const userAvatar = localStorage.getItem('user_avatar')
+			const legacyUserAvatar = localStorage.getItem('user_avatar')
 
-			let finalAvatar =
-				migrateToAbsoluteUrl(savedAvatar) ||
-				migrateToAbsoluteUrl(userAvatar) ||
+			const perUserAvatar = uid ? localStorage.getItem(avatarKey(uid)) : null
+
+			const finalAvatar =
+				migrateToAbsoluteUrl(perUserAvatar) ||
+				migrateToAbsoluteUrl(legacyAvatar) ||
+				migrateToAbsoluteUrl(legacyUserAvatar) ||
 				asset(PROFILE_CONFIG.DEFAULT.AVATAR)
+
 			setAvatar(finalAvatar)
 
-			fetch(finalAvatar, { method: 'HEAD' })
+			fetch(finalAvatar, { method: 'HEAD', cache: 'no-store' })
 				.then(res => {
 					console.log(`Avatar availability: ${finalAvatar} -> ${res.status}`)
 					if (!res.ok) {
@@ -66,12 +92,15 @@ export function useSettings() {
 		}
 	}, [])
 
+	/**
+	 * ВАЖНО:
+	 * Грузим профиль строго same-origin: /auth/me (Caddy proxy → api)
+	 * Не используем NEXT_PUBLIC_API_BASE здесь, чтобы не ловить проблемы с cookies/origin/форматом.
+	 */
 	const loadUserData = useCallback(async () => {
 		try {
-			const API_BASE =
-				process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
-
-			const response = await fetch(`${API_BASE}/auth/me`, {
+			const response = await fetch('/auth/me', {
+				method: 'GET',
 				credentials: 'include',
 				cache: 'no-store',
 			})
@@ -82,27 +111,73 @@ export function useSettings() {
 					status: 'unauth',
 					message: 'Вы не авторизованы.',
 				})
+				loadSavedAvatar(undefined)
 				return
 			}
 
-			if (!response.ok) throw new Error(`HTTP ${response.status}`)
+			if (!response.ok) {
+				throw new Error(`HTTP ${response.status}`)
+			}
 
-			const data = await response.json()
+			const raw = (await response.json().catch(() => null)) as MePayloadLike
+			const payload = unwrapAny<any>(raw)
 
-			const payload = data?.data ?? data
-			// Тут мы мапим ответ API на наш UI стейт
-			// payload должен соответствовать типу User из shared
-			const { id, email, username, avatar, frame } = payload
+			// поддерживаем id/userId и вложенные варианты
+			const userId =
+				pickString(payload?.userId) ||
+				pickString(payload?.id) ||
+				pickString(payload?.user?.userId) ||
+				pickString(payload?.user?.id)
 
-			if (typeof id === 'string' && typeof email === 'string') {
-				setProfile({
-					status: 'ok',
-					data: { id, email, username, avatar, frame }, // Данные кладем в data
-				})
+			const email =
+				pickString(payload?.email) || pickString(payload?.user?.email) || null
 
-				loadSavedAvatar()
-			} else {
+			const username =
+				typeof payload?.username === 'string'
+					? payload.username
+					: typeof payload?.user?.username === 'string'
+						? payload.user.username
+						: null
+
+			const avatarRaw =
+				typeof payload?.avatar === 'string'
+					? payload.avatar
+					: typeof payload?.user?.avatar === 'string'
+						? payload.user.avatar
+						: null
+
+			const frameRaw =
+				typeof payload?.frame === 'string'
+					? payload.frame
+					: typeof payload?.user?.frame === 'string'
+						? payload.user.frame
+						: null
+
+			if (!userId || !email) {
+				console.error('[settings] /auth/me raw=', raw)
 				throw new Error('Некорректный формат ответа сервера')
+			}
+
+			const avatarAbs = migrateToAbsoluteUrl(avatarRaw) ?? null
+			const frameAbs = migrateToAbsoluteUrl(frameRaw) ?? null
+
+			setProfile({
+				status: 'ok',
+				data: {
+					id: userId,
+					email,
+					username,
+					avatar: avatarAbs,
+					frame: frameAbs,
+				} as any,
+			})
+
+			// ставим аватар: сервер > per-user cache > дефолт
+			if (avatarAbs) {
+				setAvatar(avatarAbs)
+				localStorage.setItem(avatarKey(userId), avatarAbs)
+			} else {
+				loadSavedAvatar(userId)
 			}
 		} catch (error) {
 			console.error('User data loading error:', error)
@@ -113,7 +188,7 @@ export function useSettings() {
 						? error.message
 						: 'Не удалось загрузить данные',
 			})
-			loadSavedAvatar()
+			loadSavedAvatar(undefined)
 		}
 	}, [loadSavedAvatar])
 
@@ -147,7 +222,6 @@ export function useSettings() {
 	const updateSettings = useCallback(
 		(updates: Partial<UserSettings>) => {
 			setSettings(prev => {
-				// prev выводится автоматически как UserSettings
 				const newSettings = { ...prev, ...updates }
 				saveSettings(newSettings)
 				return newSettings
