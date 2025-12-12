@@ -12,8 +12,6 @@ export interface ProfileModalState {
 	isOpen: boolean
 }
 
-// ProfileAssets удаляем, так как avatar и frame есть внутри User из shared
-
 /**
  * Состояние профиля для UI.
  * Мы не дублируем поля username/email, а используем тип User из общего пакета.

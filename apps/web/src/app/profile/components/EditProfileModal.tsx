@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import ImgCdn from '../../../components/ImgCdn'
 import { asset } from '../../../lib/asset'
 import styles from './EditProfileModal.module.css'
@@ -8,7 +8,7 @@ import styles from './EditProfileModal.module.css'
 interface EditProfileModalProps {
 	isOpen: boolean
 	onClose: () => void
-	onSave: (avatar: string, frame: string) => void
+	onSave: (avatar: string, frame: string) => Promise<void> | void
 	currentAvatar?: string
 	currentFrame?: string
 }
@@ -42,39 +42,55 @@ const FRAMES = [
 ]
 
 // Хук для предзагрузки изображений
-function useImagePreload(urls: string[]) {
-  useEffect(() => {
-    urls.forEach(url => {
-      const img = new Image()
-      img.src = url
-    })
-  }, [urls])
+function useImagePreload(urls: string[], enabled: boolean) {
+	useEffect(() => {
+		if (!enabled) return
+		urls.forEach(url => {
+			const img = new Image()
+			img.src = url
+		})
+	}, [urls, enabled])
 }
 
 // Оптимизированный компонент для изображений с ленивой загрузкой
-const LazyImage = ({ src, alt, className, priority = false }: {
-  src: string
-  alt: string
-  className?: string
-  priority?: boolean
+const LazyImage = ({
+	src,
+	alt,
+	className,
+	priority = false,
+}: {
+	src: string
+	alt: string
+	className?: string
+	priority?: boolean
 }) => {
-  const [loaded, setLoaded] = useState(priority)
-  
-  useEffect(() => {
-    if (priority) {
-      const img = new Image()
-      img.src = src
-      img.onload = () => setLoaded(true)
-    }
-  }, [src, priority])
+	const [loaded, setLoaded] = useState(priority)
 
-  return (
-    <ImgCdn
-      src={src}
-      alt={alt}
-      className={`${className} ${!loaded ? styles.loading : ''}`}
-    />
-  )
+	useEffect(() => {
+		let cancelled = false
+		if (priority) {
+			const img = new Image()
+			img.src = src
+			img.onload = () => {
+				if (!cancelled) setLoaded(true)
+			}
+		} else {
+			// считаем "loaded" после первого рендера (ImgCdn сам лениво грузит)
+			setLoaded(true)
+		}
+
+		return () => {
+			cancelled = true
+		}
+	}, [src, priority])
+
+	return (
+		<ImgCdn
+			src={src}
+			alt={alt}
+			className={`${className ?? ''} ${!loaded ? styles.loading : ''}`.trim()}
+		/>
+	)
 }
 
 // Нормализуем входящее значение к абсолютному URL
@@ -104,62 +120,105 @@ export default function EditProfileModal({
 	const [selectedFrame, setSelectedFrame] = useState(initialFrame)
 	const [activeTab, setActiveTab] = useState<'avatars' | 'frames'>('avatars')
 
-  // Предзагрузка изображений при открытии модалки
-  useImagePreload([initialAvatar, initialFrame])
-  
-  // Предзагрузка всех изображений при монтировании (осторожно с количеством)
-  useEffect(() => {
-    if (isOpen) {
-      // Предзагружаем только первые несколько изображений каждого типа
-      const avatarsToPreload = AVATARS.slice(0, 4)
-      const framesToPreload = FRAMES.slice(0, 4)
-      
-      ;[...avatarsToPreload, ...framesToPreload].forEach(url => {
-        const img = new Image()
-        img.src = url
-      })
-    }
-  }, [isOpen])
+	const [isSaving, setIsSaving] = useState(false)
+	const [error, setError] = useState<string | null>(null)
+
+	// при открытии модалки — сбрасываем состояние к текущим значениям
+	useEffect(() => {
+		if (!isOpen) return
+		setSelectedAvatar(initialAvatar)
+		setSelectedFrame(initialFrame)
+		setActiveTab('avatars')
+		setIsSaving(false)
+		setError(null)
+	}, [isOpen, initialAvatar, initialFrame])
+
+	// Предзагрузка изображений при открытии модалки
+	useImagePreload([initialAvatar, initialFrame], isOpen)
+
+	// Предзагрузка первых нескольких изображений при открытии
+	useEffect(() => {
+		if (!isOpen) return
+		const avatarsToPreload = AVATARS.slice(0, 4)
+		const framesToPreload = FRAMES.slice(0, 4)
+
+		;[...avatarsToPreload, ...framesToPreload].forEach(url => {
+			const img = new Image()
+			img.src = url
+		})
+	}, [isOpen])
 
 	if (!isOpen) return null
 
-	const handleSave = () => {
-		onSave(selectedAvatar!, selectedFrame!)
-		onClose()
+	const handleTabChange = (tab: 'avatars' | 'frames') => {
+		setActiveTab(tab)
+
+		// чуть позже — подгружаем остальные для текущей вкладки
+		const urlsToPreload = tab === 'avatars' ? AVATARS.slice(4) : FRAMES.slice(4)
+		setTimeout(() => {
+			urlsToPreload.forEach(url => {
+				const img = new Image()
+				img.src = url
+			})
+		}, 100)
 	}
 
-  const handleTabChange = (tab: 'avatars' | 'frames') => {
-    setActiveTab(tab)
-    
-    const urlsToPreload = tab === 'avatars' ? AVATARS.slice(4) : FRAMES.slice(4)
-    setTimeout(() => {
-      urlsToPreload.forEach(url => {
-        const img = new Image()
-        img.src = url
-      })
-    }, 100)
-  }
+	const handleSave = async () => {
+		setError(null)
+		try {
+			setIsSaving(true)
+			await onSave(selectedAvatar, selectedFrame)
+			onClose()
+		} catch (e: any) {
+			const msg =
+				e instanceof Error
+					? e.message
+					: 'Не удалось сохранить. Попробуйте ещё раз.'
+			setError(msg)
+		} finally {
+			setIsSaving(false)
+		}
+	}
+
+	const onBackdrop = () => {
+		if (!isSaving) onClose()
+	}
+
+	const stop = (e: React.MouseEvent) => e.stopPropagation()
 
 	return (
-		<div className={styles.modalOverlay} onClick={onClose}>
-			<div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+		<div className={styles.modalOverlay} onClick={onBackdrop}>
+			<div className={styles.modalContent} onClick={stop}>
 				<div className={styles.modalHeader}>
 					<h2 className={styles.modalTitle}>Редактирование профиля</h2>
-					<button className={styles.closeButton} onClick={onClose}>
+					<button
+						className={styles.closeButton}
+						onClick={onClose}
+						disabled={isSaving}
+						type='button'
+					>
 						×
 					</button>
 				</div>
 
 				<div className={styles.tabs}>
-					<button 
-						className={`${styles.tab} ${activeTab === 'avatars' ? styles.activeTab : ''}`}
+					<button
+						type='button'
+						className={`${styles.tab} ${
+							activeTab === 'avatars' ? styles.activeTab : ''
+						}`}
 						onClick={() => handleTabChange('avatars')}
+						disabled={isSaving}
 					>
 						Аватары
 					</button>
-					<button 
-						className={`${styles.tab} ${activeTab === 'frames' ? styles.activeTab : ''}`}
+					<button
+						type='button'
+						className={`${styles.tab} ${
+							activeTab === 'frames' ? styles.activeTab : ''
+						}`}
 						onClick={() => handleTabChange('frames')}
+						disabled={isSaving}
 					>
 						Рамки
 					</button>
@@ -171,32 +230,33 @@ export default function EditProfileModal({
 						<div className={styles.previewContainer}>
 							<div className={styles.previewWrapper}>
 								<div className={styles.previewImage}>
-                  <div className={styles.avatarFrameContainer}>
-                    <div className={styles.avatarImageContainer}>
-                      <LazyImage
-                        src={selectedAvatar}
-                        alt='Аватар'
-                        priority={true}
-                        className={styles.previewAvatar}
-                      />
-                    </div>
-                    <LazyImage
-                      src={selectedFrame}
-                      alt='Рамка'
-                      priority={true}
-                      className={styles.previewFrame}
-                    />
-                  </div>
+									<div className={styles.avatarFrameContainer}>
+										<div className={styles.avatarImageContainer}>
+											<LazyImage
+												src={selectedAvatar}
+												alt='Аватар'
+												priority={true}
+												className={styles.previewAvatar}
+											/>
+										</div>
+										<LazyImage
+											src={selectedFrame}
+											alt='Рамка'
+											priority={true}
+											className={styles.previewFrame}
+										/>
+									</div>
 								</div>
 							</div>
+
 							<div className={styles.previewInfo}>
 								<div className={styles.previewItem}>
 									<span>Аватар:</span>
-									<span className={styles.previewValue}>Выбран</span>
+									<span className={styles.previewValue}>выбран</span>
 								</div>
 								<div className={styles.previewItem}>
 									<span>Рамка:</span>
-									<span className={styles.previewValue}>Выбрана</span>
+									<span className={styles.previewValue}>выбрана</span>
 								</div>
 							</div>
 						</div>
@@ -207,19 +267,25 @@ export default function EditProfileModal({
 							<div>
 								<h3 className={styles.sectionTitle}>Выберите аватар</h3>
 								<div className={styles.grid}>
-									{AVATARS.map((avatar, index) => (
+									{AVATARS.map((avatarUrl, index) => (
 										<button
-											key={avatar}
-											className={`${styles.option} ${selectedAvatar === avatar ? styles.selected : ''}`}
-											onClick={() => setSelectedAvatar(avatar)}
+											key={avatarUrl}
+											type='button'
+											className={`${styles.option} ${
+												selectedAvatar === avatarUrl ? styles.selected : ''
+											}`}
+											onClick={() => setSelectedAvatar(avatarUrl)}
+											disabled={isSaving}
 										>
-											<LazyImage 
-                        src={avatar} 
-                        alt='Аватар' 
-                        className={styles.optionImage}
-                        priority={index < 4} 
-                      />
-											{selectedAvatar === avatar && <div className={styles.selectedBadge}>✓</div>}
+											<LazyImage
+												src={avatarUrl}
+												alt='Аватар'
+												className={styles.optionImage}
+												priority={index < 4}
+											/>
+											{selectedAvatar === avatarUrl && (
+												<div className={styles.selectedBadge}>✓</div>
+											)}
 										</button>
 									))}
 								</div>
@@ -230,19 +296,25 @@ export default function EditProfileModal({
 							<div>
 								<h3 className={styles.sectionTitle}>Выберите рамку</h3>
 								<div className={styles.grid}>
-									{FRAMES.map((frame, index) => (
+									{FRAMES.map((frameUrl, index) => (
 										<button
-											key={frame}
-											className={`${styles.option} ${selectedFrame === frame ? styles.selected : ''}`}
-											onClick={() => setSelectedFrame(frame)}
+											key={frameUrl}
+											type='button'
+											className={`${styles.option} ${
+												selectedFrame === frameUrl ? styles.selected : ''
+											}`}
+											onClick={() => setSelectedFrame(frameUrl)}
+											disabled={isSaving}
 										>
-											<LazyImage 
-                        src={frame} 
-                        alt='Рамка' 
-                        className={styles.optionImage}
-                        priority={index < 4}
-                      />
-											{selectedFrame === frame && <div className={styles.selectedBadge}>✓</div>}
+											<LazyImage
+												src={frameUrl}
+												alt='Рамка'
+												className={styles.optionImage}
+												priority={index < 4}
+											/>
+											{selectedFrame === frameUrl && (
+												<div className={styles.selectedBadge}>✓</div>
+											)}
 										</button>
 									))}
 								</div>
@@ -251,12 +323,24 @@ export default function EditProfileModal({
 					</div>
 				</div>
 
+				{error && <p className={styles.errorText}>{error}</p>}
+
 				<div className={styles.modalActions}>
-					<button className={styles.cancelButton} onClick={onClose}>
+					<button
+						className={styles.cancelButton}
+						onClick={onClose}
+						disabled={isSaving}
+						type='button'
+					>
 						Отмена
 					</button>
-					<button className={styles.saveButton} onClick={handleSave}>
-						Сохранить изменения
+					<button
+						className={styles.saveButton}
+						onClick={handleSave}
+						disabled={isSaving}
+						type='button'
+					>
+						{isSaving ? 'сохранение…' : 'Сохранить изменения'}
 					</button>
 				</div>
 			</div>

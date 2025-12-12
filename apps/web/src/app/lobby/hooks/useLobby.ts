@@ -141,7 +141,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 			case 'ERROR':
 				console.error('Server error:', data.message)
-
 				// Просто сохраняем ошибку для UI и больше НИЧЕГО не делаем.
 				// Никаких logout / redirect здесь быть не должно.
 				setError(data.message || 'Произошла ошибка')
@@ -384,17 +383,45 @@ export function useLobby(lobbyIdFromProps?: string) {
 		}
 	})
 
+	/**
+	 * Инициализация лобби:
+	 * 1) Сначала грузим пользователя (сервер — источник истины)
+	 * 2) Потом подтягиваем локальный fallback-кэш по userId
+	 * 3) Потом проверяем иконки
+	 *
+	 * ВАЖНО: loadSavedAssets теперь требует userId — поэтому НЕ вызываем её без аргумента.
+	 */
 	useEffect(() => {
+		let cancelled = false
+
 		const init = async () => {
 			try {
 				setIsLoading(true)
-				loadSavedAssets()
-				await Promise.all([checkIconsAvailability(), loadUserData()])
+
+				// 1) Грузим профиль
+				await loadUserData()
+				if (cancelled) return
+
+				// 2) Если userId уже появился — грузим кэш
+				const uid = profile.data?.id
+				if (uid) {
+					loadSavedAssets(uid)
+				}
+
+				// 3) Иконки
+				await checkIconsAvailability()
 			} finally {
-				setIsLoading(false)
+				if (!cancelled) setIsLoading(false)
 			}
 		}
+
 		init()
+
+		return () => {
+			cancelled = true
+		}
+		// намеренно НЕ добавляем profile.data в deps,
+		// чтобы не было циклов при setProfile внутри loadUserData()
 	}, [loadSavedAssets, loadUserData, checkIconsAvailability])
 
 	const currentUserReadyState = useMemo(

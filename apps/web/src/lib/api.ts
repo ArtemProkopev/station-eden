@@ -1,4 +1,3 @@
-// apps/web/src/lib/api.ts
 import { isForcedLogout } from './authUtils'
 import { getCsrfToken } from './csrf'
 import {
@@ -178,6 +177,40 @@ async function postJSON<T = any>(
 	return unwrap<T>(responseData)
 }
 
+async function putJSON<T = any>(
+	path: string,
+	body?: unknown,
+	context: ErrorContext = 'default',
+	skipRetry = false
+): Promise<T> {
+	const token = await ensureCsrfToken()
+
+	const req: RequestInit = {
+		method: 'PUT',
+		credentials: 'include',
+		headers: {
+			'Content-Type': 'application/json',
+			'X-CSRF-Token': token,
+		},
+		body: body ? JSON.stringify(body) : undefined,
+	}
+
+	const res = await fetchWithRetry(
+		`${API}${path}`,
+		req,
+		context,
+		false,
+		skipRetry
+	)
+
+	if (!res.ok) {
+		await throwHttpAsApiError(res, context)
+	}
+
+	const responseData = await res.json().catch(() => ({}))
+	return unwrap<T>(responseData)
+}
+
 async function getJSON<T = any>(
 	path: string,
 	context: ErrorContext = 'default'
@@ -266,6 +299,20 @@ export const api = {
 
 	// Мягкий /auth/session — всегда 200, без 401
 	session: () => getJSON('/auth/session', 'default'),
+
+	// Обновление профиля (username/avatar/frame)
+	updateProfile: (patch: {
+		avatar?: string
+		frame?: string
+		username?: string
+	}) =>
+		putJSON<{
+			ok: true
+			avatar: string | null
+			frame: string | null
+			username: string | null
+			usernameChangedAt?: string | null
+		}>('/users/profile', patch, 'default'),
 
 	// Админка пользователей
 	users: () => getJSON('/users', 'default'),

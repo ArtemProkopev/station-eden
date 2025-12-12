@@ -1,4 +1,3 @@
-// packages/shared/src/index.ts
 // @station-eden/shared - дополняем существующий файл
 import { z } from 'zod'
 
@@ -51,13 +50,17 @@ export type RegisterDto = z.infer<typeof RegisterSchema>
 /**
  * Базовый интерфейс пользователя (то, что приходит с бэкенда)
  * Очищен от UI-статусов (loading/error), только данные.
+ *
+ * ВАЖНО: типы совпадают с API:
+ * - username: string | null
+ * - avatar/frame: string | null (опционально/nullable)
  */
 export interface User {
 	id: string
 	email: string
-	username: string
-	avatar?: string
-	frame?: string
+	username: string | null
+	avatar?: string | null
+	frame?: string | null
 }
 
 // ==============================================================================
@@ -160,8 +163,6 @@ export type Notification =
 // ==============================================================================
 // 5. SETTINGS (Настройки клиента)
 // ==============================================================================
-// Если эти настройки хранятся ТОЛЬКО на клиенте (localStorage), их можно оставить в web.
-// Но если планируешь синхронизацию с БД, то держи их здесь.
 
 export interface SoundSettings {
 	masterVolume: number
@@ -232,8 +233,9 @@ export interface LoginResponse {
 	id?: string
 	token?: string
 	access_token?: string
-	username?: string
-	avatar?: string
+	username?: string | null
+	avatar?: string | null
+	frame?: string | null
 }
 
 /**
