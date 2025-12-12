@@ -3,7 +3,6 @@
 
 import { Friend, Notification } from '@station-eden/shared'
 import React from 'react'
-import { useUserData } from '../../hooks/useUserData'
 import styles from './TopHUD.module.css'
 import { ChatWindow } from './components/ChatWindow'
 import { Currency } from './components/Currency'
@@ -125,36 +124,26 @@ export default function TopHUD({
 	])
 
 	const scale = useViewportScale()
-	const userData = useUserData()
 
 	const finalProfile = React.useMemo(() => {
-		if (profile) {
+		if (!profile) {
 			return {
-				status: profile.status,
-				userId: profile.userId,
-				email: profile.email,
-				username: profile.username ?? undefined,
-			}
-		}
-
-		if (userData.status === 'ok' || userData.status === 'error') {
-			return {
-				status: userData.status,
-				userId: userData.userId,
-				email: userData.email,
-				username: userData.username ?? GUEST_USERNAME,
+				status: 'loading' as const,
+				userId: undefined,
+				email: undefined,
+				username: undefined,
 			}
 		}
 
 		return {
-			status: 'loading' as const,
-			userId: undefined,
-			email: undefined,
-			username: undefined,
+			status: profile.status,
+			userId: profile.userId,
+			email: profile.email,
+			username: profile.username ?? undefined,
 		}
-	}, [profile, userData])
+	}, [profile])
 
-	const finalAvatar = avatar || userData.avatar || FALLBACK_AVATAR
+	const finalAvatar = avatar || FALLBACK_AVATAR
 
 	const handleDropdownToggle = React.useCallback(() => {
 		setIsDropdownOpen(prev => !prev)
@@ -237,7 +226,8 @@ export default function TopHUD({
 		[scale]
 	)
 
-	if (!profile && userData.status === 'loading') {
+	// Без profile (или status=loading) — скелет
+	if (!profile || finalProfile.status === 'loading') {
 		return (
 			<header
 				className={styles.hud}
@@ -299,7 +289,6 @@ export default function TopHUD({
 						onFriendsClick={handleFriendsClick}
 					/>
 
-					{/* Drawer существует в DOM только пока открыт */}
 					{isFriendsDrawerOpen && (
 						<FriendsDrawer
 							isOpen={true}
@@ -316,7 +305,6 @@ export default function TopHUD({
 				</div>
 			</header>
 
-			{/* Чат монтируется только когда есть активный собеседник */}
 			{activeChat && (
 				<ChatWindow
 					isOpen={true}
