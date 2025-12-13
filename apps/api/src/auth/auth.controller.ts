@@ -40,6 +40,8 @@ function parseDurationMs(raw: string | undefined, fallbackMs: number) {
 
 @Controller('auth')
 export class AuthController {
+	private readonly isProd = process.env.NODE_ENV === 'production'
+
 	constructor(
 		private auth: AuthService,
 		private jwt: JwtService,
@@ -54,16 +56,6 @@ export class AuthController {
 		return { ...getCookieOptions(true), maxAge: 10 * 60 * 1000 }
 	}
 
-	/**
-	 * Опции для OAuth state-куки.
-	 *
-	 * - В production:
-	 *   - secure: true
-	 *   - domain: AUTH_COOKIE_DOMAIN или .stationeden.ru
-	 * - В development (localhost):
-	 *   - secure: false
-	 *   - domain НЕ задаём, чтобы кука была host-only (localhost)
-	 */
 	private oauthCookieOpts() {
 		const isProd = process.env.NODE_ENV === 'production'
 		const authDomain =
@@ -75,17 +67,14 @@ export class AuthController {
 			httpOnly: true,
 			sameSite: 'lax' as const,
 			path: '/',
-			maxAge: 10 * 60 * 1000, // 10 минут
+			maxAge: 10 * 60 * 1000,
 		}
 
 		if (isProd) {
 			base.secure = true
 			base.domain = authDomain
 		} else {
-			// Dev / localhost
 			base.secure = false
-			// domain не указываем, чтобы не ломать localhost
-			// если очень надо — можно явно задать AUTH_COOKIE_DOMAIN для dev
 			if (process.env.AUTH_COOKIE_DOMAIN) {
 				base.domain = process.env.AUTH_COOKIE_DOMAIN
 			}
@@ -137,6 +126,24 @@ export class AuthController {
 		return this.webOrigin() + path
 	}
 
+	/**
+	 * ВАЖНО: в prod НЕ глотаем ошибки отправки кода
+	 * (иначе клиент всегда видит email_code_sent, даже когда Resend падает).
+	 */
+	private async sendMfaOrThrow(fn: () => Promise<any>, context: string) {
+		try {
+			await fn()
+		} catch (e) {
+			console.error(`[auth] ${context} failed`, e)
+			if (this.isProd) {
+				throw new InternalServerErrorException(
+					'Failed to send verification email'
+				)
+			}
+			// dev: можно продолжать, чтобы не мешать разработке
+		}
+	}
+
 	@Get('csrf')
 	csrf(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
 		const token = ensureCsrfCookie(req, res)
@@ -168,9 +175,12 @@ export class AuthController {
 			if (existing && !existing.passwordHash) {
 				const pre = this.auth.signPreauth(existing.id, existing.email)
 				res.cookie('preauth', pre, this.preauthCookieOpts())
-				try {
-					await this.auth.startEmailMfa(existing.id, existing.email)
-				} catch {}
+
+				await this.sendMfaOrThrow(
+					() => this.auth.startEmailMfa(existing.id, existing.email),
+					'startEmailMfa(oauth-only-email)'
+				)
+
 				return {
 					mfa: 'email_code_sent',
 					email: existing.email,
@@ -182,9 +192,12 @@ export class AuthController {
 			if (byUsername && !byUsername.passwordHash) {
 				const pre = this.auth.signPreauth(byUsername.id, byUsername.email)
 				res.cookie('preauth', pre, this.preauthCookieOpts())
-				try {
-					await this.auth.startEmailMfa(byUsername.id, byUsername.email)
-				} catch {}
+
+				await this.sendMfaOrThrow(
+					() => this.auth.startEmailMfa(byUsername.id, byUsername.email),
+					'startEmailMfa(oauth-only-username)'
+				)
+
 				return {
 					mfa: 'email_code_sent',
 					email: byUsername.email,
@@ -198,9 +211,12 @@ export class AuthController {
 			await this.brute.registerSuccess(login)
 			const pre = this.auth.signPreauth(result.user.id, result.user.email)
 			res.cookie('preauth', pre, this.preauthCookieOpts())
-			try {
-				await this.auth.startEmailMfa(result.user.id, result.user.email)
-			} catch {}
+
+			await this.sendMfaOrThrow(
+				() => this.auth.startEmailMfa(result.user.id, result.user.email),
+				'startEmailMfa(login)'
+			)
+
 			return { mfa: 'email_code_sent', email: result.user.email }
 		} catch {
 			const info = await this.brute.registerFail(login)
@@ -231,9 +247,12 @@ export class AuthController {
 		)
 		const pre = this.auth.signPreauth(result.user.id, result.user.email)
 		res.cookie('preauth', pre, this.preauthCookieOpts())
-		try {
-			await this.auth.startEmailMfa(result.user.id, result.user.email)
-		} catch {}
+
+		await this.sendMfaOrThrow(
+			() => this.auth.startEmailMfa(result.user.id, result.user.email),
+			'startEmailMfa(register)'
+		)
+
 		return { mfa: 'email_code_sent', email: result.user.email }
 	}
 
@@ -255,11 +274,13 @@ export class AuthController {
 		if (user) {
 			const pre = this.auth.signPreauth(user.id, user.email)
 			res.cookie('preauth', pre, this.preauthCookieOpts())
-			try {
-				await this.auth.startPasswordReset(user.id, user.email)
-			} catch {
-				// проглатываем, но не раскрываем детали наружу
-			}
+
+			// Важно: в prod пусть падает, чтобы вы увидели проблему с почтой
+			await this.sendMfaOrThrow(
+				() => this.auth.startPasswordReset(user.id, user.email),
+				'startPasswordReset'
+			)
+
 			return { mfa: 'email_code_sent', email: user.email }
 		}
 
@@ -304,12 +325,10 @@ export class AuthController {
 		const authOpts = this.authCookieOpts()
 		const preauthOpts = this.preauthCookieOpts()
 
-		// Очищаем куки с теми же атрибутами, что и при установке
 		this.clearWithSameAttrs(res, 'access_token', authOpts)
 		this.clearWithSameAttrs(res, 'refresh_token', authOpts)
 		this.clearWithSameAttrs(res, 'preauth', preauthOpts)
 
-		// Дополнительная подстраховка: чистим без domain/secure
 		res.clearCookie('access_token', { path: '/' })
 		res.clearCookie('refresh_token', { path: '/' })
 		res.clearCookie('preauth', { path: '/' })
@@ -341,22 +360,12 @@ export class AuthController {
 		return { ok: true }
 	}
 
-	/**
-	 * Мягкий эндпоинт для проверки сессии:
-	 * - всегда 200
-	 * - без JwtAuthGuard и без 401
-	 * - если access_token валиден — возвращаем user
-	 * - если нет токена / протух / битый — просто signed-out
-	 */
 	@Get('session')
 	async session(@Req() req: Request) {
 		const rawAccess = (req as any).cookies?.access_token as string | undefined
 
 		if (!rawAccess) {
-			return {
-				status: 'signed-out',
-				user: null,
-			}
+			return { status: 'signed-out', user: null }
 		}
 
 		try {
@@ -365,20 +374,10 @@ export class AuthController {
 			})
 
 			const userId: string | undefined = payload?.sub
-			if (!userId) {
-				return {
-					status: 'signed-out',
-					user: null,
-				}
-			}
+			if (!userId) return { status: 'signed-out', user: null }
 
 			const user = await this.auth['users'].findById(userId)
-			if (!user) {
-				return {
-					status: 'signed-out',
-					user: null,
-				}
-			}
+			if (!user) return { status: 'signed-out', user: null }
 
 			return {
 				status: 'signed-in',
@@ -391,10 +390,7 @@ export class AuthController {
 				},
 			}
 		} catch {
-			return {
-				status: 'signed-out',
-				user: null,
-			}
+			return { status: 'signed-out', user: null }
 		}
 	}
 
@@ -402,10 +398,7 @@ export class AuthController {
 	@Get('me')
 	async me(@Req() req: AuthenticatedRequest) {
 		if (!req.user) throw new UnauthorizedException('User not found in request')
-
-		// ВАЖНО: берём свежие данные из БД, а не из payload access-токена
 		const user = await this.auth['users'].findByIdOrFail(req.user.sub)
-
 		return {
 			userId: user.id,
 			email: user.email,
@@ -434,6 +427,7 @@ export class AuthController {
 		const email = body.email?.toLowerCase() || payload.email
 		if (!email || email !== payload.email)
 			throw new UnauthorizedException('Email mismatch')
+
 		const { user, access, refreshToken, refreshExpires } =
 			await this.auth.verifyEmailCode(
 				payload.sub,
@@ -441,6 +435,7 @@ export class AuthController {
 				body.code,
 				body.newPassword
 			)
+
 		res.cookie('access_token', access, {
 			...this.authCookieOpts(),
 			maxAge: this.accessMaxAgeMs(),
@@ -465,10 +460,12 @@ export class AuthController {
 		} catch {
 			throw new UnauthorizedException('Preauth expired')
 		}
+
 		try {
 			await this.auth.startEmailMfa(payload.sub, payload.email)
 			return { ok: true }
-		} catch {
+		} catch (e) {
+			console.error('[auth] resend-email-code failed', e)
 			throw new InternalServerErrorException('Failed to resend email')
 		}
 	}
@@ -553,9 +550,7 @@ export class AuthController {
 
 			const userResp = await fetch(
 				'https://www.googleapis.com/oauth2/v3/userinfo',
-				{
-					headers: { Authorization: `Bearer ${access_token}` },
-				}
+				{ headers: { Authorization: `Bearer ${access_token}` } }
 			)
 
 			if (!userResp.ok) {
@@ -579,9 +574,10 @@ export class AuthController {
 
 			res.cookie('preauth', pre, this.preauthCookieOpts())
 
-			try {
-				await this.auth.startEmailMfa(user.id, user.email)
-			} catch {}
+			await this.sendMfaOrThrow(
+				() => this.auth.startEmailMfa(user.id, user.email),
+				'startEmailMfa(google-callback)'
+			)
 
 			const verifyUrl = this.urlTo(
 				`/login/verify?email=${encodeURIComponent(user.email)}`

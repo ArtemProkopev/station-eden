@@ -6,26 +6,45 @@ const devCodes = new Map<string, { code: string; ts: number }>()
 
 type DevMode = 'log' | 'store' | undefined
 
+function stripWrappingQuotes(s: string) {
+	// убираем обёртку "..." или '...' если dotenv/окружение сохранило кавычки
+	const t = s.trim()
+	if (
+		(t.startsWith('"') && t.endsWith('"')) ||
+		(t.startsWith("'") && t.endsWith("'"))
+	) {
+		return t.slice(1, -1).trim()
+	}
+	return t
+}
+
 @Injectable()
 export class EmailService {
 	private readonly isProd = process.env.NODE_ENV === 'production'
 	private readonly devMode: DevMode = process.env.MAIL_DEV_MODE as DevMode
 
 	private resolveFrom() {
-		const envFrom = process.env.EMAIL_FROM?.trim()
+		const envFromRaw = process.env.EMAIL_FROM
+		const envFrom = envFromRaw ? stripWrappingQuotes(envFromRaw).trim() : ''
 		if (envFrom) return envFrom
 		// безопасный default для dev/sandbox
 		return 'Station Eden <onboarding@resend.dev>'
 	}
 
+	private normalizeEmail(s: string) {
+		return (s || '').trim().toLowerCase()
+	}
+
 	async sendLoginCode(to: string, code: string) {
+		const emailTo = this.normalizeEmail(to)
+
 		// --- DEV режим: не отправляем реальную почту ---
 		if (!this.isProd && this.devMode) {
 			if (this.devMode === 'store') {
-				devCodes.set(to.toLowerCase(), { code, ts: Date.now() })
+				devCodes.set(emailTo, { code, ts: Date.now() })
 			}
 			// eslint-disable-next-line no-console
-			console.warn(`[DEV][EmailService] MFA code for ${to}: ${code}`)
+			console.warn(`[DEV][EmailService] MFA code for ${emailTo}: ${code}`)
 			return
 		}
 
@@ -37,7 +56,6 @@ export class EmailService {
 			)
 		}
 
-		// ленивый импорт, чтобы dev без resend тоже работал
 		const { Resend } = await import('resend')
 		const resend = new Resend(process.env.RESEND_API_KEY!)
 
@@ -63,13 +81,15 @@ export class EmailService {
 
 		const { data, error } = await resend.emails.send({
 			from,
-			to,
+			to: emailTo,
 			subject: 'Код для входа в Station Eden',
 			html,
 		})
 
 		if (error) {
 			console.error('[email] resend error', {
+				to: emailTo,
+				from,
 				name: (error as any)?.name,
 				message: (error as any)?.message,
 				statusCode: (error as any)?.statusCode,
@@ -79,19 +99,21 @@ export class EmailService {
 		}
 
 		// eslint-disable-next-line no-console
-		console.log('[email] sent', { to, id: data?.id })
+		console.log('[email] sent', { to: emailTo, id: data?.id })
 		return data
 	}
 
 	/** Письмо для сброса пароля (тот же код, другая формулировка) */
 	async sendPasswordResetCode(to: string, code: string) {
+		const emailTo = this.normalizeEmail(to)
+
 		// DEV режим
 		if (!this.isProd && this.devMode) {
 			if (this.devMode === 'store') {
-				devCodes.set(to.toLowerCase(), { code, ts: Date.now() })
+				devCodes.set(emailTo, { code, ts: Date.now() })
 			}
 			// eslint-disable-next-line no-console
-			console.warn(`[DEV][EmailService] RESET code for ${to}: ${code}`)
+			console.warn(`[DEV][EmailService] RESET code for ${emailTo}: ${code}`)
 			return
 		}
 
@@ -127,13 +149,15 @@ export class EmailService {
 
 		const { data, error } = await resend.emails.send({
 			from,
-			to,
+			to: emailTo,
 			subject: 'Сброс пароля в Station Eden',
 			html,
 		})
 
 		if (error) {
 			console.error('[email] resend error (reset)', {
+				to: emailTo,
+				from,
 				name: (error as any)?.name,
 				message: (error as any)?.message,
 				statusCode: (error as any)?.statusCode,
@@ -143,13 +167,13 @@ export class EmailService {
 		}
 
 		// eslint-disable-next-line no-console
-		console.log('[email][reset] sent', { to, id: data?.id })
+		console.log('[email][reset] sent', { to: emailTo, id: data?.id })
 		return data
 	}
 
 	/** Только для dev (MAIL_DEV_MODE=store): достать последний код */
 	getLastDevCode(email: string) {
 		if (this.isProd) return undefined
-		return devCodes.get(email.toLowerCase())
+		return devCodes.get(this.normalizeEmail(email))
 	}
 }
