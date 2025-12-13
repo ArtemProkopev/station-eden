@@ -1,205 +1,260 @@
 /* Главный контейнер с панелью и кнопкой */
 .mainButtonContainer {
-	position: relative;
-	perspective: 800px;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	width: 500px;
-	height: 400px; /* под высоту панели */
-	margin-right: 160px;
-	transform: translateZ(0);
-	will-change: transform;
-
-	/* Углы панели — их можно крутить под картинку */
-	--panel-tilt-x: 18deg; /* наклон вперёд/назад */
-	--panel-tilt-y: -26deg; /* поворот влево/вправо */
-	--panel-tilt-z: 13deg; /* вращение в плоскости экрана */
+  position: relative;
+  perspective: 800px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 500px;
+  height: 400px;
+  margin-right: 160px;
+  transform: translateZ(0);
+  will-change: transform;
+  --panel-tilt-x: 18deg;
+  --panel-tilt-y: -26deg;
+  --panel-tilt-z: 13deg;
+  /* Добавляем для лучшего позиционирования */
+  align-self: flex-end;
 }
 
 /* Панель как фон */
 .panelBackground {
-	position: absolute;
-	bottom: 0; /* нижний край панели прижат к низу контейнера */
-	left: 50%;
-	transform: translateX(-50%);
-	object-fit: contain;
-	z-index: 1;
-	pointer-events: none;
-	content-visibility: auto;
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  object-fit: contain;
+  z-index: 1;
+  pointer-events: none;
+  content-visibility: auto;
+  width: 100%;
+  height: 100%;
 }
 
 /* Кнопка Play поверх экрана панели */
 .mainPlayButton {
-	position: absolute;
-	/* подбираем смещение так, чтобы текст был на "экране" панели */
-	bottom: 275px;
-	left: 50%;
-	width: 360px;
-	height: 110px;
-	background: none;
-	border: none;
-	cursor: pointer;
-	transform-style: preserve-3d;
-
-	/* ВАЖНО: порядок — сначала центрируем, потом повороты панели */
-	transform: translateX(-50%) rotateZ(var(--panel-tilt-z))
-		rotateX(var(--panel-tilt-x)) rotateY(var(--panel-tilt-y)) scale(1);
-
-	transition:
-		transform 0.4s cubic-bezier(0.25, 1, 0.5, 1),
-		filter 0.3s ease;
-	overflow: hidden;
-	animation: float3DLeftSmall 4s ease-in-out infinite;
-	z-index: 2;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	backface-visibility: hidden;
+  position: absolute;
+  bottom: 275px;
+  left: 50%;
+  width: 360px;
+  height: 110px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transform-style: preserve-3d;
+  transform: translateX(-50%) rotateZ(var(--panel-tilt-z))
+    rotateX(var(--panel-tilt-x)) rotateY(var(--panel-tilt-y)) scale(1);
+  transition:
+    transform 0.4s cubic-bezier(0.25, 1, 0.5, 1),
+    filter 0.3s ease;
+  overflow: hidden;
+  animation: float3DLeftSmall 4s ease-in-out infinite;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  backface-visibility: hidden;
 }
 
 .mainPlayButton:hover {
-	transform: translateX(-50%) rotateZ(var(--panel-tilt-z))
-		rotateX(calc(var(--panel-tilt-x) - 3deg))
-		rotateY(calc(var(--panel-tilt-y) + 3deg)) scale(1.05);
-	filter: brightness(1.2) drop-shadow(0 0 20px rgba(40, 216, 255, 0.6));
-	animation-play-state: paused;
+  transform: translateX(-50%) rotateZ(var(--panel-tilt-z))
+    rotateX(calc(var(--panel-tilt-x) - 3deg))
+    rotateY(calc(var(--panel-tilt-y) + 3deg)) scale(1.05);
+  filter: brightness(1.2) drop-shadow(0 0 20px rgba(40, 216, 255, 0.6));
+  animation-play-state: paused;
 }
 
 /* Верхняя грань */
 .mainPlayButton .topEdge {
-	position: absolute;
-	top: -8px;
-	left: 0;
-	width: 100%;
-	height: 16px;
-	background: linear-gradient(
-		85deg,
-		rgba(20, 80, 180, 0.6) 0%,
-		rgba(40, 216, 255, 0.9) 100%
-	);
-	border-radius: 4px 4px 0 0;
-	transform: rotateX(90deg) translateZ(8px);
-	transform-origin: top center;
-	z-index: 0;
-	transition: all 0.4s ease;
-	backface-visibility: hidden;
+  position: absolute;
+  top: -8px;
+  left: 0;
+  width: 100%;
+  height: 16px;
+  background: linear-gradient(
+    85deg,
+    rgba(20, 80, 180, 0.6) 0%,
+    rgba(40, 216, 255, 0.9) 100%
+  );
+  border-radius: 4px 4px 0 0;
+  transform: rotateX(90deg) translateZ(8px);
+  transform-origin: top center;
+  z-index: 0;
+  transition: all 0.4s ease;
+  backface-visibility: hidden;
 }
 
 /* Ховер через data-attribute */
 .mainPlayButton .topEdge[data-hovered='true'] {
-	height: 20px;
-	background: linear-gradient(
-		85deg,
-		rgba(40, 120, 220, 0.8) 0%,
-		rgba(80, 236, 255, 1) 100%
-	);
+  height: 20px;
+  background: linear-gradient(
+    85deg,
+    rgba(40, 120, 220, 0.8) 0%,
+    rgba(80, 236, 255, 1) 100%
+  );
 }
 
 .playText {
-	font-family: 'RussoOne', sans-serif;
-	font-size: 2.5rem;
-	font-weight: 700;
-	color: #83eefb;
-	text-shadow:
-		0 0 6px #83eefb,
-		0 0 12px #83eefb,
-		0 2px 4px rgba(0, 0, 0, 0.5);
-	letter-spacing: 3px;
-	text-transform: uppercase;
-	position: relative;
-	z-index: 2;
-	transform: translateZ(25px) translateX(-15px) scaleX(0.85);
-	display: block;
-	transition: all 0.3s ease;
-	line-height: 1;
-	font-display: swap;
+  font-family: 'RussoOne', sans-serif;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #83eefb;
+  text-shadow:
+    0 0 6px #83eefb,
+    0 0 12px #83eefb,
+    0 2px 4px rgba(0, 0, 0, 0.5);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  position: relative;
+  z-index: 2;
+  transform: translateZ(25px) translateX(-15px) scaleX(0.85);
+  display: block;
+  transition: all 0.3s ease;
+  line-height: 1;
+  font-display: swap;
 }
 
 .mainPlayButton:hover .playText {
-	color: #b9f4ff;
-	text-shadow:
-		0 0 8px #b9f4ff,
-		0 0 16px #b9f4ff,
-		0 0 24px #28d8ff;
+  color: #b9f4ff;
+  text-shadow:
+    0 0 8px #b9f4ff,
+    0 0 16px #b9f4ff,
+    0 0 24px #28d8ff;
 }
 
 /* ===== ОПТИМИЗИРОВАННЫЕ АНИМАЦИИ ===== */
 @keyframes float3DLeftSmall {
-	0%,
-	100% {
-		transform: translateX(-50%) rotateZ(var(--panel-tilt-z))
-			rotateX(var(--panel-tilt-x)) rotateY(var(--panel-tilt-y));
-	}
-	50% {
-		transform: translateX(-50%) rotateZ(var(--panel-tilt-z))
-			rotateX(calc(var(--panel-tilt-x) - 2deg))
-			rotateY(calc(var(--panel-tilt-y) + 2deg));
-	}
+  0%,
+  100% {
+    transform: translateX(-50%) rotateZ(var(--panel-tilt-z))
+      rotateX(var(--panel-tilt-x)) rotateY(var(--panel-tilt-y));
+  }
+  50% {
+    transform: translateX(-50%) rotateZ(var(--panel-tilt-z))
+      rotateX(calc(var(--panel-tilt-x) - 2deg))
+      rotateY(calc(var(--panel-tilt-y) + 2deg));
+  }
 }
 
 /* Оптимизация для более узких экранов */
 @media (max-width: 1400px) {
-	.mainButtonContainer {
-		transform: scale(0.9);
-		margin-right: 120px;
-	}
+  .mainButtonContainer {
+    /* Вместо transform: scale() меняем фактические размеры */
+    width: 450px; /* 500 * 0.9 */
+    height: 360px; /* 400 * 0.9 */
+    margin-right: 120px;
+  }
 
-	.mainPlayButton {
-		animation: none;
-	}
+  .mainPlayButton {
+    bottom: 247px; /* 275 * 0.9 */
+    width: 324px; /* 360 * 0.9 */
+    height: 99px; /* 110 * 0.9 */
+    animation: none;
+  }
+
+  .playText {
+    font-size: 2.25rem; /* 2.5 * 0.9 */
+  }
+}
+
+@media (max-width: 1200px) {
+  .mainButtonContainer {
+    width: 425px;
+    height: 340px;
+    margin-right: 80px;
+  }
+
+  .mainPlayButton {
+    bottom: 234px; /* 275 * 0.85 */
+    width: 306px; /* 360 * 0.85 */
+    height: 93.5px; /* 110 * 0.85 */
+  }
 }
 
 @media (max-width: 1000px) {
-	.mainButtonContainer {
-		transform: scale(0.8);
-		margin-right: 80px;
-	}
+  .mainButtonContainer {
+    width: 400px;
+    height: 320px;
+    margin-right: 40px;
+  }
 
-	.mainPlayButton {
-		transform: translateX(-50%) rotateZ(var(--panel-tilt-z)) scale(1);
-		animation: none;
-	}
+.mainPlayButton {
+    bottom: 220px; /* 275 * 0.8 */
+    width: 288px; /* 360 * 0.8 */
+    height: 88px; /* 110 * 0.8 */
+    transform: translateX(-50%) rotateZ(var(--panel-tilt-z)) scale(1);
+    animation: none;
+  }
 
-	.mainPlayButton:hover {
-		transform: translateX(-50%) rotateZ(var(--panel-tilt-z)) scale(1.05);
-	}
+  .mainPlayButton:hover {
+    transform: translateX(-50%) rotateZ(var(--panel-tilt-z)) scale(1.05);
+  }
+
+  .playText {
+    font-size: 2rem; /* 2.5 * 0.8 */
+  }
 }
 
 @media (max-width: 768px) {
-	.mainButtonContainer {
-		transform: scale(0.7);
-		margin-right: 0;
-	}
+  .mainButtonContainer {
+    width: 375px;
+    height: 300px;
+    margin-right: 0;
+    margin-bottom: -20px;
+    align-items: flex-end;
+    max-width: 375px;
+  }
 
-	.playText {
-		font-size: 2.8rem;
-	}
+  /* Кнопка Play */
+  .mainPlayButton {
+    bottom: 206px; /* 275 * 0.75 */
+    width: 270px; /* 360 * 0.75 */
+    height: 82.5px; /* 110 * 0.75 */
+    transform: translateX(-50%) rotateZ(var(--panel-tilt-z)) scale(1);
+    animation: none;
+  }
 
-	.mainPlayButton {
-		transform: translateX(-50%) rotateZ(var(--panel-tilt-z)) scale(1);
-		animation: none;
-		bottom: 150px; /* чуть ниже на мобильных */
-	}
+  .mainPlayButton:hover {
+    transform: translateX(-50%) rotateZ(var(--panel-tilt-z)) scale(1.05);
+  }
 
-	.mainPlayButton:hover {
-		transform: translateX(-50%) rotateZ(var(--panel-tilt-z)) scale(1.05);
-	}
+  .playText {
+    font-size: 1.875rem; /* 2.5 * 0.75 */
+  }
 
-	.mainPlayButton .topEdge {
-		display: none;
-	}
+  .mainPlayButton .topEdge {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .mainButtonContainer {
+    width: 325px;
+    height: 260px;
+    margin-bottom: -30px;
+    max-width: 325px;
+  }
+
+  .mainPlayButton {
+    bottom: 178px; /* 275 * 0.65 */
+    width: 234px; /* 360 * 0.65 */
+    height: 71.5px; /* 110 * 0.65 */
+  }
+
+  .playText {
+    font-size: 1.625rem; /* 2.5 * 0.65 */
+  }
 }
 
 /* Режим reduced-motion для доступности */
 @media (prefers-reduced-motion: reduce) {
-	.mainPlayButton {
-		animation: none;
-		transition: none;
-	}
+  .mainPlayButton {
+    animation: none;
+    transition: none;
+  }
 
-	.mainPlayButton:hover {
-		transform: translateX(-50%) rotateZ(var(--panel-tilt-z)) scale(1.05);
-	}
+  .mainPlayButton:hover {
+    transform: translateX(-50%) rotateZ(var(--panel-tilt-z)) scale(1.05);
+  }
 }
