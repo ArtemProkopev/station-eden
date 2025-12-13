@@ -95,7 +95,6 @@ const LobbyContent = memo(
 						</div>
 
 						<div className={styles.rightColumn}>
-							{/* ВАЖНО: здесь только Chat. VoicePanel рендерится внутри Chat во вкладке. */}
 							<MemoizedChat
 								lobbyId={lobbyId}
 								messages={lobby.chatMessages}
@@ -115,6 +114,9 @@ const LobbyContent = memo(
 							totalPlayersCount={lobby.players.length}
 							isConnected={lobby.isConnected}
 							minPlayersRequired={2}
+							lobbyId={lobbyId}
+							isLobbyCreator={lobby.isLobbyCreator}
+							onStartGame={lobby.handleStartGame}
 						/>
 					</div>
 

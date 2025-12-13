@@ -8,6 +8,7 @@ import {
 	LobbyPlayer as Player,
 } from '@station-eden/shared'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { AddPlayerModal } from '../components/AddPlayerModal/AddPlayerModal'
 import { LobbySettingsModal } from '../components/LobbySettingsModal/LobbySettingsModal'
 import { PlayerManagementModal } from '../components/PlayerManagementModal/PlayerManagementModal'
@@ -31,6 +32,7 @@ const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
 ]
 
 export function useLobby(lobbyIdFromProps?: string) {
+	const router = useRouter()
 	const {
 		profile,
 		assets,
@@ -140,14 +142,34 @@ export function useLobby(lobbyIdFromProps?: string) {
 				setLobbySettings(data.settings)
 				break
 
+			case 'GAME_STARTED':
+				// Перенаправляем всех игроков на страницу игры
+				console.log('Game started, redirecting to:', data.redirectUrl)
+				if (data.redirectUrl) {
+					// Добавляем системное сообщение в чат
+					const systemMessage: ChatMessage = {
+						id: `system-${Date.now()}`,
+						playerId: 'system',
+						playerName: 'Система',
+						text: 'Игра началась! Перенаправление...',
+						timestamp: new Date(),
+						type: 'system'
+					}
+					setChatMessages(prev => [...prev, systemMessage])
+					
+					// Редирект через 1 секунду для плавного перехода
+					setTimeout(() => {
+						router.push(data.redirectUrl)
+					}, 1000)
+				}
+				break
+
 			case 'ERROR':
 				console.error('Server error:', data.message)
-				// Просто сохраняем ошибку для UI и больше НИЧЕГО не делаем.
-				// Никаких logout / redirect здесь быть не должно.
 				setError(data.message || 'Произошла ошибка')
 				break
 		}
-	}, [])
+	}, [router])
 
 	const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'http://localhost:4000'
 	const wsUrl = wsBase.startsWith('http')
@@ -436,6 +458,43 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 	const lobbyId = lobbyIdFromProps || 'default-lobby'
 
+	// Добавляем функцию для начала игры
+	const handleStartGame = useCallback(() => {
+		if (!currentUserId || !isLobbyCreator) {
+			alert('Только создатель лобби может начать игру')
+			return
+		}
+
+		if (players.length < 2) {
+			alert('Для начала игры нужно минимум 2 игрока')
+			return
+		}
+
+		const notReadyPlayers = players.filter(p => !p.isReady)
+		if (notReadyPlayers.length > 0) {
+			alert(`Следующие игроки не готовы: ${notReadyPlayers.map(p => p.name).join(', ')}`)
+			return
+		}
+
+		// Отправляем запрос на сервер для начала игры
+		sendWS({ 
+			type: 'START_GAME', 
+			lobbyId: lobbyIdRef.current,
+			creatorId: currentUserId 
+		})
+
+		// Добавляем системное сообщение
+		const systemMessage: ChatMessage = {
+			id: `system-${Date.now()}`,
+			playerId: 'system',
+			playerName: 'Система',
+			text: 'Создатель начал игру...',
+			timestamp: new Date(),
+			type: 'system'
+		}
+		setChatMessages(prev => [...prev, systemMessage])
+	}, [sendWS, currentUserId, isLobbyCreator, players])
+
 	return {
 		profile,
 		assets,
@@ -454,6 +513,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 		chatContainerRef,
 		error,
 		isLobbyCreator,
+		handleStartGame, // Добавляем новую функцию
 		setShowAddPlayerModal,
 		setShowLobbySettingsModal,
 		setNewMessage,

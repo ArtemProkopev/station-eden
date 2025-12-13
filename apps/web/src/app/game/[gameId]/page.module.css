@@ -1,0 +1,433 @@
+/* apps/web/src/app/game/[gameId]/page.module.css */
+.page {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: white;
+  background-image: url('https://cdn.assets.stationeden.ru/web/lobby-background-optimized.webp');
+  background-size: cover;
+  background-position: center;
+  font-family: 'RussoOne', sans-serif;
+}
+
+.container {
+  width: 100%;
+  max-width: 1400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 20px;
+  margin-top: 80px; /* Отступ для TopHUD */
+}
+
+.header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  padding: 24px;
+  border: 2px solid #63efff;
+  box-shadow: 0 0 20px rgba(99, 239, 255, 0.3);
+}
+
+.title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #63efff;
+  text-shadow: 0 0 10px rgba(99, 239, 255, 0.6);
+  margin: 0;
+}
+
+.gameInfo {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.gameMode,
+.gameStatus {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(99, 239, 255, 0.3);
+}
+
+.leaveButton {
+  background: rgba(255, 107, 107, 0.1);
+  border: 2px solid #ff6b6b;
+  color: #ff6b6b;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'RussoOne', sans-serif;
+  text-transform: lowercase;
+}
+
+.leaveButton:hover {
+  background: rgba(255, 107, 107, 0.15);
+  transform: translateY(-1px);
+}
+
+.error {
+  width: 100%;
+  background: rgba(255, 107, 107, 0.1);
+  border: 2px solid #ff6b6b;
+  color: #ff6b6b;
+  padding: 16px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.gameContent {
+  display: grid;
+  grid-template-columns: 300px 1fr 300px;
+  gap: 24px;
+  width: 100%;
+}
+
+.panelTitle {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #63efff;
+  text-shadow: 0 0 8px rgba(99, 239, 255, 0.6);
+  text-align: center;
+}
+
+.playersPanel,
+.gameBoard,
+.gameControls {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  padding: 24px;
+  border: 2px solid #63efff;
+  display: flex;
+  flex-direction: column;
+}
+
+.playersList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.playerCard {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid rgba(99, 239, 255, 0.4);
+  transition: all 0.2s ease;
+}
+
+.playerCard.activePlayer {
+  background: rgba(76, 175, 80, 0.12);
+  border-color: #4caf50;
+}
+
+.playerCard.currentTurn {
+  animation: pulse 2s infinite;
+  box-shadow: 0 0 15px rgba(99, 239, 255, 0.6);
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 15px rgba(99, 239, 255, 0.6); }
+  50% { box-shadow: 0 0 25px rgba(99, 239, 255, 0.9); }
+  100% { box-shadow: 0 0 15px rgba(99, 239, 255, 0.6); }
+}
+
+.playerHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.playerAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(99, 239, 255, 0.3);
+  border: 1px solid #63efff;
+  flex-shrink: 0;
+}
+
+.playerInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.playerName {
+  color: #63efff;
+  font-weight: 500;
+  font-size: 16px;
+}
+
+.playerScore {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+}
+
+.playerOrder {
+  background: rgba(99, 239, 255, 0.2);
+  color: #63efff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  border: 1px solid rgba(99, 239, 255, 0.3);
+}
+
+.currentTurnIndicator {
+  background: rgba(99, 239, 255, 0.1);
+  color: #63efff;
+  text-align: center;
+  padding: 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  margin-top: 8px;
+  border: 1px solid rgba(99, 239, 255, 0.3);
+}
+
+.boardContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.roundInfo {
+  background: rgba(0, 0, 0, 0.3);
+  color: #63efff;
+  padding: 12px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 18px;
+  border: 1px solid #63efff;
+}
+
+.gameArea {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #63efff;
+}
+
+.placeholder {
+  font-size: 24px;
+  color: #63efff;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.instructions {
+  color: rgba(255, 255, 255, 0.8);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.winnerAnnouncement {
+  background: linear-gradient(135deg, rgba(99, 239, 255, 0.1), rgba(76, 175, 80, 0.1));
+  border: 2px solid #63efff;
+  border-radius: 12px;
+  padding: 30px;
+  text-align: center;
+}
+
+.winnerAnnouncement h3 {
+  color: #63efff;
+  font-size: 28px;
+  margin-bottom: 20px;
+}
+
+.winnerAnnouncement p {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+
+.backToLobby {
+  background: rgba(99, 239, 255, 0.1);
+  border: 2px solid #63efff;
+  color: #63efff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 20px;
+  font-family: 'RussoOne', sans-serif;
+  font-size: 16px;
+}
+
+.backToLobby:hover {
+  background: rgba(99, 239, 255, 0.15);
+}
+
+.controlsContent {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+.controlButton {
+  background: rgba(99, 239, 255, 0.1);
+  border: 2px solid #63efff;
+  color: #63efff;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'RussoOne', sans-serif;
+  text-transform: lowercase;
+}
+
+.controlButton:hover:not(:disabled) {
+  background: rgba(99, 239, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.controlButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.gameStats {
+  margin-top: auto;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.statItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+}
+
+.statItem span:last-child {
+  color: #63efff;
+}
+
+.connected {
+  color: #4caf50;
+}
+
+.disconnected {
+  color: #ff6b6b;
+}
+
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: #63efff;
+  text-shadow: 0 0 8px rgba(99, 239, 255, 0.6);
+}
+
+.loadingSpinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(99, 239, 255, 0.3);
+  border-left: 4px solid #63efff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@media (max-width: 1200px) {
+  .gameContent {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto;
+    gap: 20px;
+  }
+  
+  .playersPanel,
+  .gameControls {
+    height: auto;
+    min-height: 200px;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 10px;
+    margin-top: 60px;
+  }
+  
+  .header {
+    flex-direction: column;
+    gap: 15px;
+    padding: 20px;
+  }
+  
+  .gameInfo {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .gameContent {
+    gap: 15px;
+  }
+  
+  .playersPanel,
+  .gameBoard,
+  .gameControls {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .title {
+    font-size: 24px;
+  }
+  
+  .gameMode,
+  .gameStatus {
+    font-size: 14px;
+    padding: 6px 12px;
+  }
+  
+  .playerCard {
+    padding: 12px;
+  }
+  
+  .playerAvatar {
+    width: 30px;
+    height: 30px;
+  }
+  
+  .playerName {
+    font-size: 14px;
+  }
+  
+  .playerScore {
+    font-size: 12px;
+  }
+}

@@ -1,4 +1,4 @@
-// @station-eden/shared - дополняем существующий файл
+// @station-eden/shared
 import { z } from 'zod'
 
 // ==============================================================================
@@ -103,13 +103,82 @@ export interface ChatMessage {
 	type?: 'system' | 'player'
 }
 
+/**
+ * Состояние игры
+ */
+export interface GameState {
+	id: string
+	lobbyId: string
+	status: 'waiting' | 'active' | 'finished' | 'cancelled'
+	players: GamePlayer[]
+	currentPlayerId?: string
+	round: number
+	maxRounds?: number
+	startedAt?: ISODateString
+	finishedAt?: ISODateString
+	winnerId?: string
+	settings: GameSettings
+}
+
+export interface GamePlayer {
+	id: string
+	name: string
+	avatar?: string
+	score: number
+	isActive: boolean
+	order: number
+}
+
+export interface GameSettings {
+	gameMode: string
+	difficulty?: 'easy' | 'medium' | 'hard'
+	turnTime?: number
+	maxRounds?: number
+}
+
 // ==============================================================================
 // 3. WEBSOCKETS & SYSTEM
 // ==============================================================================
 
-export interface WebSocketMessage<T = unknown> {
-	type: string
+// Типы сообщений WebSocket
+export type WebSocketMessageType = 
+  | 'JOIN_LOBBY'
+  | 'PLAYER_JOINED'
+  | 'PLAYER_LEFT'
+  | 'CHAT_MESSAGE'
+  | 'SEND_MESSAGE'
+  | 'LOBBY_STATE'
+  | 'PLAYER_READY'
+  | 'TOGGLE_READY'
+  | 'UPDATE_LOBBY_SETTINGS'
+  | 'LOBBY_SETTINGS_UPDATED'
+  | 'START_GAME'
+  | 'GAME_STARTED'
+  | 'GAME_STATE'
+  | 'GAME_UPDATE'
+  | 'PLAYER_LEFT_GAME'
+  | 'GAME_ACTION'
+  | 'ERROR';
+
+export interface WebSocketMessage<T = any> {
+	type: WebSocketMessageType
 	payload: T
+}
+
+// Специфичные сообщения
+export interface StartGameMessage {
+	lobbyId: string
+	creatorId: string
+}
+
+export interface GameStartedMessage {
+	gameId: string
+	redirectUrl: string
+	gameState: GameState
+}
+
+export interface GameStateMessage {
+	gameState: GameState
 }
 
 // ==============================================================================
@@ -253,4 +322,37 @@ export interface ServerLockInfo {
 	lockedMinutes?: number
 	lockedUntil?: ISODateString
 	attemptsLeft?: number
+}
+
+/**
+ * Состояние игры
+ */
+export interface GameState {
+	id: string
+	lobbyId: string
+	status: 'waiting' | 'active' | 'finished' | 'cancelled'
+	players: GamePlayer[]
+	currentPlayerId?: string
+	round: number
+	maxRounds?: number
+	startedAt?: ISODateString
+	finishedAt?: ISODateString
+	winnerId?: string
+	settings: GameSettings
+}
+
+export interface GamePlayer {
+	id: string
+	name: string
+	avatar?: string
+	score: number
+	isActive: boolean
+	order: number
+}
+
+export interface GameSettings {
+	gameMode: string
+	difficulty?: 'easy' | 'medium' | 'hard'
+	turnTime?: number
+	maxRounds?: number
 }

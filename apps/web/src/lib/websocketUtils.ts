@@ -1,9 +1,5 @@
 // apps/web/src/lib/websocketUtils.ts
 /**
- * Утилиты для управления WebSocket соединениями
- */
-
-/**
  * Закрытие всех WebSocket соединений
  */
 export function closeAllWebSockets(): void {
@@ -38,6 +34,31 @@ export function closeAllWebSockets(): void {
 }
 
 /**
+ * Создание WebSocket соединения для игры
+ */
+export function createGameWebSocket(gameId: string): WebSocket | null {
+	if (typeof window === 'undefined') return null
+
+	const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'ws://localhost:4000'
+	const wsUrl = `${wsBase}?gameId=${encodeURIComponent(gameId)}`
+	
+	try {
+		const ws = new WebSocket(wsUrl)
+		
+		// Сохраняем соединение для последующего управления
+		if (!(window as any)._websocketConnections) {
+			(window as any)._websocketConnections = new Set()
+		}
+		(window as any)._websocketConnections.add(ws)
+		
+		return ws
+	} catch (error) {
+		console.error('[WebSocketUtils] Failed to create game WebSocket:', error)
+		return null
+	}
+}
+
+/**
  * Очистка WebSocket кэша
  */
 export async function clearWebSocketCache(): Promise<void> {
@@ -49,7 +70,8 @@ export async function clearWebSocketCache(): Promise<void> {
 					name.includes('websocket') ||
 					name.includes('ws') ||
 					name.includes('socket') ||
-					name.includes('lobby')
+					name.includes('lobby') ||
+					name.includes('game')
 			)
 
 			await Promise.all(wsCacheNames.map(name => caches.delete(name)))
@@ -78,4 +100,18 @@ export function hasAccessToken(): boolean {
 export function isForcedLogout(): boolean {
 	if (typeof window === 'undefined') return false
 	return !!(window as any).__FORCED_LOGOUT__
+}
+
+/**
+ * Генерация уникального ID для игры
+ */
+export function generateGameId(): string {
+	if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+		return crypto.randomUUID().replace(/-/g, '').substring(0, 8)
+	}
+	
+	// Fallback для старых браузеров
+	const timestamp = Date.now().toString(36)
+	const random = Math.random().toString(36).substring(2, 10)
+	return (timestamp + random).substring(0, 8)
 }
