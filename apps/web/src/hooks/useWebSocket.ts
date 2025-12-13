@@ -222,7 +222,7 @@ export const useWebSocket = (
 		process.env.NEXT_PUBLIC_WS_MOCK === 'true' ||
 		process.env.NEXT_PUBLIC_WS_USE_MOCK === 'true'
 
-	const useMock = !isProd && (urlMockFlag || lsMockFlag || envMockFlag)
+	const useMock = urlMockFlag || lsMockFlag || envMockFlag
 
 	const forceDisconnect = useCallback(() => {
 		console.log('[useWebSocket] Force disconnecting WebSocket')
