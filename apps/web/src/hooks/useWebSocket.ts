@@ -13,10 +13,12 @@ interface CommonSocket {
 	on(event: string, callback: (data: any) => void): CommonSocket
 	emit(event: string, data?: any): CommonSocket
 	disconnect(): void
+  onAny?(callback: (eventName: string, ...args: any[]) => void): CommonSocket
 }
 
 class MockSocketIO implements CommonSocket {
 	private listeners: Map<string, ((data: any) => void)[]> = new Map()
+	private anyListeners: ((eventName: string, ...args: any[]) => void)[] = []
 	private bc: BroadcastChannel
 	private lobbyId: string
 	public connected = false
@@ -51,8 +53,12 @@ class MockSocketIO implements CommonSocket {
 	}
 
 	private emitEvent(event: string, data?: any) {
+		// Вызываем обработчики конкретного события
 		const callbacks = this.listeners.get(event) || []
 		callbacks.forEach(callback => callback(data))
+		
+		// Вызываем обработчики всех событий
+		this.anyListeners.forEach(callback => callback(event, data))
 	}
 
 	on(event: string, callback: (data: any) => void): MockSocketIO {
@@ -60,6 +66,11 @@ class MockSocketIO implements CommonSocket {
 			this.listeners.set(event, [])
 		}
 		this.listeners.get(event)!.push(callback)
+		return this
+	}
+	
+	onAny(callback: (eventName: string, ...args: any[]) => void): MockSocketIO {
+		this.anyListeners.push(callback)
 		return this
 	}
 
@@ -174,6 +185,44 @@ class MockSocketIO implements CommonSocket {
 						settings: this.settings
 					}
 				}
+			});
+		}
+		
+		// ДОБАВЛЕНО: обработка игровых событий для мок-режима
+		else if (event === 'JOIN_GAME') {
+			const gameId = data.gameId || 'mock-game';
+			this.emitEvent('GAME_STATE', {
+				gameState: {
+					id: gameId,
+					lobbyId: 'mock-lobby',
+					status: 'active',
+					players: Array.from(this.players.values()),
+					creatorId: this.creatorId,
+					currentPlayerId: Array.from(this.players.keys())[0],
+					round: 1,
+					maxRounds: 10,
+					startedAt: new Date().toISOString(),
+					settings: this.settings,
+				}
+			});
+		}
+		
+		else if (event === 'GAME_ACTION') {
+			const action = data.action;
+			this.emitEvent('GAME_UPDATE', {
+				gameState: {
+					id: 'mock-game',
+					status: 'active',
+					players: Array.from(this.players.values()),
+					round: 2,
+					settings: this.settings
+				}
+			});
+		}
+		
+		else if (event === 'LEAVE_GAME') {
+			this.emitEvent('LEAVE_CONFIRMED', {
+				message: 'You left the game',
 			});
 		}
 
@@ -340,6 +389,43 @@ export const useWebSocket = (
 		const handleGameStarted = (data: any) => {
 			onMessageRef.current?.({ type: 'GAME_STARTED', ...data })
 		}
+		
+		// ДОБАВЛЕНО: обработчики для игровых событий
+		const handleGameState = (data: any) => {
+			console.log('[useWebSocket] GAME_STATE received:', data);
+			onMessageRef.current?.({ type: 'GAME_STATE', ...data });
+		};
+
+		const handleGameUpdate = (data: any) => {
+			console.log('[useWebSocket] GAME_UPDATE received:', data);
+			onMessageRef.current?.({ type: 'GAME_UPDATE', ...data });
+		};
+
+		const handlePlayerJoinedGame = (data: any) => {
+			console.log('[useWebSocket] PLAYER_JOINED_GAME received:', data);
+			onMessageRef.current?.({ type: 'PLAYER_JOINED_GAME', ...data });
+		};
+
+		const handlePlayerLeftGame = (data: any) => {
+			console.log('[useWebSocket] PLAYER_LEFT_GAME received:', data);
+			onMessageRef.current?.({ type: 'PLAYER_LEFT_GAME', ...data });
+		};
+
+		const handleGameFinished = (data: any) => {
+			console.log('[useWebSocket] GAME_FINISHED received:', data);
+			onMessageRef.current?.({ type: 'GAME_FINISHED', ...data });
+		};
+
+		const handleLeaveConfirmed = (data: any) => {
+			console.log('[useWebSocket] LEAVE_CONFIRMED received:', data);
+			onMessageRef.current?.({ type: 'LEAVE_CONFIRMED', ...data });
+		};
+		
+		// ДОБАВЛЕНО: обработчик для всех остальных событий
+		const handleGenericEvent = (eventName: string, data: any) => {
+			console.log(`[useWebSocket] Generic event ${eventName}:`, data);
+			onMessageRef.current?.({ type: eventName, ...data });
+		};
 
 		const handleError = (data: any) => {
 			console.error('[useWebSocket] Server error:', data.message)
@@ -375,6 +461,19 @@ export const useWebSocket = (
 		
 		// ДОБАВЛЕНО: подписка на GAME_STARTED
 		currentSocket.on('GAME_STARTED', handleGameStarted)
+		
+		// ДОБАВЛЕНО: подписки на игровые события
+		currentSocket.on('GAME_STATE', handleGameState)
+		currentSocket.on('GAME_UPDATE', handleGameUpdate)
+		currentSocket.on('PLAYER_JOINED_GAME', handlePlayerJoinedGame)
+		currentSocket.on('PLAYER_LEFT_GAME', handlePlayerLeftGame)
+		currentSocket.on('GAME_FINISHED', handleGameFinished)
+		currentSocket.on('LEAVE_CONFIRMED', handleLeaveConfirmed)
+		
+		// ДОБАВЛЕНО: подписка на все события для отладки
+		if (currentSocket.onAny) {
+			currentSocket.onAny(handleGenericEvent)
+		}
 
 		currentSocket.on('ERROR', handleError)
 
