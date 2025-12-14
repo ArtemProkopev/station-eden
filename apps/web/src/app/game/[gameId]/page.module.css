@@ -6,7 +6,7 @@
   flex-direction: column;
   align-items: center;
   color: white;
-  background-image: url('https://cdn.assets.stationeden.ru/web/lobby-background-optimized.webp');
+  background-image: url('https://cdn.assets.stationeden.ru/web/game-optimized.webp');
   background-size: cover;
   background-position: center;
   font-family: 'RussoOne', sans-serif;
@@ -354,6 +354,173 @@
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 20px;
+}
+
+.errorText {
+  color: #ff6b6b;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.backButton {
+  background: rgba(99, 239, 255, 0.1);
+  border: 2px solid #63efff;
+  color: #63efff;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 20px;
+  font-family: 'RussoOne', sans-serif;
+}
+
+.connectionStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+}
+
+.connectedDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #4caf50;
+  animation: pulseDot 2s infinite;
+}
+
+.disconnectedDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #ff6b6b;
+}
+
+@keyframes pulseDot {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+.retryButton {
+  background: rgba(99, 239, 255, 0.1);
+  border: 1px solid #63efff;
+  color: #63efff;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: 10px;
+  font-size: 12px;
+}
+
+.yourTurn {
+  color: #ffd700;
+  font-weight: bold;
+  margin-left: 5px;
+}
+
+.creatorBadge {
+  background: rgba(255, 215, 0, 0.1);
+  color: #ffd700;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  margin-top: 8px;
+  text-align: center;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+.finalScores {
+  margin: 20px 0;
+  width: 100%;
+}
+
+.finalScoreItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  border: 1px solid rgba(99, 239, 255, 0.2);
+}
+
+.rank {
+  color: #63efff;
+  font-weight: bold;
+  min-width: 30px;
+}
+
+.refreshButton {
+  background: rgba(76, 175, 80, 0.1);
+  border: 2px solid #4caf50;
+  color: #4caf50;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 15px;
+  font-family: 'RussoOne', sans-serif;
+  width: 100%;
+}
+
+.refreshButton:hover {
+  background: rgba(76, 175, 80, 0.15);
+}
+
+.currentPlayerInfo {
+  background: rgba(99, 239, 255, 0.1);
+  border: 1px solid #63efff;
+  border-radius: 8px;
+  padding: 15px;
+  text-align: center;
+  margin-bottom: 20px;
+  font-size: 18px;
+}
+
+.gameActions {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  align-items: center;
+}
+
+.actionButton {
+  background: rgba(99, 239, 255, 0.1);
+  border: 2px solid #63efff;
+  color: #63efff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'RussoOne', sans-serif;
+  font-size: 16px;
+  min-width: 200px;
+}
+
+.actionButton:hover:not(:disabled) {
+  background: rgba(99, 239, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.actionButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.gameInstructions {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.6;
+}
+
+.gameInstructions strong {
+  color: #63efff;
+}
+
+.playerMissions {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  margin-top: 2px;
 }
 
 @keyframes spin {

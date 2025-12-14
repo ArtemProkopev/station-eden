@@ -1,15 +1,41 @@
-// apps/web/src/app/game/[gameId]/page.tsx
 'use client'
 
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { useWebSocket } from '@/hooks/useWebSocket';
-import { GameState, GamePlayer } from '@station-eden/shared';
+import { GameState } from '@station-eden/shared';
 import TopHUD from '@/components/TopHUD/TopHUD';
 import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile';
 import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars';
 import { useProfile } from '@/app/profile/hooks/useProfile';
 import styles from './page.module.css';
+
+// Расширяем типы, чтобы они соответствовали серверной логике
+type ExtendedGamePlayer = {
+  id: string
+  name: string
+  missions?: number
+  hours?: number
+  avatar?: string
+  score: number
+  order: number
+  isActive: boolean
+  isReady?: boolean
+}
+
+type ExtendedGameState = GameState & {
+  creatorId?: string
+  maxRounds?: number
+  winnerId?: string
+  finishedAt?: string
+  settings?: {
+    gameMode?: string
+    difficulty?: string
+    turnTime?: string
+    tournamentMode?: boolean
+    limitedResources?: boolean
+  }
+}
 
 export default function GamePage() {
   const params = useParams();
@@ -17,55 +43,79 @@ export default function GamePage() {
   const gameId = params.gameId as string;
   const { profile, assets } = useProfile();
   
-  const [gameState, setGameState] = useState<GameState | null>(null);
-  const [players, setPlayers] = useState<GamePlayer[]>([]);
+  const [gameState, setGameState] = useState<ExtendedGameState | null>(null);
+  const [players, setPlayers] = useState<ExtendedGamePlayer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>('');
 
   const handleWebSocketMessage = useCallback((data: any) => {
     if (!data?.type) return;
 
+    console.log('Game WebSocket message:', data.type, data);
+
     switch (data.type) {
       case 'GAME_STATE':
-        setGameState(data.gameState);
+        console.log('Received GAME_STATE:', data.gameState);
+        setGameState(data.gameState || null);
         setPlayers(data.gameState?.players || []);
         setIsLoading(false);
+        setError('');
         break;
         
       case 'GAME_UPDATE':
+        console.log('Received GAME_UPDATE:', data.gameState);
         if (data.gameState) {
           setGameState(data.gameState);
           setPlayers(data.gameState.players || []);
         }
         break;
         
+      case 'PLAYER_JOINED_GAME':
+        console.log('Player joined:', data.playerName);
+        // Можно показать уведомление
+        break;
+        
       case 'PLAYER_LEFT_GAME':
+        console.log('Player left:', data.playerId);
         setPlayers(prev => prev.filter(p => p.id !== data.playerId));
         break;
         
       case 'ERROR':
+        console.error('Game error:', data.message);
         setError(data.message || 'Ошибка в игре');
+        setIsLoading(false);
         break;
         
       case 'GAME_FINISHED':
-        // Игра завершена
+        console.log('Game finished:', data.reason);
         if (data.gameState) {
           setGameState(data.gameState);
           setPlayers(data.gameState.players || []);
         }
         break;
+        
+      case 'LEAVE_CONFIRMED':
+        console.log('Leave confirmed');
+        router.push('/lobby');
+        break;
     }
-  }, []);
+  }, [router]);
 
-  const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'http://localhost:4000';
-  const wsUrl = wsBase.startsWith('http') ? wsBase.replace('http', 'ws') : wsBase;
+  // Важное изменение: добавляем query параметр gameId к WebSocket URL
+  const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'https://api.stationeden.ru';
+  const wsUrl = `${wsBase.startsWith('http') ? wsBase.replace('http', 'ws') : 'wss://' + wsBase}/lobby`;
+  
+  console.log('Connecting to game WebSocket:', wsUrl, 'gameId:', gameId);
+
   const { sendMessage: sendWS, isConnected } = useWebSocket(
     wsUrl,
     handleWebSocketMessage,
-    { gameId }
+    { gameId } // Этот параметр будет добавлен как query параметр
   );
 
   useEffect(() => {
+    console.log('Game page mounted, gameId:', gameId);
+    
     if (!gameId) {
       router.push('/');
       return;
@@ -73,14 +123,62 @@ export default function GamePage() {
 
     // При подключении запрашиваем состояние игры
     if (isConnected) {
+      console.log('WebSocket connected, joining game...');
       sendWS({ type: 'JOIN_GAME', gameId });
+    } else {
+      console.log('WebSocket not connected yet');
     }
   }, [gameId, isConnected, sendWS, router]);
 
+  useEffect(() => {
+    // Таймаут загрузки
+    const timeoutId = setTimeout(() => {
+      if (isLoading) {
+        console.log('Game loading timeout');
+        setError('Таймаут загрузки игры. Проверьте подключение.');
+        setIsLoading(false);
+      }
+    }, 10000);
+
+    return () => clearTimeout(timeoutId);
+  }, [isLoading]);
+
   const handleLeaveGame = () => {
     if (window.confirm('Вы уверены, что хотите покинуть игру?')) {
+      console.log('Leaving game...');
       sendWS({ type: 'LEAVE_GAME', gameId });
-      router.push('/lobby');
+      // Дополнительно можно отключиться от WebSocket
+      setTimeout(() => {
+        router.push('/lobby');
+      }, 1000);
+    }
+  };
+
+  const handleSkipTurn = () => {
+    if (!gameState || gameState.status !== 'active') {
+      setError('Игра не активна');
+      return;
+    }
+    
+    if (gameState.currentPlayerId !== profile.data?.id) {
+      setError('Не ваш ход');
+      return;
+    }
+    
+    sendWS({ 
+      type: 'GAME_ACTION', 
+      action: 'skip_turn',
+      gameId 
+    });
+  };
+
+  const handleEndGame = () => {
+    if (window.confirm('Вы уверены, что хотите завершить игру досрочно?')) {
+      sendWS({ 
+        type: 'GAME_ACTION', 
+        action: 'end_game',
+        gameId 
+      });
     }
   };
 
@@ -92,6 +190,56 @@ export default function GamePage() {
         <div className={styles.loadingContainer}>
           <div className={styles.loadingSpinner}></div>
           <p>Загрузка игры...</p>
+          {error && <p className={styles.errorText}>{error}</p>}
+          <button 
+            className={styles.backButton}
+            onClick={() => router.push('/lobby')}
+          >
+            Вернуться в лобби
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  if (error && !gameState) {
+    return (
+      <main className={styles.page}>
+        <FirefliesProfile />
+        <TwinklingStars />
+        <TopHUD 
+          profile={{
+            status: profile.status,
+            userId: profile.data?.id,
+            email: profile.data?.email,
+            username: profile.data?.username,
+            message: profile.message,
+          }}
+          avatar={assets.avatar}
+        />
+        <div className={styles.container}>
+          <div className={styles.errorContainer}>
+            <h2 className={styles.errorTitle}>Ошибка загрузки игры</h2>
+            <p className={styles.errorMessage}>{error}</p>
+            <div className={styles.errorActions}>
+              <button 
+                className={styles.retryButton}
+                onClick={() => {
+                  setError('');
+                  setIsLoading(true);
+                  sendWS({ type: 'JOIN_GAME', gameId });
+                }}
+              >
+                Попробовать снова
+              </button>
+              <button 
+                className={styles.backToLobbyButton}
+                onClick={() => router.push('/lobby')}
+              >
+                Вернуться в лобби
+              </button>
+            </div>
+          </div>
         </div>
       </main>
     );
@@ -106,6 +254,11 @@ export default function GamePage() {
     message: profile.message,
   };
 
+  const currentPlayer = players.find(p => p.id === profile.data?.id);
+  const creatorId = (gameState as ExtendedGameState)?.creatorId || '';
+  const maxRounds = (gameState as ExtendedGameState)?.maxRounds;
+  const winnerId = (gameState as ExtendedGameState)?.winnerId;
+
   return (
     <main className={styles.page}>
       <FirefliesProfile />
@@ -118,7 +271,7 @@ export default function GamePage() {
 
       <div className={styles.container}>
         <div className={styles.header}>
-          <h1 className={styles.title}>Игра #{gameId}</h1>
+          <h1 className={styles.title}>Игра #{gameId?.slice(0, 12) || '...'}</h1>
           <div className={styles.gameInfo}>
             <span className={styles.gameMode}>
               Режим: {gameState?.settings?.gameMode || 'Стандартный'}
@@ -130,6 +283,10 @@ export default function GamePage() {
                 gameState?.status === 'cancelled' ? 'Отменена' : 'Ожидание'
               }
             </span>
+            <div className={styles.connectionStatus}>
+              <span className={isConnected ? styles.connectedDot : styles.disconnectedDot}></span>
+              {isConnected ? 'Подключено' : 'Не подключено'}
+            </div>
             <button 
               className={styles.leaveButton}
               onClick={handleLeaveGame}
@@ -142,6 +299,16 @@ export default function GamePage() {
         {error && (
           <div className={styles.error}>
             {error}
+            <button 
+              className={styles.retryButton}
+              onClick={() => {
+                setError('');
+                setIsLoading(true);
+                sendWS({ type: 'JOIN_GAME', gameId });
+              }}
+            >
+              Повторить
+            </button>
           </div>
         )}
 
@@ -149,7 +316,7 @@ export default function GamePage() {
           <div className={styles.playersPanel}>
             <h2 className={styles.panelTitle}>Игроки ({players.length})</h2>
             <div className={styles.playersList}>
-              {players.map((player, index) => (
+              {players.map((player) => (
                 <div 
                   key={player.id} 
                   className={`${styles.playerCard} ${
@@ -168,15 +335,28 @@ export default function GamePage() {
                       } : {}}
                     />
                     <div className={styles.playerInfo}>
-                      <span className={styles.playerName}>{player.name}</span>
-                      <span className={styles.playerScore}>Очки: {player.score}</span>
+                      <span className={styles.playerName}>
+                        {player.name}
+                        {player.id === profile.data?.id && ' (Вы)'}
+                      </span>
+                      <span className={styles.playerScore}>Очки: {player.score || 0}</span>
+                      {/* missions может быть undefined, поэтому проверяем */}
+                      {(player.missions !== undefined) && (
+                        <span className={styles.playerMissions}>Миссий: {player.missions}</span>
+                      )}
                     </div>
-                    <span className={styles.playerOrder}>#{player.order}</span>
+                    <span className={styles.playerOrder}>#{player.order || 0}</span>
                   </div>
                   
                   {gameState?.currentPlayerId === player.id && (
                     <div className={styles.currentTurnIndicator}>
-                      Сейчас ходит
+                      🎮 Сейчас ходит
+                    </div>
+                  )}
+                  
+                  {player.id === creatorId && (
+                    <div className={styles.creatorBadge}>
+                      Создатель
                     </div>
                   )}
                 </div>
@@ -187,19 +367,26 @@ export default function GamePage() {
           <div className={styles.gameBoard}>
             <h2 className={styles.panelTitle}>Игровое поле</h2>
             <div className={styles.boardContent}>
-              {gameState?.status === 'finished' && gameState.winnerId ? (
+              {gameState?.status === 'finished' && winnerId ? (
                 <div className={styles.winnerAnnouncement}>
                   <h3>🎉 Игра завершена! 🎉</h3>
-                  <p>
+                  <p className={styles.winnerText}>
                     Победитель: {
-                      players.find(p => p.id === gameState.winnerId)?.name || 'Неизвестно'
+                      players.find(p => p.id === winnerId)?.name || 'Неизвестно'
                     }
                   </p>
-                  <p>
-                    Результат: {
-                      players.map(p => `${p.name}: ${p.score} очков`).join(', ')
-                    }
-                  </p>
+                  <div className={styles.finalScores}>
+                    <h4>Итоговые очки:</h4>
+                    {players
+                      .sort((a, b) => (b.score || 0) - (a.score || 0))
+                      .map((player, index) => (
+                        <div key={player.id} className={styles.finalScoreItem}>
+                          <span className={styles.rank}>#{index + 1}</span>
+                          <span className={styles.playerName}>{player.name}</span>
+                          <span className={styles.score}>{player.score || 0} очков</span>
+                        </div>
+                      ))}
+                  </div>
                   <button 
                     className={styles.backToLobby}
                     onClick={() => router.push('/lobby')}
@@ -210,16 +397,46 @@ export default function GamePage() {
               ) : (
                 <>
                   <div className={styles.roundInfo}>
-                    Раунд: {gameState?.round || 1}
-                    {gameState?.maxRounds && ` / ${gameState.maxRounds}`}
+                    <span className={styles.roundLabel}>Раунд:</span>
+                    <span className={styles.roundNumber}>{gameState?.round || 1}</span>
+                    {maxRounds && (
+                      <span className={styles.maxRounds}> / {maxRounds}</span>
+                    )}
                   </div>
                   <div className={styles.gameArea}>
-                    <p className={styles.placeholder}>
-                      Игровое поле для режима "{gameState?.settings?.gameMode || 'Стандартный'}"
-                    </p>
-                    <p className={styles.instructions}>
-                      Игра началась! Добро пожаловать в игру.
-                    </p>
+                    <div className={styles.currentPlayerInfo}>
+                      {gameState?.currentPlayerId && (
+                        <>
+                          <span>Сейчас ходит: </span>
+                          <strong>
+                            {players.find(p => p.id === gameState.currentPlayerId)?.name || 'Неизвестно'}
+                          </strong>
+                          {gameState.currentPlayerId === profile.data?.id && (
+                            <span className={styles.yourTurn}> (Ваш ход!)</span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    
+                    <div className={styles.gameActions}>
+                      {gameState?.currentPlayerId === profile.data?.id && (
+                        <button 
+                          className={styles.actionButton}
+                          onClick={handleSkipTurn}
+                          disabled={!gameState || gameState.status !== 'active'}
+                        >
+                          Пропустить ход
+                        </button>
+                      )}
+                      
+                      <div className={styles.gameInstructions}>
+                        <p>Игра началась! Добро пожаловать в игру.</p>
+                        <p>Режим: <strong>{gameState?.settings?.gameMode || 'Стандартный'}</strong></p>
+                        {gameState?.settings?.difficulty && (
+                          <p>Сложность: <strong>{gameState.settings.difficulty}</strong></p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </>
               )}
@@ -231,19 +448,21 @@ export default function GamePage() {
             <div className={styles.controlsContent}>
               <button 
                 className={styles.controlButton}
-                onClick={() => sendWS({ type: 'GAME_ACTION', action: 'skip_turn' })}
-                disabled={!gameState || gameState.status !== 'active'}
+                onClick={handleSkipTurn}
+                disabled={!gameState || gameState.status !== 'active' || gameState.currentPlayerId !== profile.data?.id}
               >
                 Пропустить ход
               </button>
               
-              <button 
-                className={styles.controlButton}
-                onClick={() => sendWS({ type: 'GAME_ACTION', action: 'end_game' })}
-                disabled={!isConnected}
-              >
-                Завершить игру досрочно
-              </button>
+              {creatorId === profile.data?.id && (
+                <button 
+                  className={styles.controlButton}
+                  onClick={handleEndGame}
+                  disabled={!isConnected || gameState?.status === 'finished'}
+                >
+                  Завершить игру досрочно
+                </button>
+              )}
               
               <div className={styles.gameStats}>
                 <div className={styles.statItem}>
@@ -258,7 +477,22 @@ export default function GamePage() {
                     <span>{new Date(gameState.startedAt).toLocaleTimeString()}</span>
                   </div>
                 )}
+                <div className={styles.statItem}>
+                  <span>Игроков онлайн:</span>
+                  <span>{players.length}</span>
+                </div>
+                <div className={styles.statItem}>
+                  <span>Ваши очки:</span>
+                  <span>{currentPlayer?.score || 0}</span>
+                </div>
               </div>
+              
+              <button 
+                className={styles.refreshButton}
+                onClick={() => sendWS({ type: 'JOIN_GAME', gameId })}
+              >
+                Обновить игру
+              </button>
             </div>
           </div>
         </div>
