@@ -101,9 +101,31 @@ export default function GamePage() {
     }
   }, [router]);
 
-  // Важное изменение: добавляем query параметр gameId к WebSocket URL
-  const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'https://api.stationeden.ru';
-  const wsUrl = `${wsBase.startsWith('http') ? wsBase.replace('http', 'ws') : 'wss://' + wsBase}/lobby`;
+  // ИСПРАВЛЕНО: Правильный WebSocket URL без двойного протокола
+  const wsBase = process.env.NEXT_PUBLIC_WS_BASE;
+  let wsUrl: string;
+  
+  if (process.env.NODE_ENV === 'development') {
+    // Для локальной разработки
+    wsUrl = 'ws://localhost:4000/lobby';
+  } else if (wsBase) {
+    // Для продакшена, обрабатываем разные варианты URL
+    if (wsBase.startsWith('https://')) {
+      wsUrl = wsBase.replace('https://', 'wss://') + '/lobby';
+    } else if (wsBase.startsWith('http://')) {
+      wsUrl = wsBase.replace('http://', 'ws://') + '/lobby';
+    } else if (wsBase.startsWith('wss://')) {
+      wsUrl = wsBase + (wsBase.endsWith('/lobby') ? '' : '/lobby');
+    } else if (wsBase.startsWith('ws://')) {
+      wsUrl = wsBase + (wsBase.endsWith('/lobby') ? '' : '/lobby');
+    } else {
+      // Если нет протокола, добавляем wss://
+      wsUrl = 'wss://' + wsBase + '/lobby';
+    }
+  } else {
+    // По умолчанию для продакшена
+    wsUrl = 'wss://api.stationeden.ru/lobby';
+  }
   
   console.log('Connecting to game WebSocket:', wsUrl, 'gameId:', gameId);
 
@@ -182,6 +204,18 @@ export default function GamePage() {
     }
   };
 
+  // Функция для реконнекта
+  const handleReconnect = () => {
+    setError('');
+    setIsLoading(true);
+    // Хук useWebSocket автоматически переподключится
+    setTimeout(() => {
+      if (isConnected) {
+        sendWS({ type: 'JOIN_GAME', gameId });
+      }
+    }, 1000);
+  };
+
   if (isLoading) {
     return (
       <main className={styles.page}>
@@ -191,12 +225,20 @@ export default function GamePage() {
           <div className={styles.loadingSpinner}></div>
           <p>Загрузка игры...</p>
           {error && <p className={styles.errorText}>{error}</p>}
-          <button 
-            className={styles.backButton}
-            onClick={() => router.push('/lobby')}
-          >
-            Вернуться в лобби
-          </button>
+          <div className={styles.loadingButtons}>
+            <button 
+              className={styles.backButton}
+              onClick={() => router.push('/lobby')}
+            >
+              Вернуться в лобби
+            </button>
+            <button 
+              className={styles.retryButton}
+              onClick={handleReconnect}
+            >
+              Повторить подключение
+            </button>
+          </div>
         </div>
       </main>
     );
@@ -221,14 +263,17 @@ export default function GamePage() {
           <div className={styles.errorContainer}>
             <h2 className={styles.errorTitle}>Ошибка загрузки игры</h2>
             <p className={styles.errorMessage}>{error}</p>
+            <p className={styles.errorDetails}>
+              URL подключения: {wsUrl}
+              <br />
+              Game ID: {gameId}
+              <br />
+              Статус подключения: {isConnected ? 'Подключено' : 'Не подключено'}
+            </p>
             <div className={styles.errorActions}>
               <button 
                 className={styles.retryButton}
-                onClick={() => {
-                  setError('');
-                  setIsLoading(true);
-                  sendWS({ type: 'JOIN_GAME', gameId });
-                }}
+                onClick={handleReconnect}
               >
                 Попробовать снова
               </button>
@@ -301,11 +346,7 @@ export default function GamePage() {
             {error}
             <button 
               className={styles.retryButton}
-              onClick={() => {
-                setError('');
-                setIsLoading(true);
-                sendWS({ type: 'JOIN_GAME', gameId });
-              }}
+              onClick={handleReconnect}
             >
               Повторить
             </button>
@@ -490,6 +531,7 @@ export default function GamePage() {
               <button 
                 className={styles.refreshButton}
                 onClick={() => sendWS({ type: 'JOIN_GAME', gameId })}
+                disabled={!isConnected}
               >
                 Обновить игру
               </button>
