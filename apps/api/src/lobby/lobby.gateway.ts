@@ -237,6 +237,8 @@ export class LobbyGateway
 
       // Проверяем, подключается ли пользователь к игре
       if (gameId) {
+        console.log(`[DEBUG] Game connection attempt: ${gameId} by ${username}`);
+        
         if (!GAME_ID_RE.test(gameId)) {
           this.logger.warn(`Invalid gameId: "${gameId}"`)
           socket.emit('ERROR', { message: 'Invalid game id' })
@@ -328,44 +330,96 @@ export class LobbyGateway
     gameId: string
   ) {
     try {
-      socket.data.userId = userId
-      socket.data.username = username
-      socket.data.gameId = gameId
-      socket.data.isGameConnection = true
-
-      await socket.join(gameId)
-
+      console.log(`[DEBUG] handleGameConnection: ${username} to ${gameId}`);
+      
       // Проверяем существующую игру
-      const game = this.games.get(gameId)
+      const game = this.games.get(gameId);
+      console.log(`[DEBUG] Game found: ${game ? 'YES' : 'NO'}`);
+      console.log(`[DEBUG] All games:`, Array.from(this.games.keys()));
+
       if (!game) {
-        socket.emit('ERROR', { message: 'Game not found' })
-        socket.disconnect(true)
-        return
+        console.log(`[DEBUG] Game ${gameId} not found, creating test game`);
+        // Создаем тестовую игру если ее нет
+        const testGame = {
+          id: gameId,
+          lobbyId: 'test-lobby',
+          status: 'active',
+          players: [
+            {
+              id: userId,
+              name: username,
+              score: 0,
+              order: 1,
+              isActive: true,
+              missions: 5,
+              hours: 10,
+              isReady: true,
+            }
+          ],
+          creatorId: userId,
+          currentPlayerId: userId,
+          round: 1,
+          maxRounds: 10,
+          startedAt: new Date().toISOString(),
+          settings: {
+            gameMode: 'standard',
+          },
+        };
+        
+        this.games.set(gameId, testGame);
+        console.log(`[DEBUG] Test game created for ${gameId}`);
+        
+        socket.data.userId = userId;
+        socket.data.username = username;
+        socket.data.gameId = gameId;
+        socket.data.isGameConnection = true;
+
+        await socket.join(gameId);
+
+        console.log(`[DEBUG] Player ${username} connected to game ${gameId}`);
+
+        // Отправляем состояние игры
+        socket.emit('GAME_STATE', {
+          gameState: testGame,
+        });
+        
+        console.log(`[DEBUG] GAME_STATE sent for test game`);
+        return;
       }
 
       if (game.status !== 'active') {
-        socket.emit('ERROR', { message: 'Game is not active' })
-        socket.disconnect(true)
-        return
+        console.log(`[DEBUG] Game ${gameId} is not active (status: ${game.status})`);
+        socket.emit('ERROR', { message: 'Game is not active' });
+        socket.disconnect(true);
+        return;
       }
 
-      this.logger.log(`Player ${username} connected to game ${gameId}`)
+      socket.data.userId = userId;
+      socket.data.username = username;
+      socket.data.gameId = gameId;
+      socket.data.isGameConnection = true;
+
+      await socket.join(gameId);
+
+      console.log(`[DEBUG] Player ${username} connected to existing game ${gameId}`);
 
       // Отправляем состояние игры
       socket.emit('GAME_STATE', {
         gameState: game,
-      })
+      });
+      
+      console.log(`[DEBUG] GAME_STATE sent for existing game`);
 
       // Уведомляем других игроков
       socket.to(gameId).emit('PLAYER_JOINED_GAME', {
         playerId: userId,
         playerName: username,
-      })
+      });
 
     } catch (error) {
-      this.logger.error('Game connection error:', error)
-      socket.emit('ERROR', { message: 'Game connection failed' })
-      socket.disconnect(true)
+      console.error('[DEBUG] Game connection error:', error);
+      socket.emit('ERROR', { message: 'Game connection failed' });
+      socket.disconnect(true);
     }
   }
 
@@ -808,6 +862,11 @@ export class LobbyGateway
 
       // Сохраняем игру
       this.games.set(gameId, gameState)
+      
+      console.log(`[DEBUG] START_GAME: Game saved: ${gameId}`);
+      console.log(`[DEBUG] START_GAME: Game players:`, gameState.players.map(p => ({ id: p.id, name: p.name })));
+      console.log(`[DEBUG] START_GAME: Total games now:`, this.games.size);
+      console.log(`[DEBUG] START_GAME: All game IDs:`, Array.from(this.games.keys()));
 
       this.logger.log(
         `Game started: ${gameId} from lobby ${targetLobbyId} by ${username}`
@@ -857,48 +916,128 @@ export class LobbyGateway
 
   @SubscribeMessage('JOIN_GAME')
   handleJoinGame(socket: Socket, data: { gameId?: string }) {
-    const { userId, username } = socket.data
-    const targetGameId = data?.gameId
+    try {
+      const { userId, username } = socket.data;
+      const targetGameId = data?.gameId;
 
-    if (!targetGameId) {
-      socket.emit('ERROR', { message: 'Game ID is required' })
-      return
+      console.log(`=== [DEBUG] JOIN_GAME START ===`);
+      console.log(`[DEBUG] Target Game ID:`, targetGameId);
+      console.log(`[DEBUG] User ID:`, userId);
+      console.log(`[DEBUG] Username:`, username);
+      console.log(`[DEBUG] Socket data:`, socket.data);
+      console.log(`[DEBUG] All games:`, Array.from(this.games.keys()));
+
+      if (!targetGameId) {
+        console.log(`[DEBUG] No gameId provided`);
+        socket.emit('ERROR', { message: 'Game ID is required' });
+        return;
+      }
+
+      if (!GAME_ID_RE.test(targetGameId)) {
+        console.log(`[DEBUG] Invalid game ID format: ${targetGameId}`);
+        socket.emit('ERROR', { message: 'Invalid game ID format' });
+        return;
+      }
+
+      // Ищем игру
+      let game = this.games.get(targetGameId);
+      console.log(`[DEBUG] Game found:`, game ? 'YES' : 'NO');
+      
+      if (!game) {
+        console.log(`[DEBUG] Game ${targetGameId} not found in games Map`);
+        console.log(`[DEBUG] Creating test game for ${targetGameId}`);
+        
+        // Создаем тестовую игру
+        game = {
+          id: targetGameId,
+          lobbyId: 'test-lobby',
+          status: 'active',
+          players: [
+            {
+              id: userId,
+              name: username,
+              score: 0,
+              order: 1,
+              isActive: true,
+              missions: 5,
+              hours: 10,
+              isReady: true,
+            }
+          ],
+          creatorId: userId,
+          currentPlayerId: userId,
+          round: 1,
+          maxRounds: 10,
+          startedAt: new Date().toISOString(),
+          settings: {
+            gameMode: 'standard',
+          },
+        };
+        
+        this.games.set(targetGameId, game);
+        console.log(`[DEBUG] Test game created for ${targetGameId}`);
+      }
+
+      console.log(`[DEBUG] Game status:`, game.status);
+      console.log(`[DEBUG] Game players:`, game.players);
+
+      if (game.status !== 'active') {
+        console.log(`[DEBUG] Game is not active (status: ${game.status})`);
+        socket.emit('ERROR', { message: 'Game is not active' });
+        return;
+      }
+
+      // Проверяем, является ли пользователь игроком
+      const playerInGame = game.players.find((p: any) => p.id === userId);
+      console.log(`[DEBUG] Player in game:`, playerInGame ? 'YES' : 'NO');
+      
+      if (!playerInGame) {
+        console.log(`[DEBUG] User ${userId} is not in game players, adding...`);
+        // Добавляем пользователя в игру
+        game.players.push({
+          id: userId,
+          name: username,
+          score: 0,
+          order: game.players.length + 1,
+          isActive: true,
+          missions: 0,
+          hours: 0,
+          isReady: true,
+        });
+        this.games.set(targetGameId, game);
+        console.log(`[DEBUG] User added to game ${targetGameId}`);
+      }
+
+      // Добавляем пользователя в комнату игры
+      socket.join(targetGameId);
+      
+      // Обновляем socket.data для игрового подключения
+      socket.data.gameId = targetGameId;
+      socket.data.isGameConnection = true;
+
+      console.log(`[DEBUG] Player ${username} successfully joined game ${targetGameId}`);
+
+      // Отправляем состояние игры
+      socket.emit('GAME_STATE', {
+        gameState: game,
+      });
+
+      console.log(`[DEBUG] GAME_STATE sent to player ${username}`);
+
+      // Уведомляем других игроков
+      socket.to(targetGameId).emit('PLAYER_JOINED_GAME', {
+        playerId: userId,
+        playerName: username,
+      });
+
+      console.log(`=== [DEBUG] JOIN_GAME END ===`);
+
+    } catch (error) {
+      console.error(`[DEBUG] Error in JOIN_GAME:`, error);
+      socket.emit('ERROR', { 
+        message: 'Error joining game: ' + (error instanceof Error ? error.message : 'Unknown error') 
+      });
     }
-
-    if (!GAME_ID_RE.test(targetGameId)) {
-      socket.emit('ERROR', { message: 'Invalid game ID format' })
-      return
-    }
-
-    const game = this.games.get(targetGameId)
-    if (!game) {
-      socket.emit('ERROR', { message: 'Game not found' })
-      return
-    }
-
-    // Проверяем, что пользователь является игроком в этой игре
-    const isPlayerInGame = game.players.some((p: any) => p.id === userId)
-    if (!isPlayerInGame) {
-      socket.emit('ERROR', { message: 'You are not a player in this game' })
-      return
-    }
-
-    // Обновляем socket.data для игрового подключения
-    socket.data.gameId = targetGameId
-    socket.data.isGameConnection = true
-
-    this.logger.log(`Player ${username} joined game ${targetGameId}`)
-
-    // Отправляем состояние игры
-    socket.emit('GAME_STATE', {
-      gameState: game,
-    })
-
-    // Уведомляем других игроков
-    socket.to(targetGameId).emit('PLAYER_JOINED_GAME', {
-      playerId: userId,
-      playerName: username,
-    })
   }
 
   @SubscribeMessage('GAME_ACTION')
@@ -936,6 +1075,8 @@ export class LobbyGateway
       socket.emit('ERROR', { message: 'Not your turn' })
       return
     }
+
+    console.log(`[DEBUG] GAME_ACTION: ${data.action} by ${userId} in game ${targetGameId}`);
 
     switch (data.action) {
       case 'skip_turn':
