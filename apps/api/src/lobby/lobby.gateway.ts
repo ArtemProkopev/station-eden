@@ -39,6 +39,8 @@ type LobbyState = {
 	players: Map<string, Player>
 	connections: Map<string, Socket>
 	creatorId: string
+	gameStarted?: boolean
+	gameId?: string
 }
 
 const DEFAULT_LOBBY_SETTINGS: LobbySettings = {
@@ -237,6 +239,17 @@ export class LobbyGateway
 				return
 			}
 
+			// Проверяем, не началась ли уже игра в лобби
+			const existingLobby = this.lobbies.get(lobbyId)
+			if (existingLobby?.gameStarted) {
+				this.logger.warn(`Player ${username} tried to join lobby ${lobbyId} after game started`)
+				socket.emit('ERROR', { 
+					message: 'Game has already started in this lobby' 
+				})
+				socket.disconnect(true)
+				return
+			}
+
 			socket.data.userId = userId
 			socket.data.username = username
 			socket.data.lobbyId = lobbyId
@@ -249,6 +262,7 @@ export class LobbyGateway
 					players: new Map(),
 					connections: new Map(),
 					creatorId: userId,
+					gameStarted: false,
 				})
 				this.logger.log(`New lobby created: ${lobbyId} by ${username}`)
 			}
@@ -273,6 +287,7 @@ export class LobbyGateway
 				players: Array.from(lobby.players.values()),
 				settings: { ...lobby.settings, maxPlayers: effectiveMax },
 				creatorId: lobby.creatorId,
+				gameStarted: lobby.gameStarted || false,
 			})
 
 			this.logger.log(
@@ -331,6 +346,14 @@ export class LobbyGateway
 			return
 		}
 
+		// Проверяем, не началась ли уже игра
+		if (lobby.gameStarted) {
+			socket.emit('ERROR', { 
+				message: 'Cannot join lobby - game has already started' 
+			})
+			return
+		}
+
 		const effectiveMax = Math.min(
 			lobby.settings.maxPlayers || 4,
 			HARD_MAX_PLAYERS
@@ -375,6 +398,7 @@ export class LobbyGateway
 			players: Array.from(lobby.players.values()),
 			settings: { ...lobby.settings, maxPlayers: effectiveMax },
 			creatorId: lobby.creatorId,
+			gameStarted: lobby.gameStarted || false,
 		})
 	}
 
@@ -421,6 +445,14 @@ export class LobbyGateway
 		const lobby = this.lobbies.get(lobbyId)
 		if (!lobby) return
 
+		// Проверяем, не началась ли уже игра
+		if (lobby.gameStarted) {
+			socket.emit('ERROR', { 
+				message: 'Cannot change ready status - game has already started' 
+			})
+			return
+		}
+
 		const playerId = data.playerId || userId
 		const player = lobby.players.get(playerId)
 
@@ -439,6 +471,7 @@ export class LobbyGateway
 				players: Array.from(lobby.players.values()),
 				settings: lobby.settings,
 				creatorId: lobby.creatorId,
+				gameStarted: lobby.gameStarted || false,
 			})
 		}
 	}
@@ -451,6 +484,14 @@ export class LobbyGateway
 		const { userId, lobbyId } = socket.data
 		const lobby = this.lobbies.get(lobbyId)
 		if (!lobby) return
+
+		// Проверяем, не началась ли уже игра
+		if (lobby.gameStarted) {
+			socket.emit('ERROR', { 
+				message: 'Cannot change settings - game has already started' 
+			})
+			return
+		}
 
 		if (lobby.creatorId !== userId) {
 			socket.emit('ERROR', {
@@ -515,12 +556,135 @@ export class LobbyGateway
 				players: Array.from(lobby.players.values()),
 				settings: lobby.settings,
 				creatorId: lobby.creatorId,
+				gameStarted: lobby.gameStarted || false,
 			})
 
 			if (lobby.players.size === 0 && lobby.connections.size === 0) {
 				this.lobbies.delete(lobbyId)
 				this.logger.log(`Lobby ${lobbyId} deleted (empty)`)
 			}
+		}
+	}
+
+	@SubscribeMessage('START_GAME')
+	async handleStartGame(socket: Socket, data: { lobbyId?: string; creatorId?: string }) {
+		try {
+			const { userId, lobbyId: socketLobbyId, username } = socket.data;
+			
+			// Используем lobbyId из данных или из socket.data
+			const targetLobbyId = data?.lobbyId || socketLobbyId;
+			
+			if (!targetLobbyId) {
+				socket.emit('ERROR', { message: 'Lobby ID is required' });
+				return;
+			}
+			
+			const lobby = this.lobbies.get(targetLobbyId);
+			if (!lobby) {
+				socket.emit('ERROR', { message: 'Lobby not found' });
+				return;
+			}
+			
+			// Проверяем, что отправитель - создатель лобби
+			if (lobby.creatorId !== userId) {
+				socket.emit('ERROR', { 
+					message: 'Только создатель лобби может начать игру' 
+				});
+				return;
+			}
+			
+			// Проверяем, не началась ли уже игра
+			if (lobby.gameStarted) {
+				socket.emit('ERROR', { 
+					message: 'Игра уже началась в этом лобби' 
+				});
+				return;
+			}
+			
+			// Проверяем минимальное количество игроков
+			if (lobby.players.size < 2) {
+				socket.emit('ERROR', { 
+					message: 'Для начала игры нужно минимум 2 игрока' 
+				});
+				return;
+			}
+			
+			// Проверяем, что все игроки готовы
+			const notReadyPlayers = Array.from(lobby.players.values())
+				.filter(p => !p.isReady)
+				.map(p => p.name);
+			
+			if (notReadyPlayers.length > 0) {
+				socket.emit('ERROR', { 
+					message: `Следующие игроки не готовы: ${notReadyPlayers.join(', ')}` 
+				});
+				return;
+			}
+			
+			// Генерируем уникальный ID для игры
+			const gameId = `game-${targetLobbyId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+			
+			// Помечаем лобби как начавшее игру
+			lobby.gameStarted = true;
+			lobby.gameId = gameId;
+			
+			// Создаем состояние игры (в реальности можно сохранять в БД)
+			const gameState = {
+				gameId,
+				lobbyId: targetLobbyId,
+				status: 'active',
+				players: Array.from(lobby.players.values()).map((player, index) => ({
+					...player,
+					order: index + 1,
+					score: 0,
+					isActive: true
+				})),
+				currentPlayerId: Array.from(lobby.players.keys())[0],
+				round: 1,
+				startedAt: new Date().toISOString(),
+				settings: lobby.settings
+			};
+			
+			this.logger.log(`Game started: ${gameId} from lobby ${targetLobbyId} by ${username}`);
+			
+			// Отправляем всем игрокам в лобби событие GAME_STARTED
+			this.server.to(targetLobbyId).emit('GAME_STARTED', {
+				gameId,
+				redirectUrl: `/game/${gameId}`,
+				gameState,
+				message: 'Игра начинается! Перенаправление...'
+			});
+			
+			// Добавляем системное сообщение в чат
+			const systemMessage = {
+				text: `Игра началась! ID игры: ${gameId}`,
+				type: 'system' as const,
+				playerId: 'system',
+				playerName: 'Система',
+				timestamp: new Date().toISOString(),
+			};
+			
+			this.server.to(targetLobbyId).emit('CHAT_MESSAGE', { 
+				message: systemMessage 
+			});
+			
+			// Очищаем лобби через некоторое время
+			setTimeout(() => {
+				if (this.lobbies.has(targetLobbyId)) {
+					// Проверяем, что никто не остался в лобби
+					const lobby = this.lobbies.get(targetLobbyId);
+					if (lobby && lobby.connections.size === 0) {
+						this.lobbies.delete(targetLobbyId);
+						this.logger.log(`Lobby ${targetLobbyId} cleaned up after game start`);
+					}
+				}
+			}, 30000); // 30 секунд
+			
+		} catch (error) {
+			this.logger.error('Error in START_GAME:', error);
+			socket.emit('ERROR', { 
+				message: 'Ошибка при начале игры: ' + (error instanceof Error ? error.message : 'Unknown error') 
+			});
 		}
 	}
 
@@ -532,6 +696,8 @@ export class LobbyGateway
 			settings: lobby.settings,
 			creatorId: lobby.creatorId,
 			connections: lobby.connections.size,
+			gameStarted: lobby.gameStarted || false,
+			gameId: lobby.gameId,
 		}
 	}
 
@@ -542,6 +708,8 @@ export class LobbyGateway
 			settings: lobby.settings,
 			creatorId: lobby.creatorId,
 			connections: lobby.connections.size,
+			gameStarted: lobby.gameStarted || false,
+			gameId: lobby.gameId,
 		}))
 	}
 }
