@@ -1,4 +1,3 @@
-// apps/api/src/auth/brute-force.service.ts
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { IsNull, MoreThan, Not, Repository } from 'typeorm'
@@ -9,7 +8,7 @@ export class BruteForceService {
 	private readonly MAX_ATTEMPTS = 5
 	private readonly WINDOW_MIN = 15
 	/** Эскалация по количеству блокировок за окно */
-	private readonly LOCK_STEPS_MIN = [2, 5, 10, 15]
+	private readonly LOCK_STEPS_MIN = [2, 5, 10, 15] as const
 
 	constructor(
 		@InjectRepository(LoginAttempt)
@@ -20,7 +19,7 @@ export class BruteForceService {
 		return s.trim().toLowerCase()
 	}
 
-	/** Формат для логов: локальная дата/время без «Z», понятная человеку */
+	/** Формат для логов: локальная дата/время, понятная человеку */
 	private fmt(ts: Date | string | number) {
 		const d = ts instanceof Date ? ts : new Date(ts)
 		return new Intl.DateTimeFormat('ru-RU', {
@@ -36,19 +35,26 @@ export class BruteForceService {
 	async isBlocked(loginRaw: string) {
 		const login = this.norm(loginRaw)
 		const now = new Date()
+
 		const last = await this.repo.findOne({
 			where: { login, blockedUntil: MoreThan(now) },
 			order: { attemptTime: 'DESC' },
 			select: { blockedUntil: true, attemptTime: true, id: true, login: true },
 		})
+
 		if (!last?.blockedUntil) return { blocked: false as const }
+
 		const minutesLeft = Math.max(
 			0,
 			Math.ceil((last.blockedUntil.getTime() - now.getTime()) / 60000)
 		)
+
 		console.warn(
-			`[BRUTE FORCE] Заблокирован вход "${login}" — осталось ~${minutesLeft} мин, до ${this.fmt(last.blockedUntil)}`
+			`[BRUTE FORCE] Заблокирован вход "${login}" — осталось ~${minutesLeft} мин, до ${this.fmt(
+				last.blockedUntil
+			)}`
 		)
+
 		return {
 			blocked: true as const,
 			minutesLeft,
@@ -57,24 +63,24 @@ export class BruteForceService {
 	}
 
 	/** Последняя запись-блокировка (по attemptTime) */
-	private async getLastBlock(login: string) {
-		return await this.repo.findOne({
+	private getLastBlock(login: string) {
+		return this.repo.findOne({
 			where: { login, blockedUntil: Not(IsNull()) },
 			order: { attemptTime: 'DESC' },
 			select: { attemptTime: true, blockedUntil: true, id: true, login: true },
 		})
 	}
 
-	private async failedCountInWindow(login: string) {
+	private failedCountInWindow(login: string) {
 		const since = new Date(Date.now() - this.WINDOW_MIN * 60 * 1000)
-		return await this.repo.count({
+		return this.repo.count({
 			where: { login, success: false, attemptTime: MoreThan(since) },
 		})
 	}
 
-	private async blockCountInWindow(login: string) {
+	private blockCountInWindow(login: string) {
 		const since = new Date(Date.now() - this.WINDOW_MIN * 60 * 1000)
-		return await this.repo.count({
+		return this.repo.count({
 			where: { login, blockedUntil: MoreThan(since) },
 		})
 	}
@@ -83,7 +89,7 @@ export class BruteForceService {
 		const lastBlock = await this.getLastBlock(login)
 		if (lastBlock) {
 			// после ПОСЛЕДНЕЙ блокировки — даём заново 5 попыток
-			return await this.repo.count({
+			return this.repo.count({
 				where: {
 					login,
 					success: false,
@@ -91,7 +97,7 @@ export class BruteForceService {
 				},
 			})
 		}
-		// если блокировок ещё не было — используем скользящее окно (защита от бесконечных попыток)
+		// если блокировок ещё не было — используем скользящее окно
 		return this.failedCountInWindow(login)
 	}
 
@@ -131,9 +137,13 @@ export class BruteForceService {
 
 			// Записываем блок (как отдельную запись с blockedUntil)
 			await this.logAttempt({ login, success: false, blockedUntil: until })
+
 			console.warn(
-				`[BRUTE FORCE] Блокировка для "${login}" на ${lockMin} мин (до ${this.fmt(until)})`
+				`[BRUTE FORCE] Блокировка для "${login}" на ${lockMin} мин (до ${this.fmt(
+					until
+				)})`
 			)
+
 			return {
 				blocked: true as const,
 				attemptsLeft: 0,

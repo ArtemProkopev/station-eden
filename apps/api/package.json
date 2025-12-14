@@ -4,8 +4,10 @@
 	"private": true,
 	"scripts": {
 		"start:dev": "nest start --watch",
+		"start:prod": "node dist/main.js",
 		"clean": "rimraf dist",
-		"build": "nest build",
+		"build:dev": "nest build",
+		"build:prod": "nest build --config nest-cli.webpack.json",
 		"typeorm": "ts-node -T ./node_modules/typeorm/cli.js",
 		"migration:generate": "cross-env TS_NODE_PROJECT=tsconfig.json ts-node -T ./node_modules/typeorm/cli.js migration:generate -d ./src/db/data-source.ts",
 		"migration:create": "cross-env TS_NODE_PROJECT=tsconfig.json ts-node -T ./node_modules/typeorm/cli.js migration:create",
@@ -23,14 +25,11 @@
 		"@nestjs/throttler": "^6.1.0",
 		"@nestjs/typeorm": "^11.0.0",
 		"@nestjs/websockets": "^10.4.20",
+		"@station-eden/shared": "workspace:^",
 		"bcryptjs": "^2.4.3",
 		"cookie": "^1.0.2",
 		"cookie-parser": "^1.4.6",
-		"csurf": "^1.11.0",
-		"dotenv": "^17.2.2",
-		"google-auth-library": "^10.3.0",
 		"helmet": "^7.1.0",
-		"jsonwebtoken": "^9.0.2",
 		"livekit-server-sdk": "^2.14.2",
 		"nestjs-zod": "^5.0.1",
 		"passport": "^0.7.0",
@@ -47,17 +46,14 @@
 	"devDependencies": {
 		"@nestjs/cli": "^10.4.5",
 		"@nestjs/schematics": "^10.0.2",
-		"@nestjs/testing": "^10.0.0",
 		"@types/bcryptjs": "^3.0.0",
-		"@types/cookie": "^1.0.0",
 		"@types/cookie-parser": "^1.4.9",
-		"@types/dotenv": "^8.2.3",
 		"@types/express": "^5.0.3",
 		"@types/node": "^20.19.14",
 		"@types/passport-jwt": "^4.0.1",
 		"cross-env": "^10.0.0",
-		"ts-loader": "^9.5.4",
 		"ts-node": "^10.9.2",
-		"typescript": "^5.5.4"
+		"typescript": "^5.5.4",
+		"webpack": "^5.103.0"
 	}
 }

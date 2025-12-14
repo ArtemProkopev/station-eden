@@ -1,11 +1,10 @@
-// pnpm -w dotenv -e .env -- tsx scripts/sync-media.ts
+// pnpm exec dotenv -e .env -- tsx scripts/sync-media.ts
 import {
 	GetBucketLocationCommand,
 	HeadBucketCommand,
 	PutObjectCommand,
 	S3Client,
 } from '@aws-sdk/client-s3'
-import 'dotenv/config'
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
 import { join, relative } from 'path'
 
@@ -47,18 +46,15 @@ console.log('Dry-run :', IS_DRY_RUN ? 'YES' : 'NO')
 const s3 = new S3Client({
 	region: REGION,
 	endpoint: ENDPOINT,
-	forcePathStyle: true, // надёжно для Selectel SDK
+	forcePathStyle: true,
 	credentials: {
 		accessKeyId: ACCESS_KEY_ID,
-		secretAccessKey: SECRET_ACCESS_KEY!,
+		secretAccessKey: SECRET_ACCESS_KEY,
 	},
 })
 
-/** Какие пути/файлы игнорируем */
 function shouldIgnorePath(name: string, relPath: string): boolean {
-	// Системные/мусор
 	if (name === '.DS_Store' || name === 'Thumbs.db') return true
-	// Игнорим «скрытые» файлы/папки, КРОМЕ .well-known (часто нужен)
 	if (name.startsWith('.') && !relPath.startsWith('.well-known/')) return true
 	return false
 }
@@ -113,16 +109,15 @@ async function sanityChecks() {
 	try {
 		await s3.send(new HeadBucketCommand({ Bucket: BUCKET }))
 	} catch (e: any) {
-		const msg = e?.message || String(e)
-		console.error('HeadBucket failed:', msg)
+		console.error('HeadBucket failed:', e?.message || String(e))
 		throw new Error(
 			'Не вижу бакет. Проверь имя, ключи и права (ListBucket/GetBucketLocation как минимум).'
 		)
 	}
 	try {
 		await s3.send(new GetBucketLocationCommand({ Bucket: BUCKET }))
-	} catch (e) {
-		console.warn('GetBucketLocation failed (не критично):', (e as any)?.message)
+	} catch (e: any) {
+		console.warn('GetBucketLocation failed (не критично):', e?.message)
 	}
 }
 
@@ -153,7 +148,7 @@ async function putWithRetry(
 	} catch (e: any) {
 		const status = e?.$metadata?.httpStatusCode
 		const code = e?.name || e?.Code || 'UnknownError'
-		const retriable = status >= 500 || status === 429
+		const retriable = (status >= 500 && status < 600) || status === 429
 		console.warn(
 			`PutObject failed for ${key}: ${code}${status ? ` (HTTP ${status})` : ''}`
 		)
@@ -163,6 +158,7 @@ async function putWithRetry(
 			await new Promise(r => setTimeout(r, delay))
 			return putWithRetry(localPath, key, attempt + 1)
 		}
+
 		if (code === 'AccessDenied' || status === 403) {
 			console.error(
 				'Возможная причина: объект приватный. ' +
@@ -173,7 +169,6 @@ async function putWithRetry(
 	}
 }
 
-/** Находит все папки вида apps/*\/public и возвращает пары { app, dir } */
 function findPublicRoots(): Array<{ app: string; dir: string }> {
 	const roots: Array<{ app: string; dir: string }> = []
 	const appsDir = 'apps'
@@ -199,17 +194,17 @@ async function main() {
 		return
 	}
 
-	let uploaded = 0
+	let processed = 0
 	for (const r of roots) {
-		const prefix = `${r.app}/` // web/*, foo/*, etc.
+		const prefix = `${r.app}/`
 		for (const f of walk(r.dir, r.dir)) {
-			const key = prefix + f.rel // напр. web/icons/star.svg
+			const key = prefix + f.rel
 			await putWithRetry(f.abs, key)
-			uploaded++
+			processed++
 		}
 	}
 
-	console.log(`== S3 sync finished: ${uploaded} file(s) processed ==`)
+	console.log(`== S3 sync finished: ${processed} file(s) processed ==`)
 }
 
 main().catch(err => {

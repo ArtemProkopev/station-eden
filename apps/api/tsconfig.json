@@ -3,13 +3,13 @@
 	"compilerOptions": {
 		"module": "commonjs",
 		"target": "es2019",
+
+		"rootDir": "src",
 		"outDir": "dist",
+
 		"experimentalDecorators": true,
 		"emitDecoratorMetadata": true,
-		"baseUrl": "./",
-		"paths": {
-			"@station-eden/shared": ["../../packages/shared/src/index.ts"]
-		},
+
 		"types": ["node", "cookie-parser"],
 		"typeRoots": ["./node_modules/@types", "../../node_modules/@types"]
 	},

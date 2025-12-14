@@ -17,7 +17,7 @@ RUN pnpm --filter @station-eden/shared build
 
 # Сборка API с Webpack (теперь с бандлингом модулей)
 WORKDIR /app/apps/api
-RUN pnpm build
+RUN pnpm run build:prod
 
 # --- runtime stage ---
 FROM node:20-alpine AS runtime

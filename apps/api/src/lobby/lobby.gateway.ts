@@ -1,4 +1,3 @@
-// apps/api/src/lobby/lobby.gateway.ts
 import { Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
@@ -62,6 +61,7 @@ const MAX_CONN_PER_IP_TOTAL = 20
 	cors: {
 		origin: process.env.API_CORS_ORIGIN?.split(',') || [
 			'http://localhost:3000',
+			'http://127.0.0.1:3000',
 			'https://stationeden.ru',
 		],
 		credentials: true,
@@ -128,6 +128,7 @@ export class LobbyGateway
 		this.joinBucketsByIp.set(ip, b)
 		return b.conns
 	}
+
 	private decConn(ip: string) {
 		const b = this.joinBucketsByIp.get(ip)
 		if (!b) return
@@ -158,12 +159,14 @@ export class LobbyGateway
 	async handleConnection(socket: Socket) {
 		try {
 			const ip = this.clientIp(socket)
+
 			if (!this.allowJoinFromIp(ip)) {
 				this.logger.warn(`Join rate-limit by IP ${ip}`)
 				socket.emit('ERROR', { message: 'Too many connections from IP' })
 				socket.disconnect(true)
 				return
 			}
+
 			const totalConns = this.incConn(ip)
 			if (totalConns > MAX_CONN_PER_IP_TOTAL) {
 				this.logger.warn(`Too many concurrent connections from IP ${ip}`)
@@ -210,9 +213,9 @@ export class LobbyGateway
 				payload = await this.jwtService.verifyAsync(token, {
 					secret: jwtSecret,
 				})
-			} catch (err) {
+			} catch (err: any) {
 				this.logger.warn(
-					`Invalid WS token provided: ${(err as Error).message || err}`
+					`Invalid WS token provided: ${err?.message || String(err)}`
 				)
 				socket.emit('ERROR', { message: 'Invalid authentication token' })
 				socket.disconnect(true)
@@ -241,7 +244,7 @@ export class LobbyGateway
 			socket.data.username = username
 			socket.data.lobbyId = lobbyId
 
-			await socket.join(lobbyId)
+			socket.join(lobbyId)
 
 			if (!this.lobbies.has(lobbyId)) {
 				this.lobbies.set(lobbyId, {
@@ -269,6 +272,7 @@ export class LobbyGateway
 
 			lobby.connections.set(userId, socket)
 
+			// Отправляем текущее состояние лобби новому подключению
 			socket.emit('LOBBY_STATE', {
 				players: Array.from(lobby.players.values()),
 				settings: { ...lobby.settings, maxPlayers: effectiveMax },
@@ -276,19 +280,28 @@ export class LobbyGateway
 			})
 
 			this.logger.log(
-				`Player connected: ${username} (${userId}) to lobby ${lobbyId}, players: ${lobby.players.size}`
+				`WS connected: ${username} (${userId}) lobby=${lobbyId} ip=${ip} socketId=${socket.id}`
 			)
-		} catch (error) {
-			this.logger.error('Connection error:', error)
+		} catch (error: any) {
+			this.logger.error(
+				`Connection error: ${error?.message || String(error)}`,
+				error
+			)
 			socket.emit('ERROR', { message: 'Connection failed' })
 			socket.disconnect(true)
 		}
 	}
 
 	handleDisconnect(socket: Socket) {
-		const { userId, lobbyId } = socket.data
+		const { userId, lobbyId, username } = socket.data || {}
 		const ip = this.clientIp(socket)
 		this.decConn(ip)
+
+		this.logger.log(
+			`WS disconnected: user=${username || userId || 'unknown'} lobby=${
+				lobbyId || 'unknown'
+			} ip=${ip} socketId=${socket.id}`
+		)
 
 		if (!userId || !lobbyId) return
 
@@ -323,93 +336,114 @@ export class LobbyGateway
 
 	@SubscribeMessage('JOIN_LOBBY')
 	handleJoinLobby(socket: Socket, data: { player: Player }) {
-		const { userId, username, lobbyId } = socket.data
-		const lobby = this.lobbies.get(lobbyId)
+		try {
+			const { userId, username, lobbyId } = socket.data
+			const lobby = this.lobbies.get(lobbyId)
 
-		if (!lobby) {
-			socket.emit('ERROR', { message: 'Lobby not found' })
-			return
+			if (!lobby) {
+				socket.emit('ERROR', { message: 'Lobby not found' })
+				return
+			}
+
+			const effectiveMax = Math.min(
+				lobby.settings.maxPlayers || 4,
+				HARD_MAX_PLAYERS
+			)
+			if (lobby.players.size >= effectiveMax) {
+				socket.emit('ERROR', { message: 'Lobby is full' })
+				return
+			}
+
+			const p = data?.player || ({} as Player)
+			const sanitizedName =
+				typeof p.name === 'string' && p.name.trim()
+					? p.name.trim().slice(0, 50)
+					: username || 'Игрок'
+
+			const authenticatedPlayer: Player = {
+				id: userId,
+				name: sanitizedName,
+				missions: Number.isFinite(p.missions)
+					? Math.max(0, Math.min(9999, p.missions))
+					: 0,
+				hours: Number.isFinite(p.hours)
+					? Math.max(0, Math.min(9999, p.hours))
+					: 0,
+				avatar:
+					typeof p.avatar === 'string' && p.avatar.startsWith('http')
+						? p.avatar
+						: undefined,
+				isReady: !!p.isReady,
+			}
+
+			const isNewPlayer = !lobby.players.has(userId)
+			lobby.players.set(userId, authenticatedPlayer)
+
+			this.logger.log(
+				`Player ${authenticatedPlayer.name} ${
+					isNewPlayer ? 'joined' : 'updated in'
+				} lobby ${lobbyId}`
+			)
+
+			// Отправляем успешное присоединение клиенту
+			socket.emit('JOIN_LOBBY_SUCCESS', {
+				player: authenticatedPlayer,
+				lobbyState: {
+					players: Array.from(lobby.players.values()),
+					settings: { ...lobby.settings, maxPlayers: effectiveMax },
+					creatorId: lobby.creatorId,
+				},
+			})
+
+			// Рассылаем обновленное состояние всем в лобби
+			this.server.to(lobbyId).emit('LOBBY_STATE', {
+				players: Array.from(lobby.players.values()),
+				settings: { ...lobby.settings, maxPlayers: effectiveMax },
+				creatorId: lobby.creatorId,
+			})
+		} catch (e: any) {
+			this.logger.error(`JOIN_LOBBY crash: ${e?.message || String(e)}`, e)
+			socket.emit('ERROR', { message: 'Server error (JOIN_LOBBY)' })
 		}
-
-		const effectiveMax = Math.min(
-			lobby.settings.maxPlayers || 4,
-			HARD_MAX_PLAYERS
-		)
-		if (lobby.players.size >= effectiveMax) {
-			socket.emit('ERROR', { message: 'Lobby is full' })
-			return
-		}
-
-		const p = data?.player || ({} as Player)
-		const sanitizedName =
-			typeof p.name === 'string' && p.name.trim()
-				? p.name.trim().slice(0, 50)
-				: username || 'Игрок'
-
-		const authenticatedPlayer: Player = {
-			id: userId,
-			name: sanitizedName,
-			missions: Number.isFinite(p.missions)
-				? Math.max(0, Math.min(9999, p.missions))
-				: 0,
-			hours: Number.isFinite(p.hours)
-				? Math.max(0, Math.min(9999, p.hours))
-				: 0,
-			avatar:
-				typeof p.avatar === 'string' && p.avatar.startsWith('http')
-					? p.avatar
-					: undefined,
-			isReady: !!p.isReady,
-		}
-
-		const isNewPlayer = !lobby.players.has(userId)
-		lobby.players.set(userId, authenticatedPlayer)
-
-		this.logger.log(
-			`Player ${authenticatedPlayer.name} ${
-				isNewPlayer ? 'joined' : 'updated in'
-			} lobby ${lobbyId}`
-		)
-
-		this.server.to(lobbyId).emit('LOBBY_STATE', {
-			players: Array.from(lobby.players.values()),
-			settings: { ...lobby.settings, maxPlayers: effectiveMax },
-			creatorId: lobby.creatorId,
-		})
 	}
 
 	@SubscribeMessage('SEND_MESSAGE')
 	handleSendMessage(socket: Socket, data: { message: any }) {
-		const { lobbyId, username, userId } = socket.data
-		const lobby = this.lobbies.get(lobbyId)
-		if (!lobby) return
+		try {
+			const { lobbyId, username, userId } = socket.data
+			const lobby = this.lobbies.get(lobbyId)
+			if (!lobby) return
 
-		if (!lobby.players.has(userId)) {
-			socket.emit('ERROR', { message: 'You are not in this lobby' })
-			socket.leave(lobbyId)
-			return
+			if (!lobby.players.has(userId)) {
+				socket.emit('ERROR', { message: 'You are not in this lobby' })
+				socket.leave(lobbyId)
+				return
+			}
+
+			if (!this.allowMessage(userId)) {
+				socket.emit('ERROR', { message: 'Too many messages' })
+				return
+			}
+
+			const msg = data?.message ?? {}
+			const textRaw = typeof msg.text === 'string' ? msg.text : ''
+			const text = textRaw.trim().slice(0, MSG_MAX_LEN)
+			if (!text) return
+
+			const messageWithAuth = {
+				...msg,
+				text,
+				type: 'player' as const,
+				playerId: userId,
+				playerName: username || 'Игрок',
+				timestamp: new Date().toISOString(),
+			}
+
+			this.server.to(lobbyId).emit('CHAT_MESSAGE', { message: messageWithAuth })
+		} catch (e: any) {
+			this.logger.error(`SEND_MESSAGE crash: ${e?.message || String(e)}`, e)
+			socket.emit('ERROR', { message: 'Server error (SEND_MESSAGE)' })
 		}
-
-		if (!this.allowMessage(userId)) {
-			socket.emit('ERROR', { message: 'Too many messages' })
-			return
-		}
-
-		const msg = data?.message ?? {}
-		const textRaw = typeof msg.text === 'string' ? msg.text : ''
-		const text = textRaw.trim().slice(0, MSG_MAX_LEN)
-		if (!text) return
-
-		const messageWithAuth = {
-			...msg,
-			text,
-			type: 'player' as const,
-			playerId: userId,
-			playerName: username || 'Игрок',
-			timestamp: new Date().toISOString(),
-		}
-
-		this.server.to(lobbyId).emit('CHAT_MESSAGE', { message: messageWithAuth })
 	}
 
 	@SubscribeMessage('TOGGLE_READY')
@@ -417,29 +451,34 @@ export class LobbyGateway
 		socket: Socket,
 		data: { playerId?: string; isReady: boolean }
 	) {
-		const { userId, lobbyId } = socket.data
-		const lobby = this.lobbies.get(lobbyId)
-		if (!lobby) return
+		try {
+			const { userId, lobbyId } = socket.data
+			const lobby = this.lobbies.get(lobbyId)
+			if (!lobby) return
 
-		const playerId = data.playerId || userId
-		const player = lobby.players.get(playerId)
+			const playerId = data.playerId || userId
+			const player = lobby.players.get(playerId)
 
-		if (playerId !== userId) {
-			socket.emit('ERROR', {
-				message: 'Cannot change other player ready status',
-			})
-			return
-		}
+			if (playerId !== userId) {
+				socket.emit('ERROR', {
+					message: 'Cannot change other player ready status',
+				})
+				return
+			}
 
-		if (player) {
-			player.isReady = !!data.isReady
-			this.logger.log(`Player ${player.name} ready: ${player.isReady}`)
+			if (player) {
+				player.isReady = !!data.isReady
+				this.logger.log(`Player ${player.name} ready: ${player.isReady}`)
 
-			this.server.to(lobbyId).emit('LOBBY_STATE', {
-				players: Array.from(lobby.players.values()),
-				settings: lobby.settings,
-				creatorId: lobby.creatorId,
-			})
+				this.server.to(lobbyId).emit('LOBBY_STATE', {
+					players: Array.from(lobby.players.values()),
+					settings: lobby.settings,
+					creatorId: lobby.creatorId,
+				})
+			}
+		} catch (e: any) {
+			this.logger.error(`TOGGLE_READY crash: ${e?.message || String(e)}`, e)
+			socket.emit('ERROR', { message: 'Server error (TOGGLE_READY)' })
 		}
 	}
 
@@ -448,79 +487,95 @@ export class LobbyGateway
 		socket: Socket,
 		data: { settings: Partial<LobbySettings> }
 	) {
-		const { userId, lobbyId } = socket.data
-		const lobby = this.lobbies.get(lobbyId)
-		if (!lobby) return
+		try {
+			const { userId, lobbyId } = socket.data
+			const lobby = this.lobbies.get(lobbyId)
+			if (!lobby) return
 
-		if (lobby.creatorId !== userId) {
-			socket.emit('ERROR', {
-				message: 'Only lobby creator can change settings',
+			if (lobby.creatorId !== userId) {
+				socket.emit('ERROR', {
+					message: 'Only lobby creator can change settings',
+				})
+				return
+			}
+
+			const next = { ...data.settings }
+			if (typeof next.maxPlayers === 'number') {
+				next.maxPlayers = Math.max(
+					2,
+					Math.min(HARD_MAX_PLAYERS, next.maxPlayers)
+				)
+			}
+
+			Object.assign(lobby.settings, next)
+
+			this.server.to(lobbyId).emit('LOBBY_SETTINGS_UPDATED', {
+				settings: {
+					...lobby.settings,
+					maxPlayers: Math.min(lobby.settings.maxPlayers, HARD_MAX_PLAYERS),
+				},
 			})
-			return
+		} catch (e: any) {
+			this.logger.error(
+				`UPDATE_LOBBY_SETTINGS crash: ${e?.message || String(e)}`,
+				e
+			)
+			socket.emit('ERROR', { message: 'Server error (UPDATE_LOBBY_SETTINGS)' })
 		}
-
-		const next = { ...data.settings }
-		if (typeof next.maxPlayers === 'number') {
-			next.maxPlayers = Math.max(2, Math.min(HARD_MAX_PLAYERS, next.maxPlayers))
-		}
-
-		Object.assign(lobby.settings, next)
-
-		this.server.to(lobbyId).emit('LOBBY_SETTINGS_UPDATED', {
-			settings: {
-				...lobby.settings,
-				maxPlayers: Math.min(lobby.settings.maxPlayers, HARD_MAX_PLAYERS),
-			},
-		})
 	}
 
 	@SubscribeMessage('PLAYER_LEFT')
 	handlePlayerLeft(socket: Socket, data: { playerId?: string }) {
-		const { userId, lobbyId } = socket.data
-		const lobby = this.lobbies.get(lobbyId)
-		if (!lobby) return
+		try {
+			const { userId, lobbyId } = socket.data
+			const lobby = this.lobbies.get(lobbyId)
+			if (!lobby) return
 
-		const playerId = data.playerId || userId
+			const playerId = data.playerId || userId
 
-		if (playerId !== userId && lobby.creatorId !== userId) {
-			socket.emit('ERROR', { message: 'Cannot remove other players' })
-			return
-		}
+			if (playerId !== userId && lobby.creatorId !== userId) {
+				socket.emit('ERROR', { message: 'Cannot remove other players' })
+				return
+			}
 
-		const player = lobby.players.get(playerId)
-		if (player) {
-			const targetSocket = lobby.connections.get(playerId)
+			const player = lobby.players.get(playerId)
+			if (player) {
+				const targetSocket = lobby.connections.get(playerId)
 
-			lobby.players.delete(playerId)
-			lobby.connections.delete(playerId)
+				lobby.players.delete(playerId)
+				lobby.connections.delete(playerId)
 
-			if (targetSocket) {
-				targetSocket.leave(lobbyId)
-				targetSocket.emit('ERROR', {
-					message: 'You were removed from the lobby',
+				if (targetSocket) {
+					targetSocket.leave(lobbyId)
+					targetSocket.emit('ERROR', {
+						message: 'You were removed from the lobby',
+					})
+				}
+
+				this.logger.log(`Player ${player.name} left lobby ${lobbyId}`)
+
+				if (lobby.creatorId === playerId && lobby.players.size > 0) {
+					const remainingPlayers = Array.from(lobby.players.keys())
+					lobby.creatorId = remainingPlayers[0]
+					this.logger.log(
+						`New lobby creator: ${lobby.creatorId} for lobby ${lobbyId}`
+					)
+				}
+
+				this.server.to(lobbyId).emit('LOBBY_STATE', {
+					players: Array.from(lobby.players.values()),
+					settings: lobby.settings,
+					creatorId: lobby.creatorId,
 				})
+
+				if (lobby.players.size === 0 && lobby.connections.size === 0) {
+					this.lobbies.delete(lobbyId)
+					this.logger.log(`Lobby ${lobbyId} deleted (empty)`)
+				}
 			}
-
-			this.logger.log(`Player ${player.name} left lobby ${lobbyId}`)
-
-			if (lobby.creatorId === playerId && lobby.players.size > 0) {
-				const remainingPlayers = Array.from(lobby.players.keys())
-				lobby.creatorId = remainingPlayers[0]
-				this.logger.log(
-					`New lobby creator: ${lobby.creatorId} for lobby ${lobbyId}`
-				)
-			}
-
-			this.server.to(lobbyId).emit('LOBBY_STATE', {
-				players: Array.from(lobby.players.values()),
-				settings: lobby.settings,
-				creatorId: lobby.creatorId,
-			})
-
-			if (lobby.players.size === 0 && lobby.connections.size === 0) {
-				this.lobbies.delete(lobbyId)
-				this.logger.log(`Lobby ${lobbyId} deleted (empty)`)
-			}
+		} catch (e: any) {
+			this.logger.error(`PLAYER_LEFT crash: ${e?.message || String(e)}`, e)
+			socket.emit('ERROR', { message: 'Server error (PLAYER_LEFT)' })
 		}
 	}
 

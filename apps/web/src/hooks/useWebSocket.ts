@@ -1,6 +1,5 @@
-// apps/web/src/hooks/useWebSocket.ts
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { io } from 'socket.io-client'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { io, Socket } from 'socket.io-client'
 import { isForcedLogout } from '../lib/websocketUtils'
 
 interface WebSocketMessage {
@@ -8,13 +7,16 @@ interface WebSocketMessage {
 	[key: string]: any
 }
 
-// Общий интерфейс для WebSocket/MockSocket
 interface CommonSocket {
 	on(event: string, callback: (data: any) => void): CommonSocket
+	off(event: string, callback?: (data: any) => void): CommonSocket
 	emit(event: string, data?: any): CommonSocket
 	disconnect(): void
+	connected: boolean
+	id: string
 }
 
+// --- Mock socket ---
 class MockSocketIO implements CommonSocket {
 	private listeners: Map<string, ((data: any) => void)[]> = new Map()
 	private bc: BroadcastChannel
@@ -30,7 +32,7 @@ class MockSocketIO implements CommonSocket {
 	}
 	private creatorId: string | undefined
 
-	constructor(url: string, _options: any) {
+	constructor(_url: string, _options: any) {
 		this.lobbyId = 'default-lobby'
 		this.bc = new BroadcastChannel(`mock-socketio:${this.lobbyId}`)
 
@@ -52,14 +54,25 @@ class MockSocketIO implements CommonSocket {
 
 	private emitEvent(event: string, data?: any) {
 		const callbacks = this.listeners.get(event) || []
-		callbacks.forEach(callback => callback(data))
+		callbacks.forEach(cb => cb(data))
 	}
 
 	on(event: string, callback: (data: any) => void): MockSocketIO {
-		if (!this.listeners.has(event)) {
-			this.listeners.set(event, [])
-		}
+		if (!this.listeners.has(event)) this.listeners.set(event, [])
 		this.listeners.get(event)!.push(callback)
+		return this
+	}
+
+	off(event: string, callback?: (data: any) => void): MockSocketIO {
+		if (!callback) {
+			this.listeners.delete(event)
+			return this
+		}
+		const arr = this.listeners.get(event) || []
+		this.listeners.set(
+			event,
+			arr.filter(cb => cb !== callback)
+		)
 		return this
 	}
 
@@ -69,6 +82,15 @@ class MockSocketIO implements CommonSocket {
 			if (!this.creatorId) this.creatorId = p.id
 			const prev = this.players.get(p.id) || {}
 			this.players.set(p.id, { ...prev, ...p })
+
+			this.emitEvent('JOIN_LOBBY_SUCCESS', {
+				player: p,
+				lobbyState: {
+					players: Array.from(this.players.values()),
+					settings: this.settings,
+					creatorId: this.creatorId,
+				},
+			})
 
 			this.bc.postMessage({ type: 'PLAYER_JOINED', data: { player: p } })
 			this.emitEvent('LOBBY_STATE', {
@@ -92,13 +114,9 @@ class MockSocketIO implements CommonSocket {
 			})
 		} else if (event === 'SEND_MESSAGE') {
 			const msg = { ...data.message }
-			if (typeof msg.text === 'string') {
-				msg.text = msg.text.slice(0, 300)
-			}
-			this.bc.postMessage({
-				type: 'CHAT_MESSAGE',
-				data: { message: msg },
-			})
+			if (typeof msg.text === 'string') msg.text = msg.text.slice(0, 300)
+
+			this.bc.postMessage({ type: 'CHAT_MESSAGE', data: { message: msg } })
 			setTimeout(() => {
 				this.emitEvent('MESSAGE_SENT', { messageId: data.message?.id })
 			}, 50)
@@ -108,10 +126,7 @@ class MockSocketIO implements CommonSocket {
 
 			this.bc.postMessage({
 				type: 'PLAYER_READY',
-				data: {
-					playerId: data.playerId,
-					isReady: data.isReady,
-				},
+				data: { playerId: data.playerId, isReady: data.isReady },
 			})
 
 			this.emitEvent('LOBBY_STATE', {
@@ -166,13 +181,73 @@ class MockSocketIO implements CommonSocket {
 	}
 }
 
+// --- helpers ---
+function normalizeSocketIoOrigin(baseUrl: string): string {
+	const u = new URL(baseUrl)
+	if (u.protocol === 'ws:') u.protocol = 'http:'
+	if (u.protocol === 'wss:') u.protocol = 'https:'
+	return u.origin
+}
+
+function stableKey(origin: string, path: string, query?: Record<string, any>) {
+	const q = query ? JSON.stringify(query, Object.keys(query).sort()) : ''
+	return `${origin}::${path}::${q}`
+}
+
+// --- shared socket registry ---
+type SharedEntry = {
+	socket: CommonSocket
+	refCount: number
+	disconnectTimer: number | null
+}
+
+const sharedSockets = new Map<string, SharedEntry>()
+
+function acquireSocket(
+	key: string,
+	create: () => CommonSocket
+): { socket: CommonSocket; release: () => void } {
+	let entry = sharedSockets.get(key)
+
+	if (!entry) {
+		entry = { socket: create(), refCount: 0, disconnectTimer: null }
+		sharedSockets.set(key, entry)
+	}
+
+	if (entry.disconnectTimer) {
+		window.clearTimeout(entry.disconnectTimer)
+		entry.disconnectTimer = null
+	}
+
+	entry.refCount += 1
+
+	const release = () => {
+		const e = sharedSockets.get(key)
+		if (!e) return
+
+		e.refCount = Math.max(0, e.refCount - 1)
+		if (e.refCount === 0) {
+			e.disconnectTimer = window.setTimeout(() => {
+				try {
+					e.socket.disconnect()
+				} finally {
+					sharedSockets.delete(key)
+				}
+			}, 1500)
+		}
+	}
+
+	return { socket: entry.socket, release }
+}
+
 export const useWebSocket = (
 	baseUrl: string,
 	onMessage: (data: WebSocketMessage) => void,
 	params?: Record<string, string | number | boolean | undefined>
 ) => {
-	const socket = useRef<CommonSocket | null>(null)
 	const [isConnected, setIsConnected] = useState(false)
+	const socketRef = useRef<CommonSocket | null>(null)
+	const releaseRef = useRef<(() => void) | null>(null)
 	const shouldReconnectRef = useRef(true)
 
 	const onMessageRef = useRef(onMessage)
@@ -180,15 +255,7 @@ export const useWebSocket = (
 		onMessageRef.current = onMessage
 	}, [onMessage])
 
-	const paramsRef = useRef(params)
-	useEffect(() => {
-		paramsRef.current = params
-	}, [params])
-
-	const buildUrl = useCallback(() => {
-		const u = new URL(baseUrl)
-		return u.origin
-	}, [baseUrl])
+	const paramsMemo = useMemo(() => params ?? {}, [params])
 
 	const isProd = process.env.NODE_ENV === 'production'
 	const urlMockFlag =
@@ -200,56 +267,65 @@ export const useWebSocket = (
 	const envMockFlag =
 		process.env.NEXT_PUBLIC_WS_MOCK === 'true' ||
 		process.env.NEXT_PUBLIC_WS_USE_MOCK === 'true'
-
 	const useMock = !isProd && (urlMockFlag || lsMockFlag || envMockFlag)
+
+	const origin = useMemo(() => normalizeSocketIoOrigin(baseUrl), [baseUrl])
+
+	const key = useMemo(
+		() => stableKey(origin, '/lobby', paramsMemo),
+		[origin, paramsMemo]
+	)
 
 	const forceDisconnect = useCallback(() => {
 		console.log('[useWebSocket] Force disconnecting WebSocket')
 		shouldReconnectRef.current = false
 
-		if (socket.current) {
-			socket.current.disconnect()
-			socket.current = null
+		if (releaseRef.current) {
+			releaseRef.current()
+			releaseRef.current = null
 		}
 
+		socketRef.current = null
 		setIsConnected(false)
 	}, [])
 
 	useEffect(() => {
-		// Если был принудительный логаут, не подключаемся
+		if (typeof window === 'undefined') return
+
 		if (isForcedLogout()) {
 			console.log('[useWebSocket] Skipping connection due to forced logout')
 			return
 		}
 
-		const url = buildUrl()
-		let currentSocket: CommonSocket
+		const { socket, release } = acquireSocket(key, () => {
+			if (useMock) {
+				return new MockSocketIO(origin, {
+					transports: ['websocket'],
+					withCredentials: true,
+					autoConnect: true,
+				})
+			}
 
-		if (useMock) {
-			currentSocket = new MockSocketIO(url, {
-				transports: ['websocket'],
-				withCredentials: true,
-				autoConnect: true,
-			})
-		} else {
-			const ioSocket = io(url, {
+			const s = io(origin, {
 				path: '/lobby',
-				query: paramsRef.current,
+				query: paramsMemo,
 				transports: ['websocket'],
 				withCredentials: true,
 				autoConnect: true,
 				reconnection: shouldReconnectRef.current,
-				reconnectionAttempts: 5,
-				reconnectionDelay: 1000,
+				reconnectionAttempts: 10,
+				reconnectionDelay: 500,
 				reconnectionDelayMax: 5000,
 				timeout: 20000,
-			}) as unknown as CommonSocket
+			}) as unknown as Socket
 
-			currentSocket = ioSocket
-		}
+			return s as unknown as CommonSocket
+		})
 
-		socket.current = currentSocket
+		socketRef.current = socket
+		releaseRef.current = release
 
+		// ✅ ВАЖНО: handlers — стабильные ссылки
 		const handleConnect = () => {
 			console.log('[useWebSocket] WebSocket connected')
 			setIsConnected(true)
@@ -259,18 +335,11 @@ export const useWebSocket = (
 			console.log(`[useWebSocket] WebSocket disconnected: ${reason}`)
 			setIsConnected(false)
 
-			// Если это нормальное закрытие или аутентификация не удалась, не переподключаемся
 			if (reason === 'io server disconnect' || reason.includes('auth')) {
-				console.log(
-					'[useWebSocket] Not reconnecting (server disconnect or auth error)'
-				)
 				shouldReconnectRef.current = false
 				return
 			}
-
-			// Если был принудительный логаут, не переподключаемся
 			if (isForcedLogout()) {
-				console.log('[useWebSocket] Not reconnecting due to forced logout')
 				shouldReconnectRef.current = false
 				return
 			}
@@ -281,45 +350,41 @@ export const useWebSocket = (
 			setIsConnected(false)
 		}
 
+		const handleJoinLobbySuccess = (data: any) => {
+			onMessageRef.current?.({ type: 'JOIN_LOBBY_SUCCESS', ...data })
+		}
+
 		const handleLobbyState = (data: any) => {
 			onMessageRef.current?.({ type: 'LOBBY_STATE', ...data })
 		}
-
 		const handlePlayerJoined = (data: any) => {
 			onMessageRef.current?.({ type: 'PLAYER_JOINED', ...data })
 		}
-
 		const handlePlayerLeft = (data: any) => {
 			onMessageRef.current?.({ type: 'PLAYER_LEFT', ...data })
 		}
-
 		const handleChatMessage = (data: any) => {
 			onMessageRef.current?.({ type: 'CHAT_MESSAGE', ...data })
 		}
-
 		const handlePlayerReady = (data: any) => {
 			onMessageRef.current?.({ type: 'PLAYER_READY', ...data })
 		}
-
 		const handleLobbySettingsUpdated = (data: any) => {
 			onMessageRef.current?.({ type: 'LOBBY_SETTINGS_UPDATED', ...data })
 		}
-
 		const handleMessageSent = (data: any) => {
 			onMessageRef.current?.({ type: 'MESSAGE_SENT', ...data })
 		}
-
 		const handleLobbySettingsUpdateSuccess = (data: any) => {
 			onMessageRef.current?.({ type: 'LOBBY_SETTINGS_UPDATE_SUCCESS', ...data })
 		}
 
 		const handleError = (data: any) => {
-			console.error('[useWebSocket] Server error:', data.message)
+			console.error('[useWebSocket] Server error:', data?.message)
 
-			// Если ошибка аутентификации, закрываем соединение и дальше не пробуем
 			if (
-				data.message === 'Authentication required' ||
-				data.message === 'Invalid authentication token'
+				data?.message === 'Authentication required' ||
+				data?.message === 'Invalid authentication token'
 			) {
 				console.log('[useWebSocket] Authentication error, closing connection')
 				forceDisconnect()
@@ -328,25 +393,21 @@ export const useWebSocket = (
 			onMessageRef.current?.({ type: 'ERROR', ...data })
 		}
 
-		// Подписки
-		currentSocket.on('connect', handleConnect)
-		currentSocket.on('disconnect', handleDisconnect)
-		currentSocket.on('connect_error', handleConnectError)
+		socket.on('connect', handleConnect)
+		socket.on('disconnect', handleDisconnect)
+		socket.on('connect_error', handleConnectError)
 
-		currentSocket.on('LOBBY_STATE', handleLobbyState)
-		currentSocket.on('PLAYER_JOINED', handlePlayerJoined)
-		currentSocket.on('PLAYER_LEFT', handlePlayerLeft)
-		currentSocket.on('CHAT_MESSAGE', handleChatMessage)
-		currentSocket.on('PLAYER_READY', handlePlayerReady)
-		currentSocket.on('LOBBY_SETTINGS_UPDATED', handleLobbySettingsUpdated)
-		currentSocket.on('MESSAGE_SENT', handleMessageSent)
-		currentSocket.on(
-			'LOBBY_SETTINGS_UPDATE_SUCCESS',
-			handleLobbySettingsUpdateSuccess
-		)
-		currentSocket.on('ERROR', handleError)
+		socket.on('JOIN_LOBBY_SUCCESS', handleJoinLobbySuccess)
+		socket.on('LOBBY_STATE', handleLobbyState)
+		socket.on('PLAYER_JOINED', handlePlayerJoined)
+		socket.on('PLAYER_LEFT', handlePlayerLeft)
+		socket.on('CHAT_MESSAGE', handleChatMessage)
+		socket.on('PLAYER_READY', handlePlayerReady)
+		socket.on('LOBBY_SETTINGS_UPDATED', handleLobbySettingsUpdated)
+		socket.on('MESSAGE_SENT', handleMessageSent)
+		socket.on('LOBBY_SETTINGS_UPDATE_SUCCESS', handleLobbySettingsUpdateSuccess)
+		socket.on('ERROR', handleError)
 
-		// Событие логаута
 		const handleLogout = () => {
 			console.log('[useWebSocket] Logout event received, disconnecting')
 			forceDisconnect()
@@ -369,28 +430,36 @@ export const useWebSocket = (
 			window.removeEventListener('logout', handleLogout)
 			window.removeEventListener('session-changed', handleSessionChanged)
 
-			if (currentSocket) {
-				currentSocket.disconnect()
-				socket.current = null
-			}
+			socket.off('connect', handleConnect)
+			socket.off('disconnect', handleDisconnect)
+			socket.off('connect_error', handleConnectError)
+
+			socket.off('JOIN_LOBBY_SUCCESS', handleJoinLobbySuccess)
+			socket.off('LOBBY_STATE', handleLobbyState)
+			socket.off('PLAYER_JOINED', handlePlayerJoined)
+			socket.off('PLAYER_LEFT', handlePlayerLeft)
+			socket.off('CHAT_MESSAGE', handleChatMessage)
+			socket.off('PLAYER_READY', handlePlayerReady)
+			socket.off('LOBBY_SETTINGS_UPDATED', handleLobbySettingsUpdated)
+			socket.off('MESSAGE_SENT', handleMessageSent)
+			socket.off(
+				'LOBBY_SETTINGS_UPDATE_SUCCESS',
+				handleLobbySettingsUpdateSuccess
+			)
+			socket.off('ERROR', handleError)
+
+			release()
+			if (releaseRef.current === release) releaseRef.current = null
+			socketRef.current = null
 		}
-	}, [buildUrl, useMock, forceDisconnect])
+	}, [key, origin, useMock, forceDisconnect, paramsMemo])
 
 	const sendMessage = useCallback(
 		(message: WebSocketMessage) => {
-			// Если был принудительный логаут, не отправляем сообщения
-			if (isForcedLogout()) {
-				console.log('[useWebSocket] Cannot send message - forced logout')
-				return false
-			}
-
-			if (!socket.current || !isConnected) {
-				console.warn('[useWebSocket] Cannot send message - not connected')
-				return false
-			}
+			if (isForcedLogout()) return false
+			if (!socketRef.current || !isConnected) return false
 
 			try {
-				// client-side ограничим длину текстов
 				if (
 					message?.type === 'SEND_MESSAGE' &&
 					typeof message?.message?.text === 'string'
@@ -399,7 +468,7 @@ export const useWebSocket = (
 				}
 
 				console.log('Sending WebSocket message:', message.type, message)
-				socket.current.emit(message.type, message)
+				socketRef.current.emit(message.type, message)
 				return true
 			} catch (error) {
 				console.error('[useWebSocket] Failed to send message:', error)

@@ -1,3 +1,4 @@
+// apps/web/src/app/client-root.tsx
 'use client'
 
 import CdnWarning from '@/src/components/CdnWarning'
@@ -37,8 +38,21 @@ const setupFetchInterceptor = () => {
 }
 
 // --- WebSocket interceptor ---
+// ⚠️ ВАЖНО: подмена window.WebSocket может ломать socket.io (transport close).
+// Поэтому выключено по умолчанию.
+// Включить можно только если прям надо: NEXT_PUBLIC_WS_INTERCEPTOR=true
 const setupWebSocketInterceptor = () => {
 	if (typeof window === 'undefined') return
+
+	const enabled =
+		process.env.NEXT_PUBLIC_WS_INTERCEPTOR === 'true' ||
+		(typeof window !== 'undefined' &&
+			new URLSearchParams(window.location.search).get('wsIntercept') === '1')
+
+	if (!enabled) {
+		console.log('[ws-intercept] disabled')
+		return
+	}
 
 	const OriginalWebSocket = window.WebSocket
 
@@ -65,16 +79,14 @@ const setupWebSocketInterceptor = () => {
 			return originalClose(...args)
 		}
 
-		ws.addEventListener('close', () => {
-			connections.delete(ws)
-		})
-		ws.addEventListener('error', () => {
-			connections.delete(ws)
-		})
+		ws.addEventListener('close', () => connections.delete(ws))
+		ws.addEventListener('error', () => connections.delete(ws))
 
 		return ws
 	}
 
+	// 👇 критично: сохранить prototype, иначе socket.io может “падать” на transport close
+	PatchedWebSocket.prototype = OriginalWebSocket.prototype
 	Object.setPrototypeOf(PatchedWebSocket, OriginalWebSocket)
 
 	const staticProps = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'] as const
@@ -108,6 +120,7 @@ const setupWebSocketInterceptor = () => {
 	})
 
 	window.WebSocket = PatchedWebSocket as any
+	console.log('[ws-intercept] enabled')
 
 	return () => {
 		window.WebSocket = OriginalWebSocket
@@ -129,6 +142,8 @@ const themeInitScript = `
 export default function ClientRoot({ children }: { children: ReactNode }) {
 	useEffect(() => {
 		const cleanupFetch = setupFetchInterceptor()
+
+		// WS interceptor выключен по умолчанию (см. setupWebSocketInterceptor)
 		const cleanupWebSocket = setupWebSocketInterceptor()
 
 		return () => {

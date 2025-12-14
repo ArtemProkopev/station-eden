@@ -1,12 +1,9 @@
-// apps/web/next.config.mjs
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-
-const isProd = process.env.NODE_ENV === 'production'
 
 function collectPublicRedirects(CDN) {
 	const redirects = []
@@ -47,7 +44,38 @@ const nextConfig = {
 	productionBrowserSourceMaps: false,
 
 	images: {
-		domains: ['cdn.assets.stationeden.ru'],
+		remotePatterns: [
+			{
+				protocol: 'https',
+				hostname: 'cdn.assets.stationeden.ru',
+				port: '',
+				pathname: '/**',
+			},
+			{
+				protocol: 'https',
+				hostname: 'stationeden.ru',
+				port: '',
+				pathname: '/**',
+			},
+			{
+				protocol: 'https',
+				hostname: 'www.stationeden.ru',
+				port: '',
+				pathname: '/**',
+			},
+			{
+				protocol: 'http',
+				hostname: 'localhost',
+				port: '3000',
+				pathname: '/**',
+			},
+			{
+				protocol: 'http',
+				hostname: '127.0.0.1',
+				port: '3000',
+				pathname: '/**',
+			},
+		],
 		formats: ['image/webp', 'image/avif'],
 		deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
 		imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
@@ -56,11 +84,9 @@ const nextConfig = {
 	experimental: {
 		serverActions: { bodySizeLimit: '2mb' },
 		optimizePackageImports: [
-			// React Next и так оптимизирует, их можно не трогать
 			'socket.io-client',
 			'react-hook-form',
 			'@hookform/resolvers',
-			'framer-motion',
 			'gsap',
 			'@livekit/components-react',
 		],
@@ -68,10 +94,30 @@ const nextConfig = {
 
 	webpack(config, { dev, isServer }) {
 		if (!dev && !isServer) {
-			// уменьшает вес sourcemap-ов в браузере
 			config.devtool = false
 		}
 		return config
+	},
+
+	// ✅ DEV: first-party прокси на API:4000
+	async rewrites() {
+		if (process.env.NODE_ENV !== 'production') {
+			return [
+				{
+					source: '/auth/:path*',
+					destination: 'http://localhost:4000/auth/:path*',
+				},
+				{
+					source: '/api/:path*',
+					destination: 'http://localhost:4000/api/:path*',
+				},
+				{
+					source: '/users/:path*',
+					destination: 'http://localhost:4000/users/:path*',
+				},
+			]
+		}
+		return []
 	},
 
 	async redirects() {

@@ -1,4 +1,3 @@
-// apps/web/src/app/profile/hooks/useProfile.ts
 import { asset } from '@/lib/asset'
 import { useCallback, useState } from 'react'
 import { PROFILE_CONFIG, avatarKey, frameKey } from '../config'
@@ -7,6 +6,22 @@ import { ProfileIconsStatus, ProfileState } from '../types'
 type ProfileAssets = {
 	avatar: string
 	frame: string
+}
+
+/**
+ * ✅ В DEV делаем запросы first-party (через Next rewrites):
+ * NEXT_PUBLIC_API_BASE пустой => apiUrl('/auth/me') станет '/auth/me'
+ *
+ * В docker режиме может быть '/api' => apiUrl('/auth/me') => '/api/auth/me' (если так настроишь)
+ * В prod может быть 'https://api....' => станет абсолютный URL.
+ */
+const RAW_API_BASE = process.env.NEXT_PUBLIC_API_BASE?.trim() ?? ''
+const API_BASE = RAW_API_BASE
+
+function apiUrl(path: string) {
+	if (!path.startsWith('/')) path = `/${path}`
+	if (!API_BASE || API_BASE.startsWith('/')) return `${API_BASE}${path}`
+	return `${API_BASE}${path}`
 }
 
 const migrateToAbsoluteUrl = (
@@ -28,7 +43,7 @@ function readCookie(name: string): string | null {
 
 async function ensureCsrf() {
 	try {
-		await fetch('/auth/csrf', {
+		await fetch(apiUrl('/auth/csrf'), {
 			method: 'GET',
 			credentials: 'include',
 			cache: 'no-store',
@@ -46,10 +61,6 @@ function csrfHeader(): Record<string, string> {
 type MePayloadLike = any
 
 function unwrapAny<T = any>(v: any): T {
-	// возможные обёртки
-	// - {data: {...}}
-	// - {user: {...}}
-	// - {status:'signed-in', user:{...}}
 	if (!v || typeof v !== 'object') return v as T
 	if ('data' in v && v.data && typeof v.data === 'object') return v.data as T
 	if ('status' in v && v.status === 'signed-in' && v.user) return v.user as T
@@ -84,11 +95,6 @@ export const useProfile = () => {
 		[]
 	)
 
-	/**
-	 * Кэш по userId — только fallback.
-	 * userId опционален, чтобы старые места не падали типами.
-	 * Если userId не передали — пытаемся взять из profile.
-	 */
 	const loadSavedAssets = useCallback(
 		(userId?: string) => {
 			try {
@@ -136,15 +142,9 @@ export const useProfile = () => {
 		setIconsStatus(prev => ({ ...prev, ...statusUpdates }))
 	}, [])
 
-	/**
-	 * Грузим профиль строго same-origin:
-	 * /auth/me (Caddy proxy → api:4000)
-	 *
-	 * ВАЖНО: формат ответа “разный” — поэтому аккуратно распаковываем.
-	 */
 	const loadUserData = useCallback(async () => {
 		try {
-			const meResp = await fetch('/auth/me', {
+			const meResp = await fetch(apiUrl('/auth/me'), {
 				method: 'GET',
 				credentials: 'include',
 				cache: 'no-store',
@@ -168,7 +168,6 @@ export const useProfile = () => {
 			const raw = (await meResp.json().catch(() => null)) as MePayloadLike
 			const payload = unwrapAny<any>(raw)
 
-			// поддерживаем userId или id
 			const userId =
 				pickString(payload?.userId) ||
 				pickString(payload?.id) ||
@@ -218,8 +217,6 @@ export const useProfile = () => {
 				},
 			})
 
-			// Сервер — источник истины.
-			// Но если в БД null — используем кэш.
 			if (avatarAbs) {
 				setAssets(prev => ({ ...prev, avatar: avatarAbs }))
 				localStorage.setItem(avatarKey(userId), avatarAbs)
@@ -236,7 +233,6 @@ export const useProfile = () => {
 				if (cached) setAssets(prev => ({ ...prev, frame: cached }))
 			}
 
-			// подтягиваем кэш “на всякий”
 			loadSavedAssets(userId)
 		} catch (error: any) {
 			console.error('Profile data loading error:', error)
@@ -258,7 +254,7 @@ export const useProfile = () => {
 
 			await ensureCsrf()
 
-			const resp = await fetch('/api/users/profile', {
+			const resp = await fetch(apiUrl('/users/profile'), {
 				method: 'PUT',
 				credentials: 'include',
 				cache: 'no-store',
@@ -329,7 +325,7 @@ export const useProfile = () => {
 
 			await ensureCsrf()
 
-			const resp = await fetch('/api/users/profile', {
+			const resp = await fetch(apiUrl('/users/profile'), {
 				method: 'PUT',
 				credentials: 'include',
 				cache: 'no-store',

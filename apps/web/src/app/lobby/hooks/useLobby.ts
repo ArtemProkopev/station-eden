@@ -1,4 +1,3 @@
-// apps/web/src/app/lobby/hooks/useLobby.ts
 import { useProfile } from '@/app/profile/hooks/useProfile'
 import { useScrollPrevention } from '@/hooks/useScrollPrevention'
 import { useWebSocket } from '@/hooks/useWebSocket'
@@ -29,6 +28,17 @@ const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
 		type: 'system',
 	},
 ]
+
+function defaultWsBaseForDev(): string {
+	if (typeof window === 'undefined') return 'http://localhost:4000'
+	const loc = window.location
+	const isLocal =
+		loc.hostname === 'localhost' ||
+		loc.hostname === '127.0.0.1' ||
+		loc.hostname.endsWith('.local')
+	if (!isLocal) return `${loc.protocol}//${loc.host}`
+	return 'http://localhost:4000'
+}
 
 export function useLobby(lobbyIdFromProps?: string) {
 	const {
@@ -62,10 +72,20 @@ export function useLobby(lobbyIdFromProps?: string) {
 	const lobbySettingsRef = useRef<LobbySettings>(DEFAULT_LOBBY_SETTINGS)
 	const lobbyIdRef = useRef<string>(lobbyIdFromProps || 'default-lobby')
 	const hasJoinedRef = useRef(false)
-	const reconnectTimeoutRef = useRef<NodeJS.Timeout>()
+	const joinTimeoutRef = useRef<NodeJS.Timeout>()
 	const didInitRef = useRef(false)
 
-	// Хелпер для получения ID пользователя из профиля
+	const loadUserDataRef = useRef(loadUserData)
+	const checkIconsAvailabilityRef = useRef(checkIconsAvailability)
+
+	useEffect(() => {
+		loadUserDataRef.current = loadUserData
+	}, [loadUserData])
+
+	useEffect(() => {
+		checkIconsAvailabilityRef.current = checkIconsAvailability
+	}, [checkIconsAvailability])
+
 	const currentUserId = profile.data?.id
 
 	useEffect(() => {
@@ -83,9 +103,28 @@ export function useLobby(lobbyIdFromProps?: string) {
 	useScrollPrevention()
 
 	const handleWebSocketMessage = useCallback((data: any) => {
+		console.log('[useLobby] Received message:', data.type)
+
 		if (!data?.type) return
 
 		switch (data.type) {
+			case 'JOIN_LOBBY_SUCCESS':
+				console.log('Successfully joined lobby')
+				setPlayers(
+					Array.isArray(data.lobbyState?.players) ? data.lobbyState.players : []
+				)
+				if (data.lobbyState?.settings)
+					setLobbySettings(data.lobbyState.settings)
+				if (data.lobbyState?.creatorId)
+					setLobbyCreatorId(data.lobbyState.creatorId)
+				setIsLoading(false)
+				setError('')
+				if (joinTimeoutRef.current) {
+					clearTimeout(joinTimeoutRef.current)
+					joinTimeoutRef.current = undefined
+				}
+				break
+
 			case 'PLAYER_JOINED':
 				setPlayers(prev => {
 					const exists = prev.some((p: Player) => p.id === data.player.id)
@@ -126,6 +165,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 				setPlayers(Array.isArray(data.players) ? data.players : [])
 				if (data.settings) setLobbySettings(data.settings)
 				if (data.creatorId) setLobbyCreatorId(data.creatorId)
+				setIsLoading(false)
 				break
 
 			case 'PLAYER_READY':
@@ -142,51 +182,53 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 			case 'ERROR':
 				console.error('Server error:', data.message)
-				// Просто сохраняем ошибку для UI и больше НИЧЕГО не делаем.
-				// Никаких logout / redirect здесь быть не должно.
 				setError(data.message || 'Произошла ошибка')
+				setIsLoading(false)
+				hasJoinedRef.current = false
+				if (joinTimeoutRef.current) {
+					clearTimeout(joinTimeoutRef.current)
+					joinTimeoutRef.current = undefined
+				}
 				break
 		}
 	}, [])
 
-	const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'http://localhost:4000'
-	const wsUrl = wsBase.startsWith('http')
-		? wsBase.replace('http', 'ws')
-		: wsBase
+	// WS_BASE: если не задан — dev по умолчанию на :4000
+	const wsBase =
+		process.env.NEXT_PUBLIC_WS_BASE?.trim() || defaultWsBaseForDev()
+
 	const wsParams = useMemo(
 		() => ({ lobbyId: lobbyIdFromProps || 'default-lobby' }),
 		[lobbyIdFromProps]
 	)
 
 	const { sendMessage: sendWS, isConnected } = useWebSocket(
-		wsUrl,
+		wsBase,
 		handleWebSocketMessage,
 		wsParams
 	)
 
 	useEffect(() => {
 		if (!isConnected && hasJoinedRef.current) {
-			reconnectTimeoutRef.current = setTimeout(() => {
-				if (currentUserId) {
-					hasJoinedRef.current = false
-				}
-			}, 2000)
+			console.log('Connection lost, resetting join flag')
+			hasJoinedRef.current = false
+			setIsLoading(true)
 		}
-
-		return () => {
-			if (reconnectTimeoutRef.current) {
-				clearTimeout(reconnectTimeoutRef.current)
-			}
-		}
-	}, [isConnected, currentUserId])
+	}, [isConnected])
 
 	useEffect(() => {
 		if (isConnected) setError('')
 	}, [isConnected])
 
-	// Подключаемся к лобби, когда есть соединение и загружен профиль
+	// JOIN когда есть соединение и профиль
 	useEffect(() => {
-		if (isConnected && !hasJoinedRef.current && currentUserId && profile.data) {
+		if (
+			isConnected &&
+			!hasJoinedRef.current &&
+			currentUserId &&
+			profile.data &&
+			!isLoading
+		) {
 			const currentUser: Player = {
 				id: currentUserId,
 				name: profile.data.username || 'Игрок',
@@ -201,13 +243,36 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 			if (success) {
 				hasJoinedRef.current = true
-			} else {
-				setTimeout(() => {
-					hasJoinedRef.current = false
-				}, 1000)
+				setIsLoading(true)
+
+				// Таймаут ожидания ответа от сервера
+				joinTimeoutRef.current = setTimeout(() => {
+					if (hasJoinedRef.current) {
+						console.error('Timeout waiting for JOIN_LOBBY_SUCCESS')
+						setError(
+							'Не удалось присоединиться к лобби. Попробуйте обновить страницу.'
+						)
+						setIsLoading(false)
+						hasJoinedRef.current = false
+					}
+				}, 5000)
 			}
 		}
-	}, [profile.data, isConnected, assets.avatar, sendWS, currentUserId])
+
+		return () => {
+			if (joinTimeoutRef.current) {
+				clearTimeout(joinTimeoutRef.current)
+				joinTimeoutRef.current = undefined
+			}
+		}
+	}, [
+		profile.data,
+		isConnected,
+		assets.avatar,
+		sendWS,
+		currentUserId,
+		isLoading,
+	])
 
 	const handlePlayerMenuClick = useCallback((player: Player) => {
 		setSelectedPlayer(player)
@@ -248,16 +313,13 @@ export function useLobby(lobbyIdFromProps?: string) {
 		(_playerId: string, _muted: boolean) => {},
 		[]
 	)
-
 	const handleVolumeChange = useCallback(
 		(_playerId: string, _volume: number) => {},
 		[]
 	)
 
 	const handleAddFriend = useCallback(() => {
-		if (selectedPlayer) {
-			alert(`Игрок ${selectedPlayer.name} добавлен в друзья!`)
-		}
+		if (selectedPlayer) alert(`Игрок ${selectedPlayer.name} добавлен в друзья!`)
 	}, [selectedPlayer])
 
 	const handleRemovePlayer = useCallback(
@@ -310,7 +372,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 	const toggleReady = useCallback(() => {
 		if (!currentUserId) return
-
 		const currentPlayer = playersRef.current.find(
 			(p: Player) => p.id === currentUserId
 		)
@@ -384,45 +445,30 @@ export function useLobby(lobbyIdFromProps?: string) {
 		}
 	})
 
-	/**
-	 * Инициализация лобби (одноразово):
-	 * 1) грузим пользователя (сервер — источник истины)
-	 * 2) иконки грузим фоном (не блокируют)
-	 *
-	 * ВАЖНО: не включаем loadSavedAssets в deps — иначе будет цикл,
-	 * т.к. loadSavedAssets в useProfile зависит от profile и меняет identity.
-	 */
+	// Инициализация лобби — строго 1 раз.
 	useEffect(() => {
 		if (didInitRef.current) return
 		didInitRef.current = true
 
-		let cancelled = false
+		let mounted = true
 
 		const init = async () => {
 			try {
 				setIsLoading(true)
-
-				await loadUserData()
-				if (cancelled) return
-
-				// Иконки НЕ блокируют лобби
-				checkIconsAvailability().catch(() => {})
+				await loadUserDataRef.current()
+				if (!mounted) return
+				checkIconsAvailabilityRef.current?.().catch(() => {})
 			} finally {
-				if (!cancelled) setIsLoading(false)
+				if (mounted) setIsLoading(false)
 			}
 		}
 
 		init()
-
 		return () => {
-			cancelled = true
+			mounted = false
 		}
-	}, [loadUserData, checkIconsAvailability])
+	}, [])
 
-	/**
-	 * Подтягиваем локальный кэш ассетов отдельно, когда появился userId.
-	 * Это безопасно и не вызывает цикл init-эффекта.
-	 */
 	useEffect(() => {
 		const uid = profile.data?.id
 		if (!uid) return

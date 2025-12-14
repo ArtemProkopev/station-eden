@@ -8,16 +8,17 @@ module.exports = function (options) {
 		...options,
 		mode: isProd ? 'production' : 'development',
 		devtool: isProd ? false : options.devtool,
-		externals: [],
+
+		// не затирай externals
+		externals: options.externals,
+
 		optimization: {
 			...(options.optimization || {}),
 			minimize: isProd,
 		},
 		plugins: [
-			...options.plugins,
-			new webpack.optimize.LimitChunkCountPlugin({
-				maxChunks: 1,
-			}),
+			...(options.plugins || []),
+			new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 }),
 		],
 	}
 }

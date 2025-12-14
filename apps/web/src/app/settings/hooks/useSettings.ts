@@ -7,6 +7,9 @@ import { useCallback, useState } from 'react'
 import { PROFILE_CONFIG, avatarKey } from '../../profile/config'
 import { ProfileState } from '../../profile/types'
 
+const API_BASE =
+	process.env.NEXT_PUBLIC_API_BASE?.trim() || 'http://localhost:4000'
+
 const DEFAULT_SETTINGS: UserSettings = {
 	sound: {
 		masterVolume: 63,
@@ -48,17 +51,10 @@ export function useSettings() {
 		asset(PROFILE_CONFIG.DEFAULT.AVATAR)
 	)
 
-	/**
-	 * Грузим аватар из:
-	 * 1) server avatar (если есть)
-	 * 2) localStorage per-user key (profile_avatar:<userId>)
-	 * 3) дефолт
-	 */
 	const loadSavedAvatar = useCallback((userId?: string) => {
 		try {
 			const uid = pickString(userId) || null
 
-			// старые ключи оставим как fallback (на всякий)
 			const legacyAvatar = localStorage.getItem(
 				PROFILE_CONFIG.STORAGE_KEYS.AVATAR
 			)
@@ -92,14 +88,9 @@ export function useSettings() {
 		}
 	}, [])
 
-	/**
-	 * ВАЖНО:
-	 * Грузим профиль строго same-origin: /auth/me (Caddy proxy → api)
-	 * Не используем NEXT_PUBLIC_API_BASE здесь, чтобы не ловить проблемы с cookies/origin/форматом.
-	 */
 	const loadUserData = useCallback(async () => {
 		try {
-			const response = await fetch('/auth/me', {
+			const response = await fetch(`${API_BASE}/auth/me`, {
 				method: 'GET',
 				credentials: 'include',
 				cache: 'no-store',
@@ -122,7 +113,6 @@ export function useSettings() {
 			const raw = (await response.json().catch(() => null)) as MePayloadLike
 			const payload = unwrapAny<any>(raw)
 
-			// поддерживаем id/userId и вложенные варианты
 			const userId =
 				pickString(payload?.userId) ||
 				pickString(payload?.id) ||
@@ -172,7 +162,6 @@ export function useSettings() {
 				} as any,
 			})
 
-			// ставим аватар: сервер > per-user cache > дефолт
 			if (avatarAbs) {
 				setAvatar(avatarAbs)
 				localStorage.setItem(avatarKey(userId), avatarAbs)

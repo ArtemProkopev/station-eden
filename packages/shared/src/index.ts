@@ -254,3 +254,15 @@ export interface ServerLockInfo {
 	lockedUntil?: ISODateString
 	attemptsLeft?: number
 }
+
+/**
+ * Ответ от сервера при успешном присоединении к лобби
+ */
+export interface JoinLobbySuccessResponse {
+	player: LobbyPlayer
+	lobbyState: {
+		players: LobbyPlayer[]
+		settings: LobbySettings
+		creatorId: string
+	}
+}
