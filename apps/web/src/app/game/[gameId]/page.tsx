@@ -8,6 +8,7 @@ import TopHUD from '@/components/TopHUD/TopHUD';
 import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile';
 import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars';
 import { useProfile } from '@/app/profile/hooks/useProfile';
+import GameSession from '@/components/Game/GameSession';
 import styles from './page.module.css';
 
 // Расширяем типы, чтобы они соответствовали серверной логике
@@ -23,18 +24,27 @@ type ExtendedGamePlayer = {
   isReady?: boolean
 }
 
+// Полный тип для настроек игры, соответствующий GameGateway
+type ExtendedGameSettings = {
+  gameMode: string
+  maxPlayers: number
+  maxRounds: number
+  discussionTime: number
+  votingTime: number
+  hiddenRolesCount: number
+  enableCrises: boolean
+  difficulty: 'easy' | 'normal' | 'hard'
+  tournamentMode?: boolean
+  turnTime?: string
+  limitedResources?: boolean
+}
+
 type ExtendedGameState = GameState & {
   creatorId?: string
   maxRounds?: number
   winnerId?: string
   finishedAt?: string
-  settings?: {
-    gameMode?: string
-    difficulty?: string
-    turnTime?: string
-    tournamentMode?: boolean
-    limitedResources?: boolean
-  }
+  settings?: ExtendedGameSettings
 }
 
 export default function GamePage() {
@@ -101,7 +111,7 @@ export default function GamePage() {
     }
   }, [router]);
 
-  // ИСПРАВЛЕНО: Правильный WebSocket URL без двойного протокола
+  // ИСПРАВЛЕНО: Правильный WebSocket URL для игры
   const wsBase = process.env.NEXT_PUBLIC_WS_BASE;
   let wsUrl: string;
   
@@ -204,6 +214,15 @@ export default function GamePage() {
     }
   };
 
+  const handleStartGame = () => {
+    if (!isConnected) {
+      setError('Нет подключения к серверу');
+      return;
+    }
+    
+    sendWS({ type: 'START_GAME_SESSION' });
+  };
+
   // Функция для реконнекта
   const handleReconnect = () => {
     setError('');
@@ -290,6 +309,31 @@ export default function GamePage() {
     );
   }
 
+  // Если игра активна и загружена, показываем основной интерфейс GameSession
+  if (gameState && gameState.status === 'active' && profile.data) {
+    return (
+      <main className={styles.page}>
+        <FirefliesProfile />
+        <TwinklingStars />
+        <TopHUD 
+          profile={{
+            status: profile.status,
+            userId: profile.data.id,
+            email: profile.data.email,
+            username: profile.data.username,
+            message: profile.message,
+          }}
+          avatar={assets.avatar}
+        />
+        <GameSession 
+          gameId={gameId}
+          userId={profile.data.id}
+          username={profile.data.username || 'Игрок'}
+        />
+      </main>
+    );
+  }
+
   // Приводим статус профиля к нужному формату для TopHUD
   const topHudProfile = {
     status: profile.status,
@@ -303,6 +347,7 @@ export default function GamePage() {
   const creatorId = (gameState as ExtendedGameState)?.creatorId || '';
   const maxRounds = (gameState as ExtendedGameState)?.maxRounds;
   const winnerId = (gameState as ExtendedGameState)?.winnerId;
+  const settings = gameState?.settings;
 
   return (
     <main className={styles.page}>
@@ -319,13 +364,14 @@ export default function GamePage() {
           <h1 className={styles.title}>Игра #{gameId?.slice(0, 12) || '...'}</h1>
           <div className={styles.gameInfo}>
             <span className={styles.gameMode}>
-              Режим: {gameState?.settings?.gameMode || 'Стандартный'}
+              Режим: {settings?.gameMode || 'Стандартный'}
             </span>
             <span className={styles.gameStatus}>
               Статус: {
+                gameState?.status === 'waiting' ? 'Ожидание игроков' :
                 gameState?.status === 'active' ? 'В процессе' :
                 gameState?.status === 'finished' ? 'Завершена' :
-                gameState?.status === 'cancelled' ? 'Отменена' : 'Ожидание'
+                gameState?.status === 'cancelled' ? 'Отменена' : 'Неизвестно'
               }
             </span>
             <div className={styles.connectionStatus}>
@@ -435,6 +481,33 @@ export default function GamePage() {
                     Вернуться в лобби
                   </button>
                 </div>
+              ) : gameState?.status === 'waiting' ? (
+                <div className={styles.gameArea}>
+                  <div className={styles.placeholder}>
+                    ⏳ Ожидание начала игры
+                  </div>
+                  <div className={styles.instructions}>
+                    <p>Ожидаем, когда создатель начнёт игру.</p>
+                    <p>Игроков в комнате: <strong>{players.length}</strong></p>
+                    <p>Максимум игроков: <strong>{settings?.maxPlayers || 4}</strong></p>
+                    
+                    {creatorId === profile.data?.id && (
+                      <div className={styles.gameActions}>
+                        <p>Вы создатель лобби.</p>
+                        <button 
+                          className={styles.actionButton}
+                          onClick={handleStartGame}
+                          disabled={!isConnected}
+                        >
+                          Начать игру
+                        </button>
+                        <p className={styles.gameInstructions}>
+                          Игра начнется, когда вы нажмете кнопку "Начать игру"
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               ) : (
                 <>
                   <div className={styles.roundInfo}>
@@ -472,9 +545,9 @@ export default function GamePage() {
                       
                       <div className={styles.gameInstructions}>
                         <p>Игра началась! Добро пожаловать в игру.</p>
-                        <p>Режим: <strong>{gameState?.settings?.gameMode || 'Стандартный'}</strong></p>
-                        {gameState?.settings?.difficulty && (
-                          <p>Сложность: <strong>{gameState.settings.difficulty}</strong></p>
+                        <p>Режим: <strong>{settings?.gameMode || 'Стандартный'}</strong></p>
+                        {settings?.difficulty && (
+                          <p>Сложность: <strong>{settings.difficulty}</strong></p>
                         )}
                       </div>
                     </div>
@@ -495,11 +568,11 @@ export default function GamePage() {
                 Пропустить ход
               </button>
               
-              {creatorId === profile.data?.id && (
+              {creatorId === profile.data?.id && gameState?.status !== 'finished' && (
                 <button 
                   className={styles.controlButton}
                   onClick={handleEndGame}
-                  disabled={!isConnected || gameState?.status === 'finished'}
+                  disabled={!isConnected}
                 >
                   Завершить игру досрочно
                 </button>
@@ -515,17 +588,19 @@ export default function GamePage() {
                 {gameState?.startedAt && (
                   <div className={styles.statItem}>
                     <span>Начало игры:</span>
-                    <span>{new Date(gameState.startedAt).toLocaleTimeString()}</span>
+                    <span>{new Date(gameState.startedAt).toLocaleDateString()} {new Date(gameState.startedAt).toLocaleTimeString()}</span>
                   </div>
                 )}
                 <div className={styles.statItem}>
                   <span>Игроков онлайн:</span>
                   <span>{players.length}</span>
                 </div>
-                <div className={styles.statItem}>
-                  <span>Ваши очки:</span>
-                  <span>{currentPlayer?.score || 0}</span>
-                </div>
+                {currentPlayer && (
+                  <div className={styles.statItem}>
+                    <span>Ваши очки:</span>
+                    <span>{currentPlayer.score || 0}</span>
+                  </div>
+                )}
               </div>
               
               <button 
