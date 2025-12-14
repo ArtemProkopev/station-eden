@@ -156,9 +156,9 @@ class MockSocketIO implements CommonSocket {
 			})
 		}
 		
-		// ДОБАВЛЕНО: обработка START_GAME
+		// ДОБАВЛЕНО: обработка START_GAME (только для мок-режима)
 		else if (event === 'START_GAME') {
-			// Создание игры (упрощенная версия)
+			// Создание игры (упрощенная версия для мок-режима)
 			const gameId = Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
 			
 			this.bc.postMessage({
@@ -222,7 +222,8 @@ export const useWebSocket = (
 		process.env.NEXT_PUBLIC_WS_MOCK === 'true' ||
 		process.env.NEXT_PUBLIC_WS_USE_MOCK === 'true'
 
-	const useMock = urlMockFlag || lsMockFlag || envMockFlag
+	// ВАЖНО: мок-режим только для разработки, чтобы не сломать продакшен
+	const useMock = !isProd && (urlMockFlag || lsMockFlag || envMockFlag)
 
 	const forceDisconnect = useCallback(() => {
 		console.log('[useWebSocket] Force disconnecting WebSocket')
@@ -253,9 +254,9 @@ export const useWebSocket = (
 				autoConnect: true,
 			})
 		} else {
-			// ВАША РАБОЧАЯ КОНФИГУРАЦИЯ - НЕ МЕНЯЕМ!
+			// ВАЖНО: Это ваша рабочая конфигурация для реального сервера!
 			const ioSocket = io(url, {
-				path: '/lobby',  // Обратите внимание на этот путь!
+				path: '/lobby',  // ← ПРАВИЛЬНЫЙ ПУТЬ для вашего сервера!
 				query: paramsRef.current,
 				transports: ['websocket'],
 				withCredentials: true,
