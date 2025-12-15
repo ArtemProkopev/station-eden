@@ -1,3 +1,4 @@
+// apps/web/src/hooks/useWebSocket.ts
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import { isForcedLogout } from '../lib/websocketUtils'
@@ -15,8 +16,17 @@ interface CommonSocket {
 }
 
 export type UseWebSocketOptions = {
-	path?: '/lobby' | '/game'
+	/**
+	 * Engine.IO path (на сервере NestJS это WebSocketGateway({ path: ... }))
+	 * ДОЛЖЕН быть явно указан: '/lobby' или '/game'
+	 */
+	path: '/lobby' | '/game'
 	debugAllEvents?: boolean
+	/**
+	 * Управляет тем, подключаться ли к сокету вообще.
+	 * Если false — соединение не создаём.
+	 */
+	enabled?: boolean
 }
 
 function safeParseUrl(input: string) {
@@ -48,39 +58,44 @@ export const useWebSocket = (
 		onMessageRef.current = onMessage
 	}, [onMessage])
 
-	const isProd = process.env.NODE_ENV === 'production'
-	const debugAllEvents = options?.debugAllEvents ?? !isProd
-
-	// Явно задаём path (это Engine.IO path)
-	const socketPath = (options?.path || '/lobby') as '/lobby' | '/game'
-
-	// 🚨 Защита от класса багов: gameId никогда не должен уходить в /lobby и наоборот
-	if (!isProd) {
-		const hasGameId =
-			!!params && Object.prototype.hasOwnProperty.call(params, 'gameId')
-		const hasLobbyId =
-			!!params && Object.prototype.hasOwnProperty.call(params, 'lobbyId')
-
-		if (hasGameId && socketPath !== '/game') {
-			throw new Error(
-				'[useWebSocket] Mismatch: gameId passed with non-/game path'
-			)
-		}
-		if (hasLobbyId && socketPath !== '/lobby') {
-			throw new Error(
-				'[useWebSocket] Mismatch: lobbyId passed with non-/lobby path'
-			)
-		}
+	// ✅ path обязателен: убираем "молчаливый" дефолт '/lobby'
+	const socketPath = options?.path
+	if (!socketPath) {
+		throw new Error(
+			'[useWebSocket] options.path is required: "/lobby" or "/game"'
+		)
 	}
 
-	// FIX: baseUrl должен быть ТОЛЬКО origin (без /lobby или /game)
+	const isProd = process.env.NODE_ENV === 'production'
+	const debugAllEvents = options?.debugAllEvents ?? !isProd
+	const enabled = options?.enabled ?? true
+
+	// ✅ Защита ОТ ВСЕХ сред (включая prod)
+	// gameId не может идти в /lobby, lobbyId не может идти в /game
+	const hasGameId =
+		!!params && Object.prototype.hasOwnProperty.call(params, 'gameId')
+	const hasLobbyId =
+		!!params && Object.prototype.hasOwnProperty.call(params, 'lobbyId')
+
+	if (hasGameId && socketPath !== '/game') {
+		throw new Error(
+			'[useWebSocket] Mismatch: gameId passed with non-/game socket path'
+		)
+	}
+	if (hasLobbyId && socketPath !== '/lobby') {
+		throw new Error(
+			'[useWebSocket] Mismatch: lobbyId passed with non-/lobby socket path'
+		)
+	}
+
+	// ✅ baseUrl нормализуем до origin
 	const resolvedIoUrl = useMemo(() => {
 		const u = safeParseUrl(baseUrl)
 		if (!u) return baseUrl
 		return `${u.origin}`
 	}, [baseUrl])
 
-	// Ключ для пересоздания сокета при изменении query
+	// ✅ ключ для пересоздания сокета при изменении query
 	const paramsKey = useMemo(() => JSON.stringify(params || {}), [params])
 
 	const forceDisconnect = useCallback(() => {
@@ -93,6 +108,13 @@ export const useWebSocket = (
 	}, [])
 
 	useEffect(() => {
+		// ✅ если выключено — не создаём сокет вообще
+		if (!enabled) {
+			if (debugAllEvents)
+				console.log('[useWebSocket] disabled, skipping connection')
+			return
+		}
+
 		if (isForcedLogout()) {
 			if (debugAllEvents) {
 				console.log('[useWebSocket] Skipping connection due to forced logout')
@@ -100,9 +122,7 @@ export const useWebSocket = (
 			return
 		}
 
-		let currentSocket: CommonSocket
-
-		currentSocket = io(resolvedIoUrl, {
+		const currentSocket = io(resolvedIoUrl, {
 			path: socketPath,
 			query: params || {},
 			transports: ['websocket'],
@@ -219,7 +239,14 @@ export const useWebSocket = (
 			currentSocket.disconnect()
 			socket.current = null
 		}
-	}, [resolvedIoUrl, socketPath, paramsKey, debugAllEvents, forceDisconnect])
+	}, [
+		resolvedIoUrl,
+		socketPath,
+		paramsKey,
+		debugAllEvents,
+		forceDisconnect,
+		enabled,
+	])
 
 	const sendMessage = useCallback(
 		(message: WebSocketMessage) => {
@@ -238,7 +265,6 @@ export const useWebSocket = (
 			}
 
 			try {
-				// safety trim
 				if (
 					message?.type === 'SEND_MESSAGE' &&
 					typeof message?.message?.text === 'string'

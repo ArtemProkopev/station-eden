@@ -1,8 +1,9 @@
 // apps/web/src/app/game/[gameId]/page.tsx
 'use client'
 
+import { useProfile } from '@/app/profile/hooks/useProfile'
 import { useWebSocket } from '@/hooks/useWebSocket'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styles from './page.module.css'
 
 type CardType =
@@ -29,22 +30,6 @@ type CardDetails = {
 	range?: string
 	specialAbility?: string
 	winCondition?: string
-}
-
-type PlayerInfo = {
-	id: string
-	name: string
-	avatar?: string
-	score: number
-	isAlive: boolean
-	isInfected?: boolean
-	isSuspicious?: boolean
-	isCaptain?: boolean
-	isSeniorOfficer?: boolean
-	vote?: string
-	votesAgainst: number
-	revealedCards: number
-	profession?: string
 }
 
 type CrisisInfo = {
@@ -82,12 +67,19 @@ interface GameChatMessage {
 	timestamp: Date
 }
 
-export default function GameSession({ params, searchParams }: PageProps) {
+export default function GameSession({ params }: PageProps) {
 	const { gameId } = params
 
-	// Временные значения - в реальном приложении их нужно получать из сессии/контекста
-	const userId = 'temp-user-id' // TODO: Заменить на получение из auth контекста
-	const username = 'temp-username' // TODO: Заменить на получение из auth контекста
+	// ✅ Берём реального пользователя так же, как в лобби
+	const { profile, loadUserData } = useProfile()
+
+	useEffect(() => {
+		// грузим /auth/me (same-origin) — как в лобби
+		loadUserData().catch(() => {})
+	}, [loadUserData])
+
+	const userId = profile.status === 'ok' ? profile.data?.id : undefined
+	const username = profile.status === 'ok' ? profile.data?.username : undefined
 
 	const [gameState, setGameState] = useState<any>(null)
 	const [myCards, setMyCards] = useState<Record<string, CardDetails>>({})
@@ -118,25 +110,20 @@ export default function GameSession({ params, searchParams }: PageProps) {
 		) => {
 			const newChatMessage: GameChatMessage = {
 				id: Date.now().toString(),
-				playerId: playerId || (isSystem ? 'system' : 'unknown'),
+				playerId: playerId || (isSystem ? 'system' : 'player'),
 				playerName,
 				text,
 				type: isSystem ? 'system' : 'player',
 				timestamp: new Date(),
 			}
 
-			setChatMessages(prev => {
-				// Ограничиваем до 50 последних сообщений
-				const updated = [...prev.slice(-50), newChatMessage]
-				return updated
-			})
+			setChatMessages(prev => [...prev.slice(-50), newChatMessage])
 		},
 		[]
 	)
 
 	const getCardDisplayName = useCallback(
 		(cardType: string, cardId: string): string => {
-			// Поиск названия карты по ID
 			const card = myCards[cardType as CardType]
 			return card?.name || cardId
 		},
@@ -149,27 +136,22 @@ export default function GameSession({ params, searchParams }: PageProps) {
 
 			switch (data.type) {
 				case 'GAME_STATE': {
-					console.log('Received GAME_STATE:', data.gameState)
 					const game = data.gameState
-
 					setGameState(game)
 
-					// Обновляем таймер
-					if (game.phaseEndTime) {
+					if (game?.phaseEndTime) {
 						const endTime = new Date(game.phaseEndTime).getTime()
 						const now = Date.now()
 						setPhaseTimeLeft(Math.max(0, Math.floor((endTime - now) / 1000)))
 					}
 
-					// Сбрасываем кризис если фаза изменилась
-					if (game.phase !== 'crisis' && activeCrisis) {
+					if (game?.phase !== 'crisis' && activeCrisis) {
 						setActiveCrisis(null)
 					}
 					break
 				}
 
 				case 'YOUR_CARDS': {
-					console.log('Received YOUR_CARDS:', data)
 					const cards: Record<string, CardDetails> = {}
 
 					if (data.profession) cards.profession = data.profession
@@ -188,20 +170,12 @@ export default function GameSession({ params, searchParams }: PageProps) {
 				}
 
 				case 'GAME_NARRATION': {
-					console.log('GAME_NARRATION:', data)
-					setNarration({
-						title: data.title,
-						text: data.text,
-					})
-
-					setTimeout(() => {
-						setNarration(null)
-					}, 30000)
+					setNarration({ title: data.title, text: data.text })
+					setTimeout(() => setNarration(null), 30000)
 					break
 				}
 
 				case 'CRISIS_TRIGGERED':
-					console.log('CRISIS_TRIGGERED:', data.crisis)
 					setActiveCrisis(data.crisis)
 					break
 
@@ -226,17 +200,16 @@ export default function GameSession({ params, searchParams }: PageProps) {
 					break
 
 				case 'PLAYER_REVEAL':
-					console.log('PLAYER_REVEAL:', data)
-					setRevealedPlayer({
-						name: data.playerName,
-						cards: data.cards,
-					})
+					setRevealedPlayer({ name: data.playerName, cards: data.cards })
 					break
 
 				case 'CARD_REVEALED':
 					addToChat(
 						'Система',
-						`${data.playerName} раскрыл(а) карту: ${getCardDisplayName(data.cardType, data.cardId)}`,
+						`${data.playerName} раскрыл(а) карту: ${getCardDisplayName(
+							data.cardType,
+							data.cardId
+						)}`,
 						true
 					)
 					break
@@ -282,7 +255,6 @@ export default function GameSession({ params, searchParams }: PageProps) {
 					break
 
 				case 'GAME_FINISHED':
-					console.log('GAME_FINISHED:', data)
 					setGameResults({
 						winners: data.winnerIds,
 						reason: data.reason,
@@ -302,14 +274,13 @@ export default function GameSession({ params, searchParams }: PageProps) {
 					if (data.message) {
 						const chatMsg: GameChatMessage = {
 							id: data.message.id || Date.now().toString(),
-							playerId:
-								data.message.playerId || data.message.playerName || 'player',
+							// ✅ не подменяем playerId именем — иначе ломается "мои сообщения"
+							playerId: data.message.playerId || 'player',
 							playerName: data.message.playerName || 'Игрок',
-							text: data.message.text,
+							text: String(data.message.text ?? '').slice(0, 300),
 							type: 'player',
 							timestamp: new Date(data.message.timestamp || Date.now()),
 						}
-
 						setChatMessages(prev => [...prev.slice(-50), chatMsg])
 					}
 					break
@@ -318,30 +289,44 @@ export default function GameSession({ params, searchParams }: PageProps) {
 		[activeCrisis, addToChat, getCardDisplayName]
 	)
 
-	/**
-	 * ✅ ВАЖНО:
-	 * Не добавляем "/game" к URL, иначе Socket.IO пытается подключиться к namespace "/game"
-	 * и сервер отвечает "Invalid namespace".
-	 */
+	// ✅ socket.io-client нужен http(s) origin, path задаём отдельно
 	const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'https://api.stationeden.ru'
 	const wsUrl = wsBase.replace(/\/$/, '')
+
+	// ✅ Подключаемся только когда профиль загружен и пользователь реально авторизован
+	const isProfileReady = profile.status === 'ok' || profile.status === 'unauth'
+	const canConnect = isProfileReady && profile.status === 'ok'
+
+	/**
+	 * ✅ ВАЖНО:
+	 * query держим стабильным — только gameId.
+	 * userId сервер берёт из JWT cookie, не нужно тащить в query (иначе лишние реконнекты).
+	 */
+	const socketQuery = useMemo(() => ({ gameId }), [gameId])
 
 	const { sendMessage, isConnected } = useWebSocket(
 		wsUrl,
 		handleWebSocketMessage,
-		{ gameId, userId },
-		{ path: '/lobby' } // если у сервера другой path, меняется тут
+		socketQuery,
+		{ path: '/game', enabled: canConnect }
 	)
 
+	// ✅ JOIN_GAME отправляем строго 1 раз на каждый connect
+	const joinedRef = useRef(false)
 	useEffect(() => {
-		if (isConnected && gameId) {
-			console.log('Connected to game, joining...')
-			sendMessage({ type: 'JOIN_GAME', gameId })
+		if (!isConnected) {
+			joinedRef.current = false
+			return
 		}
+		if (!gameId) return
+		if (joinedRef.current) return
+
+		joinedRef.current = true
+		console.log('Connected to game, joining...')
+		sendMessage({ type: 'JOIN_GAME', gameId })
 	}, [isConnected, gameId, sendMessage])
 
 	useEffect(() => {
-		// Таймер фазы
 		if (phaseTimeLeft > 0) {
 			const timer = setInterval(() => {
 				setPhaseTimeLeft(prev => {
@@ -356,7 +341,6 @@ export default function GameSession({ params, searchParams }: PageProps) {
 		}
 	}, [phaseTimeLeft])
 
-	// Автоскролл чата при новых сообщениях
 	useEffect(() => {
 		if (chatContainerRef.current) {
 			chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
@@ -369,25 +353,28 @@ export default function GameSession({ params, searchParams }: PageProps) {
 
 	const handleSendMessage = useCallback(
 		(e?: React.FormEvent) => {
-			if (e) {
-				e.preventDefault()
-			}
+			if (e) e.preventDefault()
 
+			// ✅ пока нет реального профиля — не отправляем и не рисуем temp
+			if (profile.status !== 'ok' || !userId) return
 			if (!newMessage.trim() || !isConnected) return
+
+			const playerName = username || 'Игрок'
+			const myId = userId
 
 			sendMessage({
 				type: 'SEND_MESSAGE',
 				message: {
 					text: newMessage.trim(),
-					playerName: username,
+					playerName,
 					gameId,
 				},
 			})
 
 			const tempMessage: GameChatMessage = {
 				id: `temp-${Date.now()}`,
-				playerId: userId,
-				playerName: username,
+				playerId: myId,
+				playerName,
 				text: newMessage.trim(),
 				type: 'player',
 				timestamp: new Date(),
@@ -396,7 +383,15 @@ export default function GameSession({ params, searchParams }: PageProps) {
 			setChatMessages(prev => [...prev.slice(-50), tempMessage])
 			setNewMessage('')
 		},
-		[newMessage, isConnected, sendMessage, username, gameId, userId]
+		[
+			newMessage,
+			isConnected,
+			sendMessage,
+			username,
+			gameId,
+			userId,
+			profile.status,
+		]
 	)
 
 	const handleKeyPress = useCallback(
@@ -409,11 +404,7 @@ export default function GameSession({ params, searchParams }: PageProps) {
 		[handleSendMessage]
 	)
 
-	const handleChatScroll = useCallback(() => {
-		// Можно добавить логику для бесконечной прокрутки, если нужно
-	}, [])
-
-	// ✅ FIX: мок и бэк у тебя ожидают START_GAME, а не START_GAME_SESSION
+	// ✅ START_GAME (как и в лобби)
 	const handleStartGame = () => {
 		if (!isConnected) return
 		sendMessage({ type: 'START_GAME' })
@@ -480,7 +471,6 @@ export default function GameSession({ params, searchParams }: PageProps) {
 	const handleLeaveGame = () => {
 		if (window.confirm('Вы уверены, что хотите покинуть игру?')) {
 			sendMessage({ type: 'LEAVE_GAME', gameId })
-			// В реальном приложении здесь был бы редирект
 			setTimeout(() => {
 				window.location.href = '/lobby'
 			}, 1000)
@@ -681,6 +671,7 @@ export default function GameSession({ params, searchParams }: PageProps) {
 								onClick={() => handleRevealCard(type as CardType)}
 								disabled={
 									gameState?.phase !== 'discussion' ||
+									!userId ||
 									!gameState?.players?.find((p: any) => p.id === userId)
 										?.isAlive
 								}
@@ -711,46 +702,13 @@ export default function GameSession({ params, searchParams }: PageProps) {
 					<div className={styles.cardsGrid}>
 						{Object.entries(revealedPlayer.cards).map(
 							([type, card]: [string, any]) =>
-								card && (
+								card ? (
 									<div key={type} className={styles.cardItem}>
 										<h3>{getCardTypeName(type as CardType)}</h3>
 										<h4>{card.name}</h4>
 										<p>{card.description}</p>
-
-										{card.pros && card.pros.length > 0 && (
-											<div className={styles.cardPros}>
-												<strong>Плюсы:</strong>
-												<ul>
-													{card.pros.map((pro: string, i: number) => (
-														<li key={i}>{pro}</li>
-													))}
-												</ul>
-											</div>
-										)}
-
-										{card.cons && card.cons.length > 0 && (
-											<div className={styles.cardCons}>
-												<strong>Минусы:</strong>
-												<ul>
-													{card.cons.map((con: string, i: number) => (
-														<li key={i}>{con}</li>
-													))}
-												</ul>
-											</div>
-										)}
-
-										{card.effects && card.effects.length > 0 && (
-											<div className={styles.cardEffects}>
-												<strong>Эффекты:</strong>
-												<ul>
-													{card.effects.map((effect: string, i: number) => (
-														<li key={i}>{effect}</li>
-													))}
-												</ul>
-											</div>
-										)}
 									</div>
-								)
+								) : null
 						)}
 					</div>
 				)}
@@ -781,13 +739,6 @@ export default function GameSession({ params, searchParams }: PageProps) {
 						<p>
 							<strong>Время на решение:</strong> {formatTime(phaseTimeLeft)}
 						</p>
-						{activeCrisis?.priorityProfessions &&
-							activeCrisis.priorityProfessions.length > 0 && (
-								<p>
-									<strong>Подходящие профессии:</strong>{' '}
-									{activeCrisis.priorityProfessions.join(', ')}
-								</p>
-							)}
 					</div>
 
 					<div className={styles.crisisActions}>
@@ -798,13 +749,6 @@ export default function GameSession({ params, searchParams }: PageProps) {
 						>
 							Попытаться решить кризис
 						</button>
-						<p className={styles.crisisHint}>
-							{activeCrisis?.type === 'technological'
-								? 'Инженеры и техники наиболее эффективны'
-								: activeCrisis?.type === 'biological'
-									? 'Медики и биологи могут помочь'
-									: 'Лингвисты и коммуникаторы нужны для решения'}
-						</p>
 					</div>
 				</div>
 			</div>
@@ -816,59 +760,6 @@ export default function GameSession({ params, searchParams }: PageProps) {
 			<div className={styles.modalContent}>
 				<div className={styles.resultsContent}>
 					<h2>🎉 Игра завершена! 🎉</h2>
-
-					{gameResults?.reason === 'capsule_full' && (
-						<p className={styles.resultReason}>Капсула заполнена!</p>
-					)}
-					{gameResults?.reason === 'hidden_role_win' && (
-						<p className={styles.resultReason}>
-							Скрытая роль выполнила свою миссию!
-						</p>
-					)}
-					{gameResults?.reason === 'round_limit' && (
-						<p className={styles.resultReason}>Закончились раунды!</p>
-					)}
-
-					<div className={styles.winnersList}>
-						<h3>Победители:</h3>
-						{gameResults?.scores
-							.filter((p: any) => gameResults.winners.includes(p.id))
-							.map((player: any) => (
-								<div key={player.id} className={styles.winnerItem}>
-									<span className={styles.winnerName}>{player.name}</span>
-									<span className={styles.winnerRole}>{player.role}</span>
-									<span className={styles.winnerScore}>
-										{player.score} очков
-									</span>
-								</div>
-							))}
-					</div>
-
-					<div className={styles.allScores}>
-						<h3>Все игроки:</h3>
-						{gameResults?.scores
-							.sort((a: any, b: any) => b.score - a.score)
-							.map((player: any, index: number) => (
-								<div
-									key={player.id}
-									className={`${styles.scoreItem} ${
-										gameResults.winners.includes(player.id) ? styles.winner : ''
-									}`}
-								>
-									<span className={styles.rank}>#{index + 1}</span>
-									<span className={styles.playerName}>
-										{player.name}
-										{player.id === userId && ' (Вы)'}
-									</span>
-									<span className={styles.playerScore}>
-										{player.score} очков
-									</span>
-									<span className={styles.playerStatus}>
-										{player.survived ? 'Выжил' : 'Погиб'}
-									</span>
-								</div>
-							))}
-					</div>
 
 					<div className={styles.resultsActions}>
 						<button className={styles.leaveButton} onClick={handleLeaveGame}>
@@ -883,7 +774,9 @@ export default function GameSession({ params, searchParams }: PageProps) {
 	const renderPhaseActions = () => {
 		if (!gameState) return null
 
-		const currentPlayer = gameState.players?.find((p: any) => p.id === userId)
+		const currentPlayer = userId
+			? gameState.players?.find((p: any) => p.id === userId)
+			: null
 		const alivePlayers = gameState.players?.filter((p: any) => p.isAlive) || []
 		const requiredVotes = Math.floor(alivePlayers.length / 2)
 
@@ -925,57 +818,6 @@ export default function GameSession({ params, searchParams }: PageProps) {
 								Начать голосование ({gameState.voteTriggerCount || 0}/
 								{requiredVotes})
 							</button>
-
-							{currentPlayer?.isCaptain && !currentPlayer?.hasUsedAbility && (
-								<button
-									className={styles.abilityButton}
-									onClick={() => handleUseAbility('captain_veto')}
-								>
-									Использовать право вето
-								</button>
-							)}
-
-							{currentPlayer?.hiddenRole === 'role_saboteur' &&
-								!currentPlayer?.hasUsedAbility && (
-									<button
-										className={styles.abilityButton}
-										onClick={() => handleUseAbility('sabotage')}
-									>
-										Саботировать капсулу
-									</button>
-								)}
-
-							{currentPlayer?.gender === 'gender_nonbinary' &&
-								!currentPlayer?.hasUsedAbility && (
-									<button
-										className={styles.abilityButton}
-										onClick={() => handleUseAbility('nonbinary_ability')}
-									>
-										Сменить восприятие
-									</button>
-								)}
-
-							{currentPlayer?.hiddenRole === 'role_xenophag' &&
-								!currentPlayer?.hasUsedAbility && (
-									<button
-										className={styles.abilityButton}
-										onClick={() => {
-											const targetId = alivePlayers.find(
-												(p: any) => p.id !== userId
-											)?.id
-											if (targetId) handleUseAbility('infect', targetId)
-										}}
-									>
-										Заразить игрока
-									</button>
-								)}
-						</div>
-
-						<div className={styles.voteInfo}>
-							<p>
-								Голосование начнется, когда {requiredVotes} игроков нажмет
-								кнопку
-							</p>
 						</div>
 					</div>
 				)
@@ -1000,12 +842,6 @@ export default function GameSession({ params, searchParams }: PageProps) {
 											<span className={styles.votePlayerName}>
 												{player.name}
 											</span>
-											{player.isInfected && (
-												<span className={styles.infectedBadge}>🦠</span>
-											)}
-											{player.isSuspicious && (
-												<span className={styles.suspiciousBadge}>👁️</span>
-											)}
 										</div>
 										<div className={styles.voteCount}>
 											Голосов: {player.votesAgainst || 0}
@@ -1013,17 +849,6 @@ export default function GameSession({ params, searchParams }: PageProps) {
 									</button>
 								))}
 						</div>
-
-						{currentPlayer?.vote && (
-							<p className={styles.voteConfirmed}>
-								Вы проголосовали против{' '}
-								{
-									gameState.players?.find(
-										(p: any) => p.id === currentPlayer.vote
-									)?.name
-								}
-							</p>
-						)}
 					</div>
 				)
 
@@ -1075,6 +900,7 @@ export default function GameSession({ params, searchParams }: PageProps) {
 		}
 	}
 
+	// UI загрузки: до получения gameState
 	if (!gameState) {
 		return (
 			<div className={styles.loadingContainer}>
@@ -1082,6 +908,12 @@ export default function GameSession({ params, searchParams }: PageProps) {
 				<p>Загрузка игры...</p>
 				<p>
 					Статус подключения: {isConnected ? 'Подключено' : 'Не подключено'}
+				</p>
+				<p>
+					Профиль:{' '}
+					{profile.status === 'ok'
+						? `OK (${profile.data?.username})`
+						: profile.status}
 				</p>
 				<button
 					className={styles.retryButton}
@@ -1094,7 +926,7 @@ export default function GameSession({ params, searchParams }: PageProps) {
 		)
 	}
 
-	// Если игра еще не начата
+	// Если игра ещё не начата
 	if (gameState.status === 'waiting') {
 		return (
 			<div className={styles.waitingRoom}>
@@ -1106,7 +938,10 @@ export default function GameSession({ params, searchParams }: PageProps) {
 					<h2>Игроки в комнате:</h2>
 					{gameState.players?.map((player: any) => (
 						<div key={player.id} className={styles.waitingPlayer}>
-							<span>{player.name}</span>
+							<span>
+								{player.name}
+								{userId && player.id === userId && ' (Вы)'}
+							</span>
 							{player.id === gameState.creatorId && (
 								<span className={styles.creatorBadge}>👑</span>
 							)}
@@ -1114,7 +949,7 @@ export default function GameSession({ params, searchParams }: PageProps) {
 					))}
 				</div>
 
-				{gameState.creatorId === userId && (
+				{userId && gameState.creatorId === userId && (
 					<button
 						className={styles.startButton}
 						onClick={handleStartGame}
@@ -1131,21 +966,21 @@ export default function GameSession({ params, searchParams }: PageProps) {
 		)
 	}
 
-	const currentPlayer = gameState.players?.find((p: any) => p.id === userId)
+	const currentPlayer = userId
+		? gameState.players?.find((p: any) => p.id === userId)
+		: null
 	const alivePlayers = gameState.players?.filter((p: any) => p.isAlive) || []
 	const ejectedPlayers = gameState.players?.filter((p: any) => !p.isAlive) || []
 	const requiredVotes = Math.floor(alivePlayers.length / 2)
 
 	return (
 		<div className={styles.container}>
-			{/* Оверлеи */}
 			{narration && renderNarrationScreen()}
 			{showMyCards && renderMyCardsModal()}
 			{revealedPlayer && renderRevealedPlayerModal()}
 			{activeCrisis && renderCrisisModal()}
 			{gameResults && renderGameResultsModal()}
 
-			{/* Хедер игры */}
 			<header className={styles.header}>
 				<div className={styles.gameTitle}>
 					<h1>Станция "Эдем"</h1>
@@ -1171,7 +1006,7 @@ export default function GameSession({ params, searchParams }: PageProps) {
 						<span className={styles.statValue}>
 							🚀 {gameState.occupiedSlots || 0}/
 							{gameState.capsuleSlots ||
-								Math.floor(gameState.players?.length / 2)}{' '}
+								Math.floor((gameState.players?.length || 0) / 2)}{' '}
 							мест
 						</span>
 					</div>
@@ -1196,9 +1031,7 @@ export default function GameSession({ params, searchParams }: PageProps) {
 				</button>
 			</header>
 
-			{/* Основное поле */}
 			<main className={styles.mainContent}>
-				{/* Левая панель - игроки */}
 				<section className={styles.playersPanel}>
 					<div className={styles.panelHeader}>
 						<h2>Экипаж ({alivePlayers.length} живых)</h2>
@@ -1218,8 +1051,8 @@ export default function GameSession({ params, searchParams }: PageProps) {
 								key={player.id}
 								className={`${styles.playerCard} ${
 									!player.isAlive ? styles.dead : ''
-								} ${player.id === userId ? styles.me : ''} ${
-									player.vote === userId ? styles.votedForMe : ''
+								} ${userId && player.id === userId ? styles.me : ''} ${
+									userId && player.vote === userId ? styles.votedForMe : ''
 								}`}
 							>
 								<div className={styles.playerHeader}>
@@ -1230,10 +1063,11 @@ export default function GameSession({ params, searchParams }: PageProps) {
 											<span>{player.name.charAt(0)}</span>
 										)}
 									</div>
+
 									<div className={styles.playerInfo}>
 										<h3>
 											{player.name}
-											{player.id === userId && ' (Вы)'}
+											{userId && player.id === userId && ' (Вы)'}
 										</h3>
 										<div className={styles.playerStatus}>
 											{player.isAlive ? (
@@ -1241,36 +1075,17 @@ export default function GameSession({ params, searchParams }: PageProps) {
 											) : (
 												<span className={styles.deadStatus}>Мертв</span>
 											)}
-											{player.isInfected && (
-												<span className={styles.infected}>Заражен</span>
-											)}
-											{player.isSuspicious && (
-												<span className={styles.suspicious}>Подозрителен</span>
-											)}
 										</div>
 										<div className={styles.playerStats}>
 											<span>Очки: {player.score || 0}</span>
 											{player.profession && <span> | {player.profession}</span>}
 										</div>
 									</div>
-
-									<div className={styles.playerBadges}>
-										{player.isCaptain && (
-											<span className={styles.captainBadge}>👑</span>
-										)}
-										{player.isSeniorOfficer && (
-											<span className={styles.officerBadge}>⭐</span>
-										)}
-										{player.revealedCards > 0 && (
-											<span className={styles.revealedBadge}>
-												📄{player.revealedCards}
-											</span>
-										)}
-									</div>
 								</div>
 
 								{gameState.phase === 'voting' &&
 									player.isAlive &&
+									userId &&
 									player.id !== userId && (
 										<div className={styles.voteSection}>
 											<button
@@ -1305,7 +1120,6 @@ export default function GameSession({ params, searchParams }: PageProps) {
 					)}
 				</section>
 
-				{/* Центральная панель - игровое поле */}
 				<section className={styles.gamePanel}>
 					<div className={styles.phaseInfo}>
 						<h2>{getPhaseName(gameState.phase)}</h2>
@@ -1332,7 +1146,6 @@ export default function GameSession({ params, searchParams }: PageProps) {
 
 					<div className={styles.gameActions}>{renderPhaseActions()}</div>
 
-					{/* Чат - упрощенная версия для игры */}
 					<div className={styles.chatSection}>
 						<div className={styles.chatHeader}>
 							<h3>Чат обсуждения</h3>
@@ -1353,7 +1166,11 @@ export default function GameSession({ params, searchParams }: PageProps) {
 										key={message.id}
 										className={`${styles.message} ${
 											message.type === 'system' ? styles.systemMessage : ''
-										} ${message.playerId === userId ? styles.myMessage : ''}`}
+										} ${
+											userId && message.playerId === userId
+												? styles.myMessage
+												: ''
+										}`}
 									>
 										<div className={styles.messageHeader}>
 											<span className={styles.sender}>
@@ -1379,7 +1196,10 @@ export default function GameSession({ params, searchParams }: PageProps) {
 									!isConnected ? 'Нет подключения...' : 'Введите сообщение...'
 								}
 								disabled={
-									!isConnected || !gameState || gameState.phase === 'game_over'
+									!isConnected ||
+									!gameState ||
+									gameState.phase === 'game_over' ||
+									profile.status !== 'ok'
 								}
 								className={styles.chatInput}
 								maxLength={300}
@@ -1391,7 +1211,8 @@ export default function GameSession({ params, searchParams }: PageProps) {
 									!newMessage.trim() ||
 									!isConnected ||
 									!gameState ||
-									gameState.phase === 'game_over'
+									gameState.phase === 'game_over' ||
+									profile.status !== 'ok'
 								}
 							>
 								Отправить
@@ -1401,20 +1222,11 @@ export default function GameSession({ params, searchParams }: PageProps) {
 				</section>
 			</main>
 
-			{/* Футер с дополнительной информацией */}
 			<footer className={styles.footer}>
 				<div className={styles.playerStatusInfo}>
 					{currentPlayer && (
 						<>
 							<span>Ваш статус: {currentPlayer.isAlive ? 'Жив' : 'Мертв'}</span>
-							{currentPlayer.isInfected && (
-								<span className={styles.infectionWarning}>Заражен!</span>
-							)}
-							{currentPlayer.isSuspicious && (
-								<span className={styles.suspiciousWarning}>
-									Под подозрением
-								</span>
-							)}
 							<span> | Карт раскрыто: {currentPlayer.revealedCards || 0}</span>
 							<span>
 								{' '}
@@ -1438,9 +1250,6 @@ export default function GameSession({ params, searchParams }: PageProps) {
 					>
 						Настройки
 					</button>
-					{currentPlayer?.isCaptain && (
-						<span className={styles.captainIndicator}>Вы капитан</span>
-					)}
 				</div>
 			</footer>
 		</div>

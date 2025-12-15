@@ -1,4 +1,5 @@
-import { useGameSocket } from '@/hooks/useGameSocket'
+// apps/web/src/app/game/hooks/useGame.ts
+import { useWebSocket } from '@/hooks/useWebSocket'
 import { GameState } from '@station-eden/shared'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
@@ -70,10 +71,12 @@ export function useGame(gameId?: string) {
 	// socket.io-client нужен http(s)
 	const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'http://localhost:4000'
 
-	const { sendMessage: sendWS, isConnected } = useGameSocket(
+	// ✅ ВАЖНО: game всегда должен ходить в path '/game'
+	const { sendMessage: sendWS, isConnected } = useWebSocket(
 		wsBase,
 		handleWebSocketMessage,
-		gameId || ''
+		{ gameId },
+		{ path: '/game' }
 	)
 
 	useEffect(() => {

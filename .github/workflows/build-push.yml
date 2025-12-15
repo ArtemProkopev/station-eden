@@ -39,29 +39,53 @@ jobs:
           install: true
 
       # ===== API image =====
-      - name: Build & Push API
+      - name: Build & Push API (latest)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: apps/api/Dockerfile
           push: true
           platforms: linux/amd64
+          provenance: false
+          sbom: false
           build-args: |
             BUILDKIT_INLINE_CACHE=1
           cache-from: |
             type=registry,ref=ghcr.io/${{ steps.owner.outputs.lc }}/station-eden-api:latest
           tags: |
             ghcr.io/${{ steps.owner.outputs.lc }}/station-eden-api:latest
-            ghcr.io/${{ steps.owner.outputs.lc }}/station-eden-api:${{ github.sha }}
+
+      - name: Tag API digest as commit SHA (no re-push)
+        shell: bash
+        run: |
+          set -euo pipefail
+          OWNER="${{ steps.owner.outputs.lc }}"
+          SRC="ghcr.io/${OWNER}/station-eden-api:latest"
+          DST="ghcr.io/${OWNER}/station-eden-api:${{ github.sha }}"
+
+          echo "Creating tag ${DST} -> ${SRC}"
+          for i in 1 2 3 4 5; do
+            if docker buildx imagetools create -t "${DST}" "${SRC}"; then
+              echo "OK"
+              exit 0
+            fi
+            echo "Retry $i failed, sleeping..."
+            sleep $((i * 2))
+          done
+
+          echo "Failed to create tag after retries"
+          exit 1
 
       # ===== WEB image =====
-      - name: Build & Push WEB
+      - name: Build & Push WEB (latest)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: apps/web/Dockerfile
           push: true
           platforms: linux/amd64
+          provenance: false
+          sbom: false
           build-args: |
             NEXT_PUBLIC_API_BASE=${{ vars.NEXT_PUBLIC_API_BASE }}
             NEXT_PUBLIC_ENABLE_TELEGRAM=${{ vars.NEXT_PUBLIC_ENABLE_TELEGRAM }}
@@ -71,7 +95,27 @@ jobs:
             type=registry,ref=ghcr.io/${{ steps.owner.outputs.lc }}/station-eden-web:latest
           tags: |
             ghcr.io/${{ steps.owner.outputs.lc }}/station-eden-web:latest
-            ghcr.io/${{ steps.owner.outputs.lc }}/station-eden-web:${{ github.sha }}
+
+      - name: Tag WEB digest as commit SHA (no re-push)
+        shell: bash
+        run: |
+          set -euo pipefail
+          OWNER="${{ steps.owner.outputs.lc }}"
+          SRC="ghcr.io/${OWNER}/station-eden-web:latest"
+          DST="ghcr.io/${OWNER}/station-eden-web:${{ github.sha }}"
+
+          echo "Creating tag ${DST} -> ${SRC}"
+          for i in 1 2 3 4 5; do
+            if docker buildx imagetools create -t "${DST}" "${SRC}"; then
+              echo "OK"
+              exit 0
+            fi
+            echo "Retry $i failed, sleeping..."
+            sleep $((i * 2))
+          done
+
+          echo "Failed to create tag after retries"
+          exit 1
 
       # ===== Deploy to server via SSH =====
       - name: Deploy to server
