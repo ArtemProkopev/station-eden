@@ -73,8 +73,11 @@ export default function GameSession({ params }: PageProps) {
 	// ✅ Берём реального пользователя так же, как в лобби
 	const { profile, loadUserData } = useProfile()
 
+	// ✅ грузим /auth/me один раз (и не зависим от "прыгающих" ссылок)
+	const loadedProfileRef = useRef(false)
 	useEffect(() => {
-		// грузим /auth/me (same-origin) — как в лобби
+		if (loadedProfileRef.current) return
+		loadedProfileRef.current = true
 		loadUserData().catch(() => {})
 	}, [loadUserData])
 
@@ -293,7 +296,7 @@ export default function GameSession({ params }: PageProps) {
 	const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'https://api.stationeden.ru'
 	const wsUrl = wsBase.replace(/\/$/, '')
 
-	// ✅ Подключаемся только когда профиль загружен и пользователь реально авторизован
+	// ✅ ВКЛЮЧЕНО всегда (как ты хотел), но JOIN_GAME защищаем ниже
 	const isProfileReady = profile.status === 'ok' || profile.status === 'unauth'
 	const canConnect = isProfileReady && profile.status === 'ok'
 
@@ -312,6 +315,7 @@ export default function GameSession({ params }: PageProps) {
 	)
 
 	// ✅ JOIN_GAME отправляем строго 1 раз на каждый connect
+	// ✅ FIX: не шлём JOIN_GAME пока профиль не ok и userId нет (иначе auth error и forceDisconnect)
 	const joinedRef = useRef(false)
 	useEffect(() => {
 		if (!isConnected) {
@@ -321,10 +325,15 @@ export default function GameSession({ params }: PageProps) {
 		if (!gameId) return
 		if (joinedRef.current) return
 
+		if (profile.status !== 'ok' || !userId) {
+			// ждём нормальную авторизацию / загрузку профиля
+			return
+		}
+
 		joinedRef.current = true
 		console.log('Connected to game, joining...')
 		sendMessage({ type: 'JOIN_GAME', gameId })
-	}, [isConnected, gameId, sendMessage])
+	}, [isConnected, gameId, sendMessage, profile.status, userId])
 
 	useEffect(() => {
 		if (phaseTimeLeft > 0) {
@@ -404,10 +413,12 @@ export default function GameSession({ params }: PageProps) {
 		[handleSendMessage]
 	)
 
-	// ✅ START_GAME (как и в лобби)
+	// ✅ START_GAME
+	// ✅ FIX: сервер слушает START_GAME_SESSION, а не START_GAME
 	const handleStartGame = () => {
 		if (!isConnected) return
-		sendMessage({ type: 'START_GAME' })
+		if (profile.status !== 'ok' || !userId) return
+		sendMessage({ type: 'START_GAME_SESSION' })
 	}
 
 	const getServerCardType = (clientType: CardType): string => {

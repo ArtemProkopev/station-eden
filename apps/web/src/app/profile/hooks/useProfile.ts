@@ -1,6 +1,6 @@
 // apps/web/src/app/profile/hooks/useProfile.ts
 import { asset } from '@/lib/asset'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { PROFILE_CONFIG, avatarKey, frameKey } from '../config'
 import { ProfileIconsStatus, ProfileState } from '../types'
 
@@ -78,6 +78,12 @@ export const useProfile = () => {
 	const [isEditModalOpen, setIsEditModalOpen] = useState(false)
 	const [isUsernameModalOpen, setIsUsernameModalOpen] = useState(false)
 
+	// ✅ держим актуальный profile в ref, чтобы колбэки не зависели от profile в deps
+	const profileRef = useRef(profile)
+	useEffect(() => {
+		profileRef.current = profile
+	}, [profile])
+
 	const openUsernameModal = useCallback(() => setIsUsernameModalOpen(true), [])
 	const closeUsernameModal = useCallback(
 		() => setIsUsernameModalOpen(false),
@@ -85,37 +91,37 @@ export const useProfile = () => {
 	)
 
 	/**
-	 * Кэш по userId — только fallback.
-	 * userId опционален, чтобы старые места не падали типами.
-	 * Если userId не передали — пытаемся взять из profile.
+	 * ✅ Кэш по userId — только fallback.
+	 * ВАЖНО: этот колбэк должен быть стабильным и НЕ зависеть от profile,
+	 * иначе будет бесконечный цикл в местах где useEffect([loadUserData]).
 	 */
-	const loadSavedAssets = useCallback(
-		(userId?: string) => {
-			try {
-				const uid =
-					userId || (profile.status === 'ok' ? profile.data?.id : undefined)
-				if (!uid) return
+	const loadSavedAssets = useCallback((userId?: string) => {
+		try {
+			const currentProfile = profileRef.current
+			const uid =
+				userId ||
+				(currentProfile.status === 'ok' ? currentProfile.data?.id : undefined)
 
-				const savedAvatar = localStorage.getItem(avatarKey(uid))
-				const savedFrame = localStorage.getItem(frameKey(uid))
+			if (!uid) return
 
-				const migratedAvatar = migrateToAbsoluteUrl(savedAvatar ?? undefined)
-				const migratedFrame = migrateToAbsoluteUrl(savedFrame ?? undefined)
+			const savedAvatar = localStorage.getItem(avatarKey(uid))
+			const savedFrame = localStorage.getItem(frameKey(uid))
 
-				if (migratedAvatar) {
-					setAssets(prev => ({ ...prev, avatar: migratedAvatar }))
-					localStorage.setItem(avatarKey(uid), migratedAvatar)
-				}
-				if (migratedFrame) {
-					setAssets(prev => ({ ...prev, frame: migratedFrame }))
-					localStorage.setItem(frameKey(uid), migratedFrame)
-				}
-			} catch (e) {
-				console.error('Error accessing localStorage', e)
+			const migratedAvatar = migrateToAbsoluteUrl(savedAvatar ?? undefined)
+			const migratedFrame = migrateToAbsoluteUrl(savedFrame ?? undefined)
+
+			if (migratedAvatar) {
+				setAssets(prev => ({ ...prev, avatar: migratedAvatar }))
+				localStorage.setItem(avatarKey(uid), migratedAvatar)
 			}
-		},
-		[profile]
-	)
+			if (migratedFrame) {
+				setAssets(prev => ({ ...prev, frame: migratedFrame }))
+				localStorage.setItem(frameKey(uid), migratedFrame)
+			}
+		} catch (e) {
+			console.error('Error accessing localStorage', e)
+		}
+	}, [])
 
 	const checkIconsAvailability = useCallback(async () => {
 		const statusUpdates: Partial<ProfileIconsStatus> = {}

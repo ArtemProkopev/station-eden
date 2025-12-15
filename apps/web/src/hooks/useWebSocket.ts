@@ -24,7 +24,7 @@ export type UseWebSocketOptions = {
 	debugAllEvents?: boolean
 	/**
 	 * Управляет тем, подключаться ли к сокету вообще.
-	 * Если false — соединение не создаём.
+	 * Если false — соединение не создаём (и если было — отключаем).
 	 */
 	enabled?: boolean
 }
@@ -108,10 +108,14 @@ export const useWebSocket = (
 	}, [])
 
 	useEffect(() => {
-		// ✅ если выключено — не создаём сокет вообще
+		// ✅ если выключено — отключаем текущий сокет (если был) и выходим
 		if (!enabled) {
-			if (debugAllEvents)
-				console.log('[useWebSocket] disabled, skipping connection')
+			if (socket.current) {
+				socket.current.disconnect()
+				socket.current = null
+			}
+			setIsConnected(false)
+			if (debugAllEvents) console.log('[useWebSocket] disabled, disconnected')
 			return
 		}
 
@@ -121,6 +125,10 @@ export const useWebSocket = (
 			}
 			return
 		}
+
+		// ✅ FIX: если раньше был forceDisconnect() / shouldReconnectRef=false,
+		// при нормальном enabled снова разрешаем реконнекты
+		shouldReconnectRef.current = true
 
 		const currentSocket = io(resolvedIoUrl, {
 			path: socketPath,

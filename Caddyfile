@@ -20,11 +20,12 @@ stationeden.ru, www.stationeden.ru {
   }
   header @assets Cache-Control "public, max-age=31536000, immutable"
 
-  handle /api/* {
-    uri strip_prefix /api
+  # /api/* -> в Nest без префикса /api (т.е. /api/users/profile -> /users/profile)
+  handle_path /api/* {
     reverse_proxy api:4000
   }
 
+  # /auth/* -> в Nest С СОХРАНЕНИЕМ /auth (т.е. /auth/me -> /auth/me)
   handle /auth/* {
     reverse_proxy api:4000
   }
