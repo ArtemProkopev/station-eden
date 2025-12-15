@@ -112,6 +112,11 @@ export default function GameSession({ params }: PageProps) {
 
 	const chatContainerRef = useRef<HTMLDivElement>(null)
 
+	// Используем useMemo для форматирования времени заставки
+	const displayTime = useMemo(() => {
+		return formatTime(phaseTimeLeft)
+	}, [phaseTimeLeft])
+
 	const addToChat = useCallback(
 		(
 			playerName: string,
@@ -648,11 +653,6 @@ export default function GameSession({ params }: PageProps) {
 	}
 
 	const renderNarrationScreen = () => {
-		// Используем useMemo для стабильного отображения времени
-		const displayTime = useMemo(() => {
-			return formatTime(phaseTimeLeft)
-		}, [phaseTimeLeft])
-
 		return (
 			<div className={styles.narrationOverlay}>
 				<div className={styles.narrationContent}>
