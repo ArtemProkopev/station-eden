@@ -94,9 +94,9 @@ export default memo(function PlayersList({
 									</div>
 								</div>
 
-								{player.isReady && (
+								{/* {player.isReady && (
 									<span className={styles.readyBadge}>Готов</span>
-								)}
+								)} */}
 							</div>
 							<button
 								className={styles.dots}
@@ -139,15 +139,10 @@ export default memo(function PlayersList({
 					onClick={onToggleReady}
 					disabled={!currentUserId}
 					title={
-						!currentUserId ? 'Профиль не загружен' : 
-						currentUserReadyState ? 'Отменить готовность' : 'Подтвердить готовность'
+						!currentUserId ? 'Профиль не загружен' : 'Переключить готовность'
 					}
-					aria-label={currentUserReadyState ? 'Отменить готовность' : 'Подтвердить готовность'}
 				>
-					{/* Иконка вместо текста */}
-					<span className={styles.readyIcon}>
-						{currentUserReadyState ? '✓' : '+'}
-					</span>
+					{currentUserReadyState ? 'не готов' : 'готов'}
 				</button>
 			</div>
 		</div>
