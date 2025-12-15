@@ -84,6 +84,7 @@
 	color: #63efff;
 	font-weight: 500;
 	text-shadow: 0 0 5px rgba(99, 239, 255, 0.5);
+	font-variant-numeric: tabular-nums;
 }
 
 .leaveGameButton {
@@ -414,12 +415,40 @@
 	background: linear-gradient(90deg, #63efff, #4caf50);
 	transition: width 1s linear;
 	border-radius: 4px;
+	position: relative;
+	overflow: hidden;
+}
+
+.timerProgress::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(255, 255, 255, 0.3),
+		transparent
+	);
+	animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+	0% {
+		transform: translateX(-100%);
+	}
+	100% {
+		transform: translateX(100%);
+	}
 }
 
 .timerText {
 	display: block;
 	color: #63efff;
 	font-size: 14px;
+	font-variant-numeric: tabular-nums;
 }
 
 .gameActions {
@@ -881,6 +910,16 @@
 	padding: 20px;
 	border: 2px solid rgba(99, 239, 255, 0.3);
 	transition: all 0.3s ease;
+	animation: slideIn 0.5s ease-out forwards;
+	opacity: 0;
+	transform: translateY(20px);
+}
+
+@keyframes slideIn {
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
 }
 
 .cardItem:hover {
@@ -1386,6 +1425,9 @@
 	border-radius: 10px;
 	border: 2px solid rgba(243, 156, 18, 0.3);
 	display: inline-block;
+	min-width: 100px;
+	text-align: center;
+	font-variant-numeric: tabular-nums;
 }
 
 /* Анимация пульсации */
@@ -1399,6 +1441,157 @@
 	100% {
 		box-shadow: 0 0 10px rgba(99, 239, 255, 0.4);
 	}
+}
+
+/* Анимация раскрытия карт */
+.revealCard {
+	position: relative;
+	overflow: hidden;
+	transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cardHeader {
+	position: relative;
+}
+
+.cardBack {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 12px;
+	border: 3px solid rgba(99, 239, 255, 0.3);
+}
+
+.cardBackText {
+	color: rgba(99, 239, 255, 0.7);
+	font-size: 24px;
+	font-weight: bold;
+	text-transform: uppercase;
+	letter-spacing: 2px;
+	transform: rotate(-45deg);
+	opacity: 0.7;
+}
+
+.revealCard.hidden {
+	background: rgba(26, 26, 46, 0.8);
+	border-color: rgba(99, 239, 255, 0.2);
+}
+
+.revealCard.revealed .cardBack {
+	animation: flipOut 0.8s forwards;
+	animation-delay: 0.3s;
+}
+
+.revealCard.revealed .cardContent {
+	animation: fadeInUp 0.8s forwards;
+	animation-delay: 0.3s;
+	opacity: 0;
+	transform: translateY(20px);
+}
+
+@keyframes flipOut {
+	0% {
+		transform: rotateY(0deg) scale(1);
+		opacity: 1;
+	}
+	50% {
+		transform: rotateY(90deg) scale(0.95);
+		opacity: 0.5;
+	}
+	100% {
+		transform: rotateY(180deg) scale(0);
+		opacity: 0;
+		display: none;
+	}
+}
+
+@keyframes fadeInUp {
+	0% {
+		opacity: 0;
+		transform: translateY(20px);
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.revealProgress {
+	margin-bottom: 25px;
+	padding: 15px;
+	background: rgba(0, 0, 0, 0.3);
+	border-radius: 12px;
+	border: 2px solid rgba(99, 239, 255, 0.3);
+	text-align: center;
+}
+
+.revealingStatus {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 15px;
+}
+
+.revealSpinner {
+	width: 24px;
+	height: 24px;
+	border: 3px solid rgba(99, 239, 255, 0.3);
+	border-left: 3px solid #63efff;
+	border-radius: 50%;
+	animation: spin 1s linear infinite;
+}
+
+.revealComplete {
+	color: #4caf50;
+	font-size: 18px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 10px;
+}
+
+.revealPhaseInfo {
+	text-align: center;
+	width: 100%;
+}
+
+.revealPhaseInfo h3 {
+	color: #63efff;
+	margin-bottom: 15px;
+}
+
+.currentReveal {
+	margin-top: 20px;
+	padding: 15px;
+	background: rgba(0, 0, 0, 0.2);
+	border-radius: 10px;
+	border: 1px solid rgba(99, 239, 255, 0.3);
+}
+
+.currentCard {
+	color: #f39c12;
+	font-weight: bold;
+}
+
+/* Для заставки - исправляем таймер */
+.narrationTimer {
+	font-size: 18px;
+	color: #f39c12;
+	font-weight: bold;
+	padding: 15px;
+	background: rgba(243, 156, 18, 0.1);
+	border-radius: 10px;
+	border: 2px solid rgba(243, 156, 18, 0.3);
+	display: inline-block;
+	min-width: 100px;
+	text-align: center;
+	font-variant-numeric: tabular-nums;
 }
 
 /* Адаптивность */
