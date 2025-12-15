@@ -139,10 +139,15 @@ export default memo(function PlayersList({
 					onClick={onToggleReady}
 					disabled={!currentUserId}
 					title={
-						!currentUserId ? 'Профиль не загружен' : 'Переключить готовность'
+						!currentUserId ? 'Профиль не загружен' : 
+						currentUserReadyState ? 'Отменить готовность' : 'Подтвердить готовность'
 					}
+					aria-label={currentUserReadyState ? 'Отменить готовность' : 'Подтвердить готовность'}
 				>
-					{currentUserReadyState ? 'не готов' : 'готов'}
+					{/* Иконка вместо текста */}
+					<span className={styles.readyIcon}>
+						{currentUserReadyState ? '✓' : '+'}
+					</span>
 				</button>
 			</div>
 		</div>
