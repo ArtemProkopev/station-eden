@@ -11,10 +11,9 @@
 	background-position: center;
 	font-family: 'RussoOne', sans-serif;
 	padding: 20px;
-	padding-top: 100px; /* Отступ для TopHUD */
+	padding-top: 100px;
 }
 
-/* Хедер игры */
 .header {
 	width: 100%;
 	max-width: 1400px;

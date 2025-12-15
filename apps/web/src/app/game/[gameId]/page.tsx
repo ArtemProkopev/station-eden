@@ -72,6 +72,16 @@ type PageProps = {
 	searchParams?: { [key: string]: string | string[] | undefined }
 }
 
+// Тип для сообщений чата в игре
+interface GameChatMessage {
+	id: string
+	playerId: string
+	playerName: string
+	text: string
+	type: 'player' | 'system'
+	timestamp: Date
+}
+
 export default function GameSession({ params, searchParams }: PageProps) {
 	const { gameId } = params
 
@@ -83,9 +93,7 @@ export default function GameSession({ params, searchParams }: PageProps) {
 	const [myCards, setMyCards] = useState<Record<string, CardDetails>>({})
 	const [selectedVote, setSelectedVote] = useState<string>('')
 	const [phaseTimeLeft, setPhaseTimeLeft] = useState<number>(0)
-	const [chatMessages, setChatMessages] = useState<
-		Array<{ player: string; text: string; isSystem?: boolean }>
-	>([])
+	const [chatMessages, setChatMessages] = useState<GameChatMessage[]>([])
 	const [newMessage, setNewMessage] = useState('')
 	const [narration, setNarration] = useState<{
 		title: string
@@ -102,8 +110,26 @@ export default function GameSession({ params, searchParams }: PageProps) {
 	const chatContainerRef = useRef<HTMLDivElement>(null)
 
 	const addToChat = useCallback(
-		(player: string, text: string, isSystem: boolean = false) => {
-			setChatMessages(prev => [...prev.slice(-50), { player, text, isSystem }])
+		(
+			playerName: string,
+			text: string,
+			isSystem: boolean = false,
+			playerId?: string
+		) => {
+			const newChatMessage: GameChatMessage = {
+				id: Date.now().toString(),
+				playerId: playerId || (isSystem ? 'system' : 'unknown'),
+				playerName,
+				text,
+				type: isSystem ? 'system' : 'player',
+				timestamp: new Date(),
+			}
+			
+			setChatMessages(prev => {
+				// Ограничиваем до 50 последних сообщений
+				const updated = [...prev.slice(-50), newChatMessage]
+				return updated
+			})
 		},
 		[]
 	)
@@ -168,7 +194,6 @@ export default function GameSession({ params, searchParams }: PageProps) {
 						text: data.text,
 					})
 
-					// Автоматически скрываем через 30 секунд
 					setTimeout(() => {
 						setNarration(null)
 					}, 30000)
@@ -275,7 +300,16 @@ export default function GameSession({ params, searchParams }: PageProps) {
 
 				case 'CHAT_MESSAGE':
 					if (data.message) {
-						addToChat(data.message.playerName || 'Игрок', data.message.text)
+						const chatMsg: GameChatMessage = {
+							id: data.message.id || Date.now().toString(),
+							playerId: data.message.playerId || data.message.playerName || 'player',
+							playerName: data.message.playerName || 'Игрок',
+							text: data.message.text,
+							type: 'player',
+							timestamp: new Date(data.message.timestamp || Date.now()),
+						}
+						
+						setChatMessages(prev => [...prev.slice(-50), chatMsg])
 					}
 					break
 			}
@@ -283,7 +317,6 @@ export default function GameSession({ params, searchParams }: PageProps) {
 		[activeCrisis, addToChat, getCardDisplayName]
 	)
 
-	// ИСПРАВЛЕНО: Правильный URL для WebSocket
 	const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'http://localhost:4000'
 	let wsUrl: string
 
@@ -326,29 +359,56 @@ export default function GameSession({ params, searchParams }: PageProps) {
 		}
 	}, [phaseTimeLeft])
 
+	// Автоскролл чата при новых сообщениях
 	useEffect(() => {
-		// Автоскролл чата
 		if (chatContainerRef.current) {
 			chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
 		}
 	}, [chatMessages])
 
-	const handleSendMessage = () => {
+	const handleMessageChange = useCallback((message: string) => {
+		setNewMessage(message.slice(0, 300))
+	}, [])
+
+	const handleSendMessage = useCallback((e?: React.FormEvent) => {
+		if (e) {
+			e.preventDefault()
+		}
+		
 		if (!newMessage.trim() || !isConnected) return
 
 		sendMessage({
 			type: 'SEND_MESSAGE',
 			message: {
-				text: newMessage,
+				text: newMessage.trim(),
 				playerName: username,
 				gameId,
 			},
 		})
 
-		// Локально добавляем сообщение для мгновенного отображения
-		addToChat(username, newMessage)
+		const tempMessage: GameChatMessage = {
+			id: `temp-${Date.now()}`,
+			playerId: userId,
+			playerName: username,
+			text: newMessage.trim(),
+			type: 'player',
+			timestamp: new Date(),
+		}
+		
+		setChatMessages(prev => [...prev.slice(-50), tempMessage])
 		setNewMessage('')
-	}
+	}, [newMessage, isConnected, sendMessage, username, gameId, userId])
+
+	const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault()
+			handleSendMessage()
+		}
+	}, [handleSendMessage])
+
+	const handleChatScroll = useCallback(() => {
+		// Можно добавить логику для бесконечной прокрутки, если нужно
+	}, [])
 
 	const handleStartGame = () => {
 		if (!isConnected) return
@@ -427,6 +487,13 @@ export default function GameSession({ params, searchParams }: PageProps) {
 		const mins = Math.floor(seconds / 60)
 		const secs = seconds % 60
 		return `${mins}:${secs < 10 ? '0' : ''}${secs}`
+	}
+
+	const formatMessageTime = (timestamp: Date) => {
+		return timestamp.toLocaleTimeString('ru-RU', {
+			hour: '2-digit',
+			minute: '2-digit',
+		})
 	}
 
 	const getPhaseName = (phase: GamePhase): string => {
@@ -691,7 +758,7 @@ export default function GameSession({ params, searchParams }: PageProps) {
 		<div className={styles.modalOverlay}>
 			<div className={styles.modalContent}>
 				<div className={styles.crisisAlert}>
-					<h2>🚨 КРИЗИС! 🚨</h2>
+					<h2>КРИЗИС</h2>
 					<h3>{activeCrisis?.name}</h3>
 					<p>{activeCrisis?.description}</p>
 
@@ -1005,7 +1072,7 @@ export default function GameSession({ params, searchParams }: PageProps) {
 			<div className={styles.loadingContainer}>
 				<div className={styles.loadingSpinner}></div>
 				<p>Загрузка игры...</p>
-				<p>
+					<p>
 					Статус подключения: {isConnected ? 'Подключено' : 'Не подключено'}
 				</p>
 				<button
@@ -1255,7 +1322,7 @@ export default function GameSession({ params, searchParams }: PageProps) {
 
 					<div className={styles.gameActions}>{renderPhaseActions()}</div>
 
-					{/* Чат */}
+					{/* Чат - упрощенная версия для игры */}
 					<div className={styles.chatSection}>
 						<div className={styles.chatHeader}>
 							<h3>Чат обсуждения</h3>
@@ -1263,37 +1330,59 @@ export default function GameSession({ params, searchParams }: PageProps) {
 								{isConnected ? 'Онлайн' : 'Офлайн'}
 							</div>
 						</div>
-
+						
 						<div className={styles.chatMessages} ref={chatContainerRef}>
-							{chatMessages.map((msg, index) => (
-								<div
-									key={index}
-									className={`${styles.chatMessage} ${msg.isSystem ? styles.systemMessage : ''}`}
-								>
-									<span className={styles.messageSender}>
-										{msg.isSystem ? '⚙️ ' : `${msg.player}: `}
-									</span>
-									<span className={styles.messageText}>{msg.text}</span>
+							{chatMessages.length === 0 ? (
+								<div className={styles.emptyChat}>
+									<p>Сообщений пока нет</p>
+									<p className={styles.emptyHint}>Начните общение первым!</p>
 								</div>
-							))}
+							) : (
+								chatMessages.map(message => (
+									<div
+										key={message.id}
+										className={`${styles.message} ${
+											message.type === 'system' ? styles.systemMessage : ''
+										} ${message.playerId === userId ? styles.myMessage : ''}`}
+									>
+										<div className={styles.messageHeader}>
+											<span className={styles.sender}>{message.playerName}</span>
+											<span className={styles.time}>
+												{formatMessageTime(message.timestamp)}
+											</span>
+										</div>
+										<div className={styles.messageText}>{message.text}</div>
+									</div>
+								))
+							)}
 						</div>
-
-						<div className={styles.chatInput}>
+						
+						<form 
+							onSubmit={handleSendMessage} 
+							className={styles.chatForm}
+						>
 							<input
-								type='text'
+								type="text"
 								value={newMessage}
-								onChange={e => setNewMessage(e.target.value)}
-								onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
-								placeholder='Введите сообщение...'
-								disabled={!isConnected}
+								onChange={(e) => handleMessageChange(e.target.value)}
+								onKeyPress={handleKeyPress}
+								placeholder={
+									!isConnected 
+										? 'Нет подключения...' 
+										: 'Введите сообщение...'
+								}
+								disabled={!isConnected || (!gameState || gameState.phase === 'game_over')}
+								className={styles.chatInput}
+								maxLength={300}
 							/>
 							<button
-								onClick={handleSendMessage}
-								disabled={!isConnected || !newMessage.trim()}
+								type="submit"
+								className={styles.sendButton}
+								disabled={!newMessage.trim() || !isConnected || (!gameState || gameState.phase === 'game_over')}
 							>
 								Отправить
 							</button>
-						</div>
+						</form>
 					</div>
 				</section>
 			</main>
@@ -1327,16 +1416,16 @@ export default function GameSession({ params, searchParams }: PageProps) {
 						className={styles.rulesButton}
 						onClick={() => window.open('/rules', '_blank')}
 					>
-						📖 Правила
+						Правила
 					</button>
 					<button
 						className={styles.settingsButton}
 						onClick={() => alert('Настройки игры')}
 					>
-						⚙️ Настройки
+						Настройки
 					</button>
 					{currentPlayer?.isCaptain && (
-						<span className={styles.captainIndicator}>👑 Вы капитан</span>
+						<span className={styles.captainIndicator}>Вы капитан</span>
 					)}
 				</div>
 			</footer>

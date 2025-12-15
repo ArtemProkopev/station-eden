@@ -13,7 +13,7 @@ import {
 import * as cookie from 'cookie'
 import { Server, Socket } from 'socket.io'
 
-// Типы для игровых карт
+// Типы для игровых карт (оставляем как было)
 type Profession = {
   id: string
   name: string
@@ -91,7 +91,7 @@ type BodyType = {
   effects: string[]
 }
 
-// Игрок в игре
+// Игрок в игре - ИСПРАВЛЕННАЯ ВЕРСИЯ
 type GamePlayer = {
   id: string
   name: string
@@ -101,7 +101,7 @@ type GamePlayer = {
   score: number
   order: number
   isActive: boolean
-  isAlive: boolean
+  isAlive: boolean // ← ВАЖНО: всегда должно быть инициализировано
   vote?: string
   votesAgainst: number
   
@@ -210,7 +210,7 @@ const GAME_ID_RE = /^game-[a-zA-Z0-9_-]+$/
 const MSG_WINDOW_MS = 10_000
 const MSG_MAX_PER_WINDOW = 15
 
-// Колоды карт (в реальном проекте это было бы в БД)
+// Колоды карт (упрощенная версия)
 const PROFESSIONS: Profession[] = [
   {
     id: 'prof_engineer',
@@ -235,22 +235,6 @@ const PROFESSIONS: Profession[] = [
     pros: ['Критически важен для управления капсулой'],
     cons: ['Всегда хочет быть у штурвала'],
     priority: ['external']
-  },
-  {
-    id: 'prof_surgeon',
-    name: 'Кибернетический хирург',
-    description: 'Человек или машина? Да.',
-    pros: ['Может «починить» другого игрока'],
-    cons: ['Импланты могут выйти из-под контроля'],
-    priority: ['technological', 'biological']
-  },
-  {
-    id: 'prof_linguist',
-    name: 'Ксенолингвист',
-    description: 'Говорит на 14 инопланетных языках',
-    pros: ['Может расшифровать инопланетные сигналы'],
-    cons: ['Иногда переводит «с ошибками»'],
-    priority: ['external']
   }
 ]
 
@@ -266,24 +250,6 @@ const HEALTH_STATUSES: HealthStatus[] = [
     name: 'Латентный вирус Кси-7',
     description: 'Заразен в условиях стресса',
     effects: ['Может заразить других игроков при голосовании', 'Иммунитет к некоторым патогенам']
-  },
-  {
-    id: 'health_vestibular',
-    name: 'Синдром идеального вестибулярного аппарата',
-    description: 'Никогда не теряет ориентацию',
-    effects: ['Не подвержен гравитационным аномалиям', 'Заметно отличается поведением']
-  },
-  {
-    id: 'health_phoenix',
-    name: 'Генная модификация «Феникс»',
-    description: 'Быстрая регенерация',
-    effects: ['Восстанавливается после кризисов быстрее', 'Подозрительная живучесть']
-  },
-  {
-    id: 'health_amnesia',
-    name: 'Амнезия',
-    description: 'Кто я и где я?',
-    effects: ['Забывает многие вещи', 'С случайным шансом может заблокироваться карточка профессии']
   }
 ]
 
@@ -301,20 +267,6 @@ const PSYCHOLOGICAL_TRAITS: PsychologicalTrait[] = [
     description: 'Числа не лгут. Люди – иногда',
     effects: ['Точно оценивает статистику выживания', 'Кажется бесчувственным'],
     triggers: ['voting', 'discussion']
-  },
-  {
-    id: 'trait_brave',
-    name: 'Безрассудно храбрый',
-    description: 'Первый в опасность, последний в капсулу',
-    effects: ['Спасает других во время кризисов', 'Часто рискует без необходимости'],
-    triggers: ['crisis']
-  },
-  {
-    id: 'trait_optimist',
-    name: 'Неисправимый оптимист',
-    description: 'Всё будет хорошо! Наверное...',
-    effects: ['Поднимает мораль команды', 'Может недооценивать угрозы'],
-    triggers: ['discussion', 'crisis']
   }
 ]
 
@@ -326,14 +278,6 @@ const SECRETS: Secret[] = [
     goal: 'добраться до Земли любой ценой',
     abilities: ['Может взламывать системы станции'],
     isHiddenRole: false
-  },
-  {
-    id: 'secret_guilty',
-    name: 'Я виновен в катастрофе',
-    description: 'Совершил роковую ошибку',
-    goal: 'искупить вину или скрыть правду',
-    abilities: ['Знает слабые места станции'],
-    isHiddenRole: false
   }
 ]
 
@@ -343,7 +287,7 @@ const HIDDEN_ROLES: HiddenRole[] = [
     name: 'Саботажник',
     description: 'Работает на конкурентов или имеет личные мотивы',
     goal: 'Не дать капсуле улететь',
-    abilities: ['Может вызывать мелкие неисправности (поломка 1 капсулы)'],
+    abilities: ['Может вызывать мелкие неисправности'],
     winCondition: 'capsule_not_launched'
   },
   {
@@ -353,14 +297,6 @@ const HIDDEN_ROLES: HiddenRole[] = [
     goal: 'Доставить «образец» на Землю',
     abilities: ['Может заражать других игроков'],
     winCondition: 'at_least_one_infected'
-  },
-  {
-    id: 'role_scientist',
-    name: 'Ученый-экстремист',
-    description: 'Готов на всё ради науки',
-    goal: 'Сохранить исследовательские данные любой ценой',
-    abilities: ['Может жертвовать другими ради данных'],
-    winCondition: 'data_preserved'
   }
 ]
 
@@ -394,12 +330,6 @@ const AGES: Age[] = [
     name: 'Зрелый',
     range: '26-50',
     effects: ['+1 к опыту', '-1 к скорости реакции']
-  },
-  {
-    id: 'age_elder',
-    name: 'Пожилой',
-    range: '51+',
-    effects: ['+2 к опыту', '-2 к скорости реакции', 'дополнительное место в капсуле']
   }
 ]
 
@@ -413,16 +343,6 @@ const BODY_TYPES: BodyType[] = [
     id: 'body_athletic',
     name: 'Атлетическое',
     effects: ['+1 к силе', '+1 к выносливости']
-  },
-  {
-    id: 'body_heavy',
-    name: 'Полное',
-    effects: ['+2 к выносливости', '-1 к скорости']
-  },
-  {
-    id: 'body_huge',
-    name: 'Огромное',
-    effects: ['+3 к силе', '+2 к выносливости', '-2 к скорости', 'занимает 2 места']
   }
 ]
 
@@ -553,6 +473,18 @@ export class GameGateway
 
       this.logger.log(`Player connected to game: ${username} (${userId}) to game ${gameId}`)
 
+      // ОТЛАДКА: проверяем состояние игрока
+      const player = game.players.get(userId)
+      if (player) {
+        this.logger.debug(`Player ${player.name} isAlive: ${player.isAlive}, status: ${game.status}`)
+        
+        // Если игра еще не началась, гарантируем что игрок жив
+        if (game.status === 'waiting' && player.isAlive === undefined) {
+          player.isAlive = true
+          this.logger.debug(`Fixed undefined isAlive for player ${player.name}`)
+        }
+      }
+
       // Отправляем текущее состояние игры
       socket.emit('GAME_STATE', {
         gameState: this.serializeGameState(game),
@@ -619,6 +551,7 @@ export class GameGateway
     }
 
     this.logger.log(`Player ${username} joined game ${targetGameId}`)
+    this.logger.debug(`Player ${player.name} state: isAlive=${player.isAlive}, score=${player.score}`)
 
     // Отправляем обновленное состояние всем
     this.broadcastGameState(targetGameId)
@@ -825,7 +758,6 @@ export class GameGateway
           player.hasUsedAbility = true
         }
         break
-      // ... другие способности
     }
 
     this.broadcastGameState(gameId)
@@ -912,10 +844,32 @@ export class GameGateway
 
   // Основная игровая логика
   private async startGameSession(game: GameState) {
+    this.logger.log(`Starting game session for ${game.id}`)
+    
+    // Убедитесь, что все игроки живы перед началом
+    Array.from(game.players.values()).forEach(player => {
+      player.isAlive = true // ← ЯВНО УСТАНАВЛИВАЕМ true
+      player.score = 0
+      player.votesAgainst = 0
+      player.revealedCards = []
+      player.hasUsedAbility = false
+      player.isInfected = false
+      player.isSuspicious = false
+      player.vote = undefined
+      
+      this.logger.debug(`Player ${player.name} initialized: isAlive=${player.isAlive}`)
+    })
+    
+    // Раздаем карты перед началом игры
+    this.dealCardsToPlayers(game)
+    
     // Устанавливаем фазу введения
     game.phase = 'introduction'
     game.phaseDuration = 30 // секунд на заставку
     game.status = 'active'
+    game.round = 1
+    game.voteTriggerCount = 0
+    game.voteRequests = new Set()
     
     this.broadcastGameState(game.id)
     
@@ -938,10 +892,7 @@ export class GameGateway
     game.phase = 'preparation'
     game.phaseDuration = 60 // 1 минута
     
-    // Раздаем карты игрокам, если еще не раздали
-    if (!game.deck) {
-      this.dealCardsToPlayers(game)
-    }
+    this.logger.log(`Starting preparation phase for game ${game.id}`)
     
     this.broadcastGameState(game.id)
     this.startPhaseTimer(game)
@@ -1312,30 +1263,41 @@ export class GameGateway
     // Раздаем карты каждому игроку
     const playerArray = Array.from(game.players.values())
     
+    this.logger.log(`Dealing cards to ${playerArray.length} players`)
+    
     playerArray.forEach((player, index) => {
-      // Сбрасываем состояние
-      player.isAlive = true
+      // ВАЖНО: Сбрасываем состояние (хотя уже должно быть установлено)
+      player.isAlive = true // ← ГАРАНТИРУЕМ что игрок жив
       player.score = 0
       player.votesAgainst = 0
       player.revealedCards = []
       player.hasUsedAbility = false
       player.isInfected = false
       player.isSuspicious = false
+      player.vote = undefined
+      
+      this.logger.debug(`Initializing player ${player.name}: isAlive=${player.isAlive}`)
       
       // Профессия
-      const professionIndex = Math.floor(Math.random() * game.deck.professions.length)
-      player.profession = game.deck.professions[professionIndex]
+      if (game.deck.professions.length > 0) {
+        const professionIndex = Math.floor(Math.random() * game.deck.professions.length)
+        player.profession = game.deck.professions[professionIndex]
+      }
       
       // Состояние здоровья
-      const healthIndex = Math.floor(Math.random() * game.deck.healthStatuses.length)
-      player.healthStatus = game.deck.healthStatuses[healthIndex]
+      if (game.deck.healthStatuses.length > 0) {
+        const healthIndex = Math.floor(Math.random() * game.deck.healthStatuses.length)
+        player.healthStatus = game.deck.healthStatuses[healthIndex]
+      }
       
       // Психологическая черта
-      const traitIndex = Math.floor(Math.random() * game.deck.psychologicalTraits.length)
-      player.psychologicalTrait = game.deck.psychologicalTraits[traitIndex]
+      if (game.deck.psychologicalTraits.length > 0) {
+        const traitIndex = Math.floor(Math.random() * game.deck.psychologicalTraits.length)
+        player.psychologicalTrait = game.deck.psychologicalTraits[traitIndex]
+      }
       
       // Секрет (не всем)
-      if (Math.random() < 0.3) { // 30% шанс получить секрет
+      if (game.deck.secrets.length > 0 && Math.random() < 0.3) {
         const secretIndex = Math.floor(Math.random() * game.deck.secrets.length)
         player.secret = game.deck.secrets[secretIndex]
       }
@@ -1357,6 +1319,7 @@ export class GameGateway
           specialAbility: 'veto' 
         }
         player.isCaptain = true
+        player.isSeniorOfficer = false
       } else if (index === 1) {
         player.roleCard = { 
           id: 'role_officer', 
@@ -1364,20 +1327,30 @@ export class GameGateway
           description: 'Замещает капитана, дополнительный голос при ничьей', 
           specialAbility: 'extra_vote' 
         }
+        player.isCaptain = false
         player.isSeniorOfficer = true
+      } else {
+        player.isCaptain = false
+        player.isSeniorOfficer = false
       }
       
       // Пол
-      const genderIndex = Math.floor(Math.random() * GENDERS.length)
-      player.gender = GENDERS[genderIndex]
+      if (GENDERS.length > 0) {
+        const genderIndex = Math.floor(Math.random() * GENDERS.length)
+        player.gender = GENDERS[genderIndex]
+      }
       
       // Возраст
-      const ageIndex = Math.floor(Math.random() * AGES.length)
-      player.age = AGES[ageIndex]
+      if (AGES.length > 0) {
+        const ageIndex = Math.floor(Math.random() * AGES.length)
+        player.age = AGES[ageIndex]
+      }
       
       // Телосложение
-      const bodyIndex = Math.floor(Math.random() * BODY_TYPES.length)
-      player.bodyType = BODY_TYPES[bodyIndex]
+      if (BODY_TYPES.length > 0) {
+        const bodyIndex = Math.floor(Math.random() * BODY_TYPES.length)
+        player.bodyType = BODY_TYPES[bodyIndex]
+      }
       
       // Проверяем, занимает ли телосложение дополнительное место
       if (player.bodyType?.id === 'body_huge') {
@@ -1387,12 +1360,12 @@ export class GameGateway
       } else {
         game.occupiedSlots += 1
       }
-    })
-    
-    // Отправляем карты игрокам
-    playerArray.forEach(player => {
+      
+      // Отправляем карты игроку
       this.sendPlayerCards(game, player)
     })
+    
+    this.logger.log(`Cards dealt to ${playerArray.length} players. All players should be alive.`)
   }
 
   private sendPlayerCards(game: GameState, player: GamePlayer) {
@@ -1410,6 +1383,8 @@ export class GameGateway
         age: player.age,
         bodyType: player.bodyType
       })
+      
+      this.logger.debug(`Sent cards to player ${player.name}, isAlive=${player.isAlive}`)
     }
   }
 
@@ -1429,12 +1404,6 @@ export class GameGateway
             // Агент ксенофагов побеждает, если заражен хотя бы один игрок
             const infectedPlayers = Array.from(game.players.values()).filter(p => p.isInfected)
             if (infectedPlayers.length > 0) {
-              winners.push(player.id)
-            }
-            break
-          case 'role_scientist':
-            // Ученый побеждает, если выжил и имеет высокий счет
-            if (player.score > 50) {
               winners.push(player.id)
             }
             break
@@ -1573,7 +1542,6 @@ export class GameGateway
   }
 
   private handleSkipTurn(game: GameState) {
-    // Простой пропуск хода (для других типов игр)
     this.logger.log(`Skipping turn in game ${game.id}`)
   }
 
@@ -1596,7 +1564,6 @@ export class GameGateway
   }
 
   private handlePlayerAction(game: GameState, userId: string, payload: any) {
-    // Общая логика игрового действия
     const player = game.players.get(userId)
     if (player) {
       player.score += payload?.points || 1
@@ -1608,8 +1575,11 @@ export class GameGateway
     const game = this.games.get(gameId)
     if (!game) return
     
+    const serializedState = this.serializeGameState(game)
+    this.logger.debug(`Broadcasting game state for ${gameId}, players: ${serializedState.players.length}`)
+    
     this.server.to(gameId).emit('GAME_STATE', {
-      gameState: this.serializeGameState(game)
+      gameState: serializedState
     })
   }
 
@@ -1617,67 +1587,93 @@ export class GameGateway
     this.server.to(gameId).emit(event, data)
   }
 
+  // ИСПРАВЛЕННАЯ СЕРИАЛИЗАЦИЯ
   private serializeGameState(game: GameState) {
+    const players = Array.from(game.players.values()).map(p => ({
+      id: p.id,
+      name: p.name || 'Безымянный',
+      missions: p.missions || 0,
+      hours: p.hours || 0,
+      avatar: p.avatar,
+      score: p.score || 0,
+      order: p.order || 0,
+      isActive: p.isActive !== false, // по умолчанию true
+      isAlive: p.isAlive !== false, // ← ВАЖНО: преобразуем undefined в true
+      vote: p.vote,
+      votesAgainst: p.votesAgainst || 0,
+      profession: p.profession?.name,
+      isInfected: p.isInfected || false,
+      isSuspicious: p.isSuspicious || false,
+      isCaptain: p.isCaptain || false,
+      isSeniorOfficer: p.isSeniorOfficer || false,
+      revealedCards: p.revealedCards?.length || 0,
+      hasUsedAbility: p.hasUsedAbility || false,
+      // Добавляем отладочную информацию
+      _debug: {
+        rawIsAlive: p.isAlive,
+        typeof: typeof p.isAlive
+      }
+    }))
+    
+    // Отладочный лог
+    if (players.length > 0) {
+      this.logger.debug(`Serializing ${players.length} players. First player: ${players[0].name}, isAlive=${players[0].isAlive}`)
+    }
+    
     return {
       id: game.id,
       lobbyId: game.lobbyId,
       status: game.status,
       phase: game.phase,
-      players: Array.from(game.players.values()).map(p => ({
-        id: p.id,
-        name: p.name,
-        missions: p.missions,
-        hours: p.hours,
-        avatar: p.avatar,
-        score: p.score,
-        order: p.order,
-        isActive: p.isActive,
-        isAlive: p.isAlive,
-        vote: p.vote,
-        votesAgainst: p.votesAgainst,
-        profession: p.profession?.name,
-        isInfected: p.isInfected,
-        isSuspicious: p.isSuspicious,
-        isCaptain: p.isCaptain,
-        isSeniorOfficer: p.isSeniorOfficer,
-        revealedCards: p.revealedCards.length
-      })),
+      players: players,
       creatorId: game.creatorId,
-      round: game.round,
-      maxRounds: game.maxRounds,
+      round: game.round || 1,
+      maxRounds: game.maxRounds || 10,
       startedAt: game.startedAt,
       finishedAt: game.finishedAt,
       winnerId: game.winnerId,
       settings: game.settings,
       currentCrisis: game.currentCrisis,
-      capsuleSlots: game.capsuleSlots,
-      occupiedSlots: game.occupiedSlots,
-      ejectedPlayers: game.ejectedPlayers,
+      capsuleSlots: game.capsuleSlots || Math.floor(players.length / 2),
+      occupiedSlots: game.occupiedSlots || 0,
+      ejectedPlayers: game.ejectedPlayers || [],
       phaseEndTime: game.phaseEndTime,
-      phaseDuration: game.phaseDuration,
-      voteTriggerCount: game.voteTriggerCount,
-      requiredVotes: Math.floor(Array.from(game.players.values()).filter(p => p.isAlive).length / 2)
+      phaseDuration: game.phaseDuration || 60,
+      voteTriggerCount: game.voteTriggerCount || 0,
+      requiredVotes: Math.floor(players.filter(p => p.isAlive).length / 2)
     }
   }
 
-  // Метод для создания игры из лобби
+  // МЕТОД СОЗДАНИЯ ИГРЫ - ИСПРАВЛЕННАЯ ВЕРСИЯ
   createGameFromLobby(lobbyId: string, gameId: string, players: any[], creatorId: string, settings: any) {
     const gamePlayers = new Map<string, GamePlayer>()
     
+    this.logger.log(`Creating game ${gameId} from lobby ${lobbyId} with ${players.length} players`)
+    
     players.forEach((player, index) => {
-      gamePlayers.set(player.id, {
+      // ВАЖНО: ВСЕГДА устанавливаем isAlive в true при создании
+      const gamePlayer: GamePlayer = {
         id: player.id,
-        name: player.name,
+        name: player.name || `Игрок ${index + 1}`,
         missions: player.missions || 0,
         hours: player.hours || 0,
         avatar: player.avatar,
         score: 0,
         order: index + 1,
         isActive: true,
-        isAlive: true,
+        isAlive: true, // ← ГАРАНТИРОВАННО true
+        vote: undefined,
         votesAgainst: 0,
-        revealedCards: []
-      })
+        revealedCards: [],
+        hasUsedAbility: false,
+        isInfected: false,
+        isSuspicious: false,
+        isCaptain: index === 0,
+        isSeniorOfficer: index === 1
+      }
+      
+      gamePlayers.set(player.id, gamePlayer)
+      this.logger.debug(`Created player ${gamePlayer.name} with isAlive=${gamePlayer.isAlive}`)
     })
 
     const gameState: GameState = {
@@ -1695,8 +1691,8 @@ export class GameGateway
         gameMode: settings?.gameMode || 'standard',
         maxPlayers: settings?.maxPlayers || 4,
         maxRounds: settings?.maxRounds || 10,
-        discussionTime: 180, // 3 минуты по умолчанию
-        votingTime: 60, // 1 минута по умолчанию
+        discussionTime: settings?.discussionTime || 180, // 3 минуты
+        votingTime: settings?.votingTime || 60, // 1 минута
         hiddenRolesCount: Math.min(settings?.hiddenRolesCount || 1, players.length),
         enableCrises: settings?.enableCrises !== false,
         difficulty: settings?.difficulty || 'normal',
@@ -1721,7 +1717,7 @@ export class GameGateway
     }
 
     this.games.set(gameId, gameState)
-    this.logger.log(`Game created: ${gameId} from lobby ${lobbyId}`)
+    this.logger.log(`Game created: ${gameId}. Players: ${Array.from(gamePlayers.values()).map(p => `${p.name}(${p.isAlive})`).join(', ')}`)
     
     return gameState
   }
@@ -1736,7 +1732,7 @@ export class GameGateway
     return Array.from(this.games.entries()).map(([gameId, game]) => ({
       gameId,
       status: game.status,
-      players: Array.from(game.players.values()).map(p => p.name),
+      players: Array.from(game.players.values()).map(p => `${p.name}(${p.isAlive})`),
       round: game.round,
       startedAt: game.startedAt,
     }))
