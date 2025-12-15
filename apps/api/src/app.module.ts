@@ -14,6 +14,7 @@ import { OAuthAccount } from './auth/oauth-account.entity'
 import { RefreshToken } from './auth/refresh-token.entity'
 import { NotFoundExceptionFilter } from './common/filters/not-found.filter'
 import { EnvSchema } from './config/env.schema'
+import { GameModule } from './game/game.module' // ✅ ДОБАВИТЬ
 import { LobbyModule } from './lobby/lobby.module'
 import { User } from './users/user.entity'
 import { UsersModule } from './users/users.module'
@@ -28,11 +29,9 @@ function resolveEnvPaths(): string[] {
 
 	const paths: string[] = []
 
-	// Базовые .env (корневой и локальный для apps/api)
 	if (fs.existsSync(rootEnv)) paths.push(rootEnv)
 	if (fs.existsSync(apiEnv)) paths.push(apiEnv)
 
-	// В dev-режиме также подключаем .env.local файлы
 	const nodeEnv = process.env.NODE_ENV || 'development'
 	if (nodeEnv !== 'production') {
 		if (fs.existsSync(rootEnvLocal)) paths.push(rootEnvLocal)
@@ -97,6 +96,7 @@ function resolveEnvPaths(): string[] {
 		ThrottlerModule.forRoot([{ ttl: 300_000, limit: 100 }]),
 		AuthModule,
 		UsersModule,
+		GameModule,
 		LobbyModule,
 		VoiceModule,
 	],

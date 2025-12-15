@@ -2,6 +2,7 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { JwtModule } from '@nestjs/jwt'
+import { GameModule } from '../game/game.module'
 import { LobbyGateway } from './lobby.gateway'
 
 @Module({
@@ -16,6 +17,7 @@ import { LobbyGateway } from './lobby.gateway'
 			}),
 			inject: [ConfigService],
 		}),
+		GameModule,
 	],
 	providers: [LobbyGateway],
 })

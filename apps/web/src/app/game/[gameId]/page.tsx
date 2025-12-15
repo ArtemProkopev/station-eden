@@ -124,7 +124,7 @@ export default function GameSession({ params, searchParams }: PageProps) {
 				type: isSystem ? 'system' : 'player',
 				timestamp: new Date(),
 			}
-			
+
 			setChatMessages(prev => {
 				// Ограничиваем до 50 последних сообщений
 				const updated = [...prev.slice(-50), newChatMessage]
@@ -302,13 +302,14 @@ export default function GameSession({ params, searchParams }: PageProps) {
 					if (data.message) {
 						const chatMsg: GameChatMessage = {
 							id: data.message.id || Date.now().toString(),
-							playerId: data.message.playerId || data.message.playerName || 'player',
+							playerId:
+								data.message.playerId || data.message.playerName || 'player',
 							playerName: data.message.playerName || 'Игрок',
 							text: data.message.text,
 							type: 'player',
 							timestamp: new Date(data.message.timestamp || Date.now()),
 						}
-						
+
 						setChatMessages(prev => [...prev.slice(-50), chatMsg])
 					}
 					break
@@ -317,23 +318,19 @@ export default function GameSession({ params, searchParams }: PageProps) {
 		[activeCrisis, addToChat, getCardDisplayName]
 	)
 
-	const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'http://localhost:4000'
-	let wsUrl: string
-
-	if (wsBase.startsWith('https://')) {
-		wsUrl = wsBase.replace('https://', 'wss://') + '/game'
-	} else if (wsBase.startsWith('http://')) {
-		wsUrl = wsBase.replace('http://', 'ws://') + '/game'
-	} else if (wsBase.startsWith('wss://')) {
-		wsUrl = wsBase + (wsBase.endsWith('/game') ? '' : '/game')
-	} else {
-		wsUrl = 'wss://' + wsBase + '/game'
-	}
+	/**
+	 * ✅ ВАЖНО:
+	 * Не добавляем "/game" к URL, иначе Socket.IO пытается подключиться к namespace "/game"
+	 * и сервер отвечает "Invalid namespace".
+	 */
+	const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'https://api.stationeden.ru'
+	const wsUrl = wsBase.replace(/\/$/, '')
 
 	const { sendMessage, isConnected } = useWebSocket(
 		wsUrl,
 		handleWebSocketMessage,
-		{ gameId, userId }
+		{ gameId, userId },
+		{ path: '/lobby' } // если у сервера другой path, меняется тут
 	)
 
 	useEffect(() => {
@@ -370,49 +367,56 @@ export default function GameSession({ params, searchParams }: PageProps) {
 		setNewMessage(message.slice(0, 300))
 	}, [])
 
-	const handleSendMessage = useCallback((e?: React.FormEvent) => {
-		if (e) {
-			e.preventDefault()
-		}
-		
-		if (!newMessage.trim() || !isConnected) return
+	const handleSendMessage = useCallback(
+		(e?: React.FormEvent) => {
+			if (e) {
+				e.preventDefault()
+			}
 
-		sendMessage({
-			type: 'SEND_MESSAGE',
-			message: {
-				text: newMessage.trim(),
+			if (!newMessage.trim() || !isConnected) return
+
+			sendMessage({
+				type: 'SEND_MESSAGE',
+				message: {
+					text: newMessage.trim(),
+					playerName: username,
+					gameId,
+				},
+			})
+
+			const tempMessage: GameChatMessage = {
+				id: `temp-${Date.now()}`,
+				playerId: userId,
 				playerName: username,
-				gameId,
-			},
-		})
+				text: newMessage.trim(),
+				type: 'player',
+				timestamp: new Date(),
+			}
 
-		const tempMessage: GameChatMessage = {
-			id: `temp-${Date.now()}`,
-			playerId: userId,
-			playerName: username,
-			text: newMessage.trim(),
-			type: 'player',
-			timestamp: new Date(),
-		}
-		
-		setChatMessages(prev => [...prev.slice(-50), tempMessage])
-		setNewMessage('')
-	}, [newMessage, isConnected, sendMessage, username, gameId, userId])
+			setChatMessages(prev => [...prev.slice(-50), tempMessage])
+			setNewMessage('')
+		},
+		[newMessage, isConnected, sendMessage, username, gameId, userId]
+	)
 
-	const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-		if (e.key === 'Enter' && !e.shiftKey) {
-			e.preventDefault()
-			handleSendMessage()
-		}
-	}, [handleSendMessage])
+	const handleKeyPress = useCallback(
+		(e: React.KeyboardEvent<HTMLInputElement>) => {
+			if (e.key === 'Enter' && !e.shiftKey) {
+				e.preventDefault()
+				handleSendMessage()
+			}
+		},
+		[handleSendMessage]
+	)
 
 	const handleChatScroll = useCallback(() => {
 		// Можно добавить логику для бесконечной прокрутки, если нужно
 	}, [])
 
+	// ✅ FIX: мок и бэк у тебя ожидают START_GAME, а не START_GAME_SESSION
 	const handleStartGame = () => {
 		if (!isConnected) return
-		sendMessage({ type: 'START_GAME_SESSION' })
+		sendMessage({ type: 'START_GAME' })
 	}
 
 	const getServerCardType = (clientType: CardType): string => {
@@ -847,7 +851,9 @@ export default function GameSession({ params, searchParams }: PageProps) {
 							.map((player: any, index: number) => (
 								<div
 									key={player.id}
-									className={`${styles.scoreItem} ${gameResults.winners.includes(player.id) ? styles.winner : ''}`}
+									className={`${styles.scoreItem} ${
+										gameResults.winners.includes(player.id) ? styles.winner : ''
+									}`}
 								>
 									<span className={styles.rank}>#{index + 1}</span>
 									<span className={styles.playerName}>
@@ -984,7 +990,9 @@ export default function GameSession({ params, searchParams }: PageProps) {
 								.map((player: any) => (
 									<button
 										key={player.id}
-										className={`${styles.voteOption} ${selectedVote === player.id ? styles.selected : ''}`}
+										className={`${styles.voteOption} ${
+											selectedVote === player.id ? styles.selected : ''
+										}`}
 										onClick={() => handleVote(player.id)}
 										disabled={!currentPlayer?.isAlive || !!currentPlayer?.vote}
 									>
@@ -1072,7 +1080,7 @@ export default function GameSession({ params, searchParams }: PageProps) {
 			<div className={styles.loadingContainer}>
 				<div className={styles.loadingSpinner}></div>
 				<p>Загрузка игры...</p>
-					<p>
+				<p>
 					Статус подключения: {isConnected ? 'Подключено' : 'Не подключено'}
 				</p>
 				<button
@@ -1309,7 +1317,9 @@ export default function GameSession({ params, searchParams }: PageProps) {
 								<div
 									className={styles.timerProgress}
 									style={{
-										width: `${(phaseTimeLeft / (gameState.phaseDuration || 180)) * 100}%`,
+										width: `${
+											(phaseTimeLeft / (gameState.phaseDuration || 180)) * 100
+										}%`,
 									}}
 								></div>
 							</div>
@@ -1330,7 +1340,7 @@ export default function GameSession({ params, searchParams }: PageProps) {
 								{isConnected ? 'Онлайн' : 'Офлайн'}
 							</div>
 						</div>
-						
+
 						<div className={styles.chatMessages} ref={chatContainerRef}>
 							{chatMessages.length === 0 ? (
 								<div className={styles.emptyChat}>
@@ -1346,7 +1356,9 @@ export default function GameSession({ params, searchParams }: PageProps) {
 										} ${message.playerId === userId ? styles.myMessage : ''}`}
 									>
 										<div className={styles.messageHeader}>
-											<span className={styles.sender}>{message.playerName}</span>
+											<span className={styles.sender}>
+												{message.playerName}
+											</span>
 											<span className={styles.time}>
 												{formatMessageTime(message.timestamp)}
 											</span>
@@ -1356,29 +1368,31 @@ export default function GameSession({ params, searchParams }: PageProps) {
 								))
 							)}
 						</div>
-						
-						<form 
-							onSubmit={handleSendMessage} 
-							className={styles.chatForm}
-						>
+
+						<form onSubmit={handleSendMessage} className={styles.chatForm}>
 							<input
-								type="text"
+								type='text'
 								value={newMessage}
-								onChange={(e) => handleMessageChange(e.target.value)}
+								onChange={e => handleMessageChange(e.target.value)}
 								onKeyPress={handleKeyPress}
 								placeholder={
-									!isConnected 
-										? 'Нет подключения...' 
-										: 'Введите сообщение...'
+									!isConnected ? 'Нет подключения...' : 'Введите сообщение...'
 								}
-								disabled={!isConnected || (!gameState || gameState.phase === 'game_over')}
+								disabled={
+									!isConnected || !gameState || gameState.phase === 'game_over'
+								}
 								className={styles.chatInput}
 								maxLength={300}
 							/>
 							<button
-								type="submit"
+								type='submit'
 								className={styles.sendButton}
-								disabled={!newMessage.trim() || !isConnected || (!gameState || gameState.phase === 'game_over')}
+								disabled={
+									!newMessage.trim() ||
+									!isConnected ||
+									!gameState ||
+									gameState.phase === 'game_over'
+								}
 							>
 								Отправить
 							</button>

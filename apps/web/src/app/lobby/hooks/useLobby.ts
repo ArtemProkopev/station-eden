@@ -1,14 +1,13 @@
-// apps/web/src/app/lobby/hooks/useLobby.ts
 import { useProfile } from '@/app/profile/hooks/useProfile'
+import { useLobbySocket } from '@/hooks/useLobbySocket'
 import { useScrollPrevention } from '@/hooks/useScrollPrevention'
-import { useWebSocket } from '@/hooks/useWebSocket'
 import {
 	ChatMessage,
 	LobbySettings,
 	LobbyPlayer as Player,
 } from '@station-eden/shared'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AddPlayerModal } from '../components/AddPlayerModal/AddPlayerModal'
 import { LobbySettingsModal } from '../components/LobbySettingsModal/LobbySettingsModal'
 import { PlayerManagementModal } from '../components/PlayerManagementModal/PlayerManagementModal'
@@ -67,7 +66,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 	const reconnectTimeoutRef = useRef<NodeJS.Timeout>()
 	const didInitRef = useRef(false)
 
-	// Хелпер для получения ID пользователя из профиля
 	const currentUserId = profile.data?.id
 
 	useEffect(() => {
@@ -84,121 +82,108 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 	useScrollPrevention()
 
-	const handleWebSocketMessage = useCallback((data: any) => {
-		if (!data?.type) return
+	const handleWebSocketMessage = useCallback(
+		(data: any) => {
+			if (!data?.type) return
 
-		switch (data.type) {
-			case 'PLAYER_JOINED':
-				setPlayers(prev => {
-					const exists = prev.some((p: Player) => p.id === data.player.id)
-					return !exists && prev.length < lobbySettingsRef.current.maxPlayers
-						? [...prev, data.player]
-						: prev
-				})
-				break
+			switch (data.type) {
+				case 'PLAYER_JOINED':
+					setPlayers(prev => {
+						const exists = prev.some((p: Player) => p.id === data.player.id)
+						return !exists && prev.length < lobbySettingsRef.current.maxPlayers
+							? [...prev, data.player]
+							: prev
+					})
+					break
 
-			case 'PLAYER_LEFT':
-				setPlayers(prev => prev.filter((p: Player) => p.id !== data.playerId))
-				break
+				case 'PLAYER_LEFT':
+					setPlayers(prev => prev.filter((p: Player) => p.id !== data.playerId))
+					break
 
-			case 'CHAT_MESSAGE': {
-				const msg = data.message || {}
-				const id =
-					msg.id ||
-					`srv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-				if (seenMsgIdsRef.current.has(id)) break
-				seenMsgIdsRef.current.add(id)
+				case 'CHAT_MESSAGE': {
+					const msg = data.message || {}
+					const id =
+						msg.id ||
+						`srv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+					if (seenMsgIdsRef.current.has(id)) break
+					seenMsgIdsRef.current.add(id)
 
-				setChatMessages(prev => [
-					...prev,
-					{
-						id,
-						playerId: msg.playerId ?? 'unknown',
-						playerName: msg.playerName ?? 'Игрок',
-						text: String(msg.text ?? '').slice(0, 300),
-						timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
-						type: msg.type ?? 'player',
-					},
-				])
-				shouldScrollRef.current = true
-				break
-			}
-
-			case 'LOBBY_STATE':
-				setPlayers(Array.isArray(data.players) ? data.players : [])
-				if (data.settings) setLobbySettings(data.settings)
-				if (data.creatorId) setLobbyCreatorId(data.creatorId)
-				break
-
-			case 'PLAYER_READY':
-				setPlayers(prev =>
-					prev.map((p: Player) =>
-						p.id === data.playerId ? { ...p, isReady: data.isReady } : p
-					)
-				)
-				break
-
-			case 'LOBBY_SETTINGS_UPDATED':
-				setLobbySettings(data.settings)
-				break
-
-			case 'GAME_STARTED':
-				// Перенаправляем всех игроков на страницу игры
-				console.log('Game started, redirecting to:', data.redirectUrl)
-				if (data.redirectUrl) {
-					// Добавляем системное сообщение в чат
-					const systemMessage: ChatMessage = {
-						id: `system-${Date.now()}`,
-						playerId: 'system',
-						playerName: 'Система',
-						text: 'Игра началась! Перенаправление...',
-						timestamp: new Date(),
-						type: 'system'
-					}
-					setChatMessages(prev => [...prev, systemMessage])
-					
-					// Редирект через 1 секунду для плавного перехода
-					setTimeout(() => {
-						router.push(data.redirectUrl)
-					}, 1000)
+					setChatMessages(prev => [
+						...prev,
+						{
+							id,
+							playerId: msg.playerId ?? 'unknown',
+							playerName: msg.playerName ?? 'Игрок',
+							text: String(msg.text ?? '').slice(0, 300),
+							timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
+							type: msg.type ?? 'player',
+						},
+					])
+					shouldScrollRef.current = true
+					break
 				}
-				break
 
-			case 'ERROR':
-				console.error('Server error:', data.message)
-				setError(data.message || 'Произошла ошибка')
-				break
-		}
-	}, [router])
+				case 'LOBBY_STATE':
+					setPlayers(Array.isArray(data.players) ? data.players : [])
+					if (data.settings) setLobbySettings(data.settings)
+					if (data.creatorId) setLobbyCreatorId(data.creatorId)
+					break
 
-	const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'http://localhost:4000'
-	const wsUrl = wsBase.startsWith('http')
-		? wsBase.replace('http', 'ws')
-		: wsBase
-	const wsParams = useMemo(
-		() => ({ lobbyId: lobbyIdFromProps || 'default-lobby' }),
-		[lobbyIdFromProps]
+				case 'PLAYER_READY':
+					setPlayers(prev =>
+						prev.map((p: Player) =>
+							p.id === data.playerId ? { ...p, isReady: data.isReady } : p
+						)
+					)
+					break
+
+				case 'LOBBY_SETTINGS_UPDATED':
+					setLobbySettings(data.settings)
+					break
+
+				case 'GAME_STARTED':
+					if (data.redirectUrl) {
+						const systemMessage: ChatMessage = {
+							id: `system-${Date.now()}`,
+							playerId: 'system',
+							playerName: 'Система',
+							text: 'Игра началась! Перенаправление...',
+							timestamp: new Date(),
+							type: 'system',
+						}
+						setChatMessages(prev => [...prev, systemMessage])
+						setTimeout(() => router.push(data.redirectUrl), 1000)
+					}
+					break
+
+				case 'ERROR':
+					console.error('Server error:', data.message)
+					setError(data.message || 'Произошла ошибка')
+					break
+			}
+		},
+		[router]
 	)
 
-	const { sendMessage: sendWS, isConnected } = useWebSocket(
-		wsUrl,
+	// ✅ socket.io-client нужен http(s)
+	const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'http://localhost:4000'
+	const lobbyId = lobbyIdFromProps || 'default-lobby'
+
+	const { sendMessage: sendWS, isConnected } = useLobbySocket(
+		wsBase,
 		handleWebSocketMessage,
-		wsParams
+		lobbyId
 	)
 
 	useEffect(() => {
 		if (!isConnected && hasJoinedRef.current) {
 			reconnectTimeoutRef.current = setTimeout(() => {
-				if (currentUserId) {
-					hasJoinedRef.current = false
-				}
+				if (currentUserId) hasJoinedRef.current = false
 			}, 2000)
 		}
 
 		return () => {
-			if (reconnectTimeoutRef.current) {
-				clearTimeout(reconnectTimeoutRef.current)
-			}
+			if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
 		}
 	}, [isConnected, currentUserId])
 
@@ -206,7 +191,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 		if (isConnected) setError('')
 	}, [isConnected])
 
-	// Подключаемся к лобби, когда есть соединение и загружен профиль
 	useEffect(() => {
 		if (isConnected && !hasJoinedRef.current && currentUserId && profile.data) {
 			const currentUser: Player = {
@@ -218,9 +202,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 				isReady: false,
 			}
 
-			console.log('Sending JOIN_LOBBY for user:', currentUser.name)
 			const success = sendWS({ type: 'JOIN_LOBBY', player: currentUser })
-
 			if (success) {
 				hasJoinedRef.current = true
 			} else {
@@ -270,16 +252,13 @@ export function useLobby(lobbyIdFromProps?: string) {
 		(_playerId: string, _muted: boolean) => {},
 		[]
 	)
-
 	const handleVolumeChange = useCallback(
 		(_playerId: string, _volume: number) => {},
 		[]
 	)
 
 	const handleAddFriend = useCallback(() => {
-		if (selectedPlayer) {
-			alert(`Игрок ${selectedPlayer.name} добавлен в друзья!`)
-		}
+		if (selectedPlayer) alert(`Игрок ${selectedPlayer.name} добавлен в друзья!`)
 	}, [selectedPlayer])
 
 	const handleRemovePlayer = useCallback(
@@ -323,7 +302,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 				isReady: false,
 			}
 
-			console.log('Adding new player (mock):', newPlayer.name)
 			sendWS({ type: 'JOIN_LOBBY', player: newPlayer })
 			setShowAddPlayerModal(false)
 		},
@@ -406,14 +384,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 		}
 	})
 
-	/**
-	 * Инициализация лобби (одноразово):
-	 * 1) грузим пользователя (сервер — источник истины)
-	 * 2) иконки грузим фоном (не блокируют)
-	 *
-	 * ВАЖНО: не включаем loadSavedAssets в deps — иначе будет цикл,
-	 * т.к. loadSavedAssets в useProfile зависит от profile и меняет identity.
-	 */
 	useEffect(() => {
 		if (didInitRef.current) return
 		didInitRef.current = true
@@ -423,11 +393,8 @@ export function useLobby(lobbyIdFromProps?: string) {
 		const init = async () => {
 			try {
 				setIsLoading(true)
-
 				await loadUserData()
 				if (cancelled) return
-
-				// Иконки НЕ блокируют лобби
 				checkIconsAvailability().catch(() => {})
 			} finally {
 				if (!cancelled) setIsLoading(false)
@@ -441,10 +408,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 		}
 	}, [loadUserData, checkIconsAvailability])
 
-	/**
-	 * Подтягиваем локальный кэш ассетов отдельно, когда появился userId.
-	 * Это безопасно и не вызывает цикл init-эффекта.
-	 */
 	useEffect(() => {
 		const uid = profile.data?.id
 		if (!uid) return
@@ -456,9 +419,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 		[players, currentUserId]
 	)
 
-	const lobbyId = lobbyIdFromProps || 'default-lobby'
-
-	// Добавляем функцию для начала игры
 	const handleStartGame = useCallback(() => {
 		if (!currentUserId || !isLobbyCreator) {
 			alert('Только создатель лобби может начать игру')
@@ -472,25 +432,25 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 		const notReadyPlayers = players.filter(p => !p.isReady)
 		if (notReadyPlayers.length > 0) {
-			alert(`Следующие игроки не готовы: ${notReadyPlayers.map(p => p.name).join(', ')}`)
+			alert(
+				`Следующие игроки не готовы: ${notReadyPlayers.map(p => p.name).join(', ')}`
+			)
 			return
 		}
 
-		// Отправляем запрос на сервер для начала игры
-		sendWS({ 
-			type: 'START_GAME', 
+		sendWS({
+			type: 'START_GAME',
 			lobbyId: lobbyIdRef.current,
-			creatorId: currentUserId 
+			creatorId: currentUserId,
 		})
 
-		// Добавляем системное сообщение
 		const systemMessage: ChatMessage = {
 			id: `system-${Date.now()}`,
 			playerId: 'system',
 			playerName: 'Система',
 			text: 'Создатель начал игру...',
 			timestamp: new Date(),
-			type: 'system'
+			type: 'system',
 		}
 		setChatMessages(prev => [...prev, systemMessage])
 	}, [sendWS, currentUserId, isLobbyCreator, players])
@@ -513,7 +473,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 		chatContainerRef,
 		error,
 		isLobbyCreator,
-		handleStartGame, // Добавляем новую функцию
+		handleStartGame,
 		setShowAddPlayerModal,
 		setShowLobbySettingsModal,
 		setNewMessage,
