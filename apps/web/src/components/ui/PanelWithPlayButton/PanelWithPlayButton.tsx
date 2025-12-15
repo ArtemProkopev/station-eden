@@ -35,6 +35,7 @@ function PanelWithPlayButton({
 				height={400}
 				quality={85}
 				priority={true}
+				unoptimized={true}
 			/>
 
 			<button

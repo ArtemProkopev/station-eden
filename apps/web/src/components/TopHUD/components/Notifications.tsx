@@ -1,9 +1,8 @@
-// apps/web/src/components/TopHUD/components/Notifications.tsx
 'use client'
 
-import { Notification, NotificationType } from '@station-eden/shared' // ← Импортируем из shared
+import { Notification, NotificationType } from '@station-eden/shared'
 import Image from 'next/image'
-import React from 'react'
+import React, { useRef, useEffect } from 'react'
 import styles from './Notifications.module.css'
 
 interface NotificationsProps {
@@ -21,9 +20,30 @@ export function Notifications({
 }: NotificationsProps) {
 	const [isOpen, setIsOpen] = React.useState(false)
 	const dropdownRef = React.useRef<HTMLDivElement>(null)
+	const notificationsListRef = useRef<HTMLDivElement>(null)
 
 	const unreadCount = notifications.filter(n => !n.isRead).length
 	const hasNotifications = notifications.length > 0
+
+	// Обработчик прокрутки колесиком мыши для списка уведомлений
+	useEffect(() => {
+		const container = notificationsListRef.current
+		if (!container || !isOpen) return
+
+		const wheelHandler = (e: WheelEvent) => {
+			// Проверяем, нужна ли прокрутка (есть ли контент для прокрутки)
+			if (container.scrollHeight > container.clientHeight) {
+				container.scrollTop += e.deltaY
+				e.preventDefault()
+			}
+		}
+
+		container.addEventListener('wheel', wheelHandler, { passive: false })
+		
+		return () => {
+			container.removeEventListener('wheel', wheelHandler)
+		}
+	}, [isOpen])
 
 	// Закрытие при клике вне компонента
 	React.useEffect(() => {
@@ -165,108 +185,113 @@ export function Notifications({
 						)}
 					</div>
 
-					<div className={styles.notificationsList}>
+					<div 
+						className={styles.notificationsList}
+						ref={notificationsListRef}
+					>
 						{hasNotifications ? (
-							notifications.map(notification => (
-								<div
-									key={notification.id}
-									className={`${styles.notificationItem} ${
-										!notification.isRead ? styles.unread : ''
-									} ${styles[`type-${notification.type}`]}`}
-									onClick={() => handleNotificationClick(notification)}
-									role='menuitem'
-								>
-									<div className={styles.notificationHeader}>
-										<div className={styles.notificationIcon}>
-											<Image
-												src={getNotificationIcon(notification.type)}
-												alt=''
-												width={16}
-												height={16}
-											/>
-										</div>
-										<span className={styles.notificationTitle}>
-											{notification.title}
-										</span>
-										<button
-											type='button'
-											className={styles.dismissButton}
-											onClick={e => handleDismiss(notification.id, e)}
-											aria-label='Закрыть уведомление'
-										>
-											×
-										</button>
-									</div>
-
-									<div className={styles.notificationContent}>
-										<p className={styles.notificationMessage}>
-											{notification.message}
-										</p>
-										<span className={styles.notificationTime}>
-											{formatTime(notification.timestamp)}
-										</span>
-									</div>
-
-									{notification.type === 'game_invite' && (
-										<div className={styles.inviteActions}>
+							<div className={styles.notificationsListInner}>
+								{notifications.map(notification => (
+									<div
+										key={notification.id}
+										className={`${styles.notificationItem} ${
+											!notification.isRead ? styles.unread : ''
+										} ${styles[`type-${notification.type}`]}`}
+										onClick={() => handleNotificationClick(notification)}
+										role='menuitem'
+									>
+										<div className={styles.notificationHeader}>
+											<div className={styles.notificationIcon}>
+												<Image
+													src={getNotificationIcon(notification.type)}
+													alt=''
+													width={16}
+													height={16}
+												/>
+											</div>
+											<span className={styles.notificationTitle}>
+												{notification.title}
+											</span>
 											<button
 												type='button'
-												className={styles.acceptButton}
-												onClick={() =>
-													handleAcceptInvite(
-														notification.id,
-														notification.lobbyId
-													)
-												}
+												className={styles.dismissButton}
+												onClick={e => handleDismiss(notification.id, e)}
+												aria-label='Закрыть уведомление'
 											>
-												Принять
-											</button>
-											<button
-												type='button'
-												className={styles.declineButton}
-												onClick={() => handleDeclineInvite(notification.id)}
-											>
-												Отклонить
+												×
 											</button>
 										</div>
-									)}
 
-									{notification.type === 'friend_request' && (
-										<div className={styles.friendActions}>
-											<button
-												type='button'
-												className={styles.acceptButton}
-												onClick={() =>
-													onNotificationAction?.(notification.id, 'accept')
-												}
-											>
-												Принять
-											</button>
-											<button
-												type='button'
-												className={styles.declineButton}
-												onClick={() =>
-													onNotificationAction?.(notification.id, 'decline')
-												}
-											>
-												Отклонить
-											</button>
+										<div className={styles.notificationContent}>
+											<p className={styles.notificationMessage}>
+												{notification.message}
+											</p>
+											<span className={styles.notificationTime}>
+												{formatTime(notification.timestamp)}
+											</span>
 										</div>
-									)}
 
-									{notification.type === 'news' &&
-										'link' in notification &&
-										notification.link && (
-											<button
-												type='button'
-												className={styles.readMoreButton}
-												onClick={() => window.open(notification.link, '_blank')}
-											>
-												Подробнее
-											</button>
+										{notification.type === 'game_invite' && (
+											<div className={styles.inviteActions}>
+												<button
+													type='button'
+													className={styles.acceptButton}
+													onClick={() =>
+														handleAcceptInvite(
+															notification.id,
+															notification.lobbyId
+														)
+													}
+												>
+													Принять
+												</button>
+												<button
+													type='button'
+													className={styles.declineButton}
+													onClick={() => handleDeclineInvite(notification.id)}
+												>
+													Отклонить
+												</button>
+											</div>
 										)}
-								</div>
-							))
+
+										{notification.type === 'friend_request' && (
+											<div className={styles.friendActions}>
+												<button
+													type='button'
+													className={styles.acceptButton}
+													onClick={() =>
+														onNotificationAction?.(notification.id, 'accept')
+													}
+												>
+													Принять
+												</button>
+												<button
+													type='button'
+													className={styles.declineButton}
+													onClick={() =>
+														onNotificationAction?.(notification.id, 'decline')
+													}
+												>
+													Отклонить
+												</button>
+											</div>
+										)}
+
+										{notification.type === 'news' &&
+											'link' in notification &&
+											notification.link && (
+												<button
+													type='button'
+													className={styles.readMoreButton}
+													onClick={() => window.open(notification.link, '_blank')}
+												>
+													Подробнее
+												</button>
+											)}
+									</div>
+								))}
+							</div>
 						) : (
 							<div className={styles.emptyState}>
 								<div className={styles.emptyIcon}>🔔</div>

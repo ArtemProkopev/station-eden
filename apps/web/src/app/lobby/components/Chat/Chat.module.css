@@ -1,3 +1,4 @@
+/* apps/web/src/app/lobby/components/Chat/Chat.module.css */
 .chatBlock {
 	flex: 1;
 	background: rgba(255, 255, 255, 0.1);
@@ -95,41 +96,28 @@
 	overflow-y: auto;
 	height: 100%;
 	min-height: 0;
+	/* Улучшаем прокрутку колесиком */
+	overscroll-behavior: contain;
+	scroll-behavior: smooth;
 }
 
-/* Стилизация скроллбара для контейнера сообщений */
-.chatMessagesContainer::-webkit-scrollbar {
-	width: 6px;
+/* Улучшение для плавности прокрутки */
+.chatMessagesContainer:focus {
+	outline: none;
+	border-color: #4fd8ff;
 }
 
-.chatMessagesContainer::-webkit-scrollbar-track {
-	background: rgba(255, 255, 255, 0.1);
-	border-radius: 3px;
-}
-
-.chatMessagesContainer::-webkit-scrollbar-thumb {
-	background: #63efff;
-	border-radius: 3px;
-}
-
-.chatMessagesContainer::-webkit-scrollbar-thumb:hover {
-	background: #4fd8ff;
-}
-
+/* Сообщения - не перехватывают события мыши */
 .chatMessages {
 	display: flex;
 	flex-direction: column;
 	gap: 16px;
 	flex: 1;
 	min-height: 0;
+	pointer-events: none; /* Это важно! */
 }
 
-/* Для Firefox */
-.chatMessagesContainer {
-	scrollbar-width: thin;
-	scrollbar-color: #63efff rgba(255, 255, 255, 0.1);
-}
-
+/* Но сами сообщения должны быть кликабельны */
 .chatMessage {
 	background: rgba(255, 255, 255, 0.1);
 	border-radius: 12px;
@@ -137,6 +125,7 @@
 	border: 1px solid rgba(99, 239, 255, 0.2);
 	transition: all 0.2s ease;
 	flex-shrink: 0;
+	pointer-events: auto; /* Возвращаем кликабельность */
 }
 
 .chatMessage:hover {
@@ -179,6 +168,31 @@
 	line-height: 1.4;
 	word-wrap: break-word;
 	margin: 0;
+}
+
+/* Стилизация скроллбара для контейнера сообщений */
+.chatMessagesContainer::-webkit-scrollbar {
+	width: 6px;
+}
+
+.chatMessagesContainer::-webkit-scrollbar-track {
+	background: rgba(255, 255, 255, 0.1);
+	border-radius: 3px;
+}
+
+.chatMessagesContainer::-webkit-scrollbar-thumb {
+	background: #63efff;
+	border-radius: 3px;
+}
+
+.chatMessagesContainer::-webkit-scrollbar-thumb:hover {
+	background: #4fd8ff;
+}
+
+/* Для Firefox */
+.chatMessagesContainer {
+	scrollbar-width: thin;
+	scrollbar-color: #63efff rgba(255, 255, 255, 0.1);
 }
 
 .chatForm {

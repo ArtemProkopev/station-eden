@@ -1,3 +1,4 @@
+/* apps/web/src/app/lobby/components/PlayersList/PlayersList.module.css */
 .playersBlock {
 	flex: 1;
 	background: rgba(255, 255, 255, 0.1);
@@ -40,6 +41,8 @@
 	z-index: 1;
 	min-height: 0;
 	overflow: hidden;
+	/* Важно: отключаем прокрутку у контейнера */
+	overflow-y: visible;
 }
 
 .playersList {
@@ -51,8 +54,19 @@
 	padding-right: 4px;
 	flex: 1;
 	min-height: 0;
+	/* Улучшаем прокрутку колесиком */
+	overscroll-behavior: contain;
+	scroll-behavior: smooth;
+	/* Сообщения - не перехватывают события мыши */
+	pointer-events: auto;
 }
 
+/* Улучшение для плавности прокрутки */
+.playersList:focus {
+	outline: none;
+}
+
+/* Стилизация скроллбара */
 .playersList::-webkit-scrollbar {
 	width: 6px;
 }
@@ -69,6 +83,12 @@
 
 .playersList::-webkit-scrollbar-thumb:hover {
 	background: #4fd8ff;
+}
+
+/* Для Firefox */
+.playersList {
+	scrollbar-width: thin;
+	scrollbar-color: #63efff rgba(255, 255, 255, 0.1);
 }
 
 /* ===== КАРТОЧКА ИГРОКА ===== */
@@ -90,6 +110,8 @@
 	flex-shrink: 0;
 	border: 1px solid rgba(99, 239, 255, 0.4);
 	overflow: hidden;
+	/* Важно: карточки не блокируют события мыши */
+	pointer-events: auto;
 }
 
 .playerCard:hover {
@@ -356,8 +378,6 @@
 .emptyState p {
 	margin: 0;
 }
-
-/* Адаптивность */
 
 @media (max-width: 1200px) {
 	.playersBlock {

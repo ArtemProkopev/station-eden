@@ -1,7 +1,7 @@
 // apps/web/src/app/lobby/components/Chat/Chat.tsx
 import { ChatMessage } from '@station-eden/shared'
 import type React from 'react'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import VoicePanel from '../VoicePanel/VoicePanel'
 import styles from './Chat.module.css'
 
@@ -27,9 +27,38 @@ export default function Chat({
 	chatContainerRef,
 }: ChatProps) {
 	const [activeTab, setActiveTab] = useState<'text' | 'voice'>('text')
-
+	const messagesContainerRef = useRef<HTMLDivElement>(null)
+	
 	// индикатор "в голосе кто-то есть" для вкладки (без числа)
 	const [hasVoiceActivity, setHasVoiceActivity] = useState(false)
+
+	// Обработчик прокрутки колесиком мыши
+	const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+		if (messagesContainerRef.current) {
+			// Прокручиваем контейнер сообщений
+			messagesContainerRef.current.scrollTop += e.deltaY
+			onChatScroll() // Оповещаем о скролле, если нужно
+			e.preventDefault() // Предотвращаем стандартное поведение
+		}
+	}, [onChatScroll])
+
+	// Установка обработчика на контейнер сообщений
+	useEffect(() => {
+		const container = messagesContainerRef.current
+		if (!container) return
+
+		const wheelHandler = (e: WheelEvent) => {
+			container.scrollTop += e.deltaY
+			onChatScroll()
+			e.preventDefault()
+		}
+
+		container.addEventListener('wheel', wheelHandler, { passive: false })
+		
+		return () => {
+			container.removeEventListener('wheel', wheelHandler)
+		}
+	}, [onChatScroll])
 
 	const handleVoiceStatsChange = useCallback(
 		(stats: { participantsCount: number; someoneSpeaking: boolean }) => {
@@ -77,8 +106,9 @@ export default function Chat({
 				<>
 					<div
 						className={styles.chatMessagesContainer}
-						ref={chatContainerRef}
+						ref={messagesContainerRef}
 						onScroll={onChatScroll}
+						onWheel={handleWheel}
 					>
 						<div className={styles.chatMessages}>
 							{messages.map(message => (

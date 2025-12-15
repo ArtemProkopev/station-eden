@@ -1,6 +1,6 @@
 // apps/web/src/app/lobby/components/PlayersList/PlayersList.tsx
 import { LobbyPlayer as Player } from '@station-eden/shared'
-import { memo } from 'react'
+import { memo, useRef, useEffect } from 'react'
 import styles from './PlayersList.module.css'
 
 interface PlayersListProps {
@@ -22,6 +22,28 @@ export default memo(function PlayersList({
 	onToggleReady,
 	currentUserReadyState,
 }: PlayersListProps) {
+	const playersListRef = useRef<HTMLDivElement>(null)
+	
+	// Обработчик прокрутки колесиком мыши
+	useEffect(() => {
+		const container = playersListRef.current
+		if (!container) return
+
+		const wheelHandler = (e: WheelEvent) => {
+			// Проверяем, нужна ли прокрутка (есть ли контент для прокрутки)
+			if (container.scrollHeight > container.clientHeight) {
+				container.scrollTop += e.deltaY
+				e.preventDefault()
+			}
+		}
+
+		container.addEventListener('wheel', wheelHandler, { passive: false })
+		
+		return () => {
+			container.removeEventListener('wheel', wheelHandler)
+		}
+	}, [])
+
 	return (
 		<div className={styles.playersBlock}>
 			<h2 className={styles.blockTitle}>
@@ -29,7 +51,10 @@ export default memo(function PlayersList({
 			</h2>
 
 			<div className={styles.playersListContainer}>
-				<div className={styles.playersList}>
+				<div 
+					className={styles.playersList}
+					ref={playersListRef}
+				>
 					{players.map(player => (
 						<div
 							key={player.id}
