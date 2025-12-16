@@ -71,7 +71,7 @@ interface GameChatMessage {
 interface PlayerCardInfo {
 	playerId: string
 	playerName: string
-	revealedCards: Record<string, { name: string; type: string }>
+	revealedCards: Record<string, { name: string; type: string; cardId: string }>
 }
 
 // Функция форматирования времени - объявляем ДО использования
@@ -96,7 +96,7 @@ export default function GameSession({ params }: PageProps) {
 	}, [loadUserData])
 
 	const userId = profile.status === 'ok' ? profile.data?.id : undefined
-	const username = profile.status === 'ok' ? profile.data?.username : undefined
+	const username = profile.status === 'ok' ? profile.data?.username || 'Игрок' : 'Игрок'
 
 	const [gameState, setGameState] = useState<any>(null)
 	const [myCards, setMyCards] = useState<Record<string, CardDetails>>({})
@@ -112,6 +112,7 @@ export default function GameSession({ params }: PageProps) {
 	const [revealedPlayer, setRevealedPlayer] = useState<{
 		name: string
 		cards: any
+		playerId?: string
 	} | null>(null)
 	const [showMyCards, setShowMyCards] = useState(false)
 	const [showCardsTable, setShowCardsTable] = useState(false)
@@ -126,13 +127,22 @@ export default function GameSession({ params }: PageProps) {
 	// Состояние для общей таблицы карт
 	const [allPlayersCards, setAllPlayersCards] = useState<PlayerCardInfo[]>([])
 	
-	// Состояние для отслеживания раскрытых карт текущего игрока
-	const [myRevealedCards, setMyRevealedCards] = useState<string[]>([])
+	// Состояние для отслеживания раскрытых карт текущего игрока в этом раунде
+	const [myRevealedCardsThisRound, setMyRevealedCardsThisRound] = useState<string[]>([])
+	
+	// Состояние для всех раскрытых карт текущего игрока за всю игру
+	const [myAllRevealedCards, setMyAllRevealedCards] = useState<Record<string, {name: string, type: string}>>({})
+	
+	// Состояние для отслеживания выданных карт в этом раунде
+	const [cardsReceivedThisRound, setCardsReceivedThisRound] = useState<number>(0)
+	
+	// Состояние для отслеживания таймера
+	const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(null)
+	
+	// Состояние для пропуска заставки
+	const [canSkipNarration, setCanSkipNarration] = useState<boolean>(false)
 
 	const chatContainerRef = useRef<HTMLDivElement>(null)
-
-	// Таймер - исправленная логика
-	const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(null)
 
 	const addToChat = useCallback(
 		(
@@ -184,15 +194,26 @@ export default function GameSession({ params }: PageProps) {
 		if (!game?.players) return
 		
 		const playersInfo: PlayerCardInfo[] = game.players.map((player: any) => {
-			const revealedCards: Record<string, { name: string; type: string }> = {}
+			const revealedCardsMap: Record<string, { name: string; type: string; cardId: string }> = {}
 			
-			// Собираем раскрытые карты игрока
-			if (player.revealedCardsInfo) {
+			// Собираем раскрытые карты игрока из состояния
+			if (player.id === userId) {
+				// Для текущего игрока используем локальное состояние
+				Object.entries(myAllRevealedCards).forEach(([cardType, cardInfo]) => {
+					revealedCardsMap[cardType] = {
+						name: cardInfo.name,
+						type: getCardTypeDisplayName(cardType),
+						cardId: cardType
+					}
+				})
+			} else if (player.revealedCardsInfo) {
+				// Для других игроков из gameState
 				Object.entries(player.revealedCardsInfo).forEach(([cardType, card]: [string, any]) => {
-					if (card) {
-						revealedCards[cardType] = {
-							name: card.name || 'Неизвестно',
-							type: getCardTypeDisplayName(cardType)
+					if (card && typeof card === 'object' && 'name' in card) {
+						revealedCardsMap[cardType] = {
+							name: card.name as string,
+							type: getCardTypeDisplayName(cardType),
+							cardId: (card.id as string) || cardType
 						}
 					}
 				})
@@ -201,47 +222,76 @@ export default function GameSession({ params }: PageProps) {
 			return {
 				playerId: player.id,
 				playerName: player.name,
-				revealedCards
+				revealedCards: revealedCardsMap
 			}
 		})
 		
 		setAllPlayersCards(playersInfo)
-	}, [getCardTypeDisplayName])
+	}, [getCardTypeDisplayName, myAllRevealedCards, userId])
 
-	// Функция для запуска/остановки таймера
-	const startTimer = useCallback((endTime: number, duration: number) => {
+	// Функция для запуска таймера
+	const startTimer = useCallback((duration: number) => {
 		// Очищаем предыдущий таймер
 		if (timerInterval) {
 			clearInterval(timerInterval)
+			setTimerInterval(null)
 		}
 		
-		const update = () => {
-			const now = Date.now()
-			const secondsLeft = Math.max(0, Math.floor((endTime - now) / 1000))
-			setPhaseTimeLeft(secondsLeft)
-			
-			// Если время вышло, очищаем интервал
-			if (secondsLeft <= 0) {
-				if (timerInterval) {
-					clearInterval(timerInterval)
+		// Устанавливаем начальное время
+		setPhaseTimeLeft(duration)
+		
+		// Запускаем новый таймер
+		const interval = setInterval(() => {
+			setPhaseTimeLeft(prev => {
+				if (prev <= 1) {
+					clearInterval(interval)
 					setTimerInterval(null)
+					return 0
 				}
-			}
-		}
+				return prev - 1
+			})
+		}, 1000)
 		
-		// Обновляем сразу
-		update()
-		
-		// Запускаем новый интервал
-		const interval = setInterval(update, 1000)
 		setTimerInterval(interval)
 		
-		return () => clearInterval(interval)
+		// Возвращаем функцию очистки
+		return () => {
+			clearInterval(interval)
+			setTimerInterval(null)
+		}
 	}, [timerInterval])
 
-	const handleWebSocketMessage = useCallback(
-		(data: any) => {
+	// Функция для остановки таймера
+	const stopTimer = useCallback(() => {
+		if (timerInterval) {
+			clearInterval(timerInterval)
+			setTimerInterval(null)
+		}
+	}, [timerInterval])
+
+	// ✅ socket.io-client нужен http(s) origin, path задаём отдельно
+	const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'https://api.stationeden.ru'
+	const wsUrl = wsBase.replace(/\/$/, '')
+
+	// ✅ ВКЛЮЧЕНО всегда (как ты хотел), но JOIN_GAME защищаем ниже
+	const isProfileReady = profile.status === 'ok' || profile.status === 'unauth'
+	const canConnect = isProfileReady && profile.status === 'ok'
+
+	// Упрощаем socketQuery
+	const socketQuery = { gameId }
+
+	// Создаем refs для хранения функций, которые будут доступны в handleWebSocketMessage
+	const sendMessageRef = useRef<((msg: any) => void) | null>(null)
+	const isConnectedRef = useRef<boolean>(false)
+
+	// Создаем обработчик сообщений без использования isConnected и sendMessage напрямую
+	const createHandleWebSocketMessage = useCallback(() => {
+		return (data: any) => {
 			console.log('Game WebSocket message:', data.type, data)
+
+			// Получаем актуальные значения из refs
+			const sendMessage = sendMessageRef.current
+			const isConnected = isConnectedRef.current
 
 			switch (data.type) {
 				case 'GAME_STATE': {
@@ -251,10 +301,30 @@ export default function GameSession({ params }: PageProps) {
 					// Обновляем общую таблицу карт
 					updateCardsTable(game)
 					
-					if (game?.phaseEndTime) {
-						const endTime = new Date(game.phaseEndTime).getTime()
-						const duration = game.phaseDuration || 180
-						startTimer(endTime, duration)
+					// Обновляем таймер на основе фазы
+					if (game?.phase === 'discussion' || game?.phase === 'introduction') {
+						// Для обсуждения и заставки используем серверное время
+						if (game?.phaseEndTime) {
+							const endTime = new Date(game.phaseEndTime).getTime()
+							const now = Date.now()
+							const secondsLeft = Math.max(0, Math.floor((endTime - now) / 1000))
+							setPhaseTimeLeft(secondsLeft)
+						}
+					} else if (game?.phase === 'voting') {
+						// Для голосования 30 секунд
+						setPhaseTimeLeft(30)
+						startTimer(30)
+					} else if (game?.phase === 'preparation') {
+						// Для подготовки нет таймера
+						stopTimer()
+						setPhaseTimeLeft(0)
+					}
+					
+					// Разрешаем пропуск заставки через 3 секунды
+					if (game?.phase === 'introduction') {
+						setTimeout(() => setCanSkipNarration(true), 3000)
+					} else {
+						setCanSkipNarration(false)
 					}
 
 					if (game?.phase !== 'crisis' && activeCrisis) {
@@ -266,53 +336,67 @@ export default function GameSession({ params }: PageProps) {
 				case 'YOUR_CARDS': {
 					const cards: Record<string, CardDetails> = {}
 					const newCards: CardDetails[] = []
+					let cardCount = 0
 
 					if (data.profession) {
 						cards.profession = data.profession
 						newCards.push(data.profession)
+						cardCount++
 					}
 					if (data.healthStatus) {
 						cards.health = data.healthStatus
 						newCards.push(data.healthStatus)
+						cardCount++
 					}
 					if (data.psychologicalTrait) {
 						cards.trait = data.psychologicalTrait
 						newCards.push(data.psychologicalTrait)
+						cardCount++
 					}
 					if (data.secret) {
 						cards.secret = data.secret
 						newCards.push(data.secret)
+						cardCount++
 					}
 					if (data.hiddenRole) {
 						cards.role = data.hiddenRole
 						newCards.push(data.hiddenRole)
+						cardCount++
 					}
 					if (data.resource) {
 						cards.resource = data.resource
 						newCards.push(data.resource)
+						cardCount++
 					}
 					if (data.roleCard) {
 						cards.role = data.roleCard
 						newCards.push(data.roleCard)
+						cardCount++
 					}
 					if (data.gender) {
 						cards.gender = data.gender
 						newCards.push(data.gender)
+						cardCount++
 					}
 					if (data.age) {
 						cards.age = data.age
 						newCards.push(data.age)
+						cardCount++
 					}
 					if (data.bodyType) {
 						cards.body = data.bodyType
 						newCards.push(data.bodyType)
+						cardCount++
 					}
 
 					setMyCards(cards)
+					setCardsReceivedThisRound(cardCount)
 					
 					// Если получены новые карты, показываем сообщение
 					if (newCards.length > 0 && gameState?.phase === 'preparation') {
-						addToChat('Система', `Вам выдано ${newCards.length} новых карт в этом раунде!`, true)
+						addToChat('Система', `Вам выдано ${cardCount} новых карт в этом раунде!`, true)
+						// Сбрасываем счетчик раскрытых карт для нового раунда
+						setMyRevealedCardsThisRound([])
 					}
 					break
 				}
@@ -321,10 +405,11 @@ export default function GameSession({ params }: PageProps) {
 					setNarration({ title: data.title, text: data.text })
 					// Для заставки устанавливаем время
 					if (data.duration) {
-						const endTime = Date.now() + data.duration * 1000
-						startTimer(endTime, data.duration)
+						setPhaseTimeLeft(data.duration)
+						startTimer(data.duration)
 					}
-					setTimeout(() => setNarration(null), 30000)
+					// Разрешаем пропуск через 3 секунды
+					setTimeout(() => setCanSkipNarration(true), 3000)
 					break
 				}
 
@@ -338,19 +423,33 @@ export default function GameSession({ params }: PageProps) {
 						`Кризис "${data.crisis}" решен игроком ${data.playerName}!`,
 						true
 					)
+					// Закрываем модалку кризиса
+					setActiveCrisis(null)
 					break
 
 				case 'CRISIS_PENALTY':
 					addToChat('Система', data.message, true)
+					// Закрываем модалку кризиса
+					setActiveCrisis(null)
 					break
 
-				case 'PLAYER_EJECTED':
+				case 'PLAYER_EJECTED': {
 					addToChat(
 						'Система',
 						`Игрок ${data.playerName} выбыл с ${data.votes} голосами!`,
 						true
 					)
+					
+					// Сохраняем информацию о выбывшем игроке для последующего раскрытия
+					if (data.cards) {
+						setRevealedPlayer({
+							name: data.playerName,
+							cards: data.cards,
+							playerId: data.playerId
+						})
+					}
 					break
+				}
 
 				case 'PLAYER_REVEAL': {
 					const playerCards = data.cards || {}
@@ -364,18 +463,20 @@ export default function GameSession({ params }: PageProps) {
 					
 					// Устанавливаем задержки для анимации
 					setTimeout(() => {
-						setRevealedPlayer({ name: data.playerName, cards: playerCards })
+						setRevealedPlayer({ 
+							name: data.playerName, 
+							cards: playerCards,
+							playerId: data.playerId
+						})
 					}, cardTypes.length * 600 + 500)
 					break
 				}
 
 				case 'CARD_REVEALED': {
+					const cardName = getCardDisplayName(data.cardType, data.cardId)
 					addToChat(
 						'Система',
-						`${data.playerName} раскрыл(а) карту: ${getCardDisplayName(
-							data.cardType,
-							data.cardId
-						)}`,
+						`${data.playerName} раскрыл(а) карту: ${cardName}`,
 						true
 					)
 					
@@ -388,17 +489,40 @@ export default function GameSession({ params }: PageProps) {
 								player.revealedCardsInfo = {}
 							}
 							player.revealedCardsInfo[data.cardType] = {
-								name: data.cardName || getCardDisplayName(data.cardType, data.cardId),
-								type: data.cardType
+								name: cardName,
+								type: data.cardType,
+								id: data.cardId
 							}
+							
+							// Увеличиваем счетчик раскрытых карт
+							player.revealedCards = (player.revealedCards || 0) + 1
+							
 							setGameState(updatedGame)
-							updateCardsTable(updatedGame)
 						}
+						
+						// Обновляем таблицу
+						updateCardsTable(updatedGame)
 					}
 					
-					// Если это текущий игрок раскрыл карту, добавляем в список раскрытых
+					// Если это текущий игрок раскрыл карту, добавляем в списки
 					if (data.playerId === userId) {
-						setMyRevealedCards(prev => [...prev, data.cardType])
+						setMyRevealedCardsThisRound(prev => [...prev, data.cardType])
+						setMyAllRevealedCards(prev => ({
+							...prev,
+							[data.cardType]: {
+								name: cardName,
+								type: getCardTypeDisplayName(data.cardType)
+							}
+						}))
+						
+						// Отправляем сообщение на сервер о раскрытии карты
+						if (isConnected && sendMessage) {
+							sendMessage({
+								type: 'CARD_REVEALED_CONFIRMATION',
+								cardType: data.cardType,
+								cardId: data.cardId
+							})
+						}
 					}
 					break
 				}
@@ -452,6 +576,7 @@ export default function GameSession({ params }: PageProps) {
 					setGameState((prev: any) =>
 						prev ? { ...prev, phase: 'game_over' } : null
 					)
+					stopTimer()
 					break
 
 				case 'ERROR':
@@ -480,41 +605,29 @@ export default function GameSession({ params }: PageProps) {
 					
 				case 'ROUND_STARTED':
 					addToChat('Система', `Начался раунд ${data.roundNumber}. Игрокам выдано по 2 новые карты!`, true)
-					// Сбрасываем список раскрытых карт для нового раунда
-					if (userId === data.playerId) {
-						setMyRevealedCards([])
-					}
+					// Сбрасываем счетчик раскрытых карт для нового раунда
+					setMyRevealedCardsThisRound([])
+					// Сбрасываем счетчик полученных карт
+					setCardsReceivedThisRound(0)
+					break
+					
+				case 'DISCUSSION_STARTED':
+					addToChat('Система', 'Началось общее обсуждение на 1 минуту!', true)
+					setPhaseTimeLeft(60)
+					startTimer(60)
+					break
+					
+				case 'ALL_CARDS_REVEALED':
+					addToChat('Система', 'Все игроки раскрыли по карте в этом раунде!', true)
 					break
 			}
-		},
-		[activeCrisis, addToChat, getCardDisplayName, gameState, updateCardsTable, startTimer, userId]
-	)
-
-	// Очистка таймера при размонтировании
-	useEffect(() => {
-		return () => {
-			if (timerInterval) {
-				clearInterval(timerInterval)
-			}
 		}
-	}, [timerInterval])
+	}, [activeCrisis, addToChat, getCardDisplayName, getCardTypeDisplayName, gameState, updateCardsTable, startTimer, stopTimer, userId])
 
-	// ✅ socket.io-client нужен http(s) origin, path задаём отдельно
-	const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'https://api.stationeden.ru'
-	const wsUrl = wsBase.replace(/\/$/, '')
+	// Создаем обработчик
+	const handleWebSocketMessage = createHandleWebSocketMessage()
 
-	// ✅ ВКЛЮЧЕНО всегда (как ты хотел), но JOIN_GAME защищаем ниже
-	const isProfileReady = profile.status === 'ok' || profile.status === 'unauth'
-	const canConnect = isProfileReady && profile.status === 'ok'
-
-	/**
-	 * ✅ ВАЖНО:
-	 * query держим стабильным — только gameId.
-	 * userId сервер берёт из JWT cookie, не нужно тащить в query (иначе лишние реконнекты).
-	 */
-	// Упрощаем socketQuery - убираем useMemo
-	const socketQuery = { gameId }
-
+	// Инициализируем WebSocket
 	const { sendMessage, isConnected } = useWebSocket(
 		wsUrl,
 		handleWebSocketMessage,
@@ -522,8 +635,20 @@ export default function GameSession({ params }: PageProps) {
 		{ path: '/game', enabled: canConnect }
 	)
 
+	// Обновляем refs при изменении isConnected и sendMessage
+	useEffect(() => {
+		sendMessageRef.current = sendMessage
+		isConnectedRef.current = isConnected
+	}, [sendMessage, isConnected])
+
+	// Очистка таймера при размонтировании
+	useEffect(() => {
+		return () => {
+			stopTimer()
+		}
+	}, [stopTimer])
+
 	// ✅ JOIN_GAME отправляем строго 1 раз на каждый connect
-	// ✅ FIX: не шлём JOIN_GAME пока профиль не ok и userId нет (иначе auth error и forceDisconnect)
 	const joinedRef = useRef(false)
 	useEffect(() => {
 		if (!isConnected) {
@@ -534,7 +659,6 @@ export default function GameSession({ params }: PageProps) {
 		if (joinedRef.current) return
 
 		if (profile.status !== 'ok' || !userId) {
-			// ждём нормальную авторизацию / загрузку профиля
 			return
 		}
 
@@ -587,11 +711,10 @@ export default function GameSession({ params }: PageProps) {
 		(e?: React.FormEvent) => {
 			if (e) e.preventDefault()
 
-			// ✅ пока нет реального профиля — не отправляем и не рисуем temp
 			if (profile.status !== 'ok' || !userId) return
 			if (!newMessage.trim() || !isConnected) return
 
-			const playerName = username || 'Игрок'
+			const playerName = username
 			const myId = userId
 
 			sendMessage({
@@ -637,11 +760,25 @@ export default function GameSession({ params }: PageProps) {
 	)
 
 	// ✅ START_GAME
-	// ✅ FIX: сервер слушает START_GAME_SESSION, а не START_GAME
 	const handleStartGame = () => {
 		if (!isConnected) return
 		if (profile.status !== 'ok' || !userId) return
 		sendMessage({ type: 'START_GAME_SESSION' })
+	}
+
+	// Пропуск заставки
+	const handleSkipNarration = () => {
+		if (canSkipNarration && isConnected) {
+			sendMessage({ type: 'SKIP_NARRATION' })
+			setNarration(null)
+			stopTimer()
+		}
+	}
+
+	// Начать общее обсуждение (только создатель лобби)
+	const handleStartDiscussion = () => {
+		if (!isConnected) return
+		sendMessage({ type: 'START_DISCUSSION' })
 	}
 
 	const getServerCardType = (clientType: CardType): string => {
@@ -673,9 +810,21 @@ export default function GameSession({ params }: PageProps) {
 		const card = myCards[cardType]
 		if (!card || !isConnected) return
 		
-		// Проверяем, не раскрыта ли уже эта карта
-		if (myRevealedCards.includes(cardType)) {
-			addToChat('Система', 'Вы уже раскрыли эту карту!', true)
+		// Проверяем, не раскрыта ли уже эта карта в этом раунде
+		if (myRevealedCardsThisRound.includes(cardType)) {
+			addToChat('Система', 'Вы уже раскрыли карту в этом раунде!', true)
+			return
+		}
+		
+		// Проверяем, не раскрыта ли уже эта карта вообще
+		if (myAllRevealedCards[cardType]) {
+			addToChat('Система', 'Вы уже раскрывали эту карту ранее!', true)
+			return
+		}
+		
+		// Проверяем, что в этом раунде можно раскрыть только 1 карту
+		if (myRevealedCardsThisRound.length >= 1) {
+			addToChat('Система', 'В этом раунде можно раскрыть только одну карту!', true)
 			return
 		}
 
@@ -706,6 +855,11 @@ export default function GameSession({ params }: PageProps) {
 	const handleSolveCrisis = () => {
 		if (!isConnected) return
 		sendMessage({ type: 'SOLVE_CRISIS' })
+	}
+	
+	// Закрыть модалку кризиса если игрок не может его решить
+	const handleCloseCrisis = () => {
+		setActiveCrisis(null)
 	}
 
 	const handleLeaveGame = () => {
@@ -807,6 +961,14 @@ export default function GameSession({ params }: PageProps) {
 					</div>
 					<div className={styles.narrationTimer}>
 						{formatTime(phaseTimeLeft)}
+						{canSkipNarration && (
+							<button 
+								className={styles.skipButton}
+								onClick={handleSkipNarration}
+							>
+								Пропустить
+							</button>
+						)}
 					</div>
 				</div>
 			</div>
@@ -824,6 +986,14 @@ export default function GameSession({ params }: PageProps) {
 					>
 						✕
 					</button>
+				</div>
+				
+				<div className={styles.cardsInfo}>
+					<p>В этом раунде вы получили: <strong>{cardsReceivedThisRound} карт</strong></p>
+					<p>Раскрыто в этом раунде: <strong>{myRevealedCardsThisRound.length} карт</strong></p>
+					{myRevealedCardsThisRound.length >= 1 && (
+						<p className={styles.warningText}>Вы уже раскрыли карту в этом раунде!</p>
+					)}
 				</div>
 
 				<div className={styles.cardsGrid}>
@@ -909,10 +1079,12 @@ export default function GameSession({ params }: PageProps) {
 									gameState?.phase !== 'discussion' ||
 									!userId ||
 									!gameState?.players?.find((p: any) => p.id === userId)?.isAlive ||
-									myRevealedCards.includes(type)
+									myRevealedCardsThisRound.length >= 1 ||
+									!!myAllRevealedCards[type]
 								}
 							>
-								{myRevealedCards.includes(type) ? 'Уже раскрыта' : 'Раскрыть карту'}
+								{myAllRevealedCards[type] ? 'Уже раскрыта' : 
+								 myRevealedCardsThisRound.length >= 1 ? 'Лимит раскрытий' : 'Раскрыть карту'}
 							</button>
 						</div>
 					))}
@@ -922,88 +1094,93 @@ export default function GameSession({ params }: PageProps) {
 	)
 
 	// Модальное окно с общей таблицей карт
-	const renderCardsTableModal = () => (
-		<div className={styles.modalOverlay}>
-			<div className={styles.modalContent}>
-				<div className={styles.modalHeader}>
-					<h2>Общая таблица карт</h2>
-					<button
-						className={styles.closeButton}
-						onClick={() => setShowCardsTable(false)}
-					>
-						✕
-					</button>
-				</div>
-
-				<div className={styles.cardsTableContainer}>
-					<div className={styles.cardsTableHeader}>
-						<h3>Раскрытые карты игроков</h3>
-						<p className={styles.tableHint}>
-							Здесь отображаются карты, которые игроки раскрыли в течение игры
-						</p>
+	const renderCardsTableModal = () => {
+		// Получаем все типы карт из карт текущего игрока
+		const allCardTypes = Object.keys(myCards)
+		
+		return (
+			<div className={styles.modalOverlay}>
+				<div className={styles.modalContent}>
+					<div className={styles.modalHeader}>
+						<h2>Общая таблица карт</h2>
+						<button
+							className={styles.closeButton}
+							onClick={() => setShowCardsTable(false)}
+						>
+							✕
+						</button>
 					</div>
 
-					<div className={styles.cardsTable}>
-						<table className={styles.cardsTableContent}>
-							<thead>
-								<tr>
-									<th className={styles.playerColumn}>Игрок</th>
-									{Object.keys(myCards).map(cardType => (
-										<th key={cardType} className={styles.cardTypeColumn}>
-											{getCardTypeDisplayName(cardType)}
-										</th>
-									))}
-								</tr>
-							</thead>
-							<tbody>
-								{allPlayersCards.map(player => (
-									<tr key={player.playerId} className={player.playerId === userId ? styles.currentPlayerRow : ''}>
-										<td className={styles.playerCell}>
-											<span className={styles.playerNameCell}>
-												{player.playerName}
-												{player.playerId === userId && ' (Вы)'}
-											</span>
-										</td>
-										{Object.keys(myCards).map(cardType => (
-											<td key={cardType} className={styles.cardCell}>
-												{player.revealedCards[cardType] ? (
-													<div className={styles.revealedCardCell}>
-														<strong>{player.revealedCards[cardType].name}</strong>
-														<span className={styles.cardTypeHint}>
-															{player.revealedCards[cardType].type}
-														</span>
-													</div>
-												) : (
-													<span className={styles.hiddenCardCell}>❓</span>
-												)}
-											</td>
+					<div className={styles.cardsTableContainer}>
+						<div className={styles.cardsTableHeader}>
+							<h3>Раскрытые карты игроков</h3>
+							<p className={styles.tableHint}>
+								Здесь отображаются карты, которые игроки раскрыли в течение игры
+							</p>
+						</div>
+
+						<div className={styles.cardsTable}>
+							<table className={styles.cardsTableContent}>
+								<thead>
+									<tr>
+										<th className={styles.playerColumn}>Игрок</th>
+										{allCardTypes.map(cardType => (
+											<th key={cardType} className={styles.cardTypeColumn}>
+												{getCardTypeDisplayName(cardType)}
+											</th>
 										))}
 									</tr>
-								))}
-							</tbody>
-						</table>
-					</div>
-
-					<div className={styles.cardsTableLegend}>
-						<div className={styles.legendItem}>
-							<span className={styles.legendSymbol}>❓</span>
-							<span className={styles.legendText}>Карта не раскрыта</span>
+								</thead>
+								<tbody>
+									{allPlayersCards.map(player => (
+										<tr key={player.playerId} className={player.playerId === userId ? styles.currentPlayerRow : ''}>
+											<td className={styles.playerCell}>
+												<span className={styles.playerNameCell}>
+													{player.playerName}
+													{player.playerId === userId && ' (Вы)'}
+												</span>
+											</td>
+											{allCardTypes.map(cardType => (
+												<td key={cardType} className={styles.cardCell}>
+													{player.revealedCards[cardType] ? (
+														<div className={styles.revealedCardCell}>
+															<strong>{player.revealedCards[cardType].name}</strong>
+															<span className={styles.cardTypeHint}>
+																{player.revealedCards[cardType].type}
+															</span>
+														</div>
+													) : (
+														<span className={styles.hiddenCardCell}>❓</span>
+													)}
+												</td>
+											))}
+										</tr>
+									))}
+								</tbody>
+							</table>
 						</div>
-						<div className={styles.legendItem}>
-							<div className={styles.legendPlayerIndicator}></div>
-							<span className={styles.legendText}>Текущий игрок</span>
+
+						<div className={styles.cardsTableLegend}>
+							<div className={styles.legendItem}>
+								<span className={styles.legendSymbol}>❓</span>
+								<span className={styles.legendText}>Карта не раскрыта</span>
+							</div>
+							<div className={styles.legendItem}>
+								<div className={styles.legendPlayerIndicator}></div>
+								<span className={styles.legendText}>Текущий игрок</span>
+							</div>
 						</div>
 					</div>
 				</div>
 			</div>
-		</div>
-	)
+		)
+	}
 
 	const renderRevealedPlayerModal = () => (
 		<div className={styles.modalOverlay}>
 			<div className={styles.modalContent}>
 				<div className={styles.modalHeader}>
-					<h2>Раскрытие карт {revealedPlayer?.name}</h2>
+					<h2>Карты выбывшего игрока: {revealedPlayer?.name}</h2>
 					<button
 						className={styles.closeButton}
 						onClick={() => {
@@ -1087,44 +1264,75 @@ export default function GameSession({ params }: PageProps) {
 		</div>
 	)
 
-	const renderCrisisModal = () => (
-		<div className={styles.modalOverlay}>
-			<div className={styles.modalContent}>
-				<div className={styles.crisisAlert}>
-					<h2>КРИЗИС</h2>
-					<h3>{activeCrisis?.name}</h3>
-					<p>{activeCrisis?.description}</p>
+	const renderCrisisModal = () => {
+		const currentPlayer = gameState?.players?.find((p: any) => p.id === userId)
+		const canSolveCrisis = currentPlayer?.profession && 
+			activeCrisis?.priorityProfessions?.includes(currentPlayer.profession)
+		
+		return (
+			<div className={styles.modalOverlay}>
+				<div className={styles.modalContent}>
+					<div className={styles.crisisAlert}>
+						<h2>КРИЗИС</h2>
+						<h3>{activeCrisis?.name}</h3>
+						<p>{activeCrisis?.description}</p>
 
-					<div className={styles.crisisInfo}>
-						<p>
-							<strong>Тип:</strong>{' '}
-							{activeCrisis?.type === 'technological'
-								? 'Технологический'
-								: activeCrisis?.type === 'biological'
-									? 'Биологический'
-									: 'Внешняя угроза'}
-						</p>
-						<p>
-							<strong>Штраф:</strong> {activeCrisis?.penalty}
-						</p>
-						<p>
-							<strong>Время на решение:</strong> {formatTime(phaseTimeLeft)}
-						</p>
-					</div>
+						<div className={styles.crisisInfo}>
+							<p>
+								<strong>Тип:</strong>{' '}
+								{activeCrisis?.type === 'technological'
+									? 'Технологический'
+									: activeCrisis?.type === 'biological'
+										? 'Биологический'
+										: 'Внешняя угроза'}
+							</p>
+							<p>
+								<strong>Штраф:</strong> {activeCrisis?.penalty}
+							</p>
+							<p>
+								<strong>Приоритетные профессии:</strong>{' '}
+								{activeCrisis?.priorityProfessions?.join(', ') || 'Все'}
+							</p>
+							<p>
+								<strong>Ваша профессия:</strong>{' '}
+								{currentPlayer?.profession || 'Неизвестно'}
+							</p>
+							<p>
+								<strong>Время на решение:</strong> {formatTime(phaseTimeLeft)}
+							</p>
+						</div>
 
-					<div className={styles.crisisActions}>
-						<button
-							className={styles.solveButton}
-							onClick={handleSolveCrisis}
-							disabled={!isConnected}
-						>
-							Попытаться решить кризис
-						</button>
+						<div className={styles.crisisActions}>
+							{canSolveCrisis ? (
+								<button
+									className={styles.solveButton}
+									onClick={handleSolveCrisis}
+									disabled={!isConnected}
+								>
+									Решить кризис
+								</button>
+							) : (
+								<div className={styles.cannotSolve}>
+									<p className={styles.cannotSolveText}>
+										Ваша профессия "{currentPlayer?.profession || 'Неизвестно'}" не может решить этот кризис.
+									</p>
+									<p className={styles.cannotSolveHint}>
+										Ждите игрока с подходящей профессией: {activeCrisis?.priorityProfessions?.join(', ')}
+									</p>
+								</div>
+							)}
+							<button
+								className={styles.closeCrisisButton}
+								onClick={handleCloseCrisis}
+							>
+								Закрыть
+							</button>
+						</div>
 					</div>
 				</div>
 			</div>
-		</div>
-	)
+		)
+	}
 
 	const renderGameResultsModal = () => (
 		<div className={styles.modalOverlay}>
@@ -1150,6 +1358,14 @@ export default function GameSession({ params }: PageProps) {
 			: null
 		const alivePlayers = gameState.players?.filter((p: any) => p.isAlive) || []
 		const requiredVotes = Math.floor(alivePlayers.length / 2)
+		
+		// Проверяем, все ли игроки раскрыли карты
+		const allPlayersRevealed = alivePlayers.every((player: any) => 
+			player.revealedCards && player.revealedCards > 0
+		)
+		
+		// Проверяем, является ли текущий игрок создателем лобби
+		const isCreator = userId === gameState.creatorId
 
 		switch (gameState.phase) {
 			case 'preparation':
@@ -1190,25 +1406,44 @@ export default function GameSession({ params }: PageProps) {
 								Общая таблица карт
 							</button>
 
-							<button
-								className={styles.voteRequestButton}
-								onClick={handleRequestVote}
-								disabled={
-									!currentPlayer?.isAlive ||
-									gameState.voteRequests?.includes(userId)
-								}
-							>
-								Начать голосование ({gameState.voteTriggerCount || 0}/
-								{requiredVotes})
-							</button>
+							{isCreator && allPlayersRevealed && (
+								<button
+									className={styles.startDiscussionButton}
+									onClick={handleStartDiscussion}
+									disabled={!isConnected}
+								>
+									Начать общее обсуждение
+								</button>
+							)}
+							
+							{!allPlayersRevealed && isCreator && (
+								<p className={styles.waitingText}>
+									Ожидание раскрытия карт всеми игроками...
+								</p>
+							)}
+							
+							{allPlayersRevealed && !isCreator && (
+								<p className={styles.waitingText}>
+									Все карты раскрыты. Ожидайте начала общего обсуждения от создателя лобби.
+								</p>
+							)}
 						</div>
+						
+						{phaseTimeLeft > 0 && (
+							<div className={styles.discussionTimer}>
+								<p>Общее обсуждение: {formatTime(phaseTimeLeft)}</p>
+							</div>
+						)}
 					</div>
 				)
 
 			case 'voting':
 				return (
 					<div className={styles.phaseActions}>
-						<h3>Голосуйте за исключение игрока:</h3>
+						<div className={styles.votingHeader}>
+							<h3>Голосуйте за исключение игрока</h3>
+							<p>Время на голосование: {formatTime(phaseTimeLeft)}</p>
+						</div>
 						<div className={styles.votingGrid}>
 							{alivePlayers
 								.filter((p: any) => p.id !== userId)
@@ -1225,6 +1460,11 @@ export default function GameSession({ params }: PageProps) {
 											<span className={styles.votePlayerName}>
 												{player.name}
 											</span>
+											{player.profession && (
+												<span className={styles.votePlayerProfession}>
+													{player.profession}
+												</span>
+											)}
 										</div>
 										<div className={styles.voteCount}>
 											Голосов: {player.votesAgainst || 0}
@@ -1353,10 +1593,8 @@ export default function GameSession({ params }: PageProps) {
 							<span>
 								{player.name}
 								{userId && player.id === userId && ' (Вы)'}
+								{player.id === gameState.creatorId && ' 👑'}
 							</span>
-							{player.id === gameState.creatorId && (
-								<span className={styles.creatorBadge}>👑</span>
-							)}
 						</div>
 					))}
 				</div>
@@ -1365,9 +1603,11 @@ export default function GameSession({ params }: PageProps) {
 					<button
 						className={styles.startButton}
 						onClick={handleStartGame}
-						disabled={!isConnected}
+						disabled={!isConnected || gameState.players?.length < 3}
 					>
-						Начать игру
+						{gameState.players?.length < 3 
+							? `Ждем игроков (${gameState.players?.length}/3)` 
+							: 'Начать игру'}
 					</button>
 				)}
 
@@ -1384,7 +1624,16 @@ export default function GameSession({ params }: PageProps) {
 	const alivePlayers = gameState.players?.filter((p: any) => p.isAlive) || []
 	const ejectedPlayers = gameState.players?.filter((p: any) => !p.isAlive) || []
 	const requiredVotes = Math.floor(alivePlayers.length / 2)
-	const phaseDuration = gameState.phaseDuration || 180
+	
+	// Определяем продолжительность фазы для отображения
+	let phaseDurationDisplay = 0
+	if (gameState.phase === 'voting') {
+		phaseDurationDisplay = 30
+	} else if (gameState.phase === 'discussion' && phaseTimeLeft > 0) {
+		phaseDurationDisplay = 60
+	} else {
+		phaseDurationDisplay = gameState.phaseDuration || 180
+	}
 
 	return (
 		<div className={styles.container}>
@@ -1431,12 +1680,22 @@ export default function GameSession({ params }: PageProps) {
 						</span>
 					</div>
 					{currentPlayer && (
-						<div className={styles.statItem}>
-							<span className={styles.statLabel}>Раскрыто:</span>
-							<span className={styles.statValue}>
-								🎴 {myRevealedCards.length}
-							</span>
-						</div>
+						<>
+							<div className={styles.statItem}>
+								<span className={styles.statLabel}>Раскрыто:</span>
+								<span className={styles.statValue}>
+									🎴 {myRevealedCardsThisRound.length}/1
+								</span>
+							</div>
+							{gameState.creatorId === userId && (
+								<div className={styles.statItem}>
+									<span className={styles.statLabel}>Роль:</span>
+									<span className={styles.statValue}>
+										👑 Создатель
+									</span>
+								</div>
+							)}
+						</>
 					)}
 				</div>
 
@@ -1488,17 +1747,23 @@ export default function GameSession({ params }: PageProps) {
 										<h3>
 											{player.name}
 											{userId && player.id === userId && ' (Вы)'}
+											{player.id === gameState.creatorId && ' 👑'}
 										</h3>
 										<div className={styles.playerStatus}>
 											{player.isAlive ? (
 												<span className={styles.alive}>Жив</span>
 											) : (
-												<span className={styles.deadStatus}>Мертв</span>
+												<span className={styles.deadStatus}>Выбыл</span>
+											)}
+											{player.profession && (
+												<span className={styles.playerProfession}>
+													{player.profession}
+												</span>
 											)}
 										</div>
 										<div className={styles.playerStats}>
 											<span>Карт раскрыто: {player.revealedCards || 0}</span>
-											{player.profession && <span> | {player.profession}</span>}
+											<span> | Очки: {player.score || 0}</span>
 										</div>
 									</div>
 								</div>
@@ -1546,19 +1811,21 @@ export default function GameSession({ params }: PageProps) {
 						<p className={styles.phaseDescription}>
 							{getPhaseDescription(gameState.phase)}
 						</p>
-						<div className={styles.phaseTimer}>
-							<div className={styles.timerBar}>
-								<div
-									className={styles.timerProgress}
-									style={{
-										width: `${Math.min(100, (phaseTimeLeft / phaseDuration) * 100)}%`,
-									}}
-								></div>
+						{(gameState.phase === 'voting' || (gameState.phase === 'discussion' && phaseTimeLeft > 0)) && (
+							<div className={styles.phaseTimer}>
+								<div className={styles.timerBar}>
+									<div
+										className={styles.timerProgress}
+										style={{
+											width: `${Math.min(100, (phaseTimeLeft / phaseDurationDisplay) * 100)}%`,
+										}}
+									></div>
+								</div>
+								<span className={styles.timerText}>
+									{formatTime(phaseTimeLeft)} / {formatTime(phaseDurationDisplay)}
+								</span>
 							</div>
-							<span className={styles.timerText}>
-								{formatTime(phaseTimeLeft)} / {formatTime(phaseDuration)}
-							</span>
-						</div>
+						)}
 					</div>
 
 					<div className={styles.gameActions}>{renderPhaseActions()}</div>
@@ -1643,13 +1910,17 @@ export default function GameSession({ params }: PageProps) {
 				<div className={styles.playerStatusInfo}>
 					{currentPlayer && (
 						<>
-							<span>Ваш статус: {currentPlayer.isAlive ? 'Жив' : 'Мертв'}</span>
-							<span> | Карт раскрыто: {myRevealedCards.length}</span>
-							<span>
-								{' '}
-								| Голосов для голосования: {gameState.voteTriggerCount || 0}/
-								{requiredVotes}
-							</span>
+							<span>Ваш статус: {currentPlayer.isAlive ? 'Жив' : 'Выбыл'}</span>
+							<span> | Карт раскрыто в раунде: {myRevealedCardsThisRound.length}/1</span>
+							<span> | Всего карт раскрыто: {Object.keys(myAllRevealedCards).length}</span>
+							{gameState.phase === 'discussion' && (
+								<span>
+									{' '}
+									| Игроков раскрыли карты: {
+										gameState.players?.filter((p: any) => p.revealedCards && p.revealedCards > 0).length || 0
+									}/{alivePlayers.length}
+								</span>
+							)}
 						</>
 					)}
 				</div>
