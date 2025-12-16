@@ -2,7 +2,8 @@
 	"extends": "../../tsconfig.json",
 	"compilerOptions": {
 		"module": "commonjs",
-		"target": "es2019",
+		"moduleResolution": "node",
+		"target": "es2020",
 		"outDir": "dist",
 		"experimentalDecorators": true,
 		"emitDecoratorMetadata": true,
@@ -10,8 +11,7 @@
 		"paths": {
 			"@station-eden/shared": ["../../packages/shared/src/index.ts"]
 		},
-		"types": ["node", "cookie-parser"],
-		"typeRoots": ["./node_modules/@types", "../../node_modules/@types"]
+		"types": ["node", "cookie-parser"]
 	},
 	"include": ["src/**/*.ts"]
 }

@@ -1,8 +1,7 @@
 'use client'
 
-import { Notification, NotificationType } from '@station-eden/shared'
-import Image from 'next/image'
-import React, { useRef, useEffect } from 'react'
+import { Notification } from '@station-eden/shared'
+import React, { useEffect, useRef } from 'react'
 import styles from './Notifications.module.css'
 
 interface NotificationsProps {
@@ -31,7 +30,6 @@ export function Notifications({
 		if (!container || !isOpen) return
 
 		const wheelHandler = (e: WheelEvent) => {
-			// Проверяем, нужна ли прокрутка (есть ли контент для прокрутки)
 			if (container.scrollHeight > container.clientHeight) {
 				container.scrollTop += e.deltaY
 				e.preventDefault()
@@ -39,7 +37,7 @@ export function Notifications({
 		}
 
 		container.addEventListener('wheel', wheelHandler, { passive: false })
-		
+
 		return () => {
 			container.removeEventListener('wheel', wheelHandler)
 		}
@@ -71,25 +69,18 @@ export function Notifications({
 		setIsOpen(!isOpen)
 	}
 
-	const handleClose = () => {
-		setIsOpen(false)
-	}
+	const handleClose = () => setIsOpen(false)
 
 	const handleKeyDown = (event: React.KeyboardEvent) => {
-		if (event.key === 'Escape') {
-			handleClose()
-		}
+		if (event.key === 'Escape') handleClose()
 	}
 
 	const handleNotificationClick = (notification: Notification) => {
-		if (!notification.isRead) {
-			onMarkAsRead?.(notification.id)
-		}
+		if (!notification.isRead) onMarkAsRead?.(notification.id)
 	}
 
 	const handleAcceptInvite = (notificationId: string, lobbyId: string) => {
 		onNotificationAction?.(notificationId, 'accept')
-		// Редирект в лобби
 		window.location.href = `/lobby/${lobbyId}`
 		handleClose()
 	}
@@ -104,26 +95,9 @@ export function Notifications({
 		onDismiss?.(notificationId)
 	}
 
-	const getNotificationIcon = (type: NotificationType) => {
-		switch (type) {
-			case 'game_invite':
-				return '/icons/game-invite.svg'
-			case 'friend_request':
-				return '/icons/friend-request.svg'
-			case 'news':
-				return '/icons/news.svg'
-			default:
-				return '/icons/bell.svg'
-		}
-	}
-
-	// <-- Исправлено: принимаем string | Date и нормализуем в Date
 	const formatTime = (timestamp: Date | string) => {
 		const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp
-
-		if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
-			return ''
-		}
+		if (!(date instanceof Date) || Number.isNaN(date.getTime())) return ''
 
 		const now = new Date()
 		const diff = now.getTime() - date.getTime()
@@ -157,21 +131,17 @@ export function Notifications({
 				}
 				title='Уведомления'
 			>
-				<div className={styles.bellIcon}>
-					<Image
-						src='/icons/bell.svg'
-						alt=''
-						width={24}
-						height={24}
-						className={styles.bellImage}
-					/>
+				{/* ✅ Uiverse-style: счётчик через ::before, число отдаём data-count */}
+				<div
+					className={styles.notification}
+					data-count={unreadCount > 99 ? '99+' : String(unreadCount)}
+					data-has-count={unreadCount > 0 ? '1' : '0'}
+					aria-hidden='true'
+				>
+					<div className={styles.bellContainer}>
+						<div className={styles.bell} />
+					</div>
 				</div>
-
-				{unreadCount > 0 && (
-					<span className={styles.badge} aria-live='polite'>
-						{unreadCount > 99 ? '99+' : unreadCount}
-					</span>
-				)}
 			</button>
 
 			{isOpen && (
@@ -185,10 +155,7 @@ export function Notifications({
 						)}
 					</div>
 
-					<div 
-						className={styles.notificationsList}
-						ref={notificationsListRef}
-					>
+					<div className={styles.notificationsList} ref={notificationsListRef}>
 						{hasNotifications ? (
 							<div className={styles.notificationsListInner}>
 								{notifications.map(notification => (
@@ -201,17 +168,10 @@ export function Notifications({
 										role='menuitem'
 									>
 										<div className={styles.notificationHeader}>
-											<div className={styles.notificationIcon}>
-												<Image
-													src={getNotificationIcon(notification.type)}
-													alt=''
-													width={16}
-													height={16}
-												/>
-											</div>
 											<span className={styles.notificationTitle}>
 												{notification.title}
 											</span>
+
 											<button
 												type='button'
 												className={styles.dismissButton}
@@ -284,7 +244,9 @@ export function Notifications({
 												<button
 													type='button'
 													className={styles.readMoreButton}
-													onClick={() => window.open(notification.link, '_blank')}
+													onClick={() =>
+														window.open(notification.link, '_blank')
+													}
 												>
 													Подробнее
 												</button>

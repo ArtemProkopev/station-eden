@@ -20,7 +20,9 @@
 		"doctor": "node -e \"console.log('node',process.version);\" && pnpm -v && git rev-parse --short HEAD"
 	},
 	"devDependencies": {
+		"@types/cookie-parser": "^1.4.9",
 		"@types/dotenv": "^8.2.3",
+		"@types/node": "^25.0.2",
 		"@types/react-dom": "^19.2.3",
 		"cross-env": "^10.0.0",
 		"dotenv": "^17.2.2",
