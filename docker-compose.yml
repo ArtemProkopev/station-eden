@@ -24,8 +24,6 @@ services:
       GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL}
       WEB_AFTER_LOGIN_URL: ${WEB_AFTER_LOGIN_URL}
 
-      TELEGRAM_LOGIN_ENABLED: ${TELEGRAM_LOGIN_ENABLED}
-
       RESEND_API_KEY: ${RESEND_API_KEY}
       EMAIL_FROM: ${EMAIL_FROM}
 
@@ -62,7 +60,6 @@ services:
       NODE_ENV: ${NODE_ENV}
       NEXT_PUBLIC_API_BASE: https://api.stationeden.ru
       NEXT_PUBLIC_WS_BASE: wss://api.stationeden.ru
-      NEXT_PUBLIC_ENABLE_TELEGRAM: false
       NEXT_PUBLIC_ENABLE_GOOGLE: true
       NEXT_PUBLIC_ASSETS_BASE: https://cdn.assets.stationeden.ru
     depends_on:

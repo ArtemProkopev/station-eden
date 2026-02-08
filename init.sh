@@ -48,7 +48,6 @@ EOF
 cat > .env.example << 'EOF'
 NODE_ENV=development
 NEXT_PUBLIC_API_BASE=http://localhost:4000
-NEXT_PUBLIC_ENABLE_TELEGRAM=false
 
 API_PORT=4000
 API_CORS_ORIGIN=http://localhost:3000
@@ -58,10 +57,6 @@ JWT_ACCESS_EXPIRES=15m
 JWT_REFRESH_EXPIRES=7d
 COOKIE_SECURE=false
 CSRF_COOKIE_NAME=csrf_token
-
-TELEGRAM_LOGIN_ENABLED=false
-TELEGRAM_BOT_TOKEN=
-TELEGRAM_BOT_NAME=@your_bot
 
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
@@ -185,10 +180,6 @@ POSTGRES_PORT=5432
 POSTGRES_USER=eden
 POSTGRES_PASSWORD=edenpwd
 POSTGRES_DB=eden
-
-TELEGRAM_LOGIN_ENABLED=false
-TELEGRAM_BOT_TOKEN=
-TELEGRAM_BOT_NAME=@your_bot
 EOF
 
 cat > apps/api/src/main.ts << 'EOF'
@@ -253,7 +244,6 @@ export function CsrfMiddleware(req: Request, res: Response, next: NextFunction) 
   }
   const needsCheck = ['POST','PUT','PATCH','DELETE'].includes(req.method)
     && req.path.startsWith('/auth')
-    && !req.path.startsWith('/auth/telegram')
     && req.path !== '/auth/csrf';
   if (!needsCheck) return next();
 
@@ -300,9 +290,6 @@ export class User {
 
   @Column({ type: 'text', select: false })
   passwordHash!: string;
-
-  @Column({ type: 'text', nullable: true })
-  telegramId!: string | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
@@ -422,22 +409,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 }
 EOF
 
-cat > apps/api/src/auth/telegram.util.ts << 'EOF'
-import crypto from 'node:crypto';
-export function verifyTelegramAuth(params: Record<string,string>, botToken: string): boolean {
-  const authData = { ...params };
-  const hash = authData.hash;
-  delete authData.hash;
-  const dataCheckString = Object.keys(authData)
-    .sort()
-    .map(k => `${k}=${authData[k]}`)
-    .join('\\n');
-  const secretKey = crypto.createHash('sha256').update(botToken).digest();
-  const hmac = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
-  return hmac === hash;
-}
-EOF
-
 cat > apps/api/src/auth/auth.service.ts << 'EOF'
 import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
@@ -542,7 +513,6 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { JwtService } from '@nestjs/jwt';
-import { verifyTelegramAuth } from './telegram.util';
 
 @Controller('auth')
 export class AuthController {
@@ -597,28 +567,6 @@ export class AuthController {
   me(@Req() req) {
     return { userId: req.user.sub, email: req.user.email };
   }
-
-  @Post('telegram/callback')
-  async telegram(@Body() body: any, @Res({ passthrough: true }) res) {
-    if (process.env.TELEGRAM_LOGIN_ENABLED !== 'true') {
-      return res.status(404).json({ message: 'Telegram login disabled' });
-    }
-    const payload = typeof body.payload === 'string' ? JSON.parse(body.payload) : body;
-    const valid = verifyTelegramAuth(payload, process.env.TELEGRAM_BOT_TOKEN!);
-    if (!valid) return res.status(401).json({ message: 'Invalid telegram auth' });
-
-    const email = `tg_${payload.id}@telegram.local`;
-    // upsert пользователя
-    let user = await this.auth['users'].findByEmail(email);
-    if (!user) user = await this.auth['users'].create({ email, passwordHash: 'telegram', telegramId: payload.id });
-
-    const access = this['auth']['signAccess']({ id: user.id, email: user.email });
-    const { plain: refreshToken, expires: refreshExpires } = await this['auth']['issueRefresh'](user.id);
-
-    res.cookie('access_token', access, { ...this.cookieOpts(), maxAge: 15 * 60 * 1000 });
-    res.cookie('refresh_token', refreshToken, { ...this.cookieOpts(), maxAge: refreshExpires.getTime() - Date.now() });
-    return { user: { id: user.id, email: user.email } };
-  }
 }
 
 function tryDecode(jwt: JwtService, token?: string) {
@@ -658,7 +606,6 @@ export class init1700000000000 implements MigrationInterface {
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         email citext UNIQUE NOT NULL,
         password_hash text NOT NULL,
-        telegram_id text,
         created_at timestamptz NOT NULL DEFAULT now(),
         updated_at timestamptz NOT NULL DEFAULT now()
       );
@@ -736,8 +683,6 @@ EOF
 
 cat > apps/web/.env.local << 'EOF'
 NEXT_PUBLIC_API_BASE=http://localhost:4000
-NEXT_PUBLIC_ENABLE_TELEGRAM=false
-NEXT_PUBLIC_TELEGRAM_BOT_NAME=@your_bot
 EOF
 
 # Next middleware должен лежать в корне пакета web
@@ -843,8 +788,6 @@ export default function LoginPage() {
     }
   }
 
-  const tgEnabled = process.env.NEXT_PUBLIC_ENABLE_TELEGRAM === 'true';
-
   return (
     <div>
       <h2>Вход</h2>
@@ -855,14 +798,6 @@ export default function LoginPage() {
       </form>
       {error && <p style={{color:'crimson'}}>{error}</p>}
       <p>Нет аккаунта? <a href="/register">Зарегистрироваться</a></p>
-
-      {tgEnabled && (
-        <>
-          <hr/>
-          <p>Или войти через Telegram (см. backend /auth/telegram/callback)</p>
-          {/* В проде лучше отдельная страница колбэка */}
-        </>
-      )}
     </div>
   );
 }
@@ -910,7 +845,7 @@ async function fetchJSON<T>(path: string, init?: RequestInit & { csrf?: boolean 
   const res = await fetch(`${API}${path}`, { ...init, headers, credentials: 'include' });
   if (!res.ok) {
     const msg = await res.text().catch(()=>'');
-    throw new Error(msg || \`HTTP \${res.status}\`);
+    throw new Error(msg || `HTTP ${res.status}`);
   }
   return res.json() as Promise<T>;
 }

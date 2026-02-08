@@ -29,9 +29,6 @@ export class User {
 	@Column({ type: 'citext', unique: true, nullable: true })
 	username!: string | null
 
-	@Column({ name: 'telegram_id', type: 'text', nullable: true })
-	telegramId!: string | null
-
 	@Column({ type: 'text', default: 'user' })
 	role!: 'user' | 'admin'
 

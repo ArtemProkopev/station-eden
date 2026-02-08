@@ -33,14 +33,13 @@ export function ensureCsrfCookie(req: Request, res: Response): string {
 export function CsrfMiddleware(
 	req: Request,
 	res: Response,
-	next: NextFunction
+	next: NextFunction,
 ) {
 	ensureCsrfCookie(req, res)
 
 	const needsCheck =
 		['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) &&
 		req.path.startsWith('/auth') &&
-		!req.path.startsWith('/auth/telegram') &&
 		req.path !== '/auth/csrf'
 
 	if (!needsCheck) return next()

@@ -18,14 +18,14 @@ const Fireflies = dynamic(
 		import('../components/ui/Fireflies/FirefliesMain').then(m => m.Fireflies),
 	{
 		ssr: false,
-	}
+	},
 )
 
 const PanelWithPlayButton = dynamic(
 	() => import('../components/ui/PanelWithPlayButton/PanelWithPlayButton'),
 	{
 		ssr: false,
-	}
+	},
 )
 
 const TargetCursor = dynamic(() => import('../components/ui/TargetCursor'), {
@@ -65,12 +65,12 @@ const NEWS_DATA = [
 
 const SOCIAL_ICONS = [
 	{
-		href: 'https://t.me/your-channel',
+		href: 'https://t.me/stationeden',
 		icon: '/icons/telegram.svg',
 		alt: 'Telegram',
 	},
 	{
-		href: 'https://tiktok.com/@your-account',
+		href: 'https://tiktok.com/@stationeden',
 		icon: '/icons/tiktok.svg',
 		alt: 'TikTok',
 	},
