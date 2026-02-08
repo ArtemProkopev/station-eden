@@ -4,8 +4,8 @@
 import React from 'react'
 import styles from './Icon.module.css'
 
-export type IconType = 'rocket' | 'star' | 'avatar'
-export type IconSize = 'small' | 'medium' | 'large'
+type IconType = 'rocket' | 'star' | 'avatar'
+type IconSize = 'small' | 'medium' | 'large'
 
 interface IconProps {
 	type: IconType

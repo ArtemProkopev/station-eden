@@ -33,7 +33,7 @@ export function clearForcedLogoutFlags(): void {
 }
 
 // Проверка наличия refresh_token (эвристика, не для бизнес-логики!)
-export function hasRefreshToken(): boolean {
+function hasRefreshToken(): boolean {
 	if (typeof document === 'undefined') return false
 	// HttpOnly-куки в document.cookie не видны; функция годится только для best-effort UI.
 	return document.cookie.includes('refresh_token=')

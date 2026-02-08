@@ -67,4 +67,4 @@ export const EnvSchema = RawEnvSchema.transform(env => ({
 	message: 'Required',
 })
 
-export type Env = z.infer<typeof EnvSchema>
+type Env = z.infer<typeof EnvSchema>

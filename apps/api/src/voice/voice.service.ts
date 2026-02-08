@@ -43,13 +43,8 @@ export class VoiceService {
 	}
 
 	async createToken(lobbyId: string, user: VoiceUser | undefined) {
-		if (!lobbyId) {
-			throw new BadRequestException('lobbyId обязателен')
-		}
-
-		if (!user) {
-			throw new UnauthorizedException('Пользователь не найден в запросе')
-		}
+		if (!lobbyId) throw new BadRequestException('lobbyId обязателен')
+		if (!user) throw new UnauthorizedException('Пользователь не найден в запросе')
 
 		if (!this.apiKey || !this.apiSecret || !this.url) {
 			this.logger.error(
@@ -62,17 +57,10 @@ export class VoiceService {
 			)
 		}
 
-		const identity = (
-			user.id ||
-			user.sub ||
-			user.email ||
-			'anonymous'
-		).toString()
-
+		const identity = (user.id || user.sub || user.email || 'anonymous').toString()
 		const name = user.username || user.email || identity
 		const roomName = `lobby_${lobbyId}`
 
-		let token: string
 		try {
 			const tokenBuilder = new AccessToken(this.apiKey, this.apiSecret, {
 				identity,
@@ -86,22 +74,23 @@ export class VoiceService {
 				canSubscribe: true,
 			})
 
-			// ВАЖНО: тут нужен await, потому что toJwt() возвращает Promise<string>
-			token = await tokenBuilder.toJwt()
+			// livekit-server-sdk чаще всего возвращает string синхронно,
+			// но await безопасен даже если вдруг станет Promise.
+			const token = await (tokenBuilder.toJwt() as any)
+
+			this.logger.log(
+				`[LiveKit] token generated identity=${identity} lobby=${lobbyId} room=${roomName} tokenLen=${token.length}`
+			)
+
+			return {
+				token,
+				roomName,
+				url: this.url,
+				identity,
+			}
 		} catch (e) {
 			this.logger.error('Failed to create LiveKit token', e as any)
 			throw new InternalServerErrorException('Не удалось создать токен LiveKit')
-		}
-
-		this.logger.log(
-			`[LiveKit] token generated for identity=${identity} lobby=${lobbyId} room=${roomName} tokenLen=${token.length}`
-		)
-
-		return {
-			token,
-			roomName,
-			url: this.url,
-			identity,
 		}
 	}
 }

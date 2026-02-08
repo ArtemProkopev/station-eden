@@ -14,17 +14,17 @@ export async function GET(req: Request) {
 			headers: {
 				cookie: cookieHeader,
 			},
-			credentials: 'include',
 			cache: 'no-store',
 		}
 	)
 
-	const text = await r.text()
+	const text = await r.text().catch(() => '')
 
 	return new Response(text, {
 		status: r.status,
 		headers: {
 			'Content-Type': r.headers.get('Content-Type') || 'application/json',
+			'Cache-Control': 'no-store',
 		},
 	})
 }

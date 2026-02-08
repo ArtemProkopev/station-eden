@@ -18,12 +18,9 @@ export class VoiceController {
 	@Get('token')
 	@UseGuards(VoiceGuard)
 	async getToken(@Query('lobbyId') lobbyId: string, @Req() req: Request) {
-		if (!lobbyId) {
-			throw new BadRequestException('lobbyId обязателен')
-		}
+		if (!lobbyId) throw new BadRequestException('lobbyId обязателен')
 
 		const user: any = (req as any).user
-
 		const data = await this.voiceService.createToken(lobbyId, user)
 
 		return {

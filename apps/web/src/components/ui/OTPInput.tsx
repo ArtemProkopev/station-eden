@@ -26,7 +26,7 @@ type OTPInputProps = {
 	ariaLabel?: string
 }
 
-export type OTPInputHandle = {
+type OTPInputHandle = {
 	focus: () => void
 	blur: () => void
 	clear: () => void

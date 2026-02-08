@@ -4,7 +4,7 @@
  * Безопасное чтение cookie в браузере.
  * Возвращает null на сервере или если куки нет.
  */
-export function readCookie(name: string): string | null {
+function readCookie(name: string): string | null {
 	if (typeof document === 'undefined') {
 		console.log(`[CSRF] readCookie called on server for: ${name}`)
 		return null

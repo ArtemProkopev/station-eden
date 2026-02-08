@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { PRIMARY } from './asset'
 
-export interface CdnHealthState {
+interface CdnHealthState {
 	isPrimaryHealthy: boolean
 	isChecking: boolean
 	lastChecked: Date | null

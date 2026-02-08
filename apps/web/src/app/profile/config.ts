@@ -25,7 +25,7 @@ export const PROFILE_CONFIG = {
 	} as const,
 } as const
 
-export const BREAKPOINTS = {
+const BREAKPOINTS = {
 	MOBILE: 768,
 	SMALL_MOBILE: 480,
 } as const

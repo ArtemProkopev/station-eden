@@ -1,10 +1,9 @@
 {
-	"name": "@station-eden/username-generator",
-	"version": "0.0.0",
-	"private": true,
-	"main": "pkg/username_generator.js",
-	"types": "pkg/username_generator.d.ts",
-	"scripts": {
-		"build": "wasm-pack build --target web"
-	}
+  "name": "@station-eden/username-generator",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "clean": "rimraf ../../apps/web/public/wasm",
+    "build": "wasm-pack build --release --target web --out-dir ../../apps/web/public/wasm"
+  }
 }

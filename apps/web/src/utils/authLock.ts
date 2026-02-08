@@ -1,7 +1,7 @@
 // apps/web/src/utils/authLock.ts
 import { LockPayload } from '@station-eden/shared'
 
-export const LOCK_KEY = 'se_auth_lock' as const
+const LOCK_KEY = 'se_auth_lock' as const
 
 export const normLogin = (s: string) => s.trim().toLowerCase()
 

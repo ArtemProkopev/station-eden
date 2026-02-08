@@ -11,10 +11,22 @@ import { RefreshToken } from '../auth/refresh-token.entity'
 import { EnvSchema } from '../config/env.schema'
 import { User } from '../users/user.entity'
 
-const rootEnv = path.resolve(process.cwd(), '../../.env')
-const localEnv = path.resolve(process.cwd(), '.env')
-const envPath = fs.existsSync(rootEnv) ? rootEnv : localEnv
-dotenv.config({ path: envPath })
+// __dirname = apps/api/src/db
+const envCandidates = [
+	// корневой .env (repo/.env)
+	path.resolve(__dirname, '../../../.env'),
+
+	// локальные для apps/api
+	path.resolve(__dirname, '../../.env.local'),
+	path.resolve(__dirname, '../../.env'),
+]
+
+const envPath = envCandidates.find(fs.existsSync)
+
+// Загружаем только если нашли файл
+if (envPath) {
+	dotenv.config({ path: envPath })
+}
 
 const parsed = EnvSchema.safeParse(process.env)
 if (!parsed.success) {

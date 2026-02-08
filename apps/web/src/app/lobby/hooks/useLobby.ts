@@ -1,3 +1,4 @@
+// apps/web/src/app/lobby/hooks/useLobby.ts
 import { useProfile } from '@/app/profile/hooks/useProfile'
 import { useLobbySocket } from '@/hooks/useLobbySocket'
 import { useScrollPrevention } from '@/hooks/useScrollPrevention'
@@ -64,7 +65,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 	const lobbyIdRef = useRef<string>(lobbyIdFromProps || 'default-lobby')
 	const hasJoinedRef = useRef(false)
 	const reconnectTimeoutRef = useRef<NodeJS.Timeout>()
-	const didInitRef = useRef(false)
 
 	const currentUserId = profile.data?.id
 
@@ -175,6 +175,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 		lobbyId
 	)
 
+	// reconnect logic: если отвалились после JOIN — разрешаем повторный JOIN
 	useEffect(() => {
 		if (!isConnected && hasJoinedRef.current) {
 			reconnectTimeoutRef.current = setTimeout(() => {
@@ -191,6 +192,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 		if (isConnected) setError('')
 	}, [isConnected])
 
+	// JOIN lobby once we have socket + profile
 	useEffect(() => {
 		if (isConnected && !hasJoinedRef.current && currentUserId && profile.data) {
 			const currentUser: Player = {
@@ -384,15 +386,17 @@ export function useLobby(lobbyIdFromProps?: string) {
 		}
 	})
 
+	/**
+	 * ✅ FIX: React 18 StrictMode (dev) double-invokes effects.
+	 * Нельзя блокировать второй запуск через didInitRef, иначе можно навсегда
+	 * остаться в loading=true (первый эффект отменили cleanup'ом, второй не запустили).
+	 */
 	useEffect(() => {
-		if (didInitRef.current) return
-		didInitRef.current = true
-
 		let cancelled = false
 
 		const init = async () => {
+			setIsLoading(true)
 			try {
-				setIsLoading(true)
 				await loadUserData()
 				if (cancelled) return
 				checkIconsAvailability().catch(() => {})
@@ -406,7 +410,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 		return () => {
 			cancelled = true
 		}
-	}, [loadUserData, checkIconsAvailability])
+	}, [loadUserData, checkIconsAvailability, lobbyIdFromProps])
 
 	useEffect(() => {
 		const uid = profile.data?.id

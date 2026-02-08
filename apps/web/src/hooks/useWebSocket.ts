@@ -15,7 +15,7 @@ interface CommonSocket {
 	onAny?(callback: (eventName: string, ...args: any[]) => void): CommonSocket
 }
 
-export type UseWebSocketOptions = {
+type UseWebSocketOptions = {
 	/**
 	 * Engine.IO path (на сервере NestJS это WebSocketGateway({ path: ... }))
 	 * ДОЛЖЕН быть явно указан: '/lobby' или '/game'

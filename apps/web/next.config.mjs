@@ -6,8 +6,6 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const isProd = process.env.NODE_ENV === 'production'
-
 function collectPublicRedirects(CDN) {
 	const redirects = []
 	if (!CDN) return redirects
@@ -43,7 +41,6 @@ const nextConfig = {
 	output: 'standalone',
 	compress: true,
 	poweredByHeader: false,
-	swcMinify: true,
 	productionBrowserSourceMaps: false,
 
 	images: {
@@ -51,12 +48,14 @@ const nextConfig = {
 		formats: ['image/webp', 'image/avif'],
 		deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
 		imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+
+		// чтобы quality=85 не ругался (и Next16 не сломал сборку)
+		qualities: [60, 70, 75, 80, 85, 90, 95, 100],
 	},
 
 	experimental: {
 		serverActions: { bodySizeLimit: '2mb' },
 		optimizePackageImports: [
-			// React Next и так оптимизирует, их можно не трогать
 			'socket.io-client',
 			'react-hook-form',
 			'@hookform/resolvers',
@@ -68,7 +67,6 @@ const nextConfig = {
 
 	webpack(config, { dev, isServer }) {
 		if (!dev && !isServer) {
-			// уменьшает вес sourcemap-ов в браузере
 			config.devtool = false
 		}
 		return config

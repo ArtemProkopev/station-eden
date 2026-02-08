@@ -3,7 +3,7 @@
 import { memo, useCallback, useState } from 'react'
 import styles from './AddPlayerModal.module.css'
 
-export interface AddPlayerModalProps {
+interface AddPlayerModalProps {
 	isOpen: boolean
 	onClose: () => void
 	onAddPlayer: (playerData?: {

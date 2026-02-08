@@ -1,8 +1,8 @@
 // apps/web/src/utils/passwordStrength.ts
-export const hasLower = (s: string) => /[a-z]/.test(s)
-export const hasUpper = (s: string) => /[A-Z]/.test(s)
-export const hasDigit = (s: string) => /\d/.test(s)
-export const hasSpecial = (s: string) => /[^A-Za-z0-9]/.test(s)
+const hasLower = (s: string) => /[a-z]/.test(s)
+const hasUpper = (s: string) => /[A-Z]/.test(s)
+const hasDigit = (s: string) => /\d/.test(s)
+const hasSpecial = (s: string) => /[^A-Za-z0-9]/.test(s)
 
 export function measureStrength(pw: string): number {
   let score = 0

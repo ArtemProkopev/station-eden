@@ -8,10 +8,6 @@ export interface ProfileIconsStatus {
 	copy: boolean
 }
 
-export interface ProfileModalState {
-	isOpen: boolean
-}
-
 /**
  * Состояние профиля для UI.
  * Мы не дублируем поля username/email, а используем тип User из общего пакета.

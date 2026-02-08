@@ -11,7 +11,7 @@ import {
 } from 'typeorm'
 import { User } from '../users/user.entity'
 
-export type OAuthProvider = 'google'
+type OAuthProvider = 'google'
 
 @Entity('oauth_accounts')
 @Unique('uq_provider_sub', ['provider', 'providerUserId'])

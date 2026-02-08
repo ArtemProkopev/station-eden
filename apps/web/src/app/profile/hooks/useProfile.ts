@@ -1,4 +1,5 @@
 // apps/web/src/app/profile/hooks/useProfile.ts
+import { api } from '@/lib/api'
 import { asset } from '@/lib/asset'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PROFILE_CONFIG, avatarKey, frameKey } from '../config'
@@ -14,33 +15,6 @@ const migrateToAbsoluteUrl = (
 ): string | undefined => {
 	if (!url) return undefined
 	return url.startsWith('http') ? url : asset(url)
-}
-
-function readCookie(name: string): string | null {
-	if (typeof document === 'undefined') return null
-	const m = document.cookie.match(
-		new RegExp(
-			`(?:^|; )${name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}=([^;]*)`
-		)
-	)
-	return m ? decodeURIComponent(m[1]) : null
-}
-
-async function ensureCsrf() {
-	try {
-		await fetch('/auth/csrf', {
-			method: 'GET',
-			credentials: 'include',
-			cache: 'no-store',
-		})
-	} catch {
-		// не критично
-	}
-}
-
-function csrfHeader(): Record<string, string> {
-	const token = readCookie('se_csrf')
-	return token ? { 'x-csrf-token': token } : {}
 }
 
 type MePayloadLike = any
@@ -59,6 +33,10 @@ function unwrapAny<T = any>(v: any): T {
 
 function pickString(v: any): string | null {
 	return typeof v === 'string' && v.trim() ? v : null
+}
+
+function isApiErrorLike(e: any): e is { status?: number; userMessage?: string } {
+	return !!e && typeof e === 'object' && ('status' in e || 'userMessage' in e)
 }
 
 export const useProfile = () => {
@@ -128,9 +106,9 @@ export const useProfile = () => {
 		const toCheck = PROFILE_CONFIG.ASSETS.ICONS
 
 		await Promise.allSettled(
-			Object.entries(toCheck).map(async ([key, path]) => {
+			Object.entries(toCheck).map(async ([key, p]) => {
 				try {
-					const url = asset(path)
+					const url = asset(p)
 					const resp = await fetch(url, { method: 'HEAD', cache: 'no-store' })
 					statusUpdates[key as keyof ProfileIconsStatus] = resp.ok
 				} catch {
@@ -143,35 +121,26 @@ export const useProfile = () => {
 	}, [])
 
 	/**
-	 * Грузим профиль строго same-origin:
-	 * /auth/me (Caddy proxy → api:4000)
-	 *
-	 * ВАЖНО: формат ответа “разный” — поэтому аккуратно распаковываем.
+	 * ✅ Грузим профиль через единый API-клиент (NEXT_PUBLIC_API_BASE).
+	 * Больше никакого fetch('/auth/me') → 404 от Next в dev исчезает.
 	 */
 	const loadUserData = useCallback(async () => {
 		try {
-			const meResp = await fetch('/auth/me', {
-				method: 'GET',
-				credentials: 'include',
-				cache: 'no-store',
-			})
+			const raw = (await api.me().catch(e => {
+				// api.me() кидает ApiError; обработаем 401 красиво
+				if (isApiErrorLike(e) && e.status === 401) {
+					setProfile({
+						status: 'unauth',
+						message:
+							'Вы не авторизованы. Войдите в аккаунт, чтобы открыть профиль.',
+					})
+					return null
+				}
+				throw e
+			})) as MePayloadLike | null
 
-			if (meResp.status === 401) {
-				setProfile({
-					status: 'unauth',
-					message:
-						'Вы не авторизованы. Войдите в аккаунт, чтобы открыть профиль.',
-				})
-				return
-			}
+			if (!raw) return
 
-			if (!meResp.ok) {
-				throw new Error(
-					`Не удалось загрузить профиль (/auth/me): ${meResp.status}`
-				)
-			}
-
-			const raw = (await meResp.json().catch(() => null)) as MePayloadLike
 			const payload = unwrapAny<any>(raw)
 
 			// поддерживаем userId или id
@@ -246,6 +215,19 @@ export const useProfile = () => {
 			loadSavedAssets(userId)
 		} catch (error: any) {
 			console.error('Profile data loading error:', error)
+
+			// Если это ApiError — покажем userMessage
+			if (isApiErrorLike(error)) {
+				setProfile({
+					status: 'error',
+					message:
+						typeof error.userMessage === 'string' && error.userMessage
+							? error.userMessage
+							: 'Не удалось загрузить профиль',
+				})
+				return
+			}
+
 			setProfile({
 				status: 'error',
 				message:
@@ -256,70 +238,61 @@ export const useProfile = () => {
 		}
 	}, [loadSavedAssets])
 
+	/**
+	 * ✅ Сохранение профиля через единый API-клиент.
+	 * Никаких ensureCsrf()/fetch('/auth/csrf') тут больше не нужно —
+	 * api.updateProfile сам делает CSRF и правильные заголовки.
+	 */
 	const handleSaveProfile = useCallback(
 		async (newAvatar: string, newFrame: string) => {
 			if (profile.status !== 'ok' || !profile.data?.id) {
 				throw new Error('Нет авторизованного пользователя')
 			}
 
-			await ensureCsrf()
-
-			const resp = await fetch('/api/users/profile', {
-				method: 'PUT',
-				credentials: 'include',
-				cache: 'no-store',
-				headers: {
-					'Content-Type': 'application/json',
-					...csrfHeader(),
-				},
-				body: JSON.stringify({
+			try {
+				const data = await api.updateProfile({
 					avatar: newAvatar,
 					frame: newFrame,
-				}),
-			})
-
-			if (resp.status === 401) {
-				setProfile({
-					status: 'unauth',
-					message: 'Сессия истекла. Войдите заново.',
 				})
-				throw new Error('Unauthorized')
-			}
 
-			if (!resp.ok) {
-				const txt = await resp.text().catch(() => '')
-				throw new Error(`Ошибка сохранения профиля: ${resp.status} ${txt}`)
-			}
+				const uid = profile.data.id
 
-			const raw = (await resp.json().catch(() => ({}))) as any
-			const data = unwrapAny<any>(raw)
+				const avatarAbs =
+					migrateToAbsoluteUrl(data?.avatar) ??
+					migrateToAbsoluteUrl(newAvatar) ??
+					newAvatar
 
-			const avatarAbs =
-				migrateToAbsoluteUrl(data?.avatar) ??
-				migrateToAbsoluteUrl(newAvatar) ??
-				newAvatar
-			const frameAbs =
-				migrateToAbsoluteUrl(data?.frame) ??
-				migrateToAbsoluteUrl(newFrame) ??
-				newFrame
+				const frameAbs =
+					migrateToAbsoluteUrl(data?.frame) ??
+					migrateToAbsoluteUrl(newFrame) ??
+					newFrame
 
-			setAssets({ avatar: avatarAbs, frame: frameAbs })
+				setAssets({ avatar: avatarAbs, frame: frameAbs })
 
-			setProfile(prev => {
-				if (prev.status !== 'ok' || !prev.data) return prev
-				return {
-					...prev,
-					data: {
-						...prev.data,
-						avatar: avatarAbs,
-						frame: frameAbs,
-					},
+				setProfile(prev => {
+					if (prev.status !== 'ok' || !prev.data) return prev
+					return {
+						...prev,
+						data: {
+							...prev.data,
+							avatar: avatarAbs,
+							frame: frameAbs,
+						},
+					}
+				})
+
+				localStorage.setItem(avatarKey(uid), avatarAbs)
+				localStorage.setItem(frameKey(uid), frameAbs)
+			} catch (e: any) {
+				if (isApiErrorLike(e) && e.status === 401) {
+					setProfile({
+						status: 'unauth',
+						message: 'Сессия истекла. Войдите заново.',
+					})
+					throw new Error('Unauthorized')
 				}
-			})
-
-			const uid = profile.data.id
-			localStorage.setItem(avatarKey(uid), avatarAbs)
-			localStorage.setItem(frameKey(uid), frameAbs)
+				throw e
+			}
 		},
 		[profile]
 	)
@@ -333,47 +306,32 @@ export const useProfile = () => {
 			const value = newUsername.trim()
 			if (!value) throw new Error('Введите никнейм')
 
-			await ensureCsrf()
+			try {
+				const data = await api.updateProfile({ username: value })
 
-			const resp = await fetch('/api/users/profile', {
-				method: 'PUT',
-				credentials: 'include',
-				cache: 'no-store',
-				headers: {
-					'Content-Type': 'application/json',
-					...csrfHeader(),
-				},
-				body: JSON.stringify({ username: value }),
-			})
+				const usernameFromServer =
+					(typeof data?.username === 'string' && data.username) || value
 
-			if (resp.status === 401) {
-				setProfile({
-					status: 'unauth',
-					message: 'Сессия истекла. Войдите заново.',
+				setProfile(prev => {
+					if (prev.status !== 'ok' || !prev.data) return prev
+					return {
+						...prev,
+						data: {
+							...prev.data,
+							username: usernameFromServer,
+						},
+					}
 				})
-				throw new Error('Unauthorized')
-			}
-
-			if (!resp.ok) {
-				const txt = await resp.text().catch(() => '')
-				throw new Error(`Ошибка обновления никнейма: ${resp.status} ${txt}`)
-			}
-
-			const raw = (await resp.json().catch(() => ({}))) as any
-			const data = unwrapAny<any>(raw)
-			const usernameFromServer =
-				(typeof data?.username === 'string' && data.username) || value
-
-			setProfile(prev => {
-				if (prev.status !== 'ok' || !prev.data) return prev
-				return {
-					...prev,
-					data: {
-						...prev.data,
-						username: usernameFromServer,
-					},
+			} catch (e: any) {
+				if (isApiErrorLike(e) && e.status === 401) {
+					setProfile({
+						status: 'unauth',
+						message: 'Сессия истекла. Войдите заново.',
+					})
+					throw new Error('Unauthorized')
 				}
-			})
+				throw e
+			}
 		},
 		[profile]
 	)

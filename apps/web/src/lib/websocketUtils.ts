@@ -36,7 +36,7 @@ export function closeAllWebSockets(): void {
 /**
  * Создание WebSocket соединения для игры
  */
-export function createGameWebSocket(gameId: string): WebSocket | null {
+function createGameWebSocket(gameId: string): WebSocket | null {
 	if (typeof window === 'undefined') return null
 
 	const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'ws://localhost:4000'
@@ -89,7 +89,7 @@ export async function clearWebSocketCache(): Promise<void> {
 /**
  * Проверка наличия access_token
  */
-export function hasAccessToken(): boolean {
+function hasAccessToken(): boolean {
 	if (typeof document === 'undefined') return false
 	return document.cookie.includes('access_token=')
 }
@@ -105,7 +105,7 @@ export function isForcedLogout(): boolean {
 /**
  * Генерация уникального ID для игры
  */
-export function generateGameId(): string {
+function generateGameId(): string {
 	if (typeof crypto !== 'undefined' && crypto.randomUUID) {
 		return crypto.randomUUID().replace(/-/g, '').substring(0, 8)
 	}

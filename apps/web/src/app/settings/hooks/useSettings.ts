@@ -1,6 +1,7 @@
 // apps/web/src/app/settings/hooks/useSettings.ts
 'use client'
 
+import { api } from '@/lib/api'
 import { asset } from '@/lib/asset'
 import { SoundSettings, UserSettings } from '@station-eden/shared'
 import { useCallback, useState } from 'react'
@@ -39,6 +40,10 @@ function unwrapAny<T = any>(v: any): T {
 
 function pickString(v: any): string | null {
 	return typeof v === 'string' && v.trim() ? v : null
+}
+
+function isApiErrorLike(e: any): e is { status?: number; userMessage?: string } {
+	return !!e && typeof e === 'object' && ('status' in e || 'userMessage' in e)
 }
 
 export function useSettings() {
@@ -93,33 +98,27 @@ export function useSettings() {
 	}, [])
 
 	/**
-	 * ВАЖНО:
-	 * Грузим профиль строго same-origin: /auth/me (Caddy proxy → api)
-	 * Не используем NEXT_PUBLIC_API_BASE здесь, чтобы не ловить проблемы с cookies/origin/форматом.
+	 * ✅ ВАЖНО:
+	 * Грузим профиль через единый API-клиент (NEXT_PUBLIC_API_BASE),
+	 * чтобы dev и prod работали одинаково и не было 404 от Next на /auth/me.
 	 */
 	const loadUserData = useCallback(async () => {
 		try {
-			const response = await fetch('/auth/me', {
-				method: 'GET',
-				credentials: 'include',
-				cache: 'no-store',
-			})
+			const raw = (await api.me().catch(e => {
+				if (isApiErrorLike(e) && e.status === 401) {
+					console.warn('Unauthorized')
+					setProfile({
+						status: 'unauth',
+						message: 'Вы не авторизованы.',
+					})
+					loadSavedAvatar(undefined)
+					return null
+				}
+				throw e
+			})) as MePayloadLike | null
 
-			if (response.status === 401) {
-				console.warn('Unauthorized')
-				setProfile({
-					status: 'unauth',
-					message: 'Вы не авторизованы.',
-				})
-				loadSavedAvatar(undefined)
-				return
-			}
+			if (!raw) return
 
-			if (!response.ok) {
-				throw new Error(`HTTP ${response.status}`)
-			}
-
-			const raw = (await response.json().catch(() => null)) as MePayloadLike
 			const payload = unwrapAny<any>(raw)
 
 			// поддерживаем id/userId и вложенные варианты
@@ -167,8 +166,8 @@ export function useSettings() {
 					id: userId,
 					email,
 					username,
-					avatar: avatarAbs,
-					frame: frameAbs,
+					avatar: avatarAbs ?? undefined,
+					frame: frameAbs ?? undefined,
 				} as any,
 			})
 
@@ -179,14 +178,28 @@ export function useSettings() {
 			} else {
 				loadSavedAvatar(userId)
 			}
-		} catch (error) {
+
+			// frameAbs тут не нужен напрямую, но оставляем в profile
+			void frameAbs
+		} catch (error: any) {
 			console.error('User data loading error:', error)
+
+			if (isApiErrorLike(error)) {
+				setProfile({
+					status: 'error',
+					message:
+						typeof error.userMessage === 'string' && error.userMessage
+							? error.userMessage
+							: 'Не удалось загрузить данные',
+				})
+				loadSavedAvatar(undefined)
+				return
+			}
+
 			setProfile({
 				status: 'error',
 				message:
-					error instanceof Error
-						? error.message
-						: 'Не удалось загрузить данные',
+					error instanceof Error ? error.message : 'Не удалось загрузить данные',
 			})
 			loadSavedAvatar(undefined)
 		}

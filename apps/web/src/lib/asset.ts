@@ -21,7 +21,7 @@ export function asset(rel: string): string {
 }
 
 /** Любой наш путь /web/* → CDN (перепишет selstorage/origin/относительные) */
-export function toCdn(u: string): string {
+function toCdn(u: string): string {
 	try {
 		const url = new URL(u, 'https://stationeden.ru') // base для относительных
 		if (url.pathname.startsWith('/web/')) {
@@ -38,7 +38,7 @@ export function toCdn(u: string): string {
 }
 
 /** Переключиться на селстор только если CDN не загрузился (onError) */
-export function onImgErrorSwapToFallback(
+function onImgErrorSwapToFallback(
 	e: React.SyntheticEvent<HTMLImageElement>
 ) {
 	const img = e.currentTarget
@@ -53,7 +53,7 @@ export function onImgErrorSwapToFallback(
 }
 
 // (опционально) сигнализировать о неверной конфигурации в проде
-export function assertPrimaryInProd() {
+function assertPrimaryInProd() {
 	if (IS_PROD && !PRIMARY) {
 		// eslint-disable-next-line no-console
 		console.error('[asset] NEXT_PUBLIC_ASSETS_BASE is empty in production!')

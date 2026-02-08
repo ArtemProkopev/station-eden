@@ -258,5 +258,3 @@ export function LobbySettingsModal({
 		</div>
 	)
 }
-
-export type { LobbySettings }
