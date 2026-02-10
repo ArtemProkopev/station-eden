@@ -1,4 +1,3 @@
-// apps/web/src/app/game/[gameId]/GameSessionClient.tsx
 'use client'
 
 import { useProfile } from '@/app/profile/hooks/useProfile'
@@ -75,8 +74,9 @@ interface PlayerCardInfo {
 
 // Функция форматирования времени - объявляем ДО использования
 const formatTime = (seconds: number) => {
-	const mins = Math.floor(seconds / 60)
-	const secs = seconds % 60
+	if (seconds === undefined || seconds === null) return '0:00'
+	const mins = Math.floor(Math.max(0, seconds) / 60)
+	const secs = Math.max(0, seconds) % 60
 	return `${mins}:${secs < 10 ? '0' : ''}${secs}`
 }
 
@@ -135,8 +135,8 @@ export default function GameSessionClient({ gameId }: Props) {
 	
 	// Состояние для отслеживания таймера
 	const [timerInterval, setTimerInterval] = useState<
-	ReturnType<typeof setInterval> | null
->(null)
+		ReturnType<typeof setInterval> | null
+	>(null)
 	
 	// Состояние для пропуска заставки
 	const [canSkipNarration, setCanSkipNarration] = useState<boolean>(false)
@@ -228,12 +228,23 @@ export default function GameSessionClient({ gameId }: Props) {
 		setAllPlayersCards(playersInfo)
 	}, [getCardTypeDisplayName, myAllRevealedCards, userId])
 
-	// Функция для запуска таймера
-	const startTimer = useCallback((duration: number) => {
-		// Очищаем предыдущий таймер
+	// Функция для остановки таймера
+	const stopTimer = useCallback(() => {
 		if (timerInterval) {
 			clearInterval(timerInterval)
 			setTimerInterval(null)
+		}
+	}, [timerInterval])
+
+	// Функция для запуска таймера
+	const startTimer = useCallback((duration: number) => {
+		// Очищаем предыдущий таймер
+		stopTimer()
+		
+		// Если время 0 или меньше, не запускаем таймер
+		if (duration <= 0) {
+			setPhaseTimeLeft(0)
+			return
 		}
 		
 		// Устанавливаем начальное время
@@ -258,15 +269,29 @@ export default function GameSessionClient({ gameId }: Props) {
 			clearInterval(interval)
 			setTimerInterval(null)
 		}
-	}, [timerInterval])
+	}, [stopTimer])
 
-	// Функция для остановки таймера
-	const stopTimer = useCallback(() => {
-		if (timerInterval) {
-			clearInterval(timerInterval)
-			setTimerInterval(null)
+	// Функция для синхронизации таймера с серверным временем
+	const syncTimerWithServer = useCallback((game: any) => {
+		if (!game?.phase || !game.phaseEndTime) {
+			setPhaseTimeLeft(0)
+			stopTimer()
+			return
 		}
-	}, [timerInterval])
+		
+		const now = Date.now()
+		const endTime = new Date(game.phaseEndTime).getTime()
+		const secondsLeft = Math.max(0, Math.floor((endTime - now) / 1000))
+		
+		// Устанавливаем время и запускаем таймер если нужно
+		setPhaseTimeLeft(secondsLeft)
+		
+		if (secondsLeft > 0) {
+			startTimer(secondsLeft)
+		} else {
+			stopTimer()
+		}
+	}, [startTimer, stopTimer])
 
 	// ✅ socket.io-client нужен http(s) origin, path задаём отдельно
 	const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'https://api.stationeden.ru'
@@ -300,24 +325,8 @@ export default function GameSessionClient({ gameId }: Props) {
 					// Обновляем общую таблицу карт
 					updateCardsTable(game)
 					
-					// Обновляем таймер на основе фазы
-					if (game?.phase === 'discussion' || game?.phase === 'introduction') {
-						// Для обсуждения и заставки используем серверное время
-						if (game?.phaseEndTime) {
-							const endTime = new Date(game.phaseEndTime).getTime()
-							const now = Date.now()
-							const secondsLeft = Math.max(0, Math.floor((endTime - now) / 1000))
-							setPhaseTimeLeft(secondsLeft)
-						}
-					} else if (game?.phase === 'voting') {
-						// Для голосования 30 секунд
-						setPhaseTimeLeft(30)
-						startTimer(30)
-					} else if (game?.phase === 'preparation') {
-						// Для подготовки нет таймера
-						stopTimer()
-						setPhaseTimeLeft(0)
-					}
+					// Синхронизируем таймер с сервером
+					syncTimerWithServer(game)
 					
 					// Разрешаем пропуск заставки через 3 секунды
 					if (game?.phase === 'introduction') {
@@ -328,6 +337,30 @@ export default function GameSessionClient({ gameId }: Props) {
 
 					if (game?.phase !== 'crisis' && activeCrisis) {
 						setActiveCrisis(null)
+					}
+					break
+				}
+
+				case 'PHASE_CHANGED': {
+					console.log('Phase changed to:', data.newPhase)
+					// Останавливаем текущий таймер
+					stopTimer()
+					setPhaseTimeLeft(0)
+					
+					// Запускаем таймер для новой фазы
+					if (data.newPhase === 'voting') {
+						setPhaseTimeLeft(30)
+						startTimer(30)
+					} else if (data.newPhase === 'discussion') {
+						setPhaseTimeLeft(60)
+						startTimer(60)
+					} else if (data.newPhase === 'crisis') {
+						setPhaseTimeLeft(60)
+						startTimer(60)
+					} else if (data.newPhase === 'introduction' && data.duration) {
+						setPhaseTimeLeft(data.duration)
+						startTimer(data.duration)
+						setTimeout(() => setCanSkipNarration(true), 3000)
 					}
 					break
 				}
@@ -414,6 +447,11 @@ export default function GameSessionClient({ gameId }: Props) {
 
 				case 'CRISIS_TRIGGERED':
 					setActiveCrisis(data.crisis)
+					// При активации кризиса запускаем таймер на 60 секунд
+					if (data.crisis?.isActive) {
+						setPhaseTimeLeft(60)
+						startTimer(60)
+					}
 					break
 
 				case 'CRISIS_SOLVED':
@@ -424,12 +462,16 @@ export default function GameSessionClient({ gameId }: Props) {
 					)
 					// Закрываем модалку кризиса
 					setActiveCrisis(null)
+					// Останавливаем таймер кризиса
+					stopTimer()
 					break
 
 				case 'CRISIS_PENALTY':
 					addToChat('Система', data.message, true)
 					// Закрываем модалку кризиса
 					setActiveCrisis(null)
+					// Останавливаем таймер кризиса
+					stopTimer()
 					break
 
 				case 'PLAYER_EJECTED': {
@@ -619,9 +661,21 @@ export default function GameSessionClient({ gameId }: Props) {
 				case 'ALL_CARDS_REVEALED':
 					addToChat('Система', 'Все игроки раскрыли по карте в этом раунде!', true)
 					break
+
+				case 'TIMER_UPDATE':
+					// Серверный таймер синхронизации
+					if (data.timeLeft !== undefined) {
+						setPhaseTimeLeft(data.timeLeft)
+						if (data.timeLeft > 0) {
+							startTimer(data.timeLeft)
+						} else {
+							stopTimer()
+						}
+					}
+					break
 			}
 		}
-	}, [activeCrisis, addToChat, getCardDisplayName, getCardTypeDisplayName, gameState, updateCardsTable, startTimer, stopTimer, userId])
+	}, [activeCrisis, addToChat, getCardDisplayName, getCardTypeDisplayName, gameState, updateCardsTable, startTimer, stopTimer, syncTimerWithServer, userId])
 
 	// Создаем обработчик
 	const handleWebSocketMessage = createHandleWebSocketMessage()
@@ -639,13 +693,6 @@ export default function GameSessionClient({ gameId }: Props) {
 		sendMessageRef.current = sendMessage
 		isConnectedRef.current = isConnected
 	}, [sendMessage, isConnected])
-
-	// Очистка таймера при размонтировании
-	useEffect(() => {
-		return () => {
-			stopTimer()
-		}
-	}, [stopTimer])
 
 	// ✅ JOIN_GAME отправляем строго 1 раз на каждый connect
 	const joinedRef = useRef(false)
@@ -665,6 +712,27 @@ export default function GameSessionClient({ gameId }: Props) {
 		console.log('Connected to game, joining...')
 		sendMessage({ type: 'JOIN_GAME', gameId })
 	}, [isConnected, gameId, sendMessage, profile.status, userId])
+
+	// useEffect для автоматического обновления таймера с сервером
+	useEffect(() => {
+		const syncTimer = () => {
+			if (!gameState || !gameState.phase || !gameState.phaseEndTime) return
+			
+			const now = Date.now()
+			const endTime = new Date(gameState.phaseEndTime).getTime()
+			const secondsLeft = Math.max(0, Math.floor((endTime - now) / 1000))
+			
+			// Обновляем только если разница больше 1 секунды
+			if (Math.abs(phaseTimeLeft - secondsLeft) > 1) {
+				setPhaseTimeLeft(secondsLeft)
+			}
+		}
+		
+		// Синхронизируем каждые 5 секунд
+		const interval = setInterval(syncTimer, 5000)
+		
+		return () => clearInterval(interval)
+	}, [gameState, phaseTimeLeft])
 
 	// useEffect для последовательного раскрытия карт
 	useEffect(() => {
@@ -701,6 +769,13 @@ export default function GameSessionClient({ gameId }: Props) {
 			chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
 		}
 	}, [chatMessages])
+
+	// Очистка таймера при размонтировании
+	useEffect(() => {
+		return () => {
+			stopTimer()
+		}
+	}, [stopTimer])
 
 	const handleMessageChange = useCallback((message: string) => {
 		setNewMessage(message.slice(0, 300))
@@ -1147,7 +1222,7 @@ export default function GameSessionClient({ gameId }: Props) {
 															<span className={styles.cardTypeHint}>
 																{player.revealedCards[cardType].type}
 															</span>
-														</div>
+													</div>
 													) : (
 														<span className={styles.hiddenCardCell}>❓</span>
 													)}
@@ -1246,9 +1321,9 @@ export default function GameSessionClient({ gameId }: Props) {
 													<div className={styles.cardCons}>
 														<strong>Минусы:</strong>
 														<ul>
-															{card.cons.map((con: string, i: number) => (
-																<li key={i}>{con}</li>
-															))}
+														{card.cons.map((con: string, i: number) => (
+															<li key={i}>{con}</li>
+														))}
 														</ul>
 													</div>
 												)}
@@ -1630,6 +1705,8 @@ export default function GameSessionClient({ gameId }: Props) {
 		phaseDurationDisplay = 30
 	} else if (gameState.phase === 'discussion' && phaseTimeLeft > 0) {
 		phaseDurationDisplay = 60
+	} else if (gameState.phase === 'crisis') {
+		phaseDurationDisplay = 60
 	} else {
 		phaseDurationDisplay = gameState.phaseDuration || 180
 	}
@@ -1810,7 +1887,10 @@ export default function GameSessionClient({ gameId }: Props) {
 						<p className={styles.phaseDescription}>
 							{getPhaseDescription(gameState.phase)}
 						</p>
-						{(gameState.phase === 'voting' || (gameState.phase === 'discussion' && phaseTimeLeft > 0)) && (
+						{(gameState.phase === 'voting' || 
+						  gameState.phase === 'discussion' || 
+						  gameState.phase === 'crisis' || 
+						  gameState.phase === 'introduction') && phaseTimeLeft > 0 && (
 							<div className={styles.phaseTimer}>
 								<div className={styles.timerBar}>
 									<div
