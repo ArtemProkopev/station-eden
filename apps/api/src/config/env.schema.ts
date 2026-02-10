@@ -1,70 +1,93 @@
 import { z } from 'zod'
 
+const emptyToUndef = (v: unknown) => (v === '' ? undefined : v)
+
+const boolStr = z.preprocess(
+	emptyToUndef,
+	z.enum(['true', 'false']).default('false'),
+)
+const strOpt = z.preprocess(emptyToUndef, z.string().optional())
+const urlOpt = z.preprocess(emptyToUndef, z.string().url().optional())
+
 const RawEnvSchema = z.object({
 	NODE_ENV: z
 		.enum(['development', 'test', 'production'])
 		.default('development'),
 
-	// API
 	API_PORT: z.coerce.number().default(4000),
-	API_CORS_ORIGIN: z.string().optional(),
+	API_CORS_ORIGIN: strOpt,
 
-	// Cookies / CSRF
-	COOKIE_SECURE: z.enum(['true', 'false']).default('false'),
-	CSRF_COOKIE_NAME: z.string().default('se_csrf'),
-	CSRF_COOKIE_DOMAIN: z.string().optional(), // например ".stationeden.ru"
+	COOKIE_SECURE: z.preprocess(
+		emptyToUndef,
+		z.enum(['true', 'false']).default('false'),
+	),
+	CSRF_COOKIE_NAME: z.preprocess(emptyToUndef, z.string().default('se_csrf')),
+	CSRF_COOKIE_DOMAIN: strOpt,
+	COOKIE_DOMAIN: strOpt,
+	AUTH_COOKIE_DOMAIN: strOpt,
 
-	// JWT
-	JWT_ACCESS_SECRET: z
-		.string()
-		.min(32, 'JWT_ACCESS_SECRET too short')
-		.optional(),
-	JWT_SECRET: z.string().min(32, 'JWT_SECRET too short').optional(), // fallback
-	JWT_ACCESS_EXPIRES: z.string().default('15m'),
-	JWT_REFRESH_TTL_MS: z.coerce.number().optional(),
+	JWT_ACCESS_SECRET: z.preprocess(emptyToUndef, z.string().min(32).optional()),
+	JWT_SECRET: z.preprocess(emptyToUndef, z.string().min(32).optional()),
+	JWT_ACCESS_EXPIRES: z.preprocess(emptyToUndef, z.string().default('15m')),
+	JWT_REFRESH_TTL_MS: z.preprocess(emptyToUndef, z.coerce.number().optional()),
 
-	// БД
-	DATABASE_URL: z.string().url().optional(),
-	POSTGRES_HOST: z.string().optional(),
-	POSTGRES_PORT: z.coerce.number().optional(),
-	POSTGRES_USER: z.string().optional(),
-	POSTGRES_PASSWORD: z.string().optional(),
-	POSTGRES_DB: z.string().optional(),
+	DATABASE_URL: z.preprocess(emptyToUndef, z.string().url().optional()),
+	POSTGRES_HOST: strOpt,
+	POSTGRES_PORT: z.preprocess(emptyToUndef, z.coerce.number().optional()),
+	POSTGRES_USER: strOpt,
+	POSTGRES_PASSWORD: strOpt,
+	POSTGRES_DB: strOpt,
 
-	// allow-list админов
-	ADMIN_EMAILS: z.string().optional().default(''),
+	ADMIN_EMAILS: z.preprocess(emptyToUndef, z.string().optional().default('')),
 
-	// Google OAuth
-	ENABLE_GOOGLE_LOGIN: z.enum(['true', 'false']).default('false'),
-	GOOGLE_CLIENT_ID: z.string().optional(),
-	GOOGLE_CLIENT_SECRET: z.string().optional(),
-	GOOGLE_REDIRECT_URL: z.string().url().optional(),
-	WEB_AFTER_LOGIN_URL: z.string().url().optional(),
+	// Google
+	ENABLE_GOOGLE_LOGIN: boolStr,
+	GOOGLE_CLIENT_ID: strOpt,
+	GOOGLE_CLIENT_SECRET: strOpt,
+	GOOGLE_REDIRECT_URL: urlOpt,
+	WEB_AFTER_LOGIN_URL: urlOpt,
 
-	// SMTP (legacy)
-	SMTP_URL: z.string().optional(),
-	SMTP_HOST: z.string().optional(),
-	SMTP_PORT: z.coerce.number().optional(),
-	SMTP_USER: z.string().optional(),
-	SMTP_PASS: z.string().optional(),
-	SMTP_FROM: z.string().optional(),
+	// Yandex
+	ENABLE_YANDEX_LOGIN: boolStr,
+	YANDEX_CLIENT_ID: strOpt,
+	YANDEX_CLIENT_SECRET: strOpt,
+	YANDEX_REDIRECT_URL: urlOpt,
 
-	// Resend
-	RESEND_API_KEY: z.string().optional(),
-	EMAIL_FROM: z.string().optional(),
+	RESEND_API_KEY: strOpt,
+	EMAIL_FROM: strOpt,
 
-	// --- LiveKit ---
-	LIVEKIT_URL: z.string().url().optional(),
-	LIVEKIT_API_KEY: z.string().optional(),
-	LIVEKIT_API_SECRET: z.string().optional(),
+	LIVEKIT_URL: urlOpt,
+	LIVEKIT_API_KEY: strOpt,
+	LIVEKIT_API_SECRET: strOpt,
 })
 
 export const EnvSchema = RawEnvSchema.transform(env => ({
 	...env,
 	JWT_ACCESS_SECRET: env.JWT_ACCESS_SECRET ?? env.JWT_SECRET,
-})).refine(e => !!e.JWT_ACCESS_SECRET, {
-	path: ['JWT_ACCESS_SECRET'],
-	message: 'Required',
-})
-
-type Env = z.infer<typeof EnvSchema>
+}))
+	.refine(e => !!e.JWT_ACCESS_SECRET, {
+		path: ['JWT_ACCESS_SECRET'],
+		message: 'Required',
+	})
+	.superRefine((e, ctx) => {
+		if (e.ENABLE_YANDEX_LOGIN === 'true') {
+			if (!e.YANDEX_CLIENT_ID)
+				ctx.addIssue({
+					code: 'custom',
+					path: ['YANDEX_CLIENT_ID'],
+					message: 'Required when ENABLE_YANDEX_LOGIN=true',
+				})
+			if (!e.YANDEX_CLIENT_SECRET)
+				ctx.addIssue({
+					code: 'custom',
+					path: ['YANDEX_CLIENT_SECRET'],
+					message: 'Required when ENABLE_YANDEX_LOGIN=true',
+				})
+			if (!e.YANDEX_REDIRECT_URL)
+				ctx.addIssue({
+					code: 'custom',
+					path: ['YANDEX_REDIRECT_URL'],
+					message: 'Required when ENABLE_YANDEX_LOGIN=true',
+				})
+		}
+	})

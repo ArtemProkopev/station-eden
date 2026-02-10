@@ -5,7 +5,7 @@
 	"scripts": {
 		"start:dev": "nest start --watch",
 		"clean": "rimraf dist",
-		"build": "nest build",
+		"build": "pnpm --filter @station-eden/shared build && nest build",
 		"typeorm": "ts-node -T ./node_modules/typeorm/cli.js",
 		"migration:generate": "cross-env TS_NODE_PROJECT=tsconfig.json ts-node -T ./node_modules/typeorm/cli.js migration:generate -d ./src/db/data-source.ts",
 		"migration:create": "cross-env TS_NODE_PROJECT=tsconfig.json ts-node -T ./node_modules/typeorm/cli.js migration:create",

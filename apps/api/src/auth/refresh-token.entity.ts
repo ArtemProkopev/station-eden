@@ -22,7 +22,20 @@ export class RefreshToken {
 	@Column({ name: 'user_id', type: 'uuid' })
 	userId!: string
 
-	@Index({ unique: true })
+	/**
+	 * Небольшой префикс refresh token (например, первые 16 символов),
+	 * чтобы быстро отобрать кандидатов без перебора bcrypt по сотням строк.
+	 */
+	@Index()
+	@Column({ type: 'text', default: '' })
+	selector!: string
+
+	/**
+	 * bcrypt hash refresh token'а
+	 * НЕ unique: соль делает значение уникальным почти всегда,
+	 * а unique-index по text только тормозит.
+	 */
+	@Index()
 	@Column({ name: 'token_hash', type: 'text' })
 	tokenHash!: string
 

@@ -4,13 +4,11 @@
 		"module": "commonjs",
 		"moduleResolution": "node",
 		"target": "es2020",
+		"rootDir": "src",
 		"outDir": "dist",
 		"experimentalDecorators": true,
 		"emitDecoratorMetadata": true,
 		"baseUrl": "./",
-		"paths": {
-			"@station-eden/shared": ["../../packages/shared/src/index.ts"]
-		},
 		"types": ["node", "cookie-parser"]
 	},
 	"include": ["src/**/*.ts"]

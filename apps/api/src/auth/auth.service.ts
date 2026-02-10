@@ -31,7 +31,7 @@ export class AuthService {
 		private readonly emailCodeRepo: Repository<EmailCode>,
 		@InjectRepository(OAuthAccount)
 		private readonly oaRepo: Repository<OAuthAccount>,
-		private readonly emailer: EmailService
+		private readonly emailer: EmailService,
 	) {}
 
 	/** Access JWT */
@@ -46,7 +46,7 @@ export class AuthService {
 			{
 				secret: process.env.JWT_ACCESS_SECRET!,
 				expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m',
-			}
+			},
 		)
 	}
 
@@ -54,7 +54,7 @@ export class AuthService {
 	public signPreauth(userId: string, email: string) {
 		return this.jwt.sign(
 			{ sub: userId, email, kind: 'preauth' },
-			{ secret: process.env.JWT_ACCESS_SECRET!, expiresIn: '10m' }
+			{ secret: process.env.JWT_ACCESS_SECRET!, expiresIn: '10m' },
 		)
 	}
 
@@ -68,9 +68,22 @@ export class AuthService {
 		return out
 	}
 
+	private refreshSelector(plain: string) {
+		// стабильный, быстрый селектор: префикс токена
+		// (не меняет формат токена для клиента)
+		return (plain || '').slice(0, 16)
+	}
+
+	private safeSelector(token: string) {
+		const s = this.refreshSelector(token)
+		// защита от пустых/коротких значений
+		return s && s.length >= 8 ? s : ''
+	}
+
 	/** Выдаём refresh и сохраняем хэш в БД */
 	public async issueRefresh(userId: string) {
 		const plain = this.cryptoRandom(48)
+		const selector = this.refreshSelector(plain)
 		const tokenHash = await bcrypt.hash(plain, 10)
 
 		const ttlMs =
@@ -79,7 +92,13 @@ export class AuthService {
 		const expires = new Date(Date.now() + ttlMs)
 
 		await this.rtRepo.save(
-			this.rtRepo.create({ userId, tokenHash, expiresAt: expires })
+			this.rtRepo.create({
+				userId,
+				selector,
+				tokenHash,
+				expiresAt: expires,
+				revoked: false,
+			}),
 		)
 
 		return { plain, expires }
@@ -96,20 +115,10 @@ export class AuthService {
 			this.users.findByUsername(username),
 		])
 
-		/**
-		 * ВАЖНО:
-		 * byEmail может существовать как "oauth-only" пользователь:
-		 * - passwordHash = null
-		 * - username = null
-		 *
-		 * Такой email формально "занят", но пользователю нужно объяснить правильный сценарий:
-		 * - вход через Google
-		 * - или восстановление/установка пароля через email-код
-		 */
 		if (byEmail) {
 			if (!byEmail.passwordHash) {
 				throw new ConflictException(
-					'Аккаунт с этим email уже существует (создан через OAuth/код). Войдите через Google или используйте восстановление пароля.'
+					'Аккаунт с этим email уже существует (создан через OAuth/код). Войдите через OAuth или используйте восстановление пароля.',
 				)
 			}
 			throw new ConflictException('Email already used')
@@ -147,7 +156,7 @@ export class AuthService {
 	/** Валидация пользователя без выдачи токенов (для MFA) */
 	public async validateUserByLogin(
 		login: string,
-		password: string
+		password: string,
 	): Promise<User> {
 		const identifier = login.toLowerCase()
 		const candidate = isEmailLike(identifier)
@@ -155,7 +164,6 @@ export class AuthService {
 			: await this.users.findByUsernameWithHash(identifier)
 
 		if (!candidate || !candidate.passwordHash) {
-			// Не раскрываем факт существования учётки без пароля — такой кейс обрабатывает контроллер
 			throw new UnauthorizedException('Invalid credentials')
 		}
 		const ok = await bcrypt.compare(password, candidate.passwordHash)
@@ -169,22 +177,62 @@ export class AuthService {
 	}
 
 	/**
-	 * Обычный путь: знаем userId и пришедший refresh. Ротируем «самый свежий»
-	 * у пользователя, сверяя хэш и срок.
+	 * Обычный путь: знаем userId и пришедший refresh.
+	 * Улучшено:
+	 *  - быстрый отбор по selector
+	 *  - fallback на старые записи (selector == ''), чтобы не разлогинить после миграции
+	 *  - апгрейд старой записи: проставляем selector при первом успешном refresh
 	 */
 	async refresh(userId: string, refreshToken: string) {
-		const rec = await this.rtRepo.findOne({
-			where: { userId, revoked: false },
-			order: { createdAt: 'DESC' },
-		})
+		const selector = this.safeSelector(refreshToken)
+
+		// --- Быстрый путь по selector (новые токены) ---
+		let rec: RefreshToken | undefined
+
+		if (selector) {
+			const candidatesFast = await this.rtRepo.find({
+				where: { userId, selector, revoked: false },
+				order: { createdAt: 'DESC' },
+				take: 20, // на случай редкой коллизии префикса
+			})
+
+			for (const r of candidatesFast) {
+				const ok = await bcrypt.compare(refreshToken, r.tokenHash)
+				if (ok) {
+					rec = r
+					break
+				}
+			}
+		}
+
+		// --- Fallback для старых записей (selector пустой / не совпал) ---
+		if (!rec) {
+			const candidatesSlow = await this.rtRepo.find({
+				where: { userId, revoked: false },
+				order: { createdAt: 'DESC' },
+				take: 200,
+			})
+
+			for (const r of candidatesSlow) {
+				const ok = await bcrypt.compare(refreshToken, r.tokenHash)
+				if (ok) {
+					rec = r
+					// апгрейдим: проставляем selector, чтобы дальше работало быстро
+					if (selector && !r.selector) {
+						await this.rtRepo.update(r.id, { selector })
+					}
+					break
+				}
+			}
+		}
+
 		if (!rec) throw new UnauthorizedException('No refresh token')
 
-		const ok = await bcrypt.compare(refreshToken, rec.tokenHash)
-		if (!ok || rec.expiresAt < new Date()) {
+		if (rec.expiresAt < new Date()) {
 			throw new UnauthorizedException('Refresh expired')
 		}
 
-		// отзываем предыдущий refresh и выдаём новый
+		// Ревокация использованного refresh (rotation)
 		await this.rtRepo.update(rec.id, { revoked: true })
 
 		const user = await this.users.findById(userId)
@@ -199,22 +247,50 @@ export class AuthService {
 
 	/**
 	 * Альтернативный путь: access протух и мы не знаем userId.
-	 * Ищем запись по самому refresh-токену (сравнивая хэш) среди последних активных.
+	 * Оптимизация:
+	 *  - быстрый поиск по selector
+	 *  - fallback на старые записи без selector (чтобы не разлогинить после миграции)
 	 */
 	public async refreshViaTokenOnly(refreshToken: string) {
-		// Берём ограниченное число последних активных записей, чтобы не сканировать всё
-		const candidates = await this.rtRepo.find({
-			where: { revoked: false },
-			order: { createdAt: 'DESC' },
-			take: 200,
-		})
+		const selector = this.safeSelector(refreshToken)
 
+		// -------- Быстрый путь: последние по selector --------
 		let rec: RefreshToken | undefined
-		for (const r of candidates) {
-			const ok = await bcrypt.compare(refreshToken, r.tokenHash)
-			if (ok) {
-				rec = r
-				break
+
+		if (selector) {
+			const candidates = await this.rtRepo.find({
+				where: { revoked: false, selector },
+				order: { createdAt: 'DESC' },
+				take: 10,
+			})
+
+			for (const r of candidates) {
+				const ok = await bcrypt.compare(refreshToken, r.tokenHash)
+				if (ok) {
+					rec = r
+					break
+				}
+			}
+		}
+
+		// -------- Fallback старый путь (selector пустой/не найден) --------
+		if (!rec) {
+			const candidates = await this.rtRepo.find({
+				where: { revoked: false },
+				order: { createdAt: 'DESC' },
+				take: 200,
+			})
+
+			for (const r of candidates) {
+				const ok = await bcrypt.compare(refreshToken, r.tokenHash)
+				if (ok) {
+					rec = r
+					// апгрейдим запись, если можем вычислить selector
+					if (selector && !r.selector) {
+						await this.rtRepo.update(r.id, { selector })
+					}
+					break
+				}
 			}
 		}
 
@@ -222,7 +298,6 @@ export class AuthService {
 			throw new UnauthorizedException('Refresh expired')
 		}
 
-		// Ротация: отзываем строго найденный токен
 		await this.rtRepo.update(rec.id, { revoked: true })
 
 		const user = await this.users.findById(rec.userId)
@@ -241,6 +316,7 @@ export class AuthService {
 			return { ok: true }
 		}
 
+		// можно ускорить по selector, но оставляем поведение как было (и редко вызывается массово)
 		const recs = await this.rtRepo.find({
 			where: { userId, revoked: false },
 			order: { createdAt: 'DESC' },
@@ -261,34 +337,31 @@ export class AuthService {
 		return Math.floor(100000 + Math.random() * 900000).toString()
 	}
 
-	/** Создаёт и отправляет одноразовый код на почту (10 минут) для входа */
 	public async startEmailMfa(userId: string, email: string) {
 		const code = this.rand6()
 		const expires = new Date(Date.now() + 10 * 60 * 1000)
 		await this.emailCodeRepo.save(
-			this.emailCodeRepo.create({ userId, email, code, expiresAt: expires })
+			this.emailCodeRepo.create({ userId, email, code, expiresAt: expires }),
 		)
 		await this.emailer.sendLoginCode(email, code)
 		return { expires }
 	}
 
-	/** Код для сброса пароля (использует ту же таблицу email_codes) */
 	public async startPasswordReset(userId: string, email: string) {
 		const code = this.rand6()
 		const expires = new Date(Date.now() + 10 * 60 * 1000)
 		await this.emailCodeRepo.save(
-			this.emailCodeRepo.create({ userId, email, code, expiresAt: expires })
+			this.emailCodeRepo.create({ userId, email, code, expiresAt: expires }),
 		)
 		await this.emailer.sendPasswordResetCode(email, code)
 		return { expires }
 	}
 
-	/** Проверка кода + (опционально) установка/смена пароля + выдача токенов */
 	public async verifyEmailCode(
 		userId: string,
 		email: string,
 		code: string,
-		newPassword?: string
+		newPassword?: string,
 	) {
 		const rec = await this.emailCodeRepo.findOne({
 			where: { userId, email, used: false },
@@ -304,7 +377,6 @@ export class AuthService {
 		const user = await this.users.findById(userId)
 		if (!user) throw new UnauthorizedException('User not found')
 
-		// Если прилетел новый пароль — всегда обновляем хэш (и для первого логина, и для сброса)
 		if (newPassword) {
 			if (newPassword.length < 8) {
 				throw new BadRequestException('Password must be at least 8 characters')
@@ -333,7 +405,7 @@ export class AuthService {
 	// ===== OAuth helpers =====
 
 	/** Найти привязку OAuth (provider+sub) */
-	private findOAuth(provider: 'google', providerUserId: string) {
+	private findOAuth(provider: 'google' | 'yandex', providerUserId: string) {
 		return this.oaRepo.findOne({
 			where: { provider, providerUserId },
 		})
@@ -344,7 +416,6 @@ export class AuthService {
 		const existing = await this.findOAuth('google', sub)
 		if (existing && existing.userId === userId) return existing
 		if (existing && existing.userId !== userId) {
-			// Защитимся от попытки «перехвата» чужого Google sub
 			throw new UnauthorizedException('This Google account is linked elsewhere')
 		}
 		const rec = this.oaRepo.create({
@@ -356,15 +427,28 @@ export class AuthService {
 		return this.oaRepo.save(rec)
 	}
 
-	/**
-	 * Логика «find or create» по Google:
-	 * 1) если есть привязка по (provider, sub) — берём этого пользователя
-	 * 2) иначе, если есть пользователь по email — линкуем его
-	 * 3) иначе — создаём нового пользователя (без пароля) и линкуем
-	 */
+	public async linkYandexAccount(
+		userId: string,
+		yandexId: string,
+		email: string,
+	) {
+		const existing = await this.findOAuth('yandex', yandexId)
+		if (existing && existing.userId === userId) return existing
+		if (existing && existing.userId !== userId) {
+			throw new UnauthorizedException('This Yandex account is linked elsewhere')
+		}
+		const rec = this.oaRepo.create({
+			provider: 'yandex',
+			providerUserId: yandexId,
+			email: email.toLowerCase(),
+			userId,
+		})
+		return this.oaRepo.save(rec)
+	}
+
 	public async findOrCreateUserByGoogle(
 		sub: string,
-		email: string
+		email: string,
 	): Promise<User> {
 		const bySub = await this.findOAuth('google', sub)
 		if (bySub) {
@@ -379,7 +463,6 @@ export class AuthService {
 			return byEmail
 		}
 
-		// создаём нового «oauth-only» пользователя (username оставим NULL)
 		const created = await this.users.create({
 			email: email.toLowerCase(),
 			passwordHash: null,
@@ -387,6 +470,33 @@ export class AuthService {
 			role: 'user',
 		})
 		await this.linkGoogleAccount(created.id, sub, email)
+		return created
+	}
+
+	public async findOrCreateUserByYandex(
+		yandexId: string,
+		email: string,
+	): Promise<User> {
+		const byId = await this.findOAuth('yandex', yandexId)
+		if (byId) {
+			const u = await this.users.findById(byId.userId)
+			if (!u) throw new UnauthorizedException('Linked user not found')
+			return u
+		}
+
+		const byEmail = await this.users.findByEmail(email)
+		if (byEmail) {
+			await this.linkYandexAccount(byEmail.id, yandexId, email)
+			return byEmail
+		}
+
+		const created = await this.users.create({
+			email: email.toLowerCase(),
+			passwordHash: null,
+			username: null,
+			role: 'user',
+		})
+		await this.linkYandexAccount(created.id, yandexId, email)
 		return created
 	}
 }

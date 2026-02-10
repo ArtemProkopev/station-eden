@@ -6,6 +6,9 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+// monorepo root = на уровень выше apps/
+const repoRoot = path.resolve(__dirname, '../..')
+
 function collectPublicRedirects(CDN) {
 	const redirects = []
 	if (!CDN) return redirects
@@ -36,20 +39,25 @@ function collectPublicRedirects(CDN) {
 	return redirects
 }
 
+// На Windows отключаем standalone, чтобы не упираться в symlink EPERM.
+// На Linux/CI оставляем standalone как было.
+const isWindows = process.platform === 'win32'
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-	output: 'standalone',
+	output: isWindows ? undefined : 'standalone',
 	compress: true,
 	poweredByHeader: false,
 	productionBrowserSourceMaps: false,
+
+	// убирает warning про неправильный workspace root / lockfile
+	outputFileTracingRoot: repoRoot,
 
 	images: {
 		domains: ['cdn.assets.stationeden.ru'],
 		formats: ['image/webp', 'image/avif'],
 		deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
 		imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-
-		// чтобы quality=85 не ругался (и Next16 не сломал сборку)
 		qualities: [60, 70, 75, 80, 85, 90, 95, 100],
 	},
 
@@ -70,6 +78,20 @@ const nextConfig = {
 			config.devtool = false
 		}
 		return config
+	},
+
+	// В DEV: /api/* -> http://localhost:4000/*
+	// В PROD: не нужен, потому что у тебя Caddy делает handle_path /api/*
+	async rewrites() {
+		const isDev = process.env.NODE_ENV !== 'production'
+		if (!isDev) return []
+
+		return [
+			{
+				source: '/api/:path*',
+				destination: 'http://localhost:4000/:path*',
+			},
+		]
 	},
 
 	async redirects() {

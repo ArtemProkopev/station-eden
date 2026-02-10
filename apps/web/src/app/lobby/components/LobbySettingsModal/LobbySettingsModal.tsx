@@ -1,3 +1,4 @@
+// apps/web/src/app/lobby/components/LobbySettingsModal/LobbySettingsModal.tsx
 import { LobbySettings } from '@station-eden/shared'
 import { useEffect, useState } from 'react'
 import styles from './LobbySettingsModal.module.css'
@@ -20,9 +21,7 @@ export function LobbySettingsModal({
 	const [activeTab, setActiveTab] = useState<'basic' | 'advanced'>('basic')
 
 	useEffect(() => {
-		if (isOpen) {
-			setSettings(currentSettings)
-		}
+		if (isOpen) setSettings(currentSettings)
 	}, [isOpen, currentSettings])
 
 	const handleSave = () => {
@@ -36,13 +35,27 @@ export function LobbySettingsModal({
 	}
 
 	const getGameModeName = (mode: string) => {
-		const modes: { [key: string]: string } = {
+		const modes: Record<string, string> = {
 			standard: 'Стандартный',
 			extended: 'Расширенный',
 			competitive: 'Соревновательный',
 			cooperative: 'Кооперативный',
 		}
 		return modes[mode] || mode
+	}
+
+	const getTurnTimeLabel = (turnTime?: number) => {
+		if (turnTime == null) return null
+		switch (turnTime) {
+			case 60:
+				return '1 минута'
+			case 180:
+				return '3 минуты'
+			case 300:
+				return '5 минут'
+			default:
+				return `${turnTime} сек`
+		}
 	}
 
 	if (!isOpen) return null
@@ -52,19 +65,25 @@ export function LobbySettingsModal({
 			<div className={styles.modalContent} onClick={e => e.stopPropagation()}>
 				<div className={styles.modalHeader}>
 					<h2 className={styles.modalTitle}>Настройки лобби</h2>
-					<button className={styles.closeButton} onClick={onClose}>
+					<button
+						className={styles.closeButton}
+						onClick={onClose}
+						type='button'
+					>
 						×
 					</button>
 				</div>
 
 				<div className={styles.tabs}>
 					<button
+						type='button'
 						className={`${styles.tab} ${activeTab === 'basic' ? styles.activeTab : ''}`}
 						onClick={() => setActiveTab('basic')}
 					>
 						Основные
 					</button>
 					<button
+						type='button'
 						className={`${styles.tab} ${activeTab === 'advanced' ? styles.activeTab : ''}`}
 						onClick={() => setActiveTab('advanced')}
 					>
@@ -78,20 +97,20 @@ export function LobbySettingsModal({
 							<div className={styles.settingItem}>
 								<label className={styles.settingLabel}>Максимум игроков</label>
 								<select
-									value={settings.maxPlayers}
+									value={String(settings.maxPlayers)}
 									onChange={e =>
 										setSettings(prev => ({
 											...prev,
-											maxPlayers: parseInt(e.target.value),
+											maxPlayers: Number(e.target.value),
 										}))
 									}
 									className={styles.select}
 								>
-									<option value={2}>2 игрока</option>
-									<option value={3}>3 игрока</option>
-									<option value={4}>4 игрока</option>
-									<option value={5}>5 игроков</option>
-									<option value={6}>6 игроков</option>
+									<option value='2'>2 игрока</option>
+									<option value='3'>3 игрока</option>
+									<option value='4'>4 игрока</option>
+									<option value='5'>5 игроков</option>
+									<option value='6'>6 игроков</option>
 								</select>
 							</div>
 
@@ -120,6 +139,8 @@ export function LobbySettingsModal({
 											setSettings(prev => ({
 												...prev,
 												isPrivate: e.target.checked,
+												// если выключили приватность — пароль можно почистить
+												password: e.target.checked ? prev.password : undefined,
 											}))
 										}
 										className={styles.checkbox}
@@ -162,13 +183,11 @@ export function LobbySettingsModal({
 							<div className={styles.settingItem}>
 								<label className={styles.settingLabel}>Сложность</label>
 								<select
-									// Используем пустую строку для 'auto' (undefined в типах)
 									value={settings.difficulty || ''}
 									onChange={e => {
 										const val = e.target.value
 										setSettings(prev => ({
 											...prev,
-											// Приводим тип к разрешенным значениям
 											difficulty:
 												val === ''
 													? undefined
@@ -187,10 +206,19 @@ export function LobbySettingsModal({
 							<div className={styles.settingItem}>
 								<label className={styles.settingLabel}>Время на ход</label>
 								<select
-									value={settings.turnTime || 'unlimited'}
-									onChange={e =>
-										setSettings(prev => ({ ...prev, turnTime: e.target.value }))
+									// select хранит string, а в состоянии держим number | undefined
+									value={
+										settings.turnTime == null
+											? 'unlimited'
+											: String(settings.turnTime)
 									}
+									onChange={e => {
+										const v = e.target.value
+										setSettings(prev => ({
+											...prev,
+											turnTime: v === 'unlimited' ? undefined : Number(v),
+										}))
+									}}
 									className={styles.select}
 								>
 									<option value='unlimited'>Неограниченно</option>
@@ -210,10 +238,12 @@ export function LobbySettingsModal({
 							<span>Игроков:</span>
 							<span>{settings.maxPlayers}</span>
 						</div>
+
 						<div className={styles.previewItem}>
 							<span>Режим:</span>
 							<span>{getGameModeName(settings.gameMode)}</span>
 						</div>
+
 						<div className={styles.previewItem}>
 							<span>Доступ:</span>
 							<span
@@ -223,6 +253,7 @@ export function LobbySettingsModal({
 								{settings.isPrivate && settings.password && ' (с паролем)'}
 							</span>
 						</div>
+
 						{settings.difficulty && (
 							<div className={styles.previewItem}>
 								<span>Сложность:</span>
@@ -233,24 +264,29 @@ export function LobbySettingsModal({
 								</span>
 							</div>
 						)}
-						{settings.turnTime && settings.turnTime !== 'unlimited' && (
+
+						{settings.turnTime != null && (
 							<div className={styles.previewItem}>
 								<span>Время на ход:</span>
-								<span>
-									{settings.turnTime === '60' && '1 минута'}
-									{settings.turnTime === '180' && '3 минуты'}
-									{settings.turnTime === '300' && '5 минут'}
-								</span>
+								<span>{getTurnTimeLabel(settings.turnTime)}</span>
 							</div>
 						)}
 					</div>
 				</div>
 
 				<div className={styles.modalActions}>
-					<button className={styles.cancelButton} onClick={handleCancel}>
+					<button
+						className={styles.cancelButton}
+						onClick={handleCancel}
+						type='button'
+					>
 						Отмена
 					</button>
-					<button className={styles.saveButton} onClick={handleSave}>
+					<button
+						className={styles.saveButton}
+						onClick={handleSave}
+						type='button'
+					>
 						Сохранить настройки
 					</button>
 				</div>

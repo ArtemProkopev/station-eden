@@ -1,9 +1,9 @@
-// apps/api/src/auth/auth.controller.ts
 import {
 	BadRequestException,
 	Body,
 	Controller,
 	Get,
+	HttpException,
 	InternalServerErrorException,
 	NotFoundException,
 	Post,
@@ -24,7 +24,7 @@ import { BruteForceService } from './brute-force.service'
 import { LoginDto } from './dto/login.dto'
 import { RegisterDto } from './dto/register.dto'
 
-type GoogleMode = 'login' | 'register' | 'link'
+type OAuthMode = 'login' | 'register' | 'link'
 
 function parseDurationMs(raw: string | undefined, fallbackMs: number) {
 	const s = (raw || '').trim()
@@ -45,7 +45,7 @@ export class AuthController {
 	constructor(
 		private auth: AuthService,
 		private jwt: JwtService,
-		private brute: BruteForceService
+		private brute: BruteForceService,
 	) {}
 
 	private authCookieOpts() {
@@ -74,10 +74,9 @@ export class AuthController {
 			base.secure = true
 			base.domain = authDomain
 		} else {
+			// DEV: localhost + разные порты — домен НЕ ставим вообще
 			base.secure = false
-			if (process.env.AUTH_COOKIE_DOMAIN) {
-				base.domain = process.env.AUTH_COOKIE_DOMAIN
-			}
+			// base.domain = undefined
 		}
 
 		return base
@@ -86,7 +85,7 @@ export class AuthController {
 	private clearWithSameAttrs(
 		res: Response,
 		name: string,
-		opts: Record<string, any>
+		opts: Record<string, any>,
 	) {
 		const { maxAge, expires, ...rest } = opts || {}
 		res.clearCookie(name, rest)
@@ -100,17 +99,74 @@ export class AuthController {
 		return process.env.ENABLE_GOOGLE_LOGIN === 'true'
 	}
 
+	private yandexEnabled() {
+		return process.env.ENABLE_YANDEX_LOGIN === 'true'
+	}
+
 	private makeState(len = 24) {
 		return randomBytes(len).toString('hex')
 	}
 
-	private setStateCookie(res: Response, raw: string) {
+	/**
+	 * ✅ FIX: безопасно считаем maxAge для refresh куки
+	 * refreshExpires может прилететь как Date | string | number
+	 */
+	private msUntil(expires: any): number {
+		try {
+			if (!expires) return 0
+			if (expires instanceof Date) return expires.getTime() - Date.now()
+			if (typeof expires === 'number') return expires - Date.now()
+			const t = new Date(String(expires)).getTime()
+			if (!Number.isFinite(t)) return 0
+			return t - Date.now()
+		} catch {
+			return 0
+		}
+	}
+
+	// ---------- provider state cookies ----------
+	private setGoogleStateCookie(res: Response, raw: string) {
 		res.cookie('google_oauth_state', raw, this.oauthCookieOpts())
 	}
 
-	private clearStateCookie(res: Response) {
+	private clearGoogleStateCookie(res: Response) {
 		this.clearWithSameAttrs(res, 'google_oauth_state', this.oauthCookieOpts())
 	}
+
+	private setYandexStateCookie(res: Response, raw: string) {
+		res.cookie('yandex_oauth_state', raw, this.oauthCookieOpts())
+	}
+
+	private clearYandexStateCookie(res: Response) {
+		this.clearWithSameAttrs(res, 'yandex_oauth_state', this.oauthCookieOpts())
+	}
+	// -----------------------------------------
+
+	// ---------- NEXT cookie for OAuth ----------
+	private oauthNextCookieOpts() {
+		return this.oauthCookieOpts()
+	}
+
+	private sanitizeNext(raw: any): string {
+		const s = String(raw || '').trim()
+		if (!s) return '/profile'
+		if (!s.startsWith('/')) return '/profile'
+		if (s.startsWith('//')) return '/profile'
+		return s
+	}
+
+	private setNextCookie(res: Response, next: string) {
+		res.cookie('oauth_next', next, this.oauthNextCookieOpts())
+	}
+
+	private readNextCookie(req: Request): string | undefined {
+		return ((req as any).cookies?.oauth_next as string | undefined) || undefined
+	}
+
+	private clearNextCookie(res: Response) {
+		this.clearWithSameAttrs(res, 'oauth_next', this.oauthNextCookieOpts())
+	}
+	// -----------------------------------------
 
 	private webOrigin(): string {
 		const after =
@@ -126,10 +182,6 @@ export class AuthController {
 		return this.webOrigin() + path
 	}
 
-	/**
-	 * ВАЖНО: в prod НЕ глотаем ошибки отправки кода
-	 * (иначе клиент всегда видит email_code_sent, даже когда Resend падает).
-	 */
 	private async sendMfaOrThrow(fn: () => Promise<any>, context: string) {
 		try {
 			await fn()
@@ -137,10 +189,9 @@ export class AuthController {
 			console.error(`[auth] ${context} failed`, e)
 			if (this.isProd) {
 				throw new InternalServerErrorException(
-					'Failed to send verification email'
+					'Failed to send verification email',
 				)
 			}
-			// dev: можно продолжать, чтобы не мешать разработке
 		}
 	}
 
@@ -156,7 +207,7 @@ export class AuthController {
 	async login(
 		@Body() dto: LoginDto,
 		@Req() req: Request,
-		@Res({ passthrough: true }) res: Response
+		@Res({ passthrough: true }) res: Response,
 	) {
 		const login = dto.login.trim().toLowerCase()
 		const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(login)
@@ -178,7 +229,7 @@ export class AuthController {
 
 				await this.sendMfaOrThrow(
 					() => this.auth.startEmailMfa(existing.id, existing.email),
-					'startEmailMfa(oauth-only-email)'
+					'startEmailMfa(oauth-only-email)',
 				)
 
 				return {
@@ -195,7 +246,7 @@ export class AuthController {
 
 				await this.sendMfaOrThrow(
 					() => this.auth.startEmailMfa(byUsername.id, byUsername.email),
-					'startEmailMfa(oauth-only-username)'
+					'startEmailMfa(oauth-only-username)',
 				)
 
 				return {
@@ -209,12 +260,13 @@ export class AuthController {
 		try {
 			const result = await this.auth.login(login, dto.password)
 			await this.brute.registerSuccess(login)
+
 			const pre = this.auth.signPreauth(result.user.id, result.user.email)
 			res.cookie('preauth', pre, this.preauthCookieOpts())
 
 			await this.sendMfaOrThrow(
 				() => this.auth.startEmailMfa(result.user.id, result.user.email),
-				'startEmailMfa(login)'
+				'startEmailMfa(login)',
 			)
 
 			return { mfa: 'email_code_sent', email: result.user.email }
@@ -238,31 +290,30 @@ export class AuthController {
 	@Post('register')
 	async register(
 		@Body() dto: RegisterDto,
-		@Res({ passthrough: true }) res: Response
+		@Res({ passthrough: true }) res: Response,
 	) {
 		const result = await this.auth.register(
 			dto.email.toLowerCase(),
 			dto.username,
-			dto.password
+			dto.password,
 		)
 		const pre = this.auth.signPreauth(result.user.id, result.user.email)
 		res.cookie('preauth', pre, this.preauthCookieOpts())
 
 		await this.sendMfaOrThrow(
 			() => this.auth.startEmailMfa(result.user.id, result.user.email),
-			'startEmailMfa(register)'
+			'startEmailMfa(register)',
 		)
 
 		return { mfa: 'email_code_sent', email: result.user.email }
 	}
 
-	/** Забыли пароль: отправка кода на email, без утечки наличия аккаунта */
 	@UseGuards(ThrottlerGuard)
 	@Throttle({ default: { limit: 10, ttl: 300000 } })
 	@Post('forgot-password')
 	async forgotPassword(
 		@Body() body: { email: string },
-		@Res({ passthrough: true }) res: Response
+		@Res({ passthrough: true }) res: Response,
 	) {
 		const raw = (body.email || '').trim().toLowerCase()
 		if (!raw) {
@@ -275,23 +326,21 @@ export class AuthController {
 			const pre = this.auth.signPreauth(user.id, user.email)
 			res.cookie('preauth', pre, this.preauthCookieOpts())
 
-			// Важно: в prod пусть падает, чтобы вы увидели проблему с почтой
 			await this.sendMfaOrThrow(
 				() => this.auth.startPasswordReset(user.id, user.email),
-				'startPasswordReset'
+				'startPasswordReset',
 			)
 
 			return { mfa: 'email_code_sent', email: user.email }
 		}
 
-		// Всегда отвечаем одинаково, чтобы не было user-enumeration
 		return { mfa: 'email_code_sent', email: raw }
 	}
 
 	@Post('refresh')
 	async refresh(
 		@Req() req: Request,
-		@Res({ passthrough: true }) res: Response
+		@Res({ passthrough: true }) res: Response,
 	) {
 		const rt = (req as any).cookies?.refresh_token as string | undefined
 		if (!rt) throw new UnauthorizedException('No refresh token')
@@ -308,10 +357,14 @@ export class AuthController {
 			...this.authCookieOpts(),
 			maxAge: this.accessMaxAgeMs(),
 		})
+
+		const refreshMaxAge = Math.max(0, this.msUntil(refreshExpires))
+
 		res.cookie('refresh_token', refreshToken, {
 			...this.authCookieOpts(),
-			maxAge: refreshExpires.getTime() - Date.now(),
+			maxAge: refreshMaxAge,
 		})
+
 		return { refreshed: true }
 	}
 
@@ -339,7 +392,7 @@ export class AuthController {
 	@Get('logout-get')
 	async logoutGet(
 		@Req() req: Request,
-		@Res({ passthrough: true }) res: Response
+		@Res({ passthrough: true }) res: Response,
 	) {
 		const payload = tryDecode(this.jwt, (req as any).cookies?.access_token)
 		const userId = (payload as any)?.sub
@@ -414,38 +467,52 @@ export class AuthController {
 	async verifyEmailCode(
 		@Body() body: { code: string; email?: string; newPassword?: string },
 		@Req() req: Request,
-		@Res({ passthrough: true }) res: Response
+		@Res({ passthrough: true }) res: Response,
 	) {
 		const pre = (req as any).cookies?.preauth
 		if (!pre) throw new UnauthorizedException('No preauth')
+
 		let payload: any
 		try {
 			payload = this.jwt.verify(pre, { secret: process.env.JWT_ACCESS_SECRET })
 		} catch {
 			throw new UnauthorizedException('Preauth expired')
 		}
+
 		const email = body.email?.toLowerCase() || payload.email
 		if (!email || email !== payload.email)
 			throw new UnauthorizedException('Email mismatch')
 
-		const { user, access, refreshToken, refreshExpires } =
-			await this.auth.verifyEmailCode(
-				payload.sub,
-				email,
-				body.code,
-				body.newPassword
-			)
+		try {
+			const { user, access, refreshToken, refreshExpires } =
+				await this.auth.verifyEmailCode(
+					payload.sub,
+					email,
+					body.code,
+					body.newPassword,
+				)
 
-		res.cookie('access_token', access, {
-			...this.authCookieOpts(),
-			maxAge: this.accessMaxAgeMs(),
-		})
-		res.cookie('refresh_token', refreshToken, {
-			...this.authCookieOpts(),
-			maxAge: refreshExpires.getTime() - Date.now(),
-		})
-		this.clearWithSameAttrs(res, 'preauth', this.preauthCookieOpts())
-		return { user }
+			res.cookie('access_token', access, {
+				...this.authCookieOpts(),
+				maxAge: this.accessMaxAgeMs(),
+			})
+
+			const refreshMaxAge = Math.max(0, this.msUntil(refreshExpires))
+
+			res.cookie('refresh_token', refreshToken, {
+				...this.authCookieOpts(),
+				maxAge: refreshMaxAge,
+			})
+
+			this.clearWithSameAttrs(res, 'preauth', this.preauthCookieOpts())
+			return { user }
+		} catch (e: any) {
+			// Если сервис бросил HttpException — отдадим его как есть
+			if (e instanceof HttpException) throw e
+
+			console.error('[auth] verify-email-code failed', e)
+			throw new InternalServerErrorException('Failed to verify email code')
+		}
 	}
 
 	@UseGuards(ThrottlerGuard)
@@ -454,6 +521,7 @@ export class AuthController {
 	async resendEmailCode(@Req() req: Request) {
 		const pre = (req as any).cookies?.preauth
 		if (!pre) throw new UnauthorizedException('No preauth')
+
 		let payload: any
 		try {
 			payload = this.jwt.verify(pre, { secret: process.env.JWT_ACCESS_SECRET })
@@ -470,16 +538,22 @@ export class AuthController {
 		}
 	}
 
+	// ====================== GOOGLE ======================
+
 	@Get('google')
 	async google(@Req() req: Request, @Res() res: Response) {
 		if (!this.googleEnabled())
 			throw new NotFoundException('Google login disabled')
+
 		const q = (req.query as any) || {}
-		const mode: GoogleMode = q?.mode === 'register' ? 'register' : 'login'
+		const mode: OAuthMode = q?.mode === 'register' ? 'register' : 'login'
+
+		const next = this.sanitizeNext(q?.next)
+		this.setNextCookie(res, next)
+
 		const nonce = this.makeState()
 		const packed = `${nonce}:${mode}`
-
-		this.setStateCookie(res, packed)
+		this.setGoogleStateCookie(res, packed)
 
 		const params = new URLSearchParams({
 			client_id: process.env.GOOGLE_CLIENT_ID!,
@@ -497,9 +571,9 @@ export class AuthController {
 
 	@Get('google/callback')
 	async googleCallback(@Req() req: Request, @Res() res: Response) {
-		if (!this.googleEnabled()) {
+		if (!this.googleEnabled())
 			throw new NotFoundException('Google login disabled')
-		}
+
 		const { code, state } = req.query as { code?: string; state?: string }
 		const stateCookie = (req as any).cookies?.google_oauth_state as
 			| string
@@ -507,15 +581,16 @@ export class AuthController {
 
 		if (!code || !state || !stateCookie || state !== stateCookie) {
 			console.warn(
-				`[OAuth Error] Mismatch. UrlState: ${state}, CookieState: ${stateCookie}`
+				`[OAuth Error] Mismatch. UrlState: ${state}, CookieState: ${stateCookie}`,
 			)
-			this.clearStateCookie(res)
+			this.clearGoogleStateCookie(res)
+			this.clearNextCookie(res)
 			throw new BadRequestException(
-				'Invalid OAuth state/code (Cookie mismatch)'
+				'Invalid OAuth state/code (Cookie mismatch)',
 			)
 		}
 
-		this.clearStateCookie(res)
+		this.clearGoogleStateCookie(res)
 
 		try {
 			if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
@@ -550,7 +625,9 @@ export class AuthController {
 
 			const userResp = await fetch(
 				'https://www.googleapis.com/oauth2/v3/userinfo',
-				{ headers: { Authorization: `Bearer ${access_token}` } }
+				{
+					headers: { Authorization: `Bearer ${access_token}` },
+				},
 			)
 
 			if (!userResp.ok) {
@@ -564,29 +641,194 @@ export class AuthController {
 
 			if (!email || !emailVerified || !sub) {
 				throw new UnauthorizedException(
-					'Google email not verified or sub missing'
+					'Google email not verified or sub missing',
 				)
 			}
 
 			const user = await this.auth.findOrCreateUserByGoogle(sub, email)
 			await this.auth['users'].ensureAdminRoleFor(user.email)
-			const pre = this.auth.signPreauth(user.id, user.email)
 
+			const pre = this.auth.signPreauth(user.id, user.email)
 			res.cookie('preauth', pre, this.preauthCookieOpts())
 
 			await this.sendMfaOrThrow(
 				() => this.auth.startEmailMfa(user.id, user.email),
-				'startEmailMfa(google-callback)'
+				'startEmailMfa(google-callback)',
 			)
 
+			const next = this.readNextCookie(req) || '/profile'
+			this.clearNextCookie(res)
+
 			const verifyUrl = this.urlTo(
-				`/login/verify?email=${encodeURIComponent(user.email)}`
+				`/login/verify?email=${encodeURIComponent(
+					user.email,
+				)}&next=${encodeURIComponent(next)}`,
 			)
 			res.redirect(verifyUrl)
 		} catch (error: any) {
+			this.clearNextCookie(res)
+
+			// ✅ не маскируем нормальные ошибки (401/400)
+			if (error instanceof HttpException) throw error
+
 			const msg = error?.message || JSON.stringify(error)
-			console.error('[Google Callback Error]:', msg)
+			console.error('[Google Callback Error]:', error)
 			throw new InternalServerErrorException(`Google Auth Failed: ${msg}`)
+		}
+	}
+
+	// ====================== YANDEX ======================
+
+	@Get('yandex')
+	async yandex(@Req() req: Request, @Res() res: Response) {
+		if (!this.yandexEnabled())
+			throw new NotFoundException('Yandex login disabled')
+
+		const q = (req.query as any) || {}
+		const mode: OAuthMode = q?.mode === 'register' ? 'register' : 'login'
+
+		const next = this.sanitizeNext(q?.next)
+		this.setNextCookie(res, next)
+
+		const nonce = this.makeState()
+		const packed = `${nonce}:${mode}`
+		this.setYandexStateCookie(res, packed)
+
+		const clientId = process.env.YANDEX_CLIENT_ID
+		const redirectUri = process.env.YANDEX_REDIRECT_URL
+
+		if (!clientId || !redirectUri) {
+			throw new InternalServerErrorException(
+				'Missing YANDEX_CLIENT_ID / YANDEX_REDIRECT_URL',
+			)
+		}
+
+		const params = new URLSearchParams({
+			response_type: 'code',
+			client_id: clientId,
+			redirect_uri: redirectUri,
+			scope: 'login:info login:email',
+			state: packed,
+		})
+
+		res.redirect(`https://oauth.yandex.com/authorize?${params}`)
+		return
+	}
+
+	@Get('yandex/callback')
+	async yandexCallback(@Req() req: Request, @Res() res: Response) {
+		if (!this.yandexEnabled())
+			throw new NotFoundException('Yandex login disabled')
+
+		const { code, state } = req.query as { code?: string; state?: string }
+		const stateCookie = (req as any).cookies?.yandex_oauth_state as
+			| string
+			| undefined
+
+		if (!code || !state || !stateCookie || state !== stateCookie) {
+			console.warn(
+				`[OAuth Error] Yandex mismatch. UrlState: ${state}, CookieState: ${stateCookie}`,
+			)
+			this.clearYandexStateCookie(res)
+			this.clearNextCookie(res)
+			throw new BadRequestException(
+				'Invalid OAuth state/code (Cookie mismatch)',
+			)
+		}
+
+		this.clearYandexStateCookie(res)
+
+		try {
+			const clientId = process.env.YANDEX_CLIENT_ID
+			const clientSecret = process.env.YANDEX_CLIENT_SECRET
+			const redirectUri = process.env.YANDEX_REDIRECT_URL
+
+			if (!clientId || !clientSecret || !redirectUri) {
+				throw new Error('Missing YANDEX_CLIENT_ID/SECRET/REDIRECT_URL env vars')
+			}
+
+			const tokenParams = new URLSearchParams({
+				grant_type: 'authorization_code',
+				code,
+				client_id: clientId,
+				client_secret: clientSecret,
+				redirect_uri: redirectUri,
+			})
+
+			const tokenResp = await fetch('https://oauth.yandex.com/token', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: tokenParams,
+			})
+
+			if (!tokenResp.ok) {
+				const txt = await tokenResp.text()
+				throw new UnauthorizedException(`Yandex token exchange failed: ${txt}`)
+			}
+
+			const tokens = (await tokenResp.json()) as any
+			const accessToken = tokens?.access_token
+			if (!accessToken) {
+				throw new UnauthorizedException('No access_token in Yandex response')
+			}
+
+			const infoResp = await fetch('https://login.yandex.ru/info?format=json', {
+				headers: { Authorization: `OAuth ${accessToken}` },
+			})
+
+			if (!infoResp.ok) {
+				const txt = await infoResp.text().catch(() => '')
+				throw new UnauthorizedException(
+					`Failed to fetch Yandex user info: ${txt}`,
+				)
+			}
+
+			const yaUser = (await infoResp.json()) as any
+
+			const yandexId = String(yaUser?.id || '').trim()
+			const email = String(
+				yaUser?.default_email ||
+					(Array.isArray(yaUser?.emails) ? yaUser.emails[0] : '') ||
+					'',
+			)
+				.toLowerCase()
+				.trim()
+
+			if (!yandexId || !email) {
+				throw new UnauthorizedException(
+					'Yandex user id/email missing (check scopes: login:email)',
+				)
+			}
+
+			const user = await this.auth.findOrCreateUserByYandex(yandexId, email)
+			await this.auth['users'].ensureAdminRoleFor(user.email)
+
+			const pre = this.auth.signPreauth(user.id, user.email)
+			res.cookie('preauth', pre, this.preauthCookieOpts())
+
+			await this.sendMfaOrThrow(
+				() => this.auth.startEmailMfa(user.id, user.email),
+				'startEmailMfa(yandex-callback)',
+			)
+
+			const next = this.readNextCookie(req) || '/profile'
+			this.clearNextCookie(res)
+
+			const verifyUrl = this.urlTo(
+				`/login/verify?email=${encodeURIComponent(
+					user.email,
+				)}&next=${encodeURIComponent(next)}`,
+			)
+			res.redirect(verifyUrl)
+		} catch (error: any) {
+			this.clearNextCookie(res)
+
+			// ✅ не маскируем нормальные ошибки (401/400)
+			if (error instanceof HttpException) throw error
+
+			const msg = error?.message || JSON.stringify(error)
+			console.error('[Yandex Callback Error]:', error)
+			throw new InternalServerErrorException(`Yandex Auth Failed: ${msg}`)
 		}
 	}
 

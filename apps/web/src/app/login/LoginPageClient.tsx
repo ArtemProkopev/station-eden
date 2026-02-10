@@ -8,18 +8,19 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
 // Components
+import GoogleAuthButton from '@/components/auth/google/GoogleAuthButton'
+import YandexAuthButton from '@/components/auth/yandex/YandexAuthButton'
 import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
+import { ClockIcon, EyeIcon, EyeOffIcon } from '@/components/ui/Icons'
 import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
-import GoogleAuthButton from '@/src/components/auth/GoogleAuthButton'
-import { ClockIcon, EyeIcon, EyeOffIcon } from '@/src/components/ui/Icons'
 
 // Hooks & Utils
-import { useAuthLock } from '@/src/hooks/useAuthLock'
-import { api, getUserMessage } from '@/src/lib/api'
-import { clearForcedLogoutFlags } from '@/src/lib/authUtils'
-import { GOOGLE_ENABLED } from '@/src/lib/flags'
-import { clearLock, normLogin, writeLock } from '@/src/utils/authLock'
-import { parseServerInfo } from '@/src/utils/serverInfoParser'
+import { useAuthLock } from '@/hooks/useAuthLock'
+import { api, getUserMessage } from '@/lib/api'
+import { clearForcedLogoutFlags } from '@/lib/authUtils'
+import { GOOGLE_ENABLED, YANDEX_ENABLED } from '@/lib/flags'
+import { clearLock, normLogin, writeLock } from '@/utils/authLock'
+import { parseServerInfo } from '@/utils/serverInfoParser'
 import {
 	LoginDto,
 	LoginResponse,
@@ -83,6 +84,7 @@ export default function LoginPageClient() {
 	} = useAuthLock()
 
 	const lastLoginRef = useRef<string>('')
+	const shakeTimeoutRef = useRef<number | null>(null)
 
 	// Watched fields
 	const login = watch('login', '')
@@ -91,12 +93,17 @@ export default function LoginPageClient() {
 	// Effects
 	useEffect(() => {
 		setFormState(prev => ({ ...prev, mounted: true }))
+		return () => {
+			if (shakeTimeoutRef.current) {
+				window.clearTimeout(shakeTimeoutRef.current)
+				shakeTimeoutRef.current = null
+			}
+		}
 	}, [])
 
 	// Memoized values
 	const next = searchParams.get('next') || '/profile'
 	const reason = searchParams.get('reason')
-	const googleEnabled = GOOGLE_ENABLED
 
 	const canSubmit = useMemo(() => {
 		if (isSubmitting) return false
@@ -108,14 +115,14 @@ export default function LoginPageClient() {
 		if (attemptsLeft == null) return 0
 		return Math.min(
 			100,
-			Math.round(((MAX_ATTEMPTS_UI - attemptsLeft) / MAX_ATTEMPTS_UI) * 100)
+			Math.round(((MAX_ATTEMPTS_UI - attemptsLeft) / MAX_ATTEMPTS_UI) * 100),
 		)
 	}, [attemptsLeft])
 
 	const forgotHref = useMemo(
 		() =>
 			next ? `/login/forgot?next=${encodeURIComponent(next)}` : '/login/forgot',
-		[next]
+		[next],
 	)
 
 	// Event handlers
@@ -127,31 +134,37 @@ export default function LoginPageClient() {
 				setAttemptsLeft(Number(info.attemptsLeft))
 			}
 
-			if (info.lockedMinutes !== undefined) {
-				const until = new Date(
-					Date.now() + Number(info.lockedMinutes) * 60 * 1000
-				)
-				const iso = until.toISOString()
-				setLockedUntilIso(iso)
-				writeLock(lastLoginRef.current || login || 'unknown', iso)
-			}
-
+			// Приоритет: lockedUntil (серверная точная дата) > lockedMinutes
 			if (info.lockedUntil) {
 				const parsed = Date.parse(info.lockedUntil)
 				if (!Number.isNaN(parsed)) {
 					const iso = new Date(parsed).toISOString()
 					setLockedUntilIso(iso)
 					writeLock(lastLoginRef.current || login || 'unknown', iso)
+					return
 				}
 			}
+
+			if (info.lockedMinutes !== undefined) {
+				const until = new Date(
+					Date.now() + Number(info.lockedMinutes) * 60 * 1000,
+				)
+				const iso = until.toISOString()
+				setLockedUntilIso(iso)
+				writeLock(lastLoginRef.current || login || 'unknown', iso)
+			}
 		},
-		[login, setAttemptsLeft, setLockedUntilIso]
+		[login, setAttemptsLeft, setLockedUntilIso],
 	)
 
 	const triggerShake = useCallback(() => {
 		setFormState(prev => ({ ...prev, shake: true }))
-		setTimeout(() => {
+		if (shakeTimeoutRef.current) {
+			window.clearTimeout(shakeTimeoutRef.current)
+		}
+		shakeTimeoutRef.current = window.setTimeout(() => {
 			setFormState(prev => ({ ...prev, shake: false }))
+			shakeTimeoutRef.current = null
 		}, FORM_ANIMATION_DURATION)
 	}, [])
 
@@ -168,21 +181,23 @@ export default function LoginPageClient() {
 				localStorage.setItem('authToken', userData.token)
 				localStorage.setItem('userData', JSON.stringify(userData))
 
-				// События для других частей приложения
+				// Событие для других частей приложения
 				window.dispatchEvent(new Event('authChange'))
+
+				// Если где-то слушают storage "в этой же вкладке" — имитируем (как было)
 				window.dispatchEvent(
 					new StorageEvent('storage', {
 						key: 'authToken',
 						newValue: userData.token,
 						storageArea: localStorage,
-					})
+					}),
 				)
 			}
 
 			clearLock()
 			router.replace(next)
 		},
-		[router, next]
+		[router, next],
 	)
 
 	const onSubmit = useCallback(
@@ -238,7 +253,7 @@ export default function LoginPageClient() {
 								type: 'server',
 								message: Array.isArray(message) ? message[0] : String(message),
 							})
-						}
+						},
 					)
 				}
 
@@ -256,7 +271,7 @@ export default function LoginPageClient() {
 			triggerShake,
 			handleSuccessfulLogin,
 			setError,
-		]
+		],
 	)
 
 	const onError = useCallback(() => {
@@ -294,7 +309,7 @@ export default function LoginPageClient() {
 				)}
 			</div>
 		),
-		[locked, countdown, attemptsLeft, progressPct]
+		[locked, countdown, attemptsLeft, progressPct],
 	)
 
 	const renderReasonMessage = useMemo(() => {
@@ -304,6 +319,10 @@ export default function LoginPageClient() {
 			google_exists:
 				'Аккаунт с этим Google-email уже существует — просто войдите.',
 			google_no_account:
+				'Похоже, такого аккаунта ещё нет. Вы можете зарегистрироваться.',
+			yandex_exists:
+				'Аккаунт с этим Яндекс-email уже существует — просто войдите.',
+			yandex_no_account:
 				'Похоже, такого аккаунта ещё нет. Вы можете зарегистрироваться.',
 		}
 
@@ -441,7 +460,7 @@ export default function LoginPageClient() {
 						</Link>
 					</p>
 
-					{formState.mounted && googleEnabled && (
+					{formState.mounted && GOOGLE_ENABLED && (
 						<>
 							<div
 								className={styles.hr}
@@ -452,6 +471,26 @@ export default function LoginPageClient() {
 							</div>
 							<div className={styles.oauthBlock}>
 								<GoogleAuthButton label='Войти с Google' mode='login' />
+							</div>
+						</>
+					)}
+
+					{formState.mounted && YANDEX_ENABLED && (
+						<>
+							<div
+								className={styles.hr}
+								role='separator'
+								aria-label='Или через Яндекс'
+							>
+								<span>Или через Яндекс</span>
+							</div>
+							<div className={styles.oauthBlock}>
+								<YandexAuthButton
+									label='Войти с Яндекс ID'
+									mode='login'
+									size='m'
+									next={next}
+								/>
 							</div>
 						</>
 					)}

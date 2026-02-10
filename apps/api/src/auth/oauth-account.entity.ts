@@ -11,7 +11,7 @@ import {
 } from 'typeorm'
 import { User } from '../users/user.entity'
 
-type OAuthProvider = 'google'
+type OAuthProvider = 'google' | 'yandex'
 
 @Entity('oauth_accounts')
 @Unique('uq_provider_sub', ['provider', 'providerUserId'])
@@ -24,7 +24,7 @@ export class OAuthAccount {
 
 	@Index()
 	@Column({ name: 'provider_user_id', type: 'text' })
-	providerUserId!: string // Google sub
+	providerUserId!: string
 
 	@Index()
 	@Column({ type: 'citext' })

@@ -1,4 +1,3 @@
-// apps/api/src/app.module.ts
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { APP_FILTER } from '@nestjs/core'
@@ -14,7 +13,7 @@ import { OAuthAccount } from './auth/oauth-account.entity'
 import { RefreshToken } from './auth/refresh-token.entity'
 import { NotFoundExceptionFilter } from './common/filters/not-found.filter'
 import { EnvSchema } from './config/env.schema'
-import { GameModule } from './game/game.module' // ✅ ДОБАВИТЬ
+import { GameModule } from './game/game.module'
 import { LobbyModule } from './lobby/lobby.module'
 import { User } from './users/user.entity'
 import { UsersModule } from './users/users.module'
@@ -44,7 +43,7 @@ function resolveEnvPaths(): string[] {
 			rootEnv,
 			'or',
 			apiEnv,
-			'— relying on process.env only'
+			'— relying on process.env only',
 		)
 	} else {
 		console.log('[config] loaded env files (in order):', paths.join(', '))
@@ -60,8 +59,9 @@ function resolveEnvPaths(): string[] {
 			envFilePath: resolveEnvPaths(),
 			validate: raw => {
 				const parsed = EnvSchema.safeParse(raw)
-				if (!parsed.success)
+				if (!parsed.success) {
 					throw new Error(JSON.stringify(parsed.error.format(), null, 2))
+				}
 				return parsed.data
 			},
 		}),
@@ -69,26 +69,44 @@ function resolveEnvPaths(): string[] {
 		TypeOrmModule.forRootAsync({
 			inject: [ConfigService],
 			useFactory: async (cfg: ConfigService) => {
+				/**
+				 * Runtime (контейнер):
+				 * WORKDIR=/app
+				 * dist лежит в /app/dist
+				 * миграции: /app/dist/migrations/*.js
+				 */
+				const migrationsGlob = path.join(process.cwd(), 'dist/migrations/*.js')
+
 				const dbUrl =
 					cfg.get<string>('DATABASE_URL') ?? process.env.DATABASE_URL
+
 				const common = {
 					type: 'postgres' as const,
 					entities: [User, RefreshToken, EmailCode, OAuthAccount, LoginAttempt],
+					migrations: [migrationsGlob],
 					synchronize: false,
+					extra: { connectionTimeoutMillis: 10_000, max: 10 },
 				}
+
 				if (dbUrl) {
-					return { url: dbUrl, ...common }
+					return {
+						...common,
+						url: dbUrl,
+						ssl: { rejectUnauthorized: false },
+					}
 				}
+
 				return {
+					...common,
 					host: cfg.get<string>('POSTGRES_HOST') ?? process.env.POSTGRES_HOST,
-					port: cfg.get<number>('POSTGRES_PORT', 5432),
+					port: Number(cfg.get<number>('POSTGRES_PORT', 5432)),
 					username:
 						cfg.get<string>('POSTGRES_USER') ?? process.env.POSTGRES_USER,
 					password:
 						cfg.get<string>('POSTGRES_PASSWORD') ??
 						process.env.POSTGRES_PASSWORD,
 					database: cfg.get<string>('POSTGRES_DB') ?? process.env.POSTGRES_DB,
-					...common,
+					ssl: false,
 				}
 			},
 		}),

@@ -1,45 +1,46 @@
+// apps/web/middleware.ts
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Исключаем API и статику, чтобы CSP не конфликтовала
 export const config = {
 	matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 }
 
 export const runtime = 'nodejs'
 
-export async function middleware(req: NextRequest) {
-	// --- 1. CSP ---
-	const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+function buildCsp() {
+	const api = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+	const ws = process.env.NEXT_PUBLIC_WS_BASE || ''
 
-	// Разрешаем CDN и LiveKit
-	const cspHeader = `
+	// CSP без strict-dynamic и без nonce — зато не ломает Next.
+	// В dev иногда нужен unsafe-eval (React/Next дев-режим).
+	const isDev = process.env.NODE_ENV !== 'production'
+	const scriptExtra = isDev ? " 'unsafe-eval'" : ''
+
+	return `
 		default-src 'self';
-		script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+		script-src 'self' 'unsafe-inline'${scriptExtra};
 		style-src 'self' 'unsafe-inline';
 		img-src 'self' blob: data: https://cdn.assets.stationeden.ru https://stationeden.ru;
-		font-src 'self';
+		font-src 'self' data:;
 		object-src 'none';
 		base-uri 'self';
 		form-action 'self';
 		frame-ancestors 'none';
 		connect-src
 			'self'
-			https://api.stationeden.ru
-			wss://api.stationeden.ru
-			https://station-eden-sfs0reyp.livekit.cloud
-			wss://station-eden-sfs0reyp.livekit.cloud
+			${api}
+			${ws}
 			https://*.livekit.cloud
 			wss://*.livekit.cloud;
-		upgrade-insecure-requests;
 	`
 		.replace(/\s{2,}/g, ' ')
 		.trim()
+}
 
-	const requestHeaders = new Headers(req.headers)
-	requestHeaders.set('x-nonce', nonce)
-	requestHeaders.set('Content-Security-Policy', cspHeader)
+export async function middleware(req: NextRequest) {
+	const cspHeader = buildCsp()
 
-	// --- 2. Проверка авторизации (только /profile) ---
+	// --- Проверка авторизации (только /profile) ---
 	if (req.nextUrl.pathname.startsWith('/profile')) {
 		const apiBase = process.env.NEXT_PUBLIC_API_BASE
 		const cookie = req.headers.get('cookie') || ''
@@ -49,17 +50,14 @@ export async function middleware(req: NextRequest) {
 			const to = setTimeout(() => ac.abort(), 1500)
 
 			try {
-				const res = await fetch(`${apiBase}/auth/me`, {
+				const res = await fetch(`${apiBase.replace(/\/+$/, '')}/auth/me`, {
 					headers: { cookie },
-					credentials: 'include',
 					cache: 'no-store',
 					signal: ac.signal,
 				})
 				clearTimeout(to)
 
-				if (!res.ok) {
-					throw new Error('Not auth')
-				}
+				if (!res.ok) throw new Error('Not auth')
 			} catch {
 				clearTimeout(to)
 				const url = req.nextUrl.clone()
@@ -70,13 +68,7 @@ export async function middleware(req: NextRequest) {
 		}
 	}
 
-	const response = NextResponse.next({
-		request: {
-			headers: requestHeaders,
-		},
-	})
-
+	const response = NextResponse.next()
 	response.headers.set('Content-Security-Policy', cspHeader)
-
 	return response
 }

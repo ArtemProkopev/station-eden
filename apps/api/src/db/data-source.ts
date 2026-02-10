@@ -1,4 +1,3 @@
-// apps/api/src/db/data-source.ts
 import * as dotenv from 'dotenv'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -11,19 +10,13 @@ import { RefreshToken } from '../auth/refresh-token.entity'
 import { EnvSchema } from '../config/env.schema'
 import { User } from '../users/user.entity'
 
-// __dirname = apps/api/src/db
 const envCandidates = [
-	// корневой .env (repo/.env)
 	path.resolve(__dirname, '../../../.env'),
-
-	// локальные для apps/api
 	path.resolve(__dirname, '../../.env.local'),
 	path.resolve(__dirname, '../../.env'),
 ]
 
 const envPath = envCandidates.find(fs.existsSync)
-
-// Загружаем только если нашли файл
 if (envPath) {
 	dotenv.config({ path: envPath })
 }
@@ -34,10 +27,24 @@ if (!parsed.success) {
 }
 const env = parsed.data
 
+/**
+ * ВАЖНО:
+ * - process.cwd() для CLI обычно = apps/api
+ * - В dev миграции лежат в apps/api/migrations/*.ts
+ * - В prod после билда миграции лежат в apps/api/dist/migrations/*.js
+ *
+ * Чтобы одинаково работало на Windows/Linux и dev/prod:
+ * просто указываем ОБА пути.
+ */
+const migrationsGlobs = [
+	path.join(process.cwd(), 'migrations/*.{ts,js}'),
+	path.join(process.cwd(), 'dist/migrations/*.js'),
+]
+
 const base = {
 	type: 'postgres' as const,
 	entities: [User, RefreshToken, EmailCode, OAuthAccount],
-	migrations: [path.join(__dirname, '../../migrations/*{.ts,.js}')],
+	migrations: migrationsGlobs,
 	synchronize: false,
 	extra: { connectionTimeoutMillis: 10_000, max: 10 },
 }

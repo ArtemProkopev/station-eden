@@ -1,3 +1,4 @@
+// apps/api/src/main.ts
 import { NestFactory } from '@nestjs/core'
 import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
@@ -37,7 +38,7 @@ async function bootstrap() {
 			crossOriginResourcePolicy: { policy: 'cross-origin' },
 			// ОТКЛЮЧАЕМ CSP НА API (он мешает OAuth и управляется фронтом)
 			contentSecurityPolicy: false,
-		})
+		}),
 	)
 	app.use(cookieParser())
 
@@ -55,7 +56,6 @@ async function bootstrap() {
 	})
 
 	app.useGlobalPipes(new ZodValidationPipe())
-
 	app.useGlobalInterceptors(new ResponseInterceptor())
 	app.use(CsrfMiddleware as any)
 

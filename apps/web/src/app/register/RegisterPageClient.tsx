@@ -15,16 +15,17 @@ import {
 import { useForm } from 'react-hook-form'
 
 // Components
+import GoogleAuthButton from '@/components/auth/google/GoogleAuthButton'
+import YandexAuthButton from '@/components/auth/yandex/YandexAuthButton'
 import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
+import { EyeIcon, EyeOffIcon } from '@/components/ui/Icons'
 import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
-import GoogleAuthButton from '@/src/components/auth/GoogleAuthButton'
-import { EyeIcon, EyeOffIcon } from '@/src/components/ui/Icons'
 
 // Hooks & Utils
-import { useUsernameGenerator } from '@/src/hooks/useUsernameGenerator'
-import { api, getUserMessage } from '@/src/lib/api'
-import { GOOGLE_ENABLED } from '@/src/lib/flags'
-import { measureStrength, strengthMeta } from '@/src/utils/passwordStrength'
+import { useUsernameGenerator } from '@/hooks/useUsernameGenerator'
+import { api, getUserMessage } from '@/lib/api'
+import { GOOGLE_ENABLED, YANDEX_ENABLED } from '@/lib/flags'
+import { measureStrength, strengthMeta } from '@/utils/passwordStrength'
 
 // Schemas из shared (валидация без сообщений)
 import { ClientRegisterForm, ClientRegisterSchema } from '@station-eden/shared'
@@ -99,11 +100,39 @@ export default function RegisterPageClient() {
 	const strength = useMemo(() => measureStrength(password), [password])
 	const strengthInfo = useMemo(() => strengthMeta(strength), [strength])
 	const googleEnabled = GOOGLE_ENABLED
+	const yandexEnabled = YANDEX_ENABLED
 	const reason = searchParams.get('reason')
+
+	// куда редиректить после oauth/verify (если пробрасывают next)
+	const next = searchParams.get('next') || '/profile'
 
 	const confirmHasValue = confirm.length > 0
 	const confirmMatches = confirmHasValue && confirm === password
 	const confirmInvalid = confirmHasValue && !confirmMatches
+
+	/**
+	 * ✅ FIX hydration:
+	 * Пока mounted=false (на сервере и на первом клиентском рендере) —
+	 * показываем одинаковый текст/атрибуты.
+	 * После mounted=true можно показывать реальное состояние wasm/loader.
+	 */
+	const genButtonTitle = useMemo(() => {
+		if (!formState.mounted) return 'Сгенерировать ник'
+		return isWasmSupported
+			? 'Сгенерировать ник с помощью WebAssembly'
+			: 'Сгенерировать случайный ник'
+	}, [formState.mounted, isWasmSupported])
+
+	const genButtonLabel = useMemo(() => {
+		if (!formState.mounted) return 'Сгенерировать'
+		return generating ? 'Генерируем…' : 'Сгенерировать'
+	}, [formState.mounted, generating])
+
+	const genButtonDisabled = useMemo(() => {
+		// до mounted держим disabled, чтобы не было рассинхрона с SSR
+		if (!formState.mounted) return true
+		return generating || formState.genCooldown
+	}, [formState.mounted, generating, formState.genCooldown])
 
 	// Event handlers
 	const handleCapsLock = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
@@ -156,8 +185,8 @@ export default function RegisterPageClient() {
 				if ((res as any)?.mfa === 'email_code_sent') {
 					router.replace(
 						`/login/verify?email=${encodeURIComponent(
-							data.email
-						)}&next=${encodeURIComponent('/profile')}`
+							data.email,
+						)}&next=${encodeURIComponent(next)}`,
 					)
 					return
 				}
@@ -171,7 +200,7 @@ export default function RegisterPageClient() {
 				triggerShake()
 			}
 		},
-		[router, triggerShake]
+		[router, triggerShake, next],
 	)
 
 	const onError = useCallback(() => {
@@ -197,13 +226,11 @@ export default function RegisterPageClient() {
 
 	const renderCapsLockWarning = useMemo(() => {
 		if (!formState.capsLockOn) return null
-
 		return <div className={styles.capsTip}>Включён Caps&nbsp;Lock</div>
 	}, [formState.capsLockOn])
 
 	const renderPasswordMatch = useMemo(() => {
 		if (!confirmMatches) return null
-
 		return (
 			<div className={`${styles.matchBadge} ${styles.show}`}>
 				Пароли совпадают
@@ -227,6 +254,13 @@ export default function RegisterPageClient() {
 					{reason === 'google_no_account' && (
 						<p className={`${styles.notice} ${styles.info}`} role='status'>
 							Такого Google-аккаунта у нас ещё нет — вы можете
+							зарегистрироваться сейчас.
+						</p>
+					)}
+
+					{reason === 'yandex_no_account' && (
+						<p className={`${styles.notice} ${styles.info}`} role='status'>
+							Такого Яндекс-аккаунта у нас ещё нет — вы можете
 							зарегистрироваться сейчас.
 						</p>
 					)}
@@ -273,15 +307,11 @@ export default function RegisterPageClient() {
 								<button
 									type='button'
 									onClick={handleGenerateUsername}
-									disabled={generating || formState.genCooldown}
+									disabled={genButtonDisabled}
 									className={styles.generateBtn}
-									title={
-										isWasmSupported
-											? 'Сгенерировать ник с помощью WebAssembly'
-											: 'Сгенерировать случайный ник'
-									}
+									title={genButtonTitle}
 								>
-									{generating ? 'Генерируем…' : 'Сгенерировать'}
+									{genButtonLabel}
 								</button>
 							</div>
 
@@ -418,6 +448,26 @@ export default function RegisterPageClient() {
 							</div>
 							<div className={styles.oauthBlock}>
 								<GoogleAuthButton mode='register' label='Продолжить с Google' />
+							</div>
+						</>
+					)}
+
+					{formState.mounted && yandexEnabled && (
+						<>
+							<div
+								className={styles.hr}
+								role='separator'
+								aria-label='Или через Яндекс'
+							>
+								<span>Или через Яндекс</span>
+							</div>
+							<div className={styles.oauthBlock}>
+								<YandexAuthButton
+									label='Продолжить с Яндекс ID'
+									mode='register'
+									size='m'
+									next={next}
+								/>
 							</div>
 						</>
 					)}

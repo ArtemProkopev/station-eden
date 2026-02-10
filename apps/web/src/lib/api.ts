@@ -7,7 +7,20 @@ import {
 	mapToUserMessage,
 } from './errors'
 
-const API = process.env.NEXT_PUBLIC_API_BASE || 'https://api.stationeden.ru'
+// Единая стратегия:
+// - В браузере всегда ходим на /api (Caddy prod + Next rewrite dev)
+// - Вне браузера (если вдруг) — fallback на localhost
+function resolveApiBase() {
+	// В браузере всегда через /api (Caddy prod + rewrites dev)
+	if (typeof window !== 'undefined') return '/api'
+
+	// На сервере (SSR / middleware / node) можно использовать env, иначе localhost
+	const fromEnv = (process.env.NEXT_PUBLIC_API_BASE || '').trim()
+	if (fromEnv) return fromEnv.replace(/\/+$/, '')
+	return 'http://localhost:4000'
+}
+
+const API = resolveApiBase()
 const CSRF_NAME = process.env.NEXT_PUBLIC_CSRF_COOKIE_NAME || 'se_csrf'
 
 function unwrap<T = any>(resp: any): T {
@@ -37,21 +50,24 @@ async function ensureCsrfToken(): Promise<string> {
 		credentials: 'include',
 		cache: 'no-store',
 	})
-	// Небольшая пауза, чтобы браузер успел записать Set-Cookie
-	await new Promise(r => setTimeout(r, 100))
+	// Пауза, чтобы браузер успел записать Set-Cookie
+	await new Promise(r => setTimeout(r, 80))
+
 	const tokenFromCookie = getCsrfToken(CSRF_NAME)
 	if (tokenFromCookie) return tokenFromCookie
+
 	try {
 		const data = (await response.json().catch(() => undefined)) as any
 		const tokenFromBody = data?.data?.csrf ?? data?.csrf
 		if (typeof tokenFromBody === 'string' && tokenFromBody) return tokenFromBody
 	} catch {}
+
 	throw new Error('CSRF token not available')
 }
 
 async function throwHttpAsApiError(
 	res: Response,
-	context: ErrorContext
+	context: ErrorContext,
 ): Promise<never> {
 	const contentType = res.headers.get('content-type') || ''
 	const raw = await res.text().catch(() => '')
@@ -71,7 +87,7 @@ async function throwHttpAsApiError(
 	const userMessage = mapToUserMessage(
 		res.status,
 		String(serverMessage ?? ''),
-		context
+		context,
 	)
 
 	throw new ApiError({
@@ -88,14 +104,9 @@ async function throwHttpAsApiError(
 let _isRefreshing = false
 
 async function tryRefreshOnce(): Promise<boolean> {
-	// Если был принудительный логаут — никогда не рефрешим автоматически
-	if (isForcedLogout()) {
-		return false
-	}
-
+	if (isForcedLogout()) return false
 	if (_isRefreshing) return false
 
-	// Не смотрим на refresh_token из document.cookie — он HttpOnly
 	_isRefreshing = true
 	try {
 		await api.refresh()
@@ -112,7 +123,7 @@ async function fetchWithRetry(
 	init: RequestInit,
 	context: ErrorContext,
 	isRefreshCall = false,
-	skipRetry = false
+	skipRetry = false,
 ): Promise<Response> {
 	const res = await fetch(input, init)
 
@@ -147,7 +158,7 @@ async function postJSON<T = any>(
 	path: string,
 	body?: unknown,
 	context: ErrorContext = 'default',
-	skipRetry = false
+	skipRetry = false,
 ): Promise<T> {
 	const token = await ensureCsrfToken()
 
@@ -166,12 +177,8 @@ async function postJSON<T = any>(
 		req,
 		context,
 		path === '/auth/refresh',
-		skipRetry
+		skipRetry,
 	)
-
-	if (!res.ok) {
-		await throwHttpAsApiError(res, context)
-	}
 
 	const responseData = await res.json().catch(() => ({}))
 	return unwrap<T>(responseData)
@@ -181,7 +188,7 @@ async function putJSON<T = any>(
 	path: string,
 	body?: unknown,
 	context: ErrorContext = 'default',
-	skipRetry = false
+	skipRetry = false,
 ): Promise<T> {
 	const token = await ensureCsrfToken()
 
@@ -200,12 +207,8 @@ async function putJSON<T = any>(
 		req,
 		context,
 		false,
-		skipRetry
+		skipRetry,
 	)
-
-	if (!res.ok) {
-		await throwHttpAsApiError(res, context)
-	}
 
 	const responseData = await res.json().catch(() => ({}))
 	return unwrap<T>(responseData)
@@ -213,7 +216,7 @@ async function putJSON<T = any>(
 
 async function getJSON<T = any>(
 	path: string,
-	context: ErrorContext = 'default'
+	context: ErrorContext = 'default',
 ): Promise<T> {
 	const req: RequestInit = {
 		method: 'GET',
@@ -222,18 +225,13 @@ async function getJSON<T = any>(
 	}
 
 	const res = await fetchWithRetry(`${API}${path}`, req, context)
-
-	if (!res.ok) {
-		await throwHttpAsApiError(res, context)
-	}
-
 	const responseData = await res.json().catch(() => ({}))
 	return unwrap<T>(responseData)
 }
 
 async function deleteJSON<T = any>(
 	path: string,
-	context: ErrorContext = 'default'
+	context: ErrorContext = 'default',
 ): Promise<T> {
 	const token = await ensureCsrfToken()
 
@@ -244,11 +242,6 @@ async function deleteJSON<T = any>(
 	}
 
 	const res = await fetchWithRetry(`${API}${path}`, req, context)
-
-	if (!res.ok) {
-		await throwHttpAsApiError(res, context)
-	}
-
 	const responseData = await res.json().catch(() => ({}))
 	return unwrap<T>(responseData)
 }
@@ -259,48 +252,50 @@ export const api = {
 		postJSON<{ mfa?: string; email?: string; needSetPassword?: boolean }>(
 			'/auth/login',
 			{ login, password },
-			'login'
+			'login',
+			true, // skipRetry (важно!)
 		),
 
 	register: (email: string, username: string, password: string) =>
 		postJSON<{ mfa?: string; email?: string }>(
 			'/auth/register',
 			{ email, username, password },
-			'register'
+			'register',
+			true, // skipRetry
 		),
 
 	verifyEmailCode: (code: string, email?: string, newPassword?: string) =>
 		postJSON(
 			'/auth/verify-email-code',
 			{ code, email, ...(newPassword ? { newPassword } : {}) },
-			'login'
+			'login',
+			true, // skipRetry (важно!)
 		),
 
-	resendEmailCode: () => postJSON('/auth/resend-email-code', {}, 'login'),
+	resendEmailCode: () => postJSON('/auth/resend-email-code', {}, 'login', true),
 
 	/** Забыли пароль */
 	forgotPassword: (email: string) =>
 		postJSON<{ mfa?: string; email?: string }>(
 			'/auth/forgot-password',
 			{ email },
-			'login'
+			'login',
+			true,
 		),
 
 	refresh: (userId?: string) =>
 		postJSON('/auth/refresh', userId ? { userId } : undefined, 'default'),
 
-	logout: () => postJSON('/auth/logout', {}, 'default', true), // skipRetry = true
+	logout: () => postJSON('/auth/logout', {}, 'default', true),
 
 	// GET-версия логаута как fallback
 	logoutGet: () => getJSON('/auth/logout-get', 'default'),
 
-	// Жёсткий /auth/me, с JwtGuard + авто-refresh
 	me: () => getJSON('/auth/me', 'default'),
 
 	// Мягкий /auth/session — всегда 200, без 401
 	session: () => getJSON('/auth/session', 'default'),
 
-	// Обновление профиля (username/avatar/frame)
 	updateProfile: (patch: {
 		avatar?: string
 		frame?: string
@@ -321,8 +316,8 @@ export const api = {
 	deleteUser: (id: string) =>
 		deleteJSON(`/users/${encodeURIComponent(id)}`, 'default'),
 
-	// Экспортируем hasCookie как вспомогательную утилиту (для не-критичных кейсов)
 	hasCookie,
 }
 
+// важно для страниц login/register/forgot (чтобы билд не падал)
 export { getUserMessage }

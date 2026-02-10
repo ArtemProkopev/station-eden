@@ -1,60 +1,37 @@
-// @station-eden/shared
+// packages/shared/src/index.ts
 import { z } from 'zod'
 
 // ==============================================================================
-// 0. ZOD GLOBAL ERROR MAP (убираем дефолтные сообщения валидации)
+// ZOD GLOBAL ERROR MAP (глушим дефолтные сообщения)
 // ==============================================================================
-
-z.setErrorMap(() => {
-	// Возвращаем пустую строку — UI получает факт ошибки, но без текста
-	return { message: '' }
-})
+z.setErrorMap(() => ({ message: '' }))
 
 // ==============================================================================
-// 0. COMMON TYPES
+// COMMON
 // ==============================================================================
-
-/**
- * Строка с датой в формате ISO (для полей, которые приходят/уходят по сети как string)
- */
 export type ISODateString = string
 
 // ==============================================================================
-// 1. AUTH & USERS (Авторизация и Пользователи)
+// AUTH
 // ==============================================================================
-
-/**
- * Схема для Входа (Login)
- * Минимальная валидация, сообщения нам не нужны — ошибки под полями не показываем.
- */
 export const LoginSchema = z.object({
 	login: z.string().trim().min(1),
 	password: z.string().min(1),
 })
+export type LoginDto = z.infer<typeof LoginSchema>
 
-/**
- * Схема для Регистрации (Register)
- * Перенесли валидацию из API (class-validator) в Zod.
- * Сообщения валидации глобально глушатся через setErrorMap.
- */
 export const RegisterSchema = z.object({
 	email: z.string().email(),
 	username: z.string().regex(/^[a-zA-Z0-9_]{3,20}$/),
 	password: z.string().min(8).max(72),
 })
-
-// Генерируем TypeScript типы из схем
-export type LoginDto = z.infer<typeof LoginSchema>
 export type RegisterDto = z.infer<typeof RegisterSchema>
 
-/**
- * Базовый интерфейс пользователя (то, что приходит с бэкенда)
- * Очищен от UI-статусов (loading/error), только данные.
- *
- * ВАЖНО: типы совпадают с API:
- * - username: string | null
- * - avatar/frame: string | null (опционально/nullable)
- */
+export const ClientRegisterSchema = RegisterSchema.extend({
+	confirm: z.string().min(1),
+}).refine(d => d.password === d.confirm, { path: ['confirm'] })
+export type ClientRegisterForm = z.infer<typeof ClientRegisterSchema>
+
 export interface User {
 	id: string
 	email: string
@@ -63,23 +40,44 @@ export interface User {
 	frame?: string | null
 }
 
-// ==============================================================================
-// 2. LOBBY & GAME (Лобби и Игра)
-// ==============================================================================
+export interface UserData extends User {
+	token: string
+}
 
-/**
- * Настройки лобби
- * Используем interface, так как валидация тут сложнее или пока не нужна строго
- */
+export interface LoginResponse {
+	mfa?: string
+	email?: string
+	needSetPassword?: boolean
+	user?: User
+	id?: string
+	token?: string
+	access_token?: string
+	username?: string | null
+	avatar?: string | null
+	frame?: string | null
+}
+
+export interface ServerLockInfo {
+	lockedMinutes?: number
+	lockedUntil?: ISODateString
+	attemptsLeft?: number
+}
+
+export interface LockPayload {
+	login: string
+	lockedUntilIso: ISODateString
+}
+
+// ==============================================================================
+// LOBBY / GAME
+// ==============================================================================
 export interface LobbySettings {
 	maxPlayers: number
 	gameMode: string
 	isPrivate: boolean
-	password?: string // Сделал опциональным, т.к. если не приватное, пароля нет
-
-	// Дополнительные настройки
-	difficulty?: 'easy' | 'medium' | 'hard' // Лучше использовать union type вместо string
-	turnTime?: string // или number (секунды), если планируешь логику
+	password?: string
+	difficulty?: 'easy' | 'medium' | 'hard'
+	turnTime?: number
 	fastGame?: boolean
 	tournamentMode?: boolean
 	limitedResources?: boolean
@@ -99,13 +97,26 @@ export interface ChatMessage {
 	playerId: string
 	playerName: string
 	text: string
-	timestamp: Date | ISODateString // String, т.к. по сети даты летают строками
+	timestamp: Date | ISODateString
 	type?: 'system' | 'player'
 }
 
-/**
- * Состояние игры
- */
+export interface GameSettings {
+	gameMode: string
+	difficulty?: 'easy' | 'medium' | 'hard'
+	turnTime?: number
+	maxRounds?: number
+}
+
+export interface GamePlayer {
+	id: string
+	name: string
+	avatar?: string
+	score: number
+	isActive: boolean
+	order: number
+}
+
 export interface GameState {
 	id: string
 	lobbyId: string
@@ -120,52 +131,33 @@ export interface GameState {
 	settings: GameSettings
 }
 
-export interface GamePlayer {
-	id: string
-	name: string
-	avatar?: string
-	score: number
-	isActive: boolean
-	order: number
-}
-
-export interface GameSettings {
-	gameMode: string
-	difficulty?: 'easy' | 'medium' | 'hard'
-	turnTime?: number
-	maxRounds?: number
-}
-
 // ==============================================================================
-// 3. WEBSOCKETS & SYSTEM
+// WEBSOCKETS
 // ==============================================================================
+export type WebSocketMessageType =
+	| 'JOIN_LOBBY'
+	| 'PLAYER_JOINED'
+	| 'PLAYER_LEFT'
+	| 'CHAT_MESSAGE'
+	| 'SEND_MESSAGE'
+	| 'LOBBY_STATE'
+	| 'PLAYER_READY'
+	| 'TOGGLE_READY'
+	| 'UPDATE_LOBBY_SETTINGS'
+	| 'LOBBY_SETTINGS_UPDATED'
+	| 'START_GAME'
+	| 'GAME_STARTED'
+	| 'GAME_STATE'
+	| 'GAME_UPDATE'
+	| 'PLAYER_LEFT_GAME'
+	| 'GAME_ACTION'
+	| 'ERROR'
 
-// Типы сообщений WebSocket
-export type WebSocketMessageType = 
-  | 'JOIN_LOBBY'
-  | 'PLAYER_JOINED'
-  | 'PLAYER_LEFT'
-  | 'CHAT_MESSAGE'
-  | 'SEND_MESSAGE'
-  | 'LOBBY_STATE'
-  | 'PLAYER_READY'
-  | 'TOGGLE_READY'
-  | 'UPDATE_LOBBY_SETTINGS'
-  | 'LOBBY_SETTINGS_UPDATED'
-  | 'START_GAME'
-  | 'GAME_STARTED'
-  | 'GAME_STATE'
-  | 'GAME_UPDATE'
-  | 'PLAYER_LEFT_GAME'
-  | 'GAME_ACTION'
-  | 'ERROR';
-
-export interface WebSocketMessage<T = any> {
+export interface WebSocketMessage<T = unknown> {
 	type: WebSocketMessageType
 	payload: T
 }
 
-// Специфичные сообщения
 export interface StartGameMessage {
 	lobbyId: string
 	creatorId: string
@@ -182,9 +174,8 @@ export interface GameStateMessage {
 }
 
 // ==============================================================================
-// 4. NOTIFICATIONS (Уведомления)
+// NOTIFICATIONS
 // ==============================================================================
-
 export type NotificationType =
 	| 'news'
 	| 'game_invite'
@@ -230,9 +221,8 @@ export type Notification =
 	| FriendRequestNotification
 
 // ==============================================================================
-// 5. SETTINGS (Настройки клиента)
+// SETTINGS / FRIENDS
 // ==============================================================================
-
 export interface SoundSettings {
 	masterVolume: number
 	musicVolume: number
@@ -248,10 +238,6 @@ export interface UserSettings {
 	purchaseHistory: boolean
 }
 
-// ==============================================================================
-// 6. FRIENDS (Друзья)
-// ==============================================================================
-
 export interface Friend {
 	id: string
 	username: string
@@ -266,93 +252,4 @@ export interface FriendsState {
 	friends: Friend[]
 	pendingRequests: FriendRequestNotification[]
 	isLoading: boolean
-}
-
-// ==============================================================================
-// 7. CLIENT-SPECIFIC TYPES (Дополнения для клиента)
-// ==============================================================================
-
-/**
- * Расширенная схема регистрации для клиента (добавляем confirm password)
- * Сообщения валидации глобально пустые, UI сам показывает подсказки.
- */
-export const ClientRegisterSchema = RegisterSchema.extend({
-	confirm: z.string().min(1),
-}).refine(data => data.password === data.confirm, {
-	path: ['confirm'],
-})
-
-export type ClientRegisterForm = z.infer<typeof ClientRegisterSchema>
-
-/**
- * Расширенный пользователь с токеном (для клиентского хранилища)
- */
-export interface UserData extends User {
-	token: string
-}
-
-/**
- * Ответ от сервера при логине
- */
-export interface LoginResponse {
-	mfa?: string
-	email?: string
-	needSetPassword?: boolean
-	user?: User
-	id?: string
-	token?: string
-	access_token?: string
-	username?: string | null
-	avatar?: string | null
-	frame?: string | null
-}
-
-/**
- * Данные блокировки аккаунта (для localStorage)
- */
-export interface LockPayload {
-	login: string
-	lockedUntilIso: ISODateString
-}
-
-/**
- * Информация о блокировке от сервера
- */
-export interface ServerLockInfo {
-	lockedMinutes?: number
-	lockedUntil?: ISODateString
-	attemptsLeft?: number
-}
-
-/**
- * Состояние игры
- */
-export interface GameState {
-	id: string
-	lobbyId: string
-	status: 'waiting' | 'active' | 'finished' | 'cancelled'
-	players: GamePlayer[]
-	currentPlayerId?: string
-	round: number
-	maxRounds?: number
-	startedAt?: ISODateString
-	finishedAt?: ISODateString
-	winnerId?: string
-	settings: GameSettings
-}
-
-export interface GamePlayer {
-	id: string
-	name: string
-	avatar?: string
-	score: number
-	isActive: boolean
-	order: number
-}
-
-export interface GameSettings {
-	gameMode: string
-	difficulty?: 'easy' | 'medium' | 'hard'
-	turnTime?: number
-	maxRounds?: number
 }
