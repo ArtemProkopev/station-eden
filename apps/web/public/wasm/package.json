@@ -1,0 +1,15 @@
+{
+  "name": "username-generator",
+  "type": "module",
+  "version": "0.2.0",
+  "files": [
+    "username_generator_bg.wasm",
+    "username_generator.js",
+    "username_generator.d.ts"
+  ],
+  "main": "username_generator.js",
+  "types": "username_generator.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
