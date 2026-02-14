@@ -6,8 +6,12 @@ import { useEffect, useRef } from 'react'
 import { api } from '../lib/api'
 import { isForcedLogout, isUserAuthenticated } from '../lib/authUtils'
 
-const DEFAULT_INTERVAL = 10 * 60 * 1000 // 10 минут
-const MIN_REFRESH_GAP = 10 * 1000 // 10 секунд
+const DEFAULT_INTERVAL = 10 * 60 * 1000
+const MIN_REFRESH_GAP = 10 * 1000
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+	return !!v && typeof v === 'object' && !Array.isArray(v)
+}
 
 export function useSessionKeepAlive() {
 	const lastCallRef = useRef(0)
@@ -15,30 +19,21 @@ export function useSessionKeepAlive() {
 	const pathname = usePathname()
 
 	useEffect(() => {
-		// На страницах логина/регистрации keep-alive не нужен
 		if (!pathname) return
-		if (pathname.startsWith('/login') || pathname.startsWith('/register')) {
+		if (pathname.startsWith('/login') || pathname.startsWith('/register'))
 			return
-		}
 
-		// Если принудительно разлогинены — не стартуем цикл
-		if (typeof window !== 'undefined' && isForcedLogout()) {
-			return
-		}
-
-		// Если пользователь не авторизован (по нашему локальному признаку) — не стартуем
-		if (typeof window !== 'undefined' && !isUserAuthenticated()) {
-			return
-		}
+		if (typeof window !== 'undefined' && isForcedLogout()) return
+		if (typeof window !== 'undefined' && !isUserAuthenticated()) return
 
 		isMounted.current = true
 
 		const intervalMs = Number(
-			process.env.NEXT_PUBLIC_REFRESH_INTERVAL_MS || DEFAULT_INTERVAL
+			process.env.NEXT_PUBLIC_REFRESH_INTERVAL_MS || DEFAULT_INTERVAL,
 		)
 
-		let firstTimeout: NodeJS.Timeout | null = null
-		let intervalId: NodeJS.Timeout | null = null
+		let firstTimeout: ReturnType<typeof setTimeout> | null = null
+		let intervalId: ReturnType<typeof setInterval> | null = null
 
 		const stopLoop = () => {
 			isMounted.current = false
@@ -52,27 +47,25 @@ export function useSessionKeepAlive() {
 			}
 		}
 
-		// Обработчик события logout
 		const handleLogoutEvent = () => {
 			console.info('[keep-alive] Logout event received, stopping loop')
 			stopLoop()
 		}
 
-		// Обработчик события session-changed
 		const handleSessionChanged = (e: Event) => {
-			const customEvent = e as CustomEvent
-			if (customEvent.detail?.loggedIn === false) {
-				console.info(
-					'[keep-alive] Session changed to logged out, stopping loop'
-				)
-				stopLoop()
+			if (e instanceof CustomEvent && isRecord(e.detail)) {
+				if (e.detail.loggedIn === false) {
+					console.info(
+						'[keep-alive] Session changed to logged out, stopping loop',
+					)
+					stopLoop()
+				}
 			}
 		}
 
 		const safeRefresh = async () => {
 			if (!isMounted.current) return
 
-			// Проверяем флаг принудительного логаута
 			if (isForcedLogout()) {
 				console.info('[keep-alive] Forced logout detected, stopping loop')
 				stopLoop()
@@ -81,54 +74,48 @@ export function useSessionKeepAlive() {
 
 			const now = Date.now()
 			const delta = now - lastCallRef.current
-
 			if (delta < MIN_REFRESH_GAP) return
 			lastCallRef.current = now
 
 			try {
 				await api.refresh()
 				console.debug('[keep-alive] Refresh successful')
-			} catch (e: any) {
-				// Извлекаем статус ошибки
+			} catch (e: unknown) {
 				let status: number | undefined
-				if (e && typeof e === 'object') {
-					if ('status' in e) {
-						status = e.status as number
-					} else if ('statusCode' in e) {
-						status = e.statusCode as number
-					} else if (e instanceof Error && e.message.includes('401')) {
-						status = 401
-					}
+
+				if (isRecord(e)) {
+					const s = e.status
+					const sc = e.statusCode
+					if (typeof s === 'number') status = s
+					else if (typeof sc === 'number') status = sc
+				} else if (e instanceof Error && e.message.includes('401')) {
+					status = 401
 				}
 
 				if (status === 401 || status === 403) {
-					// Пользователь разлогинен - останавливаем keep-alive
 					console.info('[keep-alive] Unauthorized, stopping loop')
 					stopLoop()
 					return
 				}
 
-				// Другие ошибки просто логируем
-				console.warn('[keep-alive] Refresh failed:', e?.message || e)
+				const msg =
+					e instanceof Error ? e.message : typeof e === 'string' ? e : e
+				console.warn('[keep-alive] Refresh failed:', msg)
 			}
 		}
 
-		// Первый тихий вызов после небольшой задержки
 		firstTimeout = setTimeout(() => {
 			if (isMounted.current) safeRefresh()
 		}, 2500)
 
-		// Интервальный вызов
 		intervalId = setInterval(() => {
 			if (isMounted.current) safeRefresh()
 		}, intervalMs)
 
-		// Refresh при возврате вкладки
 		let visUnlock = true
 		const onVisibilityChange = () => {
 			if (!isMounted.current) return
 			if (document.visibilityState === 'visible') {
-				// Делаем refresh только один раз при рефокусе
 				if (visUnlock) {
 					visUnlock = false
 					safeRefresh()
@@ -137,7 +124,6 @@ export function useSessionKeepAlive() {
 			}
 		}
 
-		// Подписки
 		document.addEventListener('visibilitychange', onVisibilityChange)
 		window.addEventListener('logout', handleLogoutEvent)
 		window.addEventListener('session-changed', handleSessionChanged)

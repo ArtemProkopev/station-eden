@@ -57,5 +57,8 @@ export default {
 		'scripts/**',
 	],
 
+	// чтобы убрать "Unlisted binaries: wasm-pack"
+	ignoreBinaries: ['wasm-pack'],
+
 	ignoreDependencies: ['ts-loader'],
 }

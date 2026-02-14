@@ -1,4 +1,3 @@
-// apps/web/src/app/register/RegisterPageClient.tsx
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -49,6 +48,11 @@ interface FormState {
 	mounted: boolean
 	shake: boolean
 	genCooldown: boolean
+}
+
+function hasMfaEmailCodeSent(v: unknown): boolean {
+	if (!v || typeof v !== 'object') return false
+	return 'mfa' in v && (v as { mfa?: unknown }).mfa === 'email_code_sent'
 }
 
 export default function RegisterPageClient() {
@@ -180,9 +184,13 @@ export default function RegisterPageClient() {
 			setFormState(prev => ({ ...prev, error: null }))
 
 			try {
-				const res = await api.register(data.email, data.username, data.password)
+				const res = (await api.register(
+					data.email,
+					data.username,
+					data.password,
+				)) as unknown
 
-				if ((res as any)?.mfa === 'email_code_sent') {
+				if (hasMfaEmailCodeSent(res)) {
 					router.replace(
 						`/login/verify?email=${encodeURIComponent(
 							data.email,
@@ -192,7 +200,7 @@ export default function RegisterPageClient() {
 				}
 
 				throw new Error('Не удалось запустить подтверждение по почте')
-			} catch (err: any) {
+			} catch (err: unknown) {
 				setFormState(prev => ({
 					...prev,
 					error: getUserMessage(err, 'register'),

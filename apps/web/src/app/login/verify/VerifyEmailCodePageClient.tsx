@@ -6,7 +6,7 @@ import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
 import OTPInput from '@/src/components/ui/OTPInput'
 import { api } from '@/src/lib/api'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState, type FormEvent } from 'react'
 import styles from './page.module.css'
 
 const MemoizedFireflies = memo(FirefliesProfile)
@@ -87,17 +87,21 @@ export default function VerifyEmailCodePageClient() {
 			await api.verifyEmailCode(
 				code,
 				email,
-				mode === 'set_password' ? newPassword : undefined
+				mode === 'set_password' ? newPassword : undefined,
 			)
 			try {
 				await api.me()
-			} catch {}
+			} catch {
+				// ignore
+			}
 			setOk(true)
-			if (typeof window !== 'undefined')
+			if (typeof window !== 'undefined') {
 				window.dispatchEvent(new Event('session-changed'))
+			}
 			router.replace(next)
-		} catch (e: any) {
-			setErr(e?.message || 'Неверный или просроченный код')
+		} catch (e: unknown) {
+			const msg = e instanceof Error ? e.message : undefined
+			setErr(msg || 'Неверный или просроченный код')
 			setShake(true)
 			setTimeout(() => setShake(false), 340)
 		} finally {
@@ -105,7 +109,7 @@ export default function VerifyEmailCodePageClient() {
 		}
 	}
 
-	async function onSubmit(e?: React.FormEvent) {
+	async function onSubmit(e?: FormEvent) {
 		e?.preventDefault()
 		if (!canSubmit) {
 			setShake(true)
@@ -122,8 +126,9 @@ export default function VerifyEmailCodePageClient() {
 		try {
 			await api.resendEmailCode()
 			setResendMsg('Письмо отправлено повторно. Проверьте «Входящие» и «Спам».')
-		} catch (e: any) {
-			setErr(e?.message || 'Не удалось отправить письмо повторно')
+		} catch (e: unknown) {
+			const msg = e instanceof Error ? e.message : undefined
+			setErr(msg || 'Не удалось отправить письмо повторно')
 		} finally {
 			setResending(false)
 		}
@@ -133,6 +138,7 @@ export default function VerifyEmailCodePageClient() {
 		if (code.length === 6 && !busy && mode !== 'set_password') {
 			onSubmit()
 		}
+		// намеренно: onSubmit зависит от canSubmit и busy, здесь нужен автосабмит по коду
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [code, mode])
 
@@ -142,8 +148,9 @@ export default function VerifyEmailCodePageClient() {
 	return (
 		<>
 			<div className={styles.bg} aria-hidden />
-			Ó <MemoizedFireflies />
+			<MemoizedFireflies />
 			<MemoizedStars />
+
 			<main className={styles.container}>
 				<section className={styles.card} aria-labelledby='verify-title'>
 					<header>

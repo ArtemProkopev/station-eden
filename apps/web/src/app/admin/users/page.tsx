@@ -1,10 +1,28 @@
+// apps/web/src/app/admin/users/page.tsx
 'use client'
+
 import { api } from '@/src/lib/api'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import styles from './page.module.css'
 
 type Row = { id: string; email: string; role?: string; createdAt?: string }
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+	return !!v && typeof v === 'object' && !Array.isArray(v)
+}
+
+function isRow(v: unknown): v is Row {
+	if (!isRecord(v)) return false
+	return typeof v.id === 'string' && typeof v.email === 'string'
+}
+
+function unwrapRows(input: unknown): Row[] {
+	if (Array.isArray(input)) return input.filter(isRow)
+	if (isRecord(input) && Array.isArray(input.data))
+		return input.data.filter(isRow)
+	return []
+}
 
 export default function AdminUsersPage() {
 	const [rows, setRows] = useState<Row[]>([])
@@ -19,11 +37,11 @@ export default function AdminUsersPage() {
 		return rows.filter(
 			r =>
 				r.email.toLowerCase().includes(s) ||
-				(r.role ?? 'user').toLowerCase().includes(s)
+				(r.role ?? 'user').toLowerCase().includes(s),
 		)
 	}, [rows, q])
 
-	async function load() {
+	const load = useCallback(async () => {
 		setLoading(true)
 		try {
 			try {
@@ -31,22 +49,26 @@ export default function AdminUsersPage() {
 			} catch {
 				await api.refresh()
 			}
+
 			const list = await api.users()
-			setRows((list as any).data ?? list)
+			setRows(unwrapRows(list))
 			setErr(null)
-		} catch (e: any) {
-			const msg = e?.message || ''
+		} catch (e: unknown) {
+			const msg =
+				e instanceof Error ? e.message : typeof e === 'string' ? e : ''
+
 			if (msg.includes('No refresh') || msg.includes('401')) {
 				router.replace('/login?next=/admin/users')
 				return
 			}
+
 			try {
-				const obj = JSON.parse(msg)
-				if (obj?.code === 'ADMIN_ONLY') {
+				const obj = JSON.parse(msg) as unknown
+				if (isRecord(obj) && obj.code === 'ADMIN_ONLY') {
 					setErr(
-						'Доступ ограничен: эта страница только для администратора станции.'
+						'Доступ ограничен: эта страница только для администратора станции.',
 					)
-				} else if (obj?.message) {
+				} else if (isRecord(obj) && typeof obj.message === 'string') {
 					setErr(obj.message)
 				} else {
 					setErr('Нет доступа к этой странице.')
@@ -57,21 +79,26 @@ export default function AdminUsersPage() {
 		} finally {
 			setLoading(false)
 		}
-	}
+	}, [router])
 
 	useEffect(() => {
 		load()
-	}, [])
+	}, [load])
 
-	async function onDelete(id: string) {
-		if (!confirm('Удалить пользователя?')) return
-		try {
-			await api.deleteUser(id)
-			await load()
-		} catch (e: any) {
-			alert(e?.message || 'Ошибка удаления')
-		}
-	}
+	const onDelete = useCallback(
+		async (id: string) => {
+			if (!confirm('Удалить пользователя?')) return
+			try {
+				await api.deleteUser(id)
+				await load()
+			} catch (e: unknown) {
+				const msg =
+					e instanceof Error ? e.message : typeof e === 'string' ? e : undefined
+				alert(msg || 'Ошибка удаления')
+			}
+		},
+		[load],
+	)
 
 	return (
 		<div className={styles.scene}>
@@ -88,7 +115,9 @@ export default function AdminUsersPage() {
 									className={styles.search}
 									placeholder='Поиск по email или роли…'
 									value={q}
-									onChange={e => setQ(e.target.value)}
+									onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+										setQ(e.target.value)
+									}
 									aria-label='Поиск пользователей'
 								/>
 							</div>

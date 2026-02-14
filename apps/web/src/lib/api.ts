@@ -1,3 +1,4 @@
+// apps/web/src/lib/api.ts
 import { isForcedLogout } from './authUtils'
 import { getCsrfToken } from './csrf'
 import {
@@ -7,14 +8,13 @@ import {
 	mapToUserMessage,
 } from './errors'
 
-// Единая стратегия:
-// - В браузере всегда ходим на /api (Caddy prod + Next rewrite dev)
-// - Вне браузера (если вдруг) — fallback на localhost
+function isRecord(v: unknown): v is Record<string, unknown> {
+	return !!v && typeof v === 'object' && !Array.isArray(v)
+}
+
 function resolveApiBase() {
-	// В браузере всегда через /api (Caddy prod + rewrites dev)
 	if (typeof window !== 'undefined') return '/api'
 
-	// На сервере (SSR / middleware / node) можно использовать env, иначе localhost
 	const fromEnv = (process.env.NEXT_PUBLIC_API_BASE || '').trim()
 	if (fromEnv) return fromEnv.replace(/\/+$/, '')
 	return 'http://localhost:4000'
@@ -23,17 +23,17 @@ function resolveApiBase() {
 const API = resolveApiBase()
 const CSRF_NAME = process.env.NEXT_PUBLIC_CSRF_COOKIE_NAME || 'se_csrf'
 
-function unwrap<T = any>(resp: any): T {
-	if (resp && typeof resp === 'object' && 'data' in resp) {
-		return (resp as any).data as T
+function unwrap<T = unknown>(resp: unknown): T {
+	if (isRecord(resp) && 'data' in resp) {
+		return (resp.data as T) ?? (resp as T)
 	}
 	return resp as T
 }
 
-async function safeJson(text: string | null): Promise<any | undefined> {
+async function safeJson(text: string | null): Promise<unknown | undefined> {
 	if (!text) return undefined
 	try {
-		return JSON.parse(text)
+		return JSON.parse(text) as unknown
 	} catch {
 		return undefined
 	}
@@ -50,19 +50,40 @@ async function ensureCsrfToken(): Promise<string> {
 		credentials: 'include',
 		cache: 'no-store',
 	})
-	// Пауза, чтобы браузер успел записать Set-Cookie
-	await new Promise(r => setTimeout(r, 80))
+
+	await new Promise<void>(r => setTimeout(r, 80))
 
 	const tokenFromCookie = getCsrfToken(CSRF_NAME)
 	if (tokenFromCookie) return tokenFromCookie
 
 	try {
-		const data = (await response.json().catch(() => undefined)) as any
-		const tokenFromBody = data?.data?.csrf ?? data?.csrf
-		if (typeof tokenFromBody === 'string' && tokenFromBody) return tokenFromBody
-	} catch {}
+		const data = (await response.json().catch(() => undefined)) as unknown
+		if (isRecord(data)) {
+			const csrfFromData =
+				isRecord(data.data) && typeof data.data.csrf === 'string'
+					? data.data.csrf
+					: typeof data.csrf === 'string'
+						? data.csrf
+						: undefined
+			if (typeof csrfFromData === 'string' && csrfFromData) return csrfFromData
+		}
+	} catch {
+		// ignore
+	}
 
 	throw new Error('CSRF token not available')
+}
+
+function pickServerMessage(json: unknown, raw: string): string | undefined {
+	if (isRecord(json)) {
+		const msg = json.message
+		if (Array.isArray(msg) && typeof msg[0] === 'string') return msg[0]
+		if (typeof msg === 'string') return msg
+		if (typeof json.error === 'string') return json.error
+		if (typeof json.detail === 'string') return json.detail
+	}
+	if (typeof json === 'string') return json
+	return raw && !json ? raw : undefined
 }
 
 async function throwHttpAsApiError(
@@ -76,14 +97,11 @@ async function throwHttpAsApiError(
 			? await safeJson(raw)
 			: await safeJson(raw)
 
-	const serverMessage =
-		(Array.isArray(json?.message) ? json?.message?.[0] : json?.message) ??
-		json?.error ??
-		json?.detail ??
-		(typeof json === 'string' ? json : undefined) ??
-		(raw && !json ? raw : undefined)
+	const serverMessage = pickServerMessage(json, raw)
 
-	const code = json?.code
+	const code =
+		isRecord(json) && typeof json.code === 'string' ? json.code : undefined
+
 	const userMessage = mapToUserMessage(
 		res.status,
 		String(serverMessage ?? ''),
@@ -100,7 +118,6 @@ async function throwHttpAsApiError(
 	})
 }
 
-// Флаг, чтобы не запускать несколько refresh одновременно
 let _isRefreshing = false
 
 async function tryRefreshOnce(): Promise<boolean> {
@@ -127,17 +144,12 @@ async function fetchWithRetry(
 ): Promise<Response> {
 	const res = await fetch(input, init)
 
-	// Если это запрос на logout и статус не 200, не пытаемся ретраить
 	if (typeof input === 'string' && input.includes('/auth/logout') && !res.ok) {
 		return res
 	}
 
 	if (res.ok) return res
 
-	// Авто-ретрай при 401 только если:
-	// - это НЕ refresh запрос
-	// - НЕ принудительный логаут
-	// - НЕ просили пропустить ретрай
 	if (res.status === 401 && !isRefreshCall && !skipRetry && !isForcedLogout()) {
 		const ok = await tryRefreshOnce()
 		if (ok) {
@@ -154,7 +166,7 @@ async function fetchWithRetry(
 	throw new Error('unreachable')
 }
 
-async function postJSON<T = any>(
+async function postJSON<T = unknown>(
 	path: string,
 	body?: unknown,
 	context: ErrorContext = 'default',
@@ -184,7 +196,7 @@ async function postJSON<T = any>(
 	return unwrap<T>(responseData)
 }
 
-async function putJSON<T = any>(
+async function putJSON<T = unknown>(
 	path: string,
 	body?: unknown,
 	context: ErrorContext = 'default',
@@ -214,7 +226,7 @@ async function putJSON<T = any>(
 	return unwrap<T>(responseData)
 }
 
-async function getJSON<T = any>(
+async function getJSON<T = unknown>(
 	path: string,
 	context: ErrorContext = 'default',
 ): Promise<T> {
@@ -229,7 +241,7 @@ async function getJSON<T = any>(
 	return unwrap<T>(responseData)
 }
 
-async function deleteJSON<T = any>(
+async function deleteJSON<T = unknown>(
 	path: string,
 	context: ErrorContext = 'default',
 ): Promise<T> {
@@ -247,13 +259,12 @@ async function deleteJSON<T = any>(
 }
 
 export const api = {
-	// Аутентификация / MFA
 	login: (login: string, password: string) =>
 		postJSON<{ mfa?: string; email?: string; needSetPassword?: boolean }>(
 			'/auth/login',
 			{ login, password },
 			'login',
-			true, // skipRetry (важно!)
+			true,
 		),
 
 	register: (email: string, username: string, password: string) =>
@@ -261,7 +272,7 @@ export const api = {
 			'/auth/register',
 			{ email, username, password },
 			'register',
-			true, // skipRetry
+			true,
 		),
 
 	verifyEmailCode: (code: string, email?: string, newPassword?: string) =>
@@ -269,12 +280,11 @@ export const api = {
 			'/auth/verify-email-code',
 			{ code, email, ...(newPassword ? { newPassword } : {}) },
 			'login',
-			true, // skipRetry (важно!)
+			true,
 		),
 
 	resendEmailCode: () => postJSON('/auth/resend-email-code', {}, 'login', true),
 
-	/** Забыли пароль */
 	forgotPassword: (email: string) =>
 		postJSON<{ mfa?: string; email?: string }>(
 			'/auth/forgot-password',
@@ -288,12 +298,10 @@ export const api = {
 
 	logout: () => postJSON('/auth/logout', {}, 'default', true),
 
-	// GET-версия логаута как fallback
 	logoutGet: () => getJSON('/auth/logout-get', 'default'),
 
 	me: () => getJSON('/auth/me', 'default'),
 
-	// Мягкий /auth/session — всегда 200, без 401
 	session: () => getJSON('/auth/session', 'default'),
 
 	updateProfile: (patch: {
@@ -309,7 +317,6 @@ export const api = {
 			usernameChangedAt?: string | null
 		}>('/users/profile', patch, 'default'),
 
-	// Админка пользователей
 	users: () => getJSON('/users', 'default'),
 	userById: (id: string) =>
 		getJSON(`/users/${encodeURIComponent(id)}`, 'default'),
@@ -319,5 +326,4 @@ export const api = {
 	hasCookie,
 }
 
-// важно для страниц login/register/forgot (чтобы билд не падал)
 export { getUserMessage }

@@ -1,9 +1,10 @@
-import { useWebSocket } from '@/hooks/useWebSocket'
+// apps/web/src/hooks/useGameSocket.ts
+import { useWebSocket, WebSocketMessage } from '@/hooks/useWebSocket'
 
 export function useGameSocket(
 	baseUrl: string,
-	onMessage: (data: any) => void,
-	gameId: string
+	onMessage: (data: WebSocketMessage) => void,
+	gameId: string,
 ) {
 	if (!gameId) {
 		throw new Error('useGameSocket: gameId is required')
@@ -11,3 +12,5 @@ export function useGameSocket(
 
 	return useWebSocket(baseUrl, onMessage, { gameId }, { path: '/game' })
 }
+
+export default useGameSocket

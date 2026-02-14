@@ -11,32 +11,40 @@ type ProfileAssets = {
 }
 
 const migrateToAbsoluteUrl = (
-	url: string | null | undefined
+	url: string | null | undefined,
 ): string | undefined => {
 	if (!url) return undefined
 	return url.startsWith('http') ? url : asset(url)
 }
 
-type MePayloadLike = any
+function isRecord(v: unknown): v is Record<string, unknown> {
+	return !!v && typeof v === 'object' && !Array.isArray(v)
+}
 
-function unwrapAny<T = any>(v: any): T {
+function unwrapAny<T = unknown>(v: unknown): T {
 	// возможные обёртки
 	// - {data: {...}}
 	// - {user: {...}}
 	// - {status:'signed-in', user:{...}}
-	if (!v || typeof v !== 'object') return v as T
-	if ('data' in v && v.data && typeof v.data === 'object') return v.data as T
-	if ('status' in v && v.status === 'signed-in' && v.user) return v.user as T
-	if ('user' in v && v.user && typeof v.user === 'object') return v.user as T
+	if (!isRecord(v)) return v as T
+	if (isRecord(v.data)) return v.data as T
+	if (v.status === 'signed-in' && isRecord(v.user)) return v.user as T
+	if (isRecord(v.user)) return v.user as T
 	return v as T
 }
 
-function pickString(v: any): string | null {
+function pickString(v: unknown): string | null {
 	return typeof v === 'string' && v.trim() ? v : null
 }
 
-function isApiErrorLike(e: any): e is { status?: number; userMessage?: string } {
-	return !!e && typeof e === 'object' && ('status' in e || 'userMessage' in e)
+function pickNumber(v: unknown): number | null {
+	return typeof v === 'number' && Number.isFinite(v) ? v : null
+}
+
+function isApiErrorLike(
+	e: unknown,
+): e is { status?: number; userMessage?: string } {
+	return isRecord(e) && ('status' in e || 'userMessage' in e)
 }
 
 export const useProfile = () => {
@@ -65,7 +73,7 @@ export const useProfile = () => {
 	const openUsernameModal = useCallback(() => setIsUsernameModalOpen(true), [])
 	const closeUsernameModal = useCallback(
 		() => setIsUsernameModalOpen(false),
-		[]
+		[],
 	)
 
 	/**
@@ -96,7 +104,7 @@ export const useProfile = () => {
 				setAssets(prev => ({ ...prev, frame: migratedFrame }))
 				localStorage.setItem(frameKey(uid), migratedFrame)
 			}
-		} catch (e) {
+		} catch (e: unknown) {
 			console.error('Error accessing localStorage', e)
 		}
 	}, [])
@@ -114,19 +122,18 @@ export const useProfile = () => {
 				} catch {
 					statusUpdates[key as keyof ProfileIconsStatus] = false
 				}
-			})
+			}),
 		)
 
 		setIconsStatus(prev => ({ ...prev, ...statusUpdates }))
 	}, [])
 
 	/**
-	 * ✅ Грузим профиль через единый API-клиент (NEXT_PUBLIC_API_BASE).
-	 * Больше никакого fetch('/auth/me') → 404 от Next в dev исчезает.
+	 * ✅ Грузим профиль через единый API-клиент.
 	 */
 	const loadUserData = useCallback(async () => {
 		try {
-			const raw = (await api.me().catch(e => {
+			const raw = await api.me().catch((e: unknown) => {
 				// api.me() кидает ApiError; обработаем 401 красиво
 				if (isApiErrorLike(e) && e.status === 401) {
 					setProfile({
@@ -137,40 +144,42 @@ export const useProfile = () => {
 					return null
 				}
 				throw e
-			})) as MePayloadLike | null
+			})
 
 			if (!raw) return
 
-			const payload = unwrapAny<any>(raw)
+			const payload = unwrapAny<Record<string, unknown>>(raw)
 
 			// поддерживаем userId или id
 			const userId =
-				pickString(payload?.userId) ||
-				pickString(payload?.id) ||
-				pickString(payload?.user?.userId) ||
-				pickString(payload?.user?.id)
+				pickString(payload.userId) ||
+				pickString(payload.id) ||
+				(isRecord(payload.user) ? pickString(payload.user.userId) : null) ||
+				(isRecord(payload.user) ? pickString(payload.user.id) : null)
 
 			const email =
-				pickString(payload?.email) || pickString(payload?.user?.email) || null
+				pickString(payload.email) ||
+				(isRecord(payload.user) ? pickString(payload.user.email) : null) ||
+				null
 
 			const username =
-				typeof payload?.username === 'string'
+				typeof payload.username === 'string'
 					? payload.username
-					: typeof payload?.user?.username === 'string'
+					: isRecord(payload.user) && typeof payload.user.username === 'string'
 						? payload.user.username
 						: null
 
 			const avatarRaw =
-				typeof payload?.avatar === 'string'
+				typeof payload.avatar === 'string'
 					? payload.avatar
-					: typeof payload?.user?.avatar === 'string'
+					: isRecord(payload.user) && typeof payload.user.avatar === 'string'
 						? payload.user.avatar
 						: null
 
 			const frameRaw =
-				typeof payload?.frame === 'string'
+				typeof payload.frame === 'string'
 					? payload.frame
-					: typeof payload?.user?.frame === 'string'
+					: isRecord(payload.user) && typeof payload.user.frame === 'string'
 						? payload.user.frame
 						: null
 
@@ -213,7 +222,7 @@ export const useProfile = () => {
 
 			// подтягиваем кэш “на всякий”
 			loadSavedAssets(userId)
-		} catch (error: any) {
+		} catch (error: unknown) {
 			console.error('Profile data loading error:', error)
 
 			// Если это ApiError — покажем userMessage
@@ -238,11 +247,6 @@ export const useProfile = () => {
 		}
 	}, [loadSavedAssets])
 
-	/**
-	 * ✅ Сохранение профиля через единый API-клиент.
-	 * Никаких ensureCsrf()/fetch('/auth/csrf') тут больше не нужно —
-	 * api.updateProfile сам делает CSRF и правильные заголовки.
-	 */
 	const handleSaveProfile = useCallback(
 		async (newAvatar: string, newFrame: string) => {
 			if (profile.status !== 'ok' || !profile.data?.id) {
@@ -283,7 +287,7 @@ export const useProfile = () => {
 
 				localStorage.setItem(avatarKey(uid), avatarAbs)
 				localStorage.setItem(frameKey(uid), frameAbs)
-			} catch (e: any) {
+			} catch (e: unknown) {
 				if (isApiErrorLike(e) && e.status === 401) {
 					setProfile({
 						status: 'unauth',
@@ -294,7 +298,7 @@ export const useProfile = () => {
 				throw e
 			}
 		},
-		[profile]
+		[profile],
 	)
 
 	const updateUsername = useCallback(
@@ -322,7 +326,7 @@ export const useProfile = () => {
 						},
 					}
 				})
-			} catch (e: any) {
+			} catch (e: unknown) {
 				if (isApiErrorLike(e) && e.status === 401) {
 					setProfile({
 						status: 'unauth',
@@ -333,7 +337,7 @@ export const useProfile = () => {
 				throw e
 			}
 		},
-		[profile]
+		[profile],
 	)
 
 	const handleIconError = useCallback((iconName: string) => {
@@ -343,6 +347,9 @@ export const useProfile = () => {
 			return { ...prev, [key]: false }
 		})
 	}, [])
+
+	// (не используется прямо сейчас, но оставляю как пример безопасного чтения чисел)
+	void pickNumber
 
 	return {
 		profile,

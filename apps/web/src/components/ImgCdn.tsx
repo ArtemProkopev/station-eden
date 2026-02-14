@@ -1,6 +1,8 @@
 // apps/web/src/components/ImgCdn.tsx
 'use client'
 
+/* eslint-disable @next/next/no-img-element */
+
 import type { ImgHTMLAttributes } from 'react'
 import { useEffect, useState } from 'react'
 import { asset, FALLBACK } from '../lib/asset'
@@ -18,7 +20,7 @@ type Props = Omit<
 	priority?: boolean
 }
 
-export default function ImgCdn({ src, priority, style, ...rest }: Props) {
+export default function ImgCdn({ src, priority, style, alt, ...rest }: Props) {
 	const { isPrimaryHealthy } = useCdnHealth()
 	const isRel = !/^https?:\/\//i.test(src)
 
@@ -39,6 +41,7 @@ export default function ImgCdn({ src, priority, style, ...rest }: Props) {
 	return (
 		<img
 			src={cur}
+			alt={typeof alt === 'string' ? alt : ''} // ✅ обязательный alt для jsx-a11y
 			loading={priority ? 'eager' : 'lazy'}
 			decoding='async'
 			onError={() => {

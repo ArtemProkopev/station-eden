@@ -2,6 +2,7 @@
 'use client'
 
 import { Friend, Notification } from '@station-eden/shared'
+import Link from 'next/link'
 import React from 'react'
 import styles from './TopHUD.module.css'
 import { ChatWindow } from './components/ChatWindow'
@@ -77,7 +78,7 @@ export default function TopHUD({
 				requesterId: 'user-789',
 				requesterName: 'SpaceExplorer',
 			},
-		]
+		],
 	)
 
 	const [friends, setFriends] = React.useState<Friend[]>(() => [
@@ -161,12 +162,12 @@ export default function TopHUD({
 		(notificationId: string, action: string) => {
 			console.log(`Notification ${notificationId}: ${action}`)
 		},
-		[]
+		[],
 	)
 
 	const handleMarkAsRead = React.useCallback((notificationId: string) => {
 		setNotifications(prev =>
-			prev.map(n => (n.id === notificationId ? { ...n, isRead: true } : n))
+			prev.map(n => (n.id === notificationId ? { ...n, isRead: true } : n)),
 		)
 	}, [])
 
@@ -174,7 +175,7 @@ export default function TopHUD({
 		(notificationId: string) => {
 			setNotifications(prev => prev.filter(n => n.id !== notificationId))
 		},
-		[]
+		[],
 	)
 
 	const handleFriendsClick = React.useCallback(() => {
@@ -197,7 +198,7 @@ export default function TopHUD({
 				})
 			}
 		},
-		[friends]
+		[friends],
 	)
 
 	const handleCloseChat = React.useCallback(() => {
@@ -223,7 +224,7 @@ export default function TopHUD({
 				transform: `scale(${scale})`,
 				transformOrigin: 'top center',
 			}) as React.CSSProperties,
-		[scale]
+		[scale],
 	)
 
 	// Без profile (или status=loading) — скелет
@@ -249,7 +250,7 @@ export default function TopHUD({
 				<div className={styles.leftSection}>
 					{variant === 'default' && (
 						<nav aria-label='Основная навигация'>
-							<a
+							<Link
 								href='/'
 								className={styles.backLink}
 								aria-label='Вернуться на главную страницу'
@@ -261,7 +262,7 @@ export default function TopHUD({
 									aria-hidden={true}
 								/>
 								<span className={styles.backText}>на главную</span>
-							</a>
+							</Link>
 						</nav>
 					)}
 				</div>

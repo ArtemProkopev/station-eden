@@ -1,3 +1,4 @@
+// apps/web/src/components/ui/OTPInput.tsx
 'use client'
 
 import React, {
@@ -9,6 +10,7 @@ import React, {
 	useMemo,
 	useRef,
 	useState,
+	type CSSProperties,
 } from 'react'
 import styles from './OTPInput.module.css'
 
@@ -32,6 +34,8 @@ type OTPInputHandle = {
 	clear: () => void
 }
 
+type CSSVars = CSSProperties & { ['--len']?: string }
+
 function digitsOnly(s: string) {
 	return (s || '').replace(/\D/g, '')
 }
@@ -53,19 +57,29 @@ const OTPInput = forwardRef<OTPInputHandle, OTPInputProps>(function OTPInput(
 		error,
 		ariaLabel = 'Код подтверждения',
 	},
-	ref
+	ref,
 ) {
 	const rid = useId()
 	const inputId = id || `otp-${rid}`
 
 	const [internal, setInternal] = useState<string>(
-		clampDigits(value ?? '', length)
+		clampDigits(value ?? '', length),
 	)
 	const val = value !== undefined ? clampDigits(value, length) : internal
 
 	const containerRef = useRef<HTMLDivElement>(null)
 	const inputRef = useRef<HTMLInputElement>(null)
 	const [isFocused, setIsFocused] = useState(false)
+
+	const setValue = useCallback(
+		(next: string) => {
+			const digits = clampDigits(next, length)
+			if (value === undefined) setInternal(digits)
+			onChange?.(digits)
+			if (digits.length === length) onComplete?.(digits)
+		},
+		[length, onChange, onComplete, value],
+	)
 
 	useImperativeHandle(
 		ref,
@@ -77,17 +91,7 @@ const OTPInput = forwardRef<OTPInputHandle, OTPInputProps>(function OTPInput(
 				inputRef.current?.focus()
 			},
 		}),
-		[]
-	)
-
-	const setValue = useCallback(
-		(next: string) => {
-			const digits = clampDigits(next, length)
-			if (value === undefined) setInternal(digits)
-			onChange?.(digits)
-			if (digits.length === length) onComplete?.(digits)
-		},
-		[length, onChange, onComplete, value]
+		[setValue],
 	)
 
 	useEffect(() => {
@@ -113,7 +117,7 @@ const OTPInput = forwardRef<OTPInputHandle, OTPInputProps>(function OTPInput(
 				e.preventDefault()
 			}
 		},
-		[disabled, length, onComplete, setValue, val]
+		[disabled, length, onComplete, setValue, val],
 	)
 
 	const onInputChange = useCallback(
@@ -121,7 +125,7 @@ const OTPInput = forwardRef<OTPInputHandle, OTPInputProps>(function OTPInput(
 			if (disabled) return
 			setValue(e.target.value)
 		},
-		[disabled, setValue]
+		[disabled, setValue],
 	)
 
 	const onPasteAny = useCallback(
@@ -133,7 +137,7 @@ const OTPInput = forwardRef<OTPInputHandle, OTPInputProps>(function OTPInput(
 				setValue(text)
 			}
 		},
-		[disabled, setValue]
+		[disabled, setValue],
 	)
 
 	const digitsArray = useMemo(() => {
@@ -155,7 +159,7 @@ const OTPInput = forwardRef<OTPInputHandle, OTPInputProps>(function OTPInput(
 			onPaste={onPasteAny}
 			role='group'
 			aria-label={ariaLabel}
-			style={{ ['--len' as any]: String(length) } as React.CSSProperties}
+			style={{ '--len': String(length) } as CSSVars}
 		>
 			<input
 				ref={inputRef}
@@ -176,7 +180,6 @@ const OTPInput = forwardRef<OTPInputHandle, OTPInputProps>(function OTPInput(
 
 			<div className={styles.liquid} aria-hidden />
 
-			{/* Горизонтальный ряд слотов */}
 			<div className={styles.track}>
 				{digitsArray.map((d, i) => {
 					const isActive = i === activeIndex && val.length < length

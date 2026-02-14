@@ -22,35 +22,39 @@ const DEFAULT_SETTINGS: UserSettings = {
 }
 
 const migrateToAbsoluteUrl = (
-	url: string | null | undefined
+	url: string | null | undefined,
 ): string | undefined => {
 	if (!url) return undefined
 	return url.startsWith('http') ? url : asset(url)
 }
 
-type MePayloadLike = any
+function isRecord(v: unknown): v is Record<string, unknown> {
+	return !!v && typeof v === 'object' && !Array.isArray(v)
+}
 
-function unwrapAny<T = any>(v: any): T {
-	if (!v || typeof v !== 'object') return v as T
-	if ('data' in v && v.data && typeof v.data === 'object') return v.data as T
-	if ('status' in v && v.status === 'signed-in' && v.user) return v.user as T
-	if ('user' in v && v.user && typeof v.user === 'object') return v.user as T
+function unwrapAny<T = unknown>(v: unknown): T {
+	if (!isRecord(v)) return v as T
+	if (isRecord(v.data)) return v.data as T
+	if (v.status === 'signed-in' && isRecord(v.user)) return v.user as T
+	if (isRecord(v.user)) return v.user as T
 	return v as T
 }
 
-function pickString(v: any): string | null {
+function pickString(v: unknown): string | null {
 	return typeof v === 'string' && v.trim() ? v : null
 }
 
-function isApiErrorLike(e: any): e is { status?: number; userMessage?: string } {
-	return !!e && typeof e === 'object' && ('status' in e || 'userMessage' in e)
+function isApiErrorLike(
+	e: unknown,
+): e is { status?: number; userMessage?: string } {
+	return isRecord(e) && ('status' in e || 'userMessage' in e)
 }
 
 export function useSettings() {
 	const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS)
 	const [profile, setProfile] = useState<ProfileState>({ status: 'loading' })
 	const [avatar, setAvatar] = useState<string>(
-		asset(PROFILE_CONFIG.DEFAULT.AVATAR)
+		asset(PROFILE_CONFIG.DEFAULT.AVATAR),
 	)
 
 	/**
@@ -65,7 +69,7 @@ export function useSettings() {
 
 			// старые ключи оставим как fallback (на всякий)
 			const legacyAvatar = localStorage.getItem(
-				PROFILE_CONFIG.STORAGE_KEYS.AVATAR
+				PROFILE_CONFIG.STORAGE_KEYS.AVATAR,
 			)
 			const legacyUserAvatar = localStorage.getItem('user_avatar')
 
@@ -87,11 +91,11 @@ export function useSettings() {
 						setAvatar(asset(PROFILE_CONFIG.DEFAULT.AVATAR))
 					}
 				})
-				.catch(err => {
+				.catch((err: unknown) => {
 					console.error('Avatar fetch error:', err)
 					setAvatar(asset(PROFILE_CONFIG.DEFAULT.AVATAR))
 				})
-		} catch (error) {
+		} catch (error: unknown) {
 			console.error('Error loading avatar:', error)
 			setAvatar(asset(PROFILE_CONFIG.DEFAULT.AVATAR))
 		}
@@ -104,7 +108,7 @@ export function useSettings() {
 	 */
 	const loadUserData = useCallback(async () => {
 		try {
-			const raw = (await api.me().catch(e => {
+			const raw = await api.me().catch((e: unknown) => {
 				if (isApiErrorLike(e) && e.status === 401) {
 					console.warn('Unauthorized')
 					setProfile({
@@ -115,40 +119,42 @@ export function useSettings() {
 					return null
 				}
 				throw e
-			})) as MePayloadLike | null
+			})
 
 			if (!raw) return
 
-			const payload = unwrapAny<any>(raw)
+			const payload = unwrapAny<Record<string, unknown>>(raw)
 
 			// поддерживаем id/userId и вложенные варианты
 			const userId =
-				pickString(payload?.userId) ||
-				pickString(payload?.id) ||
-				pickString(payload?.user?.userId) ||
-				pickString(payload?.user?.id)
+				pickString(payload.userId) ||
+				pickString(payload.id) ||
+				(isRecord(payload.user) ? pickString(payload.user.userId) : null) ||
+				(isRecord(payload.user) ? pickString(payload.user.id) : null)
 
 			const email =
-				pickString(payload?.email) || pickString(payload?.user?.email) || null
+				pickString(payload.email) ||
+				(isRecord(payload.user) ? pickString(payload.user.email) : null) ||
+				null
 
 			const username =
-				typeof payload?.username === 'string'
+				typeof payload.username === 'string'
 					? payload.username
-					: typeof payload?.user?.username === 'string'
+					: isRecord(payload.user) && typeof payload.user.username === 'string'
 						? payload.user.username
 						: null
 
 			const avatarRaw =
-				typeof payload?.avatar === 'string'
+				typeof payload.avatar === 'string'
 					? payload.avatar
-					: typeof payload?.user?.avatar === 'string'
+					: isRecord(payload.user) && typeof payload.user.avatar === 'string'
 						? payload.user.avatar
 						: null
 
 			const frameRaw =
-				typeof payload?.frame === 'string'
+				typeof payload.frame === 'string'
 					? payload.frame
-					: typeof payload?.user?.frame === 'string'
+					: isRecord(payload.user) && typeof payload.user.frame === 'string'
 						? payload.user.frame
 						: null
 
@@ -168,7 +174,7 @@ export function useSettings() {
 					username,
 					avatar: avatarAbs ?? undefined,
 					frame: frameAbs ?? undefined,
-				} as any,
+				},
 			})
 
 			// ставим аватар: сервер > per-user cache > дефолт
@@ -181,7 +187,7 @@ export function useSettings() {
 
 			// frameAbs тут не нужен напрямую, но оставляем в profile
 			void frameAbs
-		} catch (error: any) {
+		} catch (error: unknown) {
 			console.error('User data loading error:', error)
 
 			if (isApiErrorLike(error)) {
@@ -199,7 +205,9 @@ export function useSettings() {
 			setProfile({
 				status: 'error',
 				message:
-					error instanceof Error ? error.message : 'Не удалось загрузить данные',
+					error instanceof Error
+						? error.message
+						: 'Не удалось загрузить данные',
 			})
 			loadSavedAvatar(undefined)
 		}
@@ -209,17 +217,23 @@ export function useSettings() {
 		try {
 			const saved = localStorage.getItem('user_settings')
 			if (saved) {
-				const parsedSettings = JSON.parse(saved)
-				setSettings({
-					...DEFAULT_SETTINGS,
-					...parsedSettings,
-					sound: {
-						...DEFAULT_SETTINGS.sound,
-						...parsedSettings.sound,
-					},
-				})
+				const parsedSettings = JSON.parse(saved) as unknown
+				if (isRecord(parsedSettings)) {
+					const sound = isRecord(parsedSettings.sound)
+						? parsedSettings.sound
+						: {}
+
+					setSettings({
+						...DEFAULT_SETTINGS,
+						...parsedSettings,
+						sound: {
+							...DEFAULT_SETTINGS.sound,
+							...sound,
+						},
+					})
+				}
 			}
-		} catch (error) {
+		} catch (error: unknown) {
 			console.error('Failed to load settings:', error)
 		}
 	}, [])
@@ -227,7 +241,7 @@ export function useSettings() {
 	const saveSettings = useCallback((newSettings: UserSettings) => {
 		try {
 			localStorage.setItem('user_settings', JSON.stringify(newSettings))
-		} catch (error) {
+		} catch (error: unknown) {
 			console.error('Failed to save settings:', error)
 		}
 	}, [])
@@ -240,7 +254,7 @@ export function useSettings() {
 				return newSettings
 			})
 		},
-		[saveSettings]
+		[saveSettings],
 	)
 
 	const updateSoundSettings = useCallback(
@@ -252,7 +266,7 @@ export function useSettings() {
 				return newSettings
 			})
 		},
-		[saveSettings]
+		[saveSettings],
 	)
 
 	return {

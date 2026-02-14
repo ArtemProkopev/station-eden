@@ -7,14 +7,12 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
-// Components
 import GoogleAuthButton from '@/components/auth/google/GoogleAuthButton'
 import YandexAuthButton from '@/components/auth/yandex/YandexAuthButton'
 import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
 import { ClockIcon, EyeIcon, EyeOffIcon } from '@/components/ui/Icons'
 import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
 
-// Hooks & Utils
 import { useAuthLock } from '@/hooks/useAuthLock'
 import { api, getUserMessage } from '@/lib/api'
 import { clearForcedLogoutFlags } from '@/lib/authUtils'
@@ -29,14 +27,11 @@ import {
 	UserData,
 } from '@station-eden/shared'
 
-// Styles
 import styles from './page.module.css'
 
-// Constants
 const FORM_ANIMATION_DURATION = 340
 const MAX_ATTEMPTS_UI = 5
 
-// Memoized components
 const MemoizedFireflies = memo(FirefliesProfile)
 const MemoizedStars = memo(TwinklingStars)
 
@@ -48,11 +43,20 @@ interface FormState {
 	shake: boolean
 }
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+	return !!v && typeof v === 'object' && !Array.isArray(v)
+}
+
+function pickFieldErrors(err: unknown): Record<string, unknown> | null {
+	if (!isRecord(err)) return null
+	const fe = err.fieldErrors
+	return isRecord(fe) ? fe : null
+}
+
 export default function LoginPageClient() {
 	const router = useRouter()
 	const searchParams = useSearchParams()
 
-	// Form state
 	const [formState, setFormState] = useState<FormState>({
 		showPassword: false,
 		error: null,
@@ -61,7 +65,6 @@ export default function LoginPageClient() {
 		shake: false,
 	})
 
-	// Form handling
 	const {
 		register,
 		handleSubmit,
@@ -73,9 +76,7 @@ export default function LoginPageClient() {
 		mode: 'onChange',
 	})
 
-	// Auth lock state
 	const {
-		lockedUntilIso,
 		setLockedUntilIso,
 		countdown,
 		attemptsLeft,
@@ -86,11 +87,9 @@ export default function LoginPageClient() {
 	const lastLoginRef = useRef<string>('')
 	const shakeTimeoutRef = useRef<number | null>(null)
 
-	// Watched fields
 	const login = watch('login', '')
 	const password = watch('password', '')
 
-	// Effects
 	useEffect(() => {
 		setFormState(prev => ({ ...prev, mounted: true }))
 		return () => {
@@ -101,7 +100,6 @@ export default function LoginPageClient() {
 		}
 	}, [])
 
-	// Memoized values
 	const next = searchParams.get('next') || '/profile'
 	const reason = searchParams.get('reason')
 
@@ -125,16 +123,14 @@ export default function LoginPageClient() {
 		[next],
 	)
 
-	// Event handlers
 	const handleParseAndSet = useCallback(
-		(err: any) => {
+		(err: unknown) => {
 			const info = parseServerInfo(err) as ServerLockInfo
 
 			if (info.attemptsLeft !== undefined) {
 				setAttemptsLeft(Number(info.attemptsLeft))
 			}
 
-			// Приоритет: lockedUntil (серверная точная дата) > lockedMinutes
 			if (info.lockedUntil) {
 				const parsed = Date.parse(info.lockedUntil)
 				if (!Number.isNaN(parsed)) {
@@ -174,17 +170,14 @@ export default function LoginPageClient() {
 
 	const handleSuccessfulLogin = useCallback(
 		(userData: UserData) => {
-			// Сбрасываем флаги принудительного логаута / отключения keep-alive
 			clearForcedLogoutFlags()
 
 			if (typeof window !== 'undefined') {
 				localStorage.setItem('authToken', userData.token)
 				localStorage.setItem('userData', JSON.stringify(userData))
 
-				// Событие для других частей приложения
 				window.dispatchEvent(new Event('authChange'))
 
-				// Если где-то слушают storage "в этой же вкладке" — имитируем (как было)
 				window.dispatchEvent(
 					new StorageEvent('storage', {
 						key: 'authToken',
@@ -214,7 +207,6 @@ export default function LoginPageClient() {
 				const res = await api.login(data.login, data.password)
 				const response = res as LoginResponse
 
-				// MFA по email
 				if (response.mfa === 'email_code_sent') {
 					const needSet = response.needSetPassword === true
 					const queryParams = new URLSearchParams({
@@ -228,7 +220,6 @@ export default function LoginPageClient() {
 					return
 				}
 
-				// Сохраняем данные пользователя
 				const userData: UserData = {
 					id: response.user?.id || response.id || 'unknown',
 					email: response.user?.email || response.email || data.login,
@@ -238,23 +229,27 @@ export default function LoginPageClient() {
 				}
 
 				handleSuccessfulLogin(userData)
-			} catch (err: any) {
+			} catch (err: unknown) {
 				const errorMessage = getUserMessage(err, 'login')
 				setFormState(prev => ({
 					...prev,
 					error: errorMessage,
 				}))
 
-				// Устанавливаем ошибку в форму для конкретных полей если нужно (сервер)
-				if ((err as any).fieldErrors) {
-					Object.entries((err as any).fieldErrors).forEach(
-						([field, message]) => {
-							setError(field as keyof LoginDto, {
-								type: 'server',
-								message: Array.isArray(message) ? message[0] : String(message),
-							})
-						},
-					)
+				const fe = pickFieldErrors(err)
+				if (fe) {
+					Object.entries(fe).forEach(([field, message]) => {
+						const msg = Array.isArray(message)
+							? String(message[0] ?? '')
+							: typeof message === 'string'
+								? message
+								: String(message ?? '')
+
+						setError(field as keyof LoginDto, {
+							type: 'server',
+							message: msg,
+						})
+					})
 				}
 
 				handleParseAndSet(err)
@@ -278,7 +273,6 @@ export default function LoginPageClient() {
 		triggerShake()
 	}, [triggerShake])
 
-	// Render helpers
 	const renderLockPills = useMemo(
 		() => (
 			<div className={styles.pillRow} aria-live='polite'>
@@ -326,9 +320,11 @@ export default function LoginPageClient() {
 				'Похоже, такого аккаунта ещё нет. Вы можете зарегистрироваться.',
 		}
 
+		const key = reason as keyof typeof messages
+
 		return (
 			<p className={`${styles.notice} ${styles.info}`} role='status'>
-				{messages[reason as keyof typeof messages]}
+				{messages[key]}
 			</p>
 		)
 	}, [reason])
@@ -364,7 +360,6 @@ export default function LoginPageClient() {
 								: undefined
 						}
 					>
-						{/* Login Field */}
 						<div className={styles.inputGroup}>
 							<label htmlFor='login' className={styles.label}>
 								Email или username
@@ -389,7 +384,6 @@ export default function LoginPageClient() {
 							)}
 						</div>
 
-						{/* Password Field */}
 						<div className={styles.inputGroup}>
 							<div className={styles.labelRow}>
 								<label htmlFor='password' className={styles.label}>

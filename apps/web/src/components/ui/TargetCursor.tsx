@@ -1,3 +1,4 @@
+// apps/web/src/components/ui/TargetCursor.tsx
 'use client'
 
 import { gsap } from 'gsap'
@@ -23,22 +24,19 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 	const spinTl = useRef<gsap.core.Timeline | null>(null)
 	const dotRef = useRef<HTMLDivElement>(null)
 
-	const isActiveRef = useRef(false)
 	const targetCornerPositionsRef = useRef<{ x: number; y: number }[] | null>(
-		null
+		null,
 	)
 	const tickerFnRef = useRef<(() => void) | null>(null)
 	const activeStrengthRef = useRef({ current: 0 })
 
-	// важно: guard на SSR
 	const isMobile = useMemo(() => {
 		if (typeof window === 'undefined') return false
 
 		const hasTouchScreen =
 			'ontouchstart' in window || navigator.maxTouchPoints > 0
 		const isSmallScreen = window.innerWidth <= 768
-		const userAgent =
-			navigator.userAgent || navigator.vendor || (window as any).opera
+		const userAgent = navigator.userAgent || navigator.vendor || ''
 		const mobileRegex =
 			/android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i
 		const isMobileUserAgent = mobileRegex.test(userAgent.toLowerCase())
@@ -63,7 +61,7 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 
 		const cursor = cursorRef.current
 		cornersRef.current = cursor.querySelectorAll<HTMLDivElement>(
-			'.target-cursor-corner'
+			'.target-cursor-corner',
 		)
 
 		let activeTarget: Element | null = null
@@ -176,9 +174,7 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 			if (!target || !cursorRef.current || !cornersRef.current) return
 			if (activeTarget === target) return
 
-			if (activeTarget) {
-				cleanupTarget(activeTarget)
-			}
+			if (activeTarget) cleanupTarget(activeTarget)
 			if (resumeTimeout) {
 				clearTimeout(resumeTimeout)
 				resumeTimeout = null
@@ -212,7 +208,6 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 				},
 			]
 
-			isActiveRef.current = true
 			gsap.ticker.add(tickerFnRef.current!)
 
 			gsap.to(activeStrengthRef.current, {
@@ -232,7 +227,6 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 
 			const leaveHandler = () => {
 				gsap.ticker.remove(tickerFnRef.current!)
-				isActiveRef.current = false
 				targetCornerPositionsRef.current = null
 				gsap.set(activeStrengthRef.current, { current: 0, overwrite: true })
 				activeTarget = null
@@ -257,7 +251,7 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 								duration: 0.3,
 								ease: 'power3.out',
 							},
-							0
+							0,
 						)
 					})
 				}
@@ -266,7 +260,7 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 					if (!activeTarget && cursorRef.current && spinTl.current) {
 						const currentRotation = gsap.getProperty(
 							cursorRef.current,
-							'rotation'
+							'rotation',
 						) as number
 						const normalizedRotation = currentRotation % 360
 						spinTl.current.kill()
@@ -289,9 +283,7 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 					resumeTimeout = null
 				}, 50)
 
-				if (target) {
-					cleanupTarget(target)
-				}
+				if (target) cleanupTarget(target)
 			}
 
 			currentLeaveHandler = leaveHandler
@@ -301,20 +293,15 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 		window.addEventListener('mouseover', enterHandler as EventListener)
 
 		return () => {
-			if (tickerFnRef.current) {
-				gsap.ticker.remove(tickerFnRef.current)
-			}
+			if (tickerFnRef.current) gsap.ticker.remove(tickerFnRef.current)
 			window.removeEventListener('mousemove', moveHandler)
 			window.removeEventListener('mouseover', enterHandler as EventListener)
 			window.removeEventListener('scroll', scrollHandler)
 			window.removeEventListener('mousedown', mouseDownHandler)
 			window.removeEventListener('mouseup', mouseUpHandler)
-			if (activeTarget) {
-				cleanupTarget(activeTarget)
-			}
+			if (activeTarget) cleanupTarget(activeTarget)
 			spinTl.current?.kill()
 			document.body.style.cursor = originalCursor
-			isActiveRef.current = false
 			targetCornerPositionsRef.current = null
 			activeStrengthRef.current.current = 0
 		}
@@ -341,9 +328,7 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 		}
 	}, [spinDuration, isMobile])
 
-	if (isMobile) {
-		return null
-	}
+	if (isMobile) return null
 
 	return (
 		<div ref={cursorRef} className='target-cursor-wrapper'>

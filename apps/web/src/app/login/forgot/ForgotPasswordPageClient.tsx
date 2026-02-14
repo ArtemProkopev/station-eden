@@ -8,14 +8,10 @@ import { memo, useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
-// UI
 import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
 import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
 
-// API
 import { api, getUserMessage } from '@/src/lib/api'
-
-// Стили — переиспользуем login/page.module.css
 import styles from '../page.module.css'
 
 const MemoizedFireflies = memo(FirefliesProfile)
@@ -77,7 +73,6 @@ export default function ForgotPasswordPageClient() {
 			try {
 				await api.forgotPassword(data.email)
 
-				// UX: сразу уходим на экран кода + нового пароля
 				const params = new URLSearchParams({
 					email: data.email,
 					mode: 'set_password',
@@ -85,7 +80,7 @@ export default function ForgotPasswordPageClient() {
 				})
 				setFormState(prev => ({ ...prev, success: true }))
 				router.replace(`/login/verify?${params.toString()}`)
-			} catch (err: any) {
+			} catch (err: unknown) {
 				const msg = getUserMessage(err, 'login')
 				setFormState(prev => ({ ...prev, error: msg, success: false }))
 				triggerShake()
@@ -93,7 +88,7 @@ export default function ForgotPasswordPageClient() {
 				setFormState(prev => ({ ...prev, busy: false }))
 			}
 		},
-		[next, router, triggerShake]
+		[next, router, triggerShake],
 	)
 
 	const onError = useCallback(() => {

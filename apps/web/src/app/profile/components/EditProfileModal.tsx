@@ -1,6 +1,7 @@
+// apps/web/src/app/profile/components/EditProfileModal.tsx
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import ImgCdn from '../../../components/ImgCdn'
 import { asset } from '../../../lib/asset'
 import styles from './EditProfileModal.module.css'
@@ -13,7 +14,6 @@ interface EditProfileModalProps {
 	currentFrame?: string
 }
 
-// Наборы доступных картинок сразу как абсолютные CDN/S3-URL
 const AVATARS = [
 	asset('/avatars/avatar1.png'),
 	asset('/avatars/avatar2.png'),
@@ -41,7 +41,6 @@ const FRAMES = [
 	asset('/frames/frame9.png'),
 ]
 
-// Хук для предзагрузки изображений
 function useImagePreload(urls: string[], enabled: boolean) {
 	useEffect(() => {
 		if (!enabled) return
@@ -52,7 +51,6 @@ function useImagePreload(urls: string[], enabled: boolean) {
 	}, [urls, enabled])
 }
 
-// Оптимизированный компонент для изображений с ленивой загрузкой
 const LazyImage = ({
 	src,
 	alt,
@@ -75,7 +73,6 @@ const LazyImage = ({
 				if (!cancelled) setLoaded(true)
 			}
 		} else {
-			// считаем "loaded" после первого рендера (ImgCdn сам лениво грузит)
 			setLoaded(true)
 		}
 
@@ -93,7 +90,6 @@ const LazyImage = ({
 	)
 }
 
-// Нормализуем входящее значение к абсолютному URL
 function toAbsolute(url?: string) {
 	if (!url) return undefined
 	return /^https?:\/\//.test(url) ? url : asset(url)
@@ -106,14 +102,13 @@ export default function EditProfileModal({
 	currentAvatar,
 	currentFrame,
 }: EditProfileModalProps) {
-	// Дефолты + миграция старых относительных значений к абсолютным
 	const initialAvatar = useMemo(
 		() => toAbsolute(currentAvatar) ?? AVATARS[0],
-		[currentAvatar]
+		[currentAvatar],
 	)
 	const initialFrame = useMemo(
 		() => toAbsolute(currentFrame) ?? FRAMES[0],
-		[currentFrame]
+		[currentFrame],
 	)
 
 	const [selectedAvatar, setSelectedAvatar] = useState(initialAvatar)
@@ -123,7 +118,6 @@ export default function EditProfileModal({
 	const [isSaving, setIsSaving] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 
-	// при открытии модалки — сбрасываем состояние к текущим значениям
 	useEffect(() => {
 		if (!isOpen) return
 		setSelectedAvatar(initialAvatar)
@@ -133,10 +127,8 @@ export default function EditProfileModal({
 		setError(null)
 	}, [isOpen, initialAvatar, initialFrame])
 
-	// Предзагрузка изображений при открытии модалки
 	useImagePreload([initialAvatar, initialFrame], isOpen)
 
-	// Предзагрузка первых нескольких изображений при открытии
 	useEffect(() => {
 		if (!isOpen) return
 		const avatarsToPreload = AVATARS.slice(0, 4)
@@ -153,7 +145,6 @@ export default function EditProfileModal({
 	const handleTabChange = (tab: 'avatars' | 'frames') => {
 		setActiveTab(tab)
 
-		// чуть позже — подгружаем остальные для текущей вкладки
 		const urlsToPreload = tab === 'avatars' ? AVATARS.slice(4) : FRAMES.slice(4)
 		setTimeout(() => {
 			urlsToPreload.forEach(url => {
@@ -169,7 +160,7 @@ export default function EditProfileModal({
 			setIsSaving(true)
 			await onSave(selectedAvatar, selectedFrame)
 			onClose()
-		} catch (e: any) {
+		} catch (e: unknown) {
 			const msg =
 				e instanceof Error
 					? e.message
@@ -184,7 +175,7 @@ export default function EditProfileModal({
 		if (!isSaving) onClose()
 	}
 
-	const stop = (e: React.MouseEvent) => e.stopPropagation()
+	const stop = (e: MouseEvent) => e.stopPropagation()
 
 	return (
 		<div className={styles.modalOverlay} onClick={onBackdrop}>

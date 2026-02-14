@@ -2,6 +2,7 @@
 import { useProfile } from '@/app/profile/hooks/useProfile'
 import { useLobbySocket } from '@/hooks/useLobbySocket'
 import { useScrollPrevention } from '@/hooks/useScrollPrevention'
+import { WebSocketMessage } from '@/hooks/useWebSocket'
 import {
 	ChatMessage,
 	LobbySettings,
@@ -31,6 +32,68 @@ const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
 	},
 ]
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+	return !!v && typeof v === 'object' && !Array.isArray(v)
+}
+
+function normalizeChatType(v: unknown): 'system' | 'player' | undefined {
+	return v === 'system' || v === 'player' ? v : undefined
+}
+
+function pickNumber(v: unknown): number {
+	return typeof v === 'number' && Number.isFinite(v) ? v : 0
+}
+
+function safeDate(v: unknown): Date {
+	if (v instanceof Date) return v
+	if (typeof v === 'string') {
+		const d = new Date(v)
+		return Number.isNaN(d.getTime()) ? new Date() : d
+	}
+	return new Date()
+}
+
+function toIsoTimestamp(ts: string | Date): string {
+	if (ts instanceof Date) return ts.toISOString()
+	const d = new Date(ts)
+	return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString()
+}
+
+function toLobbyPlayer(v: unknown): Player | null {
+	if (!isRecord(v)) return null
+
+	const id = typeof v.id === 'string' ? v.id : null
+	const name = typeof v.name === 'string' ? v.name : null
+
+	if (!id || !name) return null
+
+	return {
+		id,
+		name,
+		missions: pickNumber(v.missions),
+		hours: pickNumber(v.hours),
+		isReady: typeof v.isReady === 'boolean' ? v.isReady : false,
+		avatar: typeof v.avatar === 'string' ? v.avatar : undefined,
+	}
+}
+
+function normalizeSettings(v: unknown): LobbySettings {
+	if (!isRecord(v)) return DEFAULT_LOBBY_SETTINGS
+	return {
+		maxPlayers:
+			typeof v.maxPlayers === 'number' && v.maxPlayers > 0 ? v.maxPlayers : 4,
+		gameMode: (v.gameMode === 'standard' || v.gameMode === 'custom'
+			? v.gameMode
+			: 'standard') as LobbySettings['gameMode'],
+		isPrivate: typeof v.isPrivate === 'boolean' ? v.isPrivate : false,
+		password: typeof v.password === 'string' ? v.password : '',
+	}
+}
+
+function makeId(prefix: string) {
+	return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+}
+
 export function useLobby(lobbyIdFromProps?: string) {
 	const router = useRouter()
 	const {
@@ -45,10 +108,10 @@ export function useLobby(lobbyIdFromProps?: string) {
 	const [showAddPlayerModal, setShowAddPlayerModal] = useState(false)
 	const [showLobbySettingsModal, setShowLobbySettingsModal] = useState(false)
 	const [lobbySettings, setLobbySettings] = useState<LobbySettings>(
-		DEFAULT_LOBBY_SETTINGS
+		DEFAULT_LOBBY_SETTINGS,
 	)
 	const [chatMessages, setChatMessages] = useState<ChatMessage[]>(
-		INITIAL_CHAT_MESSAGES
+		INITIAL_CHAT_MESSAGES,
 	)
 	const [newMessage, setNewMessage] = useState('')
 	const [isLoading, setIsLoading] = useState(true)
@@ -64,7 +127,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 	const lobbySettingsRef = useRef<LobbySettings>(DEFAULT_LOBBY_SETTINGS)
 	const lobbyIdRef = useRef<string>(lobbyIdFromProps || 'default-lobby')
 	const hasJoinedRef = useRef(false)
-	const reconnectTimeoutRef = useRef<NodeJS.Timeout>()
+	const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
 	const currentUserId = profile.data?.id
 
@@ -83,137 +146,190 @@ export function useLobby(lobbyIdFromProps?: string) {
 	useScrollPrevention()
 
 	const handleWebSocketMessage = useCallback(
-		(data: any) => {
+		(data: WebSocketMessage) => {
 			if (!data?.type) return
 
 			switch (data.type) {
-				case 'PLAYER_JOINED':
+				case 'PLAYER_JOINED': {
+					const candidate = (data as Record<string, unknown>).player
+					const player = toLobbyPlayer(candidate)
+					if (!player) break
+
 					setPlayers(prev => {
-						const exists = prev.some((p: Player) => p.id === data.player.id)
-						return !exists && prev.length < lobbySettingsRef.current.maxPlayers
-							? [...prev, data.player]
-							: prev
+						const exists = prev.some(p => p.id === player.id)
+						if (exists) return prev
+						if (prev.length >= lobbySettingsRef.current.maxPlayers) return prev
+						return [...prev, player]
 					})
 					break
+				}
 
-				case 'PLAYER_LEFT':
-					setPlayers(prev => prev.filter((p: Player) => p.id !== data.playerId))
+				case 'PLAYER_LEFT': {
+					const playerId =
+						typeof (data as Record<string, unknown>).playerId === 'string'
+							? ((data as Record<string, unknown>).playerId as string)
+							: ''
+					if (playerId) setPlayers(prev => prev.filter(p => p.id !== playerId))
 					break
+				}
 
 				case 'CHAT_MESSAGE': {
-					const msg = data.message || {}
-					const id =
-						msg.id ||
-						`srv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+					const msgAny = (data as Record<string, unknown>).message
+					const msg = isRecord(msgAny) ? msgAny : {}
+
+					const id = typeof msg.id === 'string' ? msg.id : makeId('srv')
 					if (seenMsgIdsRef.current.has(id)) break
 					seenMsgIdsRef.current.add(id)
 
-					setChatMessages(prev => [
-						...prev,
-						{
-							id,
-							playerId: msg.playerId ?? 'unknown',
-							playerName: msg.playerName ?? 'Игрок',
-							text: String(msg.text ?? '').slice(0, 300),
-							timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
-							type: msg.type ?? 'player',
-						},
-					])
+					const nextMessage: ChatMessage = {
+						id,
+						playerId:
+							typeof msg.playerId === 'string' ? msg.playerId : 'unknown',
+						playerName:
+							typeof msg.playerName === 'string' ? msg.playerName : 'Игрок',
+						text: String(msg.text ?? '').slice(0, 300),
+						timestamp: safeDate(msg.timestamp),
+						type: normalizeChatType(msg.type) ?? 'player',
+					}
+
+					setChatMessages(prev => [...prev, nextMessage])
 					shouldScrollRef.current = true
 					break
 				}
 
-				case 'LOBBY_STATE':
-					setPlayers(Array.isArray(data.players) ? data.players : [])
-					if (data.settings) setLobbySettings(data.settings)
-					if (data.creatorId) setLobbyCreatorId(data.creatorId)
-					break
+				case 'LOBBY_STATE': {
+					const list = (data as Record<string, unknown>).players
+					if (Array.isArray(list)) {
+						setPlayers(list.map(toLobbyPlayer).filter(Boolean) as Player[])
+					} else {
+						setPlayers([])
+					}
 
-				case 'PLAYER_READY':
+					const settings = (data as Record<string, unknown>).settings
+					setLobbySettings(normalizeSettings(settings))
+
+					const creatorId =
+						typeof (data as Record<string, unknown>).creatorId === 'string'
+							? ((data as Record<string, unknown>).creatorId as string)
+							: ''
+					if (creatorId) setLobbyCreatorId(creatorId)
+
+					break
+				}
+
+				case 'PLAYER_READY': {
+					const playerId =
+						typeof (data as Record<string, unknown>).playerId === 'string'
+							? ((data as Record<string, unknown>).playerId as string)
+							: ''
+					const isReady =
+						typeof (data as Record<string, unknown>).isReady === 'boolean'
+							? ((data as Record<string, unknown>).isReady as boolean)
+							: false
+
+					if (!playerId) break
 					setPlayers(prev =>
-						prev.map((p: Player) =>
-							p.id === data.playerId ? { ...p, isReady: data.isReady } : p
-						)
+						prev.map(p => (p.id === playerId ? { ...p, isReady } : p)),
 					)
 					break
+				}
 
-				case 'LOBBY_SETTINGS_UPDATED':
-					setLobbySettings(data.settings)
+				case 'LOBBY_SETTINGS_UPDATED': {
+					const settings = (data as Record<string, unknown>).settings
+					setLobbySettings(normalizeSettings(settings))
 					break
+				}
 
-				case 'GAME_STARTED':
-					if (data.redirectUrl) {
-						const systemMessage: ChatMessage = {
-							id: `system-${Date.now()}`,
+				case 'GAME_STARTED': {
+					const redirectUrl =
+						typeof (data as Record<string, unknown>).redirectUrl === 'string'
+							? ((data as Record<string, unknown>).redirectUrl as string)
+							: ''
+					if (!redirectUrl) break
+
+					setChatMessages(prev => [
+						...prev,
+						{
+							id: makeId('system'),
 							playerId: 'system',
 							playerName: 'Система',
 							text: 'Игра началась! Перенаправление...',
 							timestamp: new Date(),
 							type: 'system',
-						}
-						setChatMessages(prev => [...prev, systemMessage])
-						setTimeout(() => router.push(data.redirectUrl), 1000)
-					}
-					break
+						},
+					])
 
-				case 'ERROR':
-					console.error('Server error:', data.message)
-					setError(data.message || 'Произошла ошибка')
+					setTimeout(() => router.push(redirectUrl), 700)
 					break
+				}
+
+				case 'ERROR': {
+					const message =
+						typeof (data as Record<string, unknown>).message === 'string'
+							? ((data as Record<string, unknown>).message as string)
+							: 'Произошла ошибка'
+					console.error('Server error:', message)
+					setError(message)
+					break
+				}
 			}
 		},
-		[router]
+		[router],
 	)
 
-	// ✅ socket.io-client нужен http(s)
 	const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'http://localhost:4000'
 	const lobbyId = lobbyIdFromProps || 'default-lobby'
 
 	const { sendMessage: sendWS, isConnected } = useLobbySocket(
 		wsBase,
 		handleWebSocketMessage,
-		lobbyId
+		lobbyId,
 	)
 
-	// reconnect logic: если отвалились после JOIN — разрешаем повторный JOIN
+	// При дисконнекте — сбрасываем hasJoined, чтобы после реконнекта заджойниться снова
 	useEffect(() => {
-		if (!isConnected && hasJoinedRef.current) {
+		if (reconnectTimeoutRef.current) {
+			clearTimeout(reconnectTimeoutRef.current)
+			reconnectTimeoutRef.current = null
+		}
+
+		if (!isConnected) {
 			reconnectTimeoutRef.current = setTimeout(() => {
-				if (currentUserId) hasJoinedRef.current = false
-			}, 2000)
+				hasJoinedRef.current = false
+			}, 800)
 		}
 
 		return () => {
-			if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
+			if (reconnectTimeoutRef.current) {
+				clearTimeout(reconnectTimeoutRef.current)
+				reconnectTimeoutRef.current = null
+			}
 		}
-	}, [isConnected, currentUserId])
+	}, [isConnected])
 
 	useEffect(() => {
 		if (isConnected) setError('')
 	}, [isConnected])
 
-	// JOIN lobby once we have socket + profile
+	// JOIN_LOBBY
 	useEffect(() => {
-		if (isConnected && !hasJoinedRef.current && currentUserId && profile.data) {
-			const currentUser: Player = {
-				id: currentUserId,
-				name: profile.data.username || 'Игрок',
-				missions: (profile.data as any)?.missionsCompleted || 0,
-				hours: (profile.data as any)?.playTime || 0,
-				avatar: assets.avatar,
-				isReady: false,
-			}
+		if (!isConnected) return
+		if (hasJoinedRef.current) return
+		if (!currentUserId || !profile.data) return
 
-			const success = sendWS({ type: 'JOIN_LOBBY', player: currentUser })
-			if (success) {
-				hasJoinedRef.current = true
-			} else {
-				setTimeout(() => {
-					hasJoinedRef.current = false
-				}, 1000)
-			}
+		const data = profile.data as unknown as Record<string, unknown>
+		const currentUser: Player = {
+			id: currentUserId,
+			name: profile.data.username || 'Игрок',
+			missions: pickNumber(data.missionsCompleted),
+			hours: pickNumber(data.playTime),
+			avatar: assets.avatar,
+			isReady: false,
 		}
-	}, [profile.data, isConnected, assets.avatar, sendWS, currentUserId])
+
+		const ok = sendWS({ type: 'JOIN_LOBBY', player: currentUser })
+		if (ok) hasJoinedRef.current = true
+	}, [isConnected, currentUserId, profile.data, assets.avatar, sendWS])
 
 	const handlePlayerMenuClick = useCallback((player: Player) => {
 		setSelectedPlayer(player)
@@ -227,7 +343,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 	const isLobbyCreator = useMemo(
 		() => lobbyCreatorId === currentUserId,
-		[lobbyCreatorId, currentUserId]
+		[lobbyCreatorId, currentUserId],
 	)
 
 	const handleOpenLobbySettings = useCallback(() => {
@@ -240,23 +356,24 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 	const handleSaveLobbySettings = useCallback(
 		(settings: LobbySettings) => {
-			setLobbySettings(settings)
+			const normalized = normalizeSettings(settings)
+			setLobbySettings(normalized)
 			sendWS({
 				type: 'UPDATE_LOBBY_SETTINGS',
-				settings,
+				settings: normalized,
 				__userId: currentUserId,
 			})
 		},
-		[sendWS, currentUserId]
+		[sendWS, currentUserId],
 	)
 
 	const handleMutePlayer = useCallback(
 		(_playerId: string, _muted: boolean) => {},
-		[]
+		[],
 	)
 	const handleVolumeChange = useCallback(
 		(_playerId: string, _volume: number) => {},
-		[]
+		[],
 	)
 
 	const handleAddFriend = useCallback(() => {
@@ -268,7 +385,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 			sendWS({ type: 'PLAYER_LEFT', playerId })
 			handleClosePlayerModal()
 		},
-		[sendWS, handleClosePlayerModal]
+		[sendWS, handleClosePlayerModal],
 	)
 
 	const addNewPlayer = useCallback(
@@ -283,7 +400,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 			if (!useMock) {
 				alert(
-					'Добавление игроков вручную недоступно. Пригласите игрока по ссылке или включите мок-режим для теста.'
+					'Добавление игроков вручную недоступно. Пригласите игрока по ссылке или включите мок-режим для теста.',
 				)
 				return
 			}
@@ -294,9 +411,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 			}
 
 			const newPlayer: Player = {
-				id:
-					playerData?.id ||
-					`player-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+				id: playerData?.id || makeId('player'),
 				name: playerData?.name || `Игрок${playersRef.current.length + 1}`,
 				missions: Math.floor(Math.random() * 50),
 				hours: Math.floor(Math.random() * 200),
@@ -307,21 +422,19 @@ export function useLobby(lobbyIdFromProps?: string) {
 			sendWS({ type: 'JOIN_LOBBY', player: newPlayer })
 			setShowAddPlayerModal(false)
 		},
-		[sendWS]
+		[sendWS],
 	)
 
 	const toggleReady = useCallback(() => {
 		if (!currentUserId) return
 
-		const currentPlayer = playersRef.current.find(
-			(p: Player) => p.id === currentUserId
-		)
+		const currentPlayer = playersRef.current.find(p => p.id === currentUserId)
 		if (!currentPlayer) return
 
 		const isReady = !currentPlayer.isReady
 
 		setPlayers(prev =>
-			prev.map((p: Player) => (p.id === currentUserId ? { ...p, isReady } : p))
+			prev.map(p => (p.id === currentUserId ? { ...p, isReady } : p)),
 		)
 
 		sendWS({
@@ -332,46 +445,53 @@ export function useLobby(lobbyIdFromProps?: string) {
 		})
 	}, [currentUserId, sendWS])
 
+	const sendChat = useCallback(() => {
+		if (!newMessage.trim() || !currentUserId) return
+
+		const id = makeId('msg')
+
+		const localMessage: ChatMessage = {
+			id,
+			playerId: currentUserId,
+			playerName: profile.data?.username || 'Игрок',
+			text: newMessage.trim().slice(0, 300),
+			timestamp: new Date(),
+			type: 'player',
+		}
+
+		if (!seenMsgIdsRef.current.has(id)) {
+			seenMsgIdsRef.current.add(id)
+			setChatMessages(prev => [...prev, localMessage])
+		}
+
+		const outgoing = {
+			...localMessage,
+			timestamp: toIsoTimestamp(localMessage.timestamp),
+		}
+
+		const sent = sendWS({ type: 'SEND_MESSAGE', message: outgoing })
+		if (sent) {
+			setNewMessage('')
+			shouldScrollRef.current = true
+		}
+	}, [newMessage, profile.data, sendWS, currentUserId])
+
 	const handleSendMessage = useCallback(
 		(e: React.FormEvent) => {
 			e.preventDefault()
-			if (!newMessage.trim() || !currentUserId) return
-
-			const id = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-			const message: ChatMessage = {
-				id,
-				playerId: currentUserId,
-				playerName: profile.data?.username || 'Игрок',
-				text: newMessage.trim().slice(0, 300),
-				timestamp: new Date().toISOString(),
-				type: 'player',
-			}
-
-			if (!seenMsgIdsRef.current.has(id)) {
-				seenMsgIdsRef.current.add(id)
-				setChatMessages(prev => [
-					...prev,
-					{ ...message, timestamp: new Date() },
-				])
-			}
-
-			const sent = sendWS({ type: 'SEND_MESSAGE', message })
-			if (sent) {
-				setNewMessage('')
-				shouldScrollRef.current = true
-			}
+			sendChat()
 		},
-		[newMessage, profile.data, sendWS, currentUserId]
+		[sendChat],
 	)
 
 	const handleKeyPress = useCallback(
 		(e: React.KeyboardEvent) => {
 			if (e.key === 'Enter' && !e.shiftKey) {
 				e.preventDefault()
-				handleSendMessage(e as any)
+				sendChat()
 			}
 		},
-		[handleSendMessage]
+		[sendChat],
 	)
 
 	const handleChatScroll = useCallback(() => {
@@ -380,17 +500,15 @@ export function useLobby(lobbyIdFromProps?: string) {
 		shouldScrollRef.current = scrollHeight - scrollTop - clientHeight < 100
 	}, [])
 
+	// Автоскролл только когда нужно
 	useEffect(() => {
-		if (shouldScrollRef.current && chatContainerRef.current) {
-			chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
-		}
-	})
+		if (!shouldScrollRef.current) return
+		const el = chatContainerRef.current
+		if (!el) return
+		el.scrollTop = el.scrollHeight
+	}, [chatMessages.length])
 
-	/**
-	 * ✅ FIX: React 18 StrictMode (dev) double-invokes effects.
-	 * Нельзя блокировать второй запуск через didInitRef, иначе можно навсегда
-	 * остаться в loading=true (первый эффект отменили cleanup'ом, второй не запустили).
-	 */
+	// Init profile/assets
 	useEffect(() => {
 		let cancelled = false
 
@@ -406,7 +524,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 		}
 
 		init()
-
 		return () => {
 			cancelled = true
 		}
@@ -419,8 +536,8 @@ export function useLobby(lobbyIdFromProps?: string) {
 	}, [profile.data?.id, loadSavedAssets])
 
 	const currentUserReadyState = useMemo(
-		() => players.find((p: Player) => p.id === currentUserId)?.isReady || false,
-		[players, currentUserId]
+		() => players.find(p => p.id === currentUserId)?.isReady || false,
+		[players, currentUserId],
 	)
 
 	const handleStartGame = useCallback(() => {
@@ -437,7 +554,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 		const notReadyPlayers = players.filter(p => !p.isReady)
 		if (notReadyPlayers.length > 0) {
 			alert(
-				`Следующие игроки не готовы: ${notReadyPlayers.map(p => p.name).join(', ')}`
+				`Следующие игроки не готовы: ${notReadyPlayers.map(p => p.name).join(', ')}`,
 			)
 			return
 		}
@@ -448,15 +565,17 @@ export function useLobby(lobbyIdFromProps?: string) {
 			creatorId: currentUserId,
 		})
 
-		const systemMessage: ChatMessage = {
-			id: `system-${Date.now()}`,
-			playerId: 'system',
-			playerName: 'Система',
-			text: 'Создатель начал игру...',
-			timestamp: new Date(),
-			type: 'system',
-		}
-		setChatMessages(prev => [...prev, systemMessage])
+		setChatMessages(prev => [
+			...prev,
+			{
+				id: makeId('system'),
+				playerId: 'system',
+				playerName: 'Система',
+				text: 'Создатель начал игру...',
+				timestamp: new Date(),
+				type: 'system',
+			},
+		])
 	}, [sendWS, currentUserId, isLobbyCreator, players])
 
 	return {

@@ -8,7 +8,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import styles from './home.module.css'
 
-// Ленивая подгрузка тяжёлых компонентов
 const TopHUD = dynamic(() => import('../components/TopHUD/TopHUD'), {
 	ssr: false,
 })
@@ -16,16 +15,12 @@ const TopHUD = dynamic(() => import('../components/TopHUD/TopHUD'), {
 const Fireflies = dynamic(
 	() =>
 		import('../components/ui/Fireflies/FirefliesMain').then(m => m.Fireflies),
-	{
-		ssr: false,
-	},
+	{ ssr: false },
 )
 
 const PanelWithPlayButton = dynamic(
 	() => import('../components/ui/PanelWithPlayButton/PanelWithPlayButton'),
-	{
-		ssr: false,
-	},
+	{ ssr: false },
 )
 
 const TargetCursor = dynamic(() => import('../components/ui/TargetCursor'), {
@@ -37,6 +32,10 @@ interface UserProfile {
 	email: string
 	username: string
 	avatar?: string
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+	return !!v && typeof v === 'object' && !Array.isArray(v)
 }
 
 const NEWS_DATA = [
@@ -81,34 +80,39 @@ const SOCIAL_ICONS = [
 	},
 ] as const
 
-// Мягкая проверка сессии через /auth/session:
-// - всегда 200, без 401/403
-// - status: 'signed-in' | 'signed-out'
 async function fetchProfile(): Promise<UserProfile | null> {
 	try {
-		const session: any = await api.session()
+		const sessionUnknown = await api.session()
 
-		if (session?.status !== 'signed-in' || !session?.user) {
-			return null
-		}
+		if (!isRecord(sessionUnknown)) return null
+		if (sessionUnknown.status !== 'signed-in') return null
 
-		const user = session.user
-		const id: string | undefined = user.userId ?? user.id ?? user.sub
-		const email: string | undefined = user.email
+		const userUnknown = sessionUnknown.user
+		if (!isRecord(userUnknown)) return null
 
+		const id =
+			typeof userUnknown.userId === 'string'
+				? userUnknown.userId
+				: typeof userUnknown.id === 'string'
+					? userUnknown.id
+					: typeof userUnknown.sub === 'string'
+						? userUnknown.sub
+						: undefined
+
+		const email =
+			typeof userUnknown.email === 'string' ? userUnknown.email : undefined
 		if (!id || !email) return null
 
-		const profile: UserProfile = {
-			id,
-			email,
-			username:
-				typeof user.username === 'string' ? user.username : email.split('@')[0],
-			avatar: user.avatar,
-		}
+		const username =
+			typeof userUnknown.username === 'string'
+				? userUnknown.username
+				: email.split('@')[0]
 
-		return profile
+		const avatar =
+			typeof userUnknown.avatar === 'string' ? userUnknown.avatar : undefined
+
+		return { id, email, username, avatar }
 	} catch {
-		// Любые ошибки → просто считаем, что гость, без красных ошибок в консоли
 		return null
 	}
 }
@@ -214,11 +218,7 @@ export default function HomePage() {
 	const isAuthenticated = !!userProfile
 
 	const handlePlayClick = useCallback(() => {
-		if (isAuthenticated) {
-			router.push('/lobby')
-		} else {
-			router.push('/login')
-		}
+		router.push(isAuthenticated ? '/lobby' : '/login')
 	}, [router, isAuthenticated])
 
 	const handleRegister = () => router.push('/register')

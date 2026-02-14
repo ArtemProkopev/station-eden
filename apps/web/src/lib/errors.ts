@@ -1,4 +1,9 @@
+// apps/web/src/lib/errors.ts
 export type ErrorContext = 'login' | 'register' | 'default'
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+	return !!v && typeof v === 'object' && !Array.isArray(v)
+}
 
 export class ApiError extends Error {
 	status?: number
@@ -6,7 +11,6 @@ export class ApiError extends Error {
 	serverMessage?: string
 	userMessage: string
 	cause?: unknown
-	/** Оригинальный JSON от сервера (чтобы фронт мог достать attemptsLeft/minutesLeft/lockedUntil). */
 	payload?: unknown
 
 	constructor(init: {
@@ -29,11 +33,10 @@ export class ApiError extends Error {
 	}
 }
 
-/** Дружелюбные тексты по статусу/сообщению бэка (учитываем контекст экрана). */
 export function mapToUserMessage(
 	status?: number,
 	serverMessage?: string,
-	context: ErrorContext = 'default'
+	context: ErrorContext = 'default',
 ): string {
 	const msg = (serverMessage || '').toLowerCase().trim()
 
@@ -42,7 +45,6 @@ export function mapToUserMessage(
 	}
 
 	if (status === 401) {
-		// Для логина сообщаем нейтрально: мог быть неверен и пароль, и логин.
 		if (context === 'login') return 'Неверный логин или пароль.'
 		return 'Не авторизован. Пожалуйста, войдите в аккаунт.'
 	}
@@ -62,7 +64,6 @@ export function mapToUserMessage(
 	if (status >= 500)
 		return 'На сервере возникла ошибка. Уже чиним — попробуйте ещё раз позже.'
 
-	// эвристики по тексту
 	if (msg.includes('csrf')) {
 		return 'Сессия защиты истекла. Обновите страницу и повторите попытку.'
 	}
@@ -75,20 +76,26 @@ export function mapToUserMessage(
 	return 'Что-то пошло не так. Попробуйте ещё раз.'
 }
 
-/** Достаёт человекочитаемый текст из любого error-объекта. */
 export function getUserMessage(
 	err: unknown,
-	context: ErrorContext = 'default'
+	context: ErrorContext = 'default',
 ) {
-	if (err && typeof err === 'object') {
-		const anyErr = err as any
-		if (typeof anyErr.userMessage === 'string') return anyErr.userMessage
-		if (typeof anyErr.message === 'string') {
-			if (/failed to fetch|network/i.test(anyErr.message)) {
+	if (isRecord(err)) {
+		if (typeof err.userMessage === 'string') return err.userMessage
+		if (typeof err.message === 'string') {
+			if (/failed to fetch|network/i.test(err.message)) {
 				return mapToUserMessage(undefined, undefined, context)
 			}
-			if (anyErr.message.length < 120) return anyErr.message
+			if (err.message.length < 120) return err.message
 		}
 	}
+
+	if (err instanceof Error) {
+		if (/failed to fetch|network/i.test(err.message)) {
+			return mapToUserMessage(undefined, undefined, context)
+		}
+		if (err.message.length < 120) return err.message
+	}
+
 	return mapToUserMessage(undefined, undefined, context)
 }

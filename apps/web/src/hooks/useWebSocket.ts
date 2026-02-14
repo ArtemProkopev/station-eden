@@ -3,16 +3,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import { isForcedLogout } from '../lib/websocketUtils'
 
-interface WebSocketMessage {
+type JsonObject = Record<string, unknown>
+
+export type WebSocketMessage = {
 	type: string
-	[key: string]: any
-}
+} & JsonObject
 
 interface CommonSocket {
-	on(event: string, callback: (data: any) => void): CommonSocket
-	emit(event: string, data?: any): CommonSocket
+	on(event: string, callback: (data: unknown) => void): CommonSocket
+	emit(event: string, data?: unknown): CommonSocket
 	disconnect(): void
-	onAny?(callback: (eventName: string, ...args: any[]) => void): CommonSocket
+	onAny?(
+		callback: (eventName: string, ...args: unknown[]) => void,
+	): CommonSocket
 }
 
 type UseWebSocketOptions = {
@@ -43,11 +46,15 @@ function safeParseUrl(input: string) {
 	}
 }
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+	return !!v && typeof v === 'object' && !Array.isArray(v)
+}
+
 export const useWebSocket = (
 	baseUrl: string,
 	onMessage: (data: WebSocketMessage) => void,
 	params?: Record<string, string | number | boolean | undefined>,
-	options?: UseWebSocketOptions
+	options?: UseWebSocketOptions,
 ) => {
 	const socket = useRef<CommonSocket | null>(null)
 	const [isConnected, setIsConnected] = useState(false)
@@ -62,7 +69,7 @@ export const useWebSocket = (
 	const socketPath = options?.path
 	if (!socketPath) {
 		throw new Error(
-			'[useWebSocket] options.path is required: "/lobby" or "/game"'
+			'[useWebSocket] options.path is required: "/lobby" or "/game"',
 		)
 	}
 
@@ -79,12 +86,12 @@ export const useWebSocket = (
 
 	if (hasGameId && socketPath !== '/game') {
 		throw new Error(
-			'[useWebSocket] Mismatch: gameId passed with non-/game socket path'
+			'[useWebSocket] Mismatch: gameId passed with non-/game socket path',
 		)
 	}
 	if (hasLobbyId && socketPath !== '/lobby') {
 		throw new Error(
-			'[useWebSocket] Mismatch: lobbyId passed with non-/lobby socket path'
+			'[useWebSocket] Mismatch: lobbyId passed with non-/lobby socket path',
 		)
 	}
 
@@ -150,19 +157,20 @@ export const useWebSocket = (
 			setIsConnected(true)
 		}
 
-		const handleDisconnect = (reason: string) => {
+		const handleDisconnect = (reason: unknown) => {
+			const reasonStr = typeof reason === 'string' ? reason : 'unknown'
 			if (debugAllEvents) {
-				console.log(`[useWebSocket] WebSocket disconnected: ${reason}`)
+				console.log(`[useWebSocket] WebSocket disconnected: ${reasonStr}`)
 			}
 			setIsConnected(false)
 
 			if (
-				reason === 'io server disconnect' ||
-				(reason && reason.includes('auth'))
+				reasonStr === 'io server disconnect' ||
+				(reasonStr && reasonStr.includes('auth'))
 			) {
 				if (debugAllEvents) {
 					console.log(
-						'[useWebSocket] Not reconnecting (server disconnect or auth error)'
+						'[useWebSocket] Not reconnecting (server disconnect or auth error)',
 					)
 				}
 				shouldReconnectRef.current = false
@@ -178,17 +186,22 @@ export const useWebSocket = (
 			}
 		}
 
-		const handleConnectError = (error: Error) => {
+		const handleConnectError = (error: unknown) => {
 			console.error('[useWebSocket] WebSocket connection error:', error)
 			setIsConnected(false)
 		}
 
-		const handleError = (data: any) => {
-			console.error('[useWebSocket] Server error:', data?.message ?? data)
+		const handleError = (data: unknown) => {
+			const msg =
+				isRecord(data) && typeof data.message === 'string'
+					? data.message
+					: undefined
+
+			console.error('[useWebSocket] Server error:', msg ?? data)
 
 			if (
-				data?.message === 'Authentication required' ||
-				data?.message === 'Invalid authentication token'
+				msg === 'Authentication required' ||
+				msg === 'Invalid authentication token'
 			) {
 				if (debugAllEvents) {
 					console.log('[useWebSocket] Authentication error, closing connection')
@@ -196,14 +209,22 @@ export const useWebSocket = (
 				forceDisconnect()
 			}
 
-			onMessageRef.current?.({ type: 'ERROR', ...(data || {}) })
+			const payload: WebSocketMessage = {
+				type: 'ERROR',
+				...(isRecord(data) ? data : {}),
+			}
+			onMessageRef.current?.(payload)
 		}
 
-		const handleGenericEvent = (eventName: string, data: any) => {
+		const handleGenericEvent = (eventName: string, data: unknown) => {
 			if (debugAllEvents) {
 				console.log(`[useWebSocket] Event ${eventName}:`, data)
 			}
-			onMessageRef.current?.({ type: eventName, ...(data || {}) })
+			const payload: WebSocketMessage = {
+				type: eventName,
+				...(isRecord(data) ? data : {}),
+			}
+			onMessageRef.current?.(payload)
 		}
 
 		currentSocket.on('connect', handleConnect)
@@ -212,7 +233,9 @@ export const useWebSocket = (
 		currentSocket.on('ERROR', handleError)
 
 		if (currentSocket.onAny) {
-			currentSocket.onAny(handleGenericEvent)
+			currentSocket.onAny((eventName: string, ...args: unknown[]) => {
+				handleGenericEvent(eventName, args[0])
+			})
 		}
 
 		const handleLogout = () => {
@@ -223,11 +246,16 @@ export const useWebSocket = (
 		}
 
 		const handleSessionChanged = (e: Event) => {
-			const customEvent = e as CustomEvent
-			if (customEvent?.detail?.loggedIn === false) {
+			const customEvent = e as CustomEvent<unknown>
+			const detail = customEvent?.detail
+			if (
+				isRecord(detail) &&
+				Object.prototype.hasOwnProperty.call(detail, 'loggedIn') &&
+				detail.loggedIn === false
+			) {
 				if (debugAllEvents) {
 					console.log(
-						'[useWebSocket] Session changed to logged out, disconnecting'
+						'[useWebSocket] Session changed to logged out, disconnecting',
 					)
 				}
 				forceDisconnect()
@@ -273,11 +301,17 @@ export const useWebSocket = (
 			}
 
 			try {
+				// ограничение длины текста чата (если структура подходит)
 				if (
-					message?.type === 'SEND_MESSAGE' &&
-					typeof message?.message?.text === 'string'
+					message.type === 'SEND_MESSAGE' &&
+					isRecord(message.message) &&
+					isRecord(message.message.message) &&
+					typeof message.message.message.text === 'string'
 				) {
-					message.message.text = message.message.text.slice(0, 300)
+					message.message.message.text = message.message.message.text.slice(
+						0,
+						300,
+					)
 				}
 
 				if (debugAllEvents) {
@@ -291,7 +325,7 @@ export const useWebSocket = (
 				return false
 			}
 		},
-		[isConnected, debugAllEvents]
+		[isConnected, debugAllEvents],
 	)
 
 	return { sendMessage, isConnected }

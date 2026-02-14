@@ -1,3 +1,4 @@
+// apps/web/src/app/client-root.tsx
 'use client'
 
 import CdnWarning from '@/src/components/CdnWarning'
@@ -6,30 +7,41 @@ import Script from 'next/script'
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
 
+declare global {
+	interface Window {
+		__FORCED_LOGOUT__?: boolean
+		__SESSION_KEEP_ALIVE_DISABLED__?: boolean
+		__LOGOUT_IN_PROGRESS__?: boolean
+		_websocketConnections?: Set<WebSocket>
+	}
+}
+
 // --- fetch interceptor ---
-const setupFetchInterceptor = () => {
-	if (typeof window === 'undefined') return
+const setupFetchInterceptor = (): (() => void) | undefined => {
+	if (typeof window === 'undefined') return undefined
 
-	const originalFetch = window.fetch
+	const originalFetch: typeof window.fetch = window.fetch.bind(window)
 
-	window.fetch = async function (...args) {
-		if ((window as any).__FORCED_LOGOUT__) {
+	window.fetch = (async (
+		...args: Parameters<typeof window.fetch>
+	): Promise<Response> => {
+		if (window.__FORCED_LOGOUT__) {
 			const url = typeof args[0] === 'string' ? args[0] : ''
 
 			if (url.includes('/auth/refresh')) {
 				console.log('[fetch-intercept] Blocking refresh request after logout')
-				return Promise.reject(new Error('Refresh blocked after logout'))
+				throw new Error('Refresh blocked after logout')
 			}
 
 			if (url.includes('/auth/logout')) {
 				console.log(
-					'[fetch-intercept] Allowing logout request despite forced logout flag'
+					'[fetch-intercept] Allowing logout request despite forced logout flag',
 				)
 			}
 		}
 
-		return originalFetch.apply(this, args as any)
-	}
+		return originalFetch(...args)
+	}) as typeof window.fetch
 
 	return () => {
 		window.fetch = originalFetch
@@ -37,50 +49,61 @@ const setupFetchInterceptor = () => {
 }
 
 // --- WebSocket interceptor ---
-const setupWebSocketInterceptor = () => {
-	if (typeof window === 'undefined') return
+const setupWebSocketInterceptor = (): (() => void) | undefined => {
+	if (typeof window === 'undefined') return undefined
 
 	const OriginalWebSocket = window.WebSocket
 
-	if (!(window as any)._websocketConnections) {
-		;(window as any)._websocketConnections = new Set<WebSocket>()
+	if (!window._websocketConnections) {
+		window._websocketConnections = new Set<WebSocket>()
 	}
 
-	const connections = (window as any)._websocketConnections as Set<WebSocket>
+	const connections = window._websocketConnections
 
-	function PatchedWebSocket(
-		this: any,
+	type WebSocketCtor = typeof WebSocket
+	type WSStaticsKey = 'CONNECTING' | 'OPEN' | 'CLOSING' | 'CLOSED'
+
+	const PatchedWebSocket = function (
+		this: WebSocket,
 		url: string | URL,
-		protocols?: string | string[]
-	) {
-		const ws = protocols
-			? new OriginalWebSocket(url, protocols)
-			: new OriginalWebSocket(url)
+		protocols?: string | string[],
+	): WebSocket {
+		const ws =
+			protocols !== undefined
+				? new OriginalWebSocket(url, protocols)
+				: new OriginalWebSocket(url)
 
 		connections.add(ws)
 
 		const originalClose = ws.close.bind(ws)
-		ws.close = function (...args: any[]) {
+		ws.close = ((code?: number, reason?: string) => {
 			connections.delete(ws)
-			return originalClose(...args)
-		}
+			return originalClose(code, reason)
+		}) as typeof ws.close
 
-		ws.addEventListener('close', () => {
-			connections.delete(ws)
-		})
-		ws.addEventListener('error', () => {
-			connections.delete(ws)
-		})
+		ws.addEventListener('close', () => connections.delete(ws))
+		ws.addEventListener('error', () => connections.delete(ws))
 
 		return ws
-	}
+	} as unknown as WebSocketCtor
 
 	Object.setPrototypeOf(PatchedWebSocket, OriginalWebSocket)
 
-	const staticProps = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'] as const
+	const staticProps: readonly WSStaticsKey[] = [
+		'CONNECTING',
+		'OPEN',
+		'CLOSING',
+		'CLOSED',
+	] as const
+
+	const originalWSRecord = OriginalWebSocket as unknown as Record<
+		string,
+		unknown
+	>
+
 	staticProps.forEach(prop => {
 		Object.defineProperty(PatchedWebSocket, prop, {
-			value: (OriginalWebSocket as any)[prop],
+			value: originalWSRecord[prop],
 			enumerable: true,
 			configurable: true,
 			writable: false,
@@ -89,14 +112,14 @@ const setupWebSocketInterceptor = () => {
 
 	Object.getOwnPropertyNames(OriginalWebSocket).forEach(prop => {
 		if (
-			!staticProps.includes(prop as any) &&
+			!staticProps.includes(prop as WSStaticsKey) &&
 			prop !== 'length' &&
 			prop !== 'name' &&
 			prop !== 'prototype'
 		) {
 			try {
 				Object.defineProperty(PatchedWebSocket, prop, {
-					value: (OriginalWebSocket as any)[prop],
+					value: originalWSRecord[prop],
 					enumerable: true,
 					configurable: true,
 					writable: true,
@@ -107,7 +130,7 @@ const setupWebSocketInterceptor = () => {
 		}
 	})
 
-	window.WebSocket = PatchedWebSocket as any
+	window.WebSocket = PatchedWebSocket
 
 	return () => {
 		window.WebSocket = OriginalWebSocket
