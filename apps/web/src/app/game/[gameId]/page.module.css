@@ -1801,6 +1801,70 @@
 	font-variant-numeric: tabular-nums;
 }
 
+.cardsInfo {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  padding: 15px;
+  margin-bottom: 20px;
+  border: 2px solid rgba(99, 239, 255, 0.3);
+}
+
+.cardsInfo p {
+  margin: 5px 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+}
+
+.cardsInfo strong {
+  color: #63efff;
+}
+
+.waitingText {
+  color: #f39c12 !important;
+  font-style: italic;
+}
+
+.warningText {
+  color: #ff6b6b !important;
+  font-weight: bold;
+}
+
+.newCard {
+  border-color: #4caf50 !important;
+  box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+  animation: pulse 2s infinite;
+}
+
+.newCardBadge {
+  background: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  margin-left: 8px;
+  font-weight: normal;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+  }
+}
+
 @media (max-width: 1200px) {
 	.mainContent {
 		grid-template-columns: 1fr;

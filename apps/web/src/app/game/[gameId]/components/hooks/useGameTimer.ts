@@ -1,20 +1,23 @@
 // apps/web/src/app/game/[gameId]/hooks/useGameTimer.ts
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { GameState } from '../types/game.types'
 
 export function useGameTimer() {
   const [phaseTimeLeft, setPhaseTimeLeft] = useState<number>(0)
   const [timerInterval, setTimerInterval] = useState<ReturnType<typeof setInterval> | null>(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const stopTimer = useCallback(() => {
-    if (timerInterval) {
-      clearInterval(timerInterval)
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
       setTimerInterval(null)
     }
-  }, [timerInterval])
+  }, [])
 
   const startTimer = useCallback(
     (duration: number) => {
+      // Останавливаем предыдущий таймер
       stopTimer()
 
       if (duration <= 0) {
@@ -22,19 +25,29 @@ export function useGameTimer() {
         return
       }
 
+      console.log(`Starting timer with duration: ${duration} seconds`)
+      
+      // Устанавливаем начальное время
       setPhaseTimeLeft(duration)
 
+      // Запускаем новый интервал
       const interval = setInterval(() => {
         setPhaseTimeLeft(prev => {
           if (prev <= 1) {
+            console.log('Timer finished')
+            // Время вышло, очищаем интервал
             clearInterval(interval)
+            intervalRef.current = null
             setTimerInterval(null)
             return 0
           }
-          return prev - 1
+          const newValue = prev - 1
+          console.log(`Timer tick: ${newValue}`)
+          return newValue
         })
       }, 1000)
 
+      intervalRef.current = interval
       setTimerInterval(interval)
     },
     [stopTimer],
@@ -52,6 +65,8 @@ export function useGameTimer() {
       const endTime = new Date(String(game.phaseEndTime)).getTime()
       const secondsLeft = Math.max(0, Math.floor((endTime - now) / 1000))
 
+      console.log(`Syncing timer with server: ${secondsLeft} seconds left`)
+
       setPhaseTimeLeft(secondsLeft)
 
       if (secondsLeft > 0) {
@@ -63,6 +78,7 @@ export function useGameTimer() {
     [startTimer, stopTimer],
   )
 
+  // Очистка при размонтировании
   useEffect(() => {
     return () => {
       stopTimer()

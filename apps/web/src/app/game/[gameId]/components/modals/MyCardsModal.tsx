@@ -8,6 +8,7 @@ interface MyCardsModalProps {
   cardsReceivedThisRound: number
   myRevealedCardsThisRound: string[]
   myAllRevealedCards: Record<string, { name: string; type: string }>
+  newCardsThisRound?: CardDetails[]
   gameState: GameState | null
   userId?: string
   onClose: () => void
@@ -19,11 +20,18 @@ export default function MyCardsModal({
   cardsReceivedThisRound, 
   myRevealedCardsThisRound, 
   myAllRevealedCards, 
+  newCardsThisRound = [],
   gameState, 
   userId, 
   onClose, 
   onRevealCard 
 }: MyCardsModalProps) {
+  
+  // Проверяем, является ли карта новой в этом раунде
+  const isNewCard = (card: CardDetails): boolean => {
+    return newCardsThisRound.some(newCard => newCard.id === card.id)
+  }
+
   return (
     <div className={styles.modalOverlay}>
       <div className={styles.modalContent}>
@@ -36,14 +44,22 @@ export default function MyCardsModal({
 
         <div className={styles.cardsInfo}>
           <p>
-            В этом раунде вы получили: <strong>{cardsReceivedThisRound} карт</strong>
+            <strong>Всего карт:</strong> {Object.keys(myCards).length}
           </p>
           <p>
-            Раскрыто в этом раунде: <strong>{myRevealedCardsThisRound.length} карт</strong>
+            <strong>В этом раунде получено:</strong> {cardsReceivedThisRound} карт
+          </p>
+          <p>
+            <strong>Раскрыто в этом раунде:</strong> {myRevealedCardsThisRound.length}/1
           </p>
           {myRevealedCardsThisRound.length >= 1 && (
             <p className={styles.warningText}>
-              Вы уже раскрыли карту в этом раунде!
+              ⚠️ Вы уже раскрыли карту в этом раунде!
+            </p>
+          )}
+          {cardsReceivedThisRound === 0 && gameState?.phase === 'preparation' && (
+            <p className={styles.waitingText}>
+              ⏳ Ожидание выдачи карт...
             </p>
           )}
         </div>
@@ -55,6 +71,7 @@ export default function MyCardsModal({
               type={type as CardType}
               card={card}
               isRevealed={!!myAllRevealedCards[type]}
+              isNew={isNewCard(card)}
               myRevealedCardsThisRound={myRevealedCardsThisRound}
               canReveal={
                 gameState?.phase === 'discussion' &&
@@ -76,15 +93,19 @@ interface CardItemProps {
   type: CardType
   card: CardDetails
   isRevealed: boolean
+  isNew: boolean
   myRevealedCardsThisRound: string[]
   canReveal: boolean
   onReveal: (cardType: CardType) => void
 }
 
-function CardItem({ type, card, isRevealed, myRevealedCardsThisRound, canReveal, onReveal }: CardItemProps) {
+function CardItem({ type, card, isRevealed, isNew, myRevealedCardsThisRound, canReveal, onReveal }: CardItemProps) {
   return (
-    <div className={styles.cardItem}>
-      <h3>{getCardTypeName(type)}</h3>
+    <div className={`${styles.cardItem} ${isNew ? styles.newCard : ''}`}>
+      <div className={styles.cardHeader}>
+        <h3>{getCardTypeName(type)}</h3>
+        {isNew && <span className={styles.newCardBadge}>Новая</span>}
+      </div>
       <h4>{card.name}</h4>
       <p>{card.description}</p>
 

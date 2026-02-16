@@ -17,6 +17,21 @@ import { useGameTimer } from './useGameTimer'
 import { useGameChat } from './useGameChat'
 import { useCardReveal } from './useCardReveal'
 
+// Вспомогательная функция для безопасного получения числа
+const safeNumber = (value: unknown, defaultValue: number = 1): number => {
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') {
+    const parsed = parseInt(value, 10)
+    return isNaN(parsed) ? defaultValue : parsed
+  }
+  return defaultValue
+}
+
+// Функция для проверки, можно ли выдавать карты в этой фазе
+const canReceiveCards = (phase: string | undefined): boolean => {
+  return phase === 'preparation' || phase === 'intermission' || phase === 'introduction'
+}
+
 export function useGameSession(gameId: string) {
   const { profile, loadUserData } = useProfile()
   const { phaseTimeLeft, startTimer, stopTimer, syncTimerWithServer, setPhaseTimeLeft } = useGameTimer()
@@ -53,6 +68,7 @@ export function useGameSession(gameId: string) {
   const [myAllRevealedCards, setMyAllRevealedCards] = useState<Record<string, { name: string; type: string }>>({})
   const [cardsReceivedThisRound, setCardsReceivedThisRound] = useState<number>(0)
   const [canSkipNarration, setCanSkipNarration] = useState<boolean>(false)
+  const [newCardsThisRound, setNewCardsThisRound] = useState<CardDetails[]>([])
 
   const loadedProfileRef = useRef(false)
   useEffect(() => {
@@ -122,12 +138,30 @@ export function useGameSession(gameId: string) {
     [myAllRevealedCards, userId],
   )
 
+  // Отслеживаем смену фазы для подготовки к получению карт
+  useEffect(() => {
+    if (!gameState?.phase) return
+    
+    console.log(`🎯 Phase changed to: ${gameState.phase}`)
+    
+    if (gameState.phase === 'preparation') {
+      console.log('📦 Preparation phase - ready to receive cards')
+      if (cardsReceivedThisRound === 0) {
+        addToChat('Система', 'Подготовка к раунду - скоро будут выданы карты...', true)
+      }
+    }
+    
+    if (gameState.phase === 'intermission') {
+      console.log('⏸️ Intermission phase - between rounds')
+    }
+  }, [gameState?.phase, cardsReceivedThisRound, addToChat])
+
   const createHandleWebSocketMessage = useCallback(() => {
     return (data: unknown) => {
       if (!data || typeof data !== 'object') return
       const msg = data as WsMessage
 
-      console.log('Game WebSocket message:', msg.type, msg)
+      console.log('📩 Game WebSocket message:', msg.type, msg)
 
       const sendMessage = sendMessageRef.current
       const isConnected = isConnectedRef.current
@@ -135,6 +169,12 @@ export function useGameSession(gameId: string) {
       switch (msg.type) {
         case 'GAME_STATE': {
           const game = (msg.gameState as GameState) || null
+          if (game) {
+            // Преобразуем round в число, если это строка
+            if (game.round !== undefined) {
+              game.round = safeNumber(game.round, 1)
+            }
+          }
           setGameState(game)
 
           if (game) {
@@ -156,74 +196,143 @@ export function useGameSession(gameId: string) {
 
         case 'PHASE_CHANGED': {
           const newPhase = String(msg.newPhase ?? '')
-          console.log('Phase changed to:', newPhase)
+          const phaseDuration = typeof msg.duration === 'number' ? msg.duration : undefined
+          
+          console.log('🔄 Phase changed to:', newPhase, 'duration:', phaseDuration)
+          
           stopTimer()
           setPhaseTimeLeft(0)
-
-          const duration = typeof msg.duration === 'number' ? msg.duration : undefined
 
           if (newPhase === 'voting') {
             setPhaseTimeLeft(30)
             startTimer(30)
+            console.log('Started voting timer: 30 seconds')
           } else if (newPhase === 'discussion') {
             setPhaseTimeLeft(60)
             startTimer(60)
+            console.log('Started discussion timer: 60 seconds')
           } else if (newPhase === 'crisis') {
             setPhaseTimeLeft(60)
             startTimer(60)
-          } else if (newPhase === 'introduction' && duration) {
-            setPhaseTimeLeft(duration)
-            startTimer(duration)
+            console.log('Started crisis timer: 60 seconds')
+          } else if (newPhase === 'introduction') {
+            const introDuration = phaseDuration || 30
+            setPhaseTimeLeft(introDuration)
+            startTimer(introDuration)
+            console.log('Started introduction timer:', introDuration, 'seconds')
             setTimeout(() => setCanSkipNarration(true), 3000)
           }
           break
         }
 
         case 'YOUR_CARDS': {
+          console.log('🃏 Received YOUR_CARDS message:', msg)
+          
           const cards: Record<string, CardDetails> = {}
           const newCards: CardDetails[] = []
           let cardCount = 0
 
-          const profession = msg.profession as CardDetails | undefined
-          const healthStatus = msg.healthStatus as CardDetails | undefined
-          const psychologicalTrait = msg.psychologicalTrait as CardDetails | undefined
-          const secret = msg.secret as CardDetails | undefined
-          const hiddenRole = msg.hiddenRole as CardDetails | undefined
-          const resource = msg.resource as CardDetails | undefined
-          const roleCard = msg.roleCard as CardDetails | undefined
-          const gender = msg.gender as CardDetails | undefined
-          const age = msg.age as CardDetails | undefined
-          const bodyType = msg.bodyType as CardDetails | undefined
+          // Функция для добавления карты, если она есть
+          const addCard = (key: string, card: CardDetails | undefined, cardType: CardType) => {
+            if (card) {
+              cards[cardType] = card
+              newCards.push(card)
+              cardCount++
+              console.log(`Added card: ${cardType} - ${card.name}`)
+            }
+          }
 
-          if (profession) { cards.profession = profession; newCards.push(profession); cardCount++ }
-          if (healthStatus) { cards.health = healthStatus; newCards.push(healthStatus); cardCount++ }
-          if (psychologicalTrait) { cards.trait = psychologicalTrait; newCards.push(psychologicalTrait); cardCount++ }
-          if (secret) { cards.secret = secret; newCards.push(secret); cardCount++ }
-          if (hiddenRole) { cards.role = hiddenRole; newCards.push(hiddenRole); cardCount++ }
-          if (resource) { cards.resource = resource; newCards.push(resource); cardCount++ }
-          if (roleCard) { cards.role = roleCard; newCards.push(roleCard); cardCount++ }
-          if (gender) { cards.gender = gender; newCards.push(gender); cardCount++ }
-          if (age) { cards.age = age; newCards.push(age); cardCount++ }
-          if (bodyType) { cards.body = bodyType; newCards.push(bodyType); cardCount++ }
+          // Добавляем карты разных типов
+          addCard('profession', msg.profession as CardDetails | undefined, 'profession')
+          addCard('health', msg.healthStatus as CardDetails | undefined, 'health')
+          addCard('trait', msg.psychologicalTrait as CardDetails | undefined, 'trait')
+          addCard('secret', msg.secret as CardDetails | undefined, 'secret')
+          addCard('role', msg.hiddenRole as CardDetails | undefined, 'role')
+          addCard('resource', msg.resource as CardDetails | undefined, 'resource')
+          addCard('role', msg.roleCard as CardDetails | undefined, 'role')
+          addCard('gender', msg.gender as CardDetails | undefined, 'gender')
+          addCard('age', msg.age as CardDetails | undefined, 'age')
+          addCard('body', msg.bodyType as CardDetails | undefined, 'body')
 
-          setMyCards(cards)
+          // Обновляем состояние карт
+          setMyCards(prevCards => {
+            // Если это первый раунд или карты еще не были выданы
+            if (Object.keys(prevCards).length === 0) {
+              console.log('First round - setting all cards')
+              return cards
+            }
+            
+            // Для последующих раундов - добавляем новые карты к существующим
+            console.log('Subsequent round - merging new cards with existing')
+            return { ...prevCards, ...cards }
+          })
+          
+          // Сохраняем новые карты для отображения
+          setNewCardsThisRound(newCards)
+          
+          // Обновляем счетчик полученных карт в этом раунде
           setCardsReceivedThisRound(cardCount)
+          
+          console.log(`📊 Cards received this round: ${cardCount}, total cards: ${Object.keys(cards).length}`)
 
+          // Если получены новые карты и мы в фазе подготовки, показываем сообщение
           if (newCards.length > 0 && gameState?.phase === 'preparation') {
             addToChat('Система', `Вам выдано ${cardCount} новых карт в этом раунде!`, true)
+            
+            // Показываем какие именно карты получены
+            const cardNames = newCards.map(c => c.name).join(', ')
+            addToChat('Система', `Карты: ${cardNames}`, true)
+            
+            // Сбрасываем счетчик раскрытых карт для нового раунда
             setMyRevealedCardsThisRound([])
           }
+          
+          break
+        }
+
+        case 'ROUND_STARTED': {
+          // Безопасно получаем номер раунда
+          const roundNumber = safeNumber(msg.roundNumber, gameState?.round ? gameState.round + 1 : 1)
+          
+          console.log(`🎮 Round ${roundNumber} started!`)
+          
+          addToChat(
+            'Система',
+            `Начался раунд ${roundNumber}. Игрокам выдано по 2 новые карты!`,
+            true
+          )
+          
+          // Сбрасываем счетчик раскрытых карт для нового раунда
+          setMyRevealedCardsThisRound([])
+          
+          // Сбрасываем счетчик полученных карт (будет обновлен при получении YOUR_CARDS)
+          setCardsReceivedThisRound(0)
+          
+          // Очищаем новые карты предыдущего раунда
+          setNewCardsThisRound([])
+          
+          // Обновляем номер раунда в gameState
+          setGameState(prev => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              round: roundNumber
+            }
+          })
+          
           break
         }
 
         case 'GAME_NARRATION': {
           const title = String(msg.title ?? '')
           const text = String(msg.text ?? '')
+          const duration = typeof msg.duration === 'number' ? msg.duration : 30
+          
+          console.log('📖 Game narration received:', { title, duration })
+          
           setNarration({ title, text })
-          if (typeof msg.duration === 'number') {
-            setPhaseTimeLeft(msg.duration)
-            startTimer(msg.duration)
-          }
+          setPhaseTimeLeft(duration)
+          startTimer(duration)
           setTimeout(() => setCanSkipNarration(true), 3000)
           break
         }
@@ -381,7 +490,7 @@ export function useGameSession(gameId: string) {
           if (raw && typeof raw === 'object') {
             const m = raw as Record<string, unknown>
             const chatMsg: GameChatMessage = {
-              id: String(m.id ?? Date.now().toString()),
+              id: String(m.id ?? Date.now().toString() + Math.random()),
               playerId: String(m.playerId ?? 'player'),
               playerName: String(m.playerName ?? 'Игрок'),
               text: String(m.text ?? '').slice(0, 300),
@@ -402,12 +511,6 @@ export function useGameSession(gameId: string) {
           addToChat('Система', 'Началось раскрытие карт выбывшего игрока', true)
           break
 
-        case 'ROUND_STARTED':
-          addToChat('Система', `Начался раунд ${String(msg.roundNumber ?? '')}. Игрокам выдано по 2 новые карты!`, true)
-          setMyRevealedCardsThisRound([])
-          setCardsReceivedThisRound(0)
-          break
-
         case 'DISCUSSION_STARTED':
           addToChat('Система', 'Началось общее обсуждение на 1 минуту!', true)
           setPhaseTimeLeft(60)
@@ -420,6 +523,7 @@ export function useGameSession(gameId: string) {
 
         case 'TIMER_UPDATE':
           if (typeof msg.timeLeft === 'number') {
+            console.log('⏱️ Timer update from server:', msg.timeLeft)
             setPhaseTimeLeft(msg.timeLeft)
             if (msg.timeLeft > 0) {
               startTimer(msg.timeLeft)
@@ -488,6 +592,7 @@ export function useGameSession(gameId: string) {
       const secondsLeft = Math.max(0, Math.floor((endTime - now) / 1000))
 
       if (Math.abs(phaseTimeLeft - secondsLeft) > 1) {
+        console.log('Syncing timer - local:', phaseTimeLeft, 'server:', secondsLeft)
         setPhaseTimeLeft(secondsLeft)
       }
     }
@@ -516,7 +621,7 @@ export function useGameSession(gameId: string) {
       })
 
       const tempMessage: GameChatMessage = {
-        id: `temp-${Date.now()}`,
+        id: `temp-${Date.now()}-${Math.random()}`,
         playerId: myId,
         playerName,
         text: newMessage.trim(),
@@ -550,6 +655,7 @@ export function useGameSession(gameId: string) {
 
   const handleSkipNarration = () => {
     if (canSkipNarration && isConnected) {
+      console.log('Skipping narration')
       ;(sendMessage as unknown as (msg: unknown) => void)({
         type: 'SKIP_NARRATION',
       })
@@ -640,6 +746,8 @@ export function useGameSession(gameId: string) {
     }
   }
 
+  const currentPlayer = userId ? gameState?.players?.find(p => p.id === userId) : undefined
+
   return {
     // Состояния
     gameState,
@@ -656,6 +764,7 @@ export function useGameSession(gameId: string) {
     myAllRevealedCards,
     cardsReceivedThisRound,
     canSkipNarration,
+    newCardsThisRound,
     
     // Состояния раскрытия
     revealingCards,

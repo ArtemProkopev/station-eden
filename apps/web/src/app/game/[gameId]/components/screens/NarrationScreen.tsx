@@ -1,4 +1,5 @@
 // apps/web/src/app/game/[gameId]/components/screens/NarrationScreen.tsx
+import { useEffect } from 'react'
 import styles from '../../page.module.css'
 
 interface NarrationScreenProps {
@@ -14,6 +15,15 @@ export default function NarrationScreen({
   canSkipNarration, 
   onSkip 
 }: NarrationScreenProps) {
+  
+  // Автоматический переход по окончании таймера
+  useEffect(() => {
+    if (phaseTimeLeft <= 0) {
+      console.log('Timer finished, auto-skipping narration')
+      onSkip()
+    }
+  }, [phaseTimeLeft, onSkip])
+
   return (
     <div className={styles.narrationOverlay}>
       <div className={styles.narrationContent}>
@@ -39,7 +49,7 @@ export default function NarrationScreen({
   )
 }
 
-function formatTime(seconds: number) {
+function formatTime(seconds: number): string {
   const mins = Math.floor(Math.max(0, seconds) / 60)
   const secs = Math.max(0, seconds) % 60
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`
