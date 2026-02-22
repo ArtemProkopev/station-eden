@@ -1,3 +1,5 @@
+'use client'
+
 import { ChatMessage } from '@station-eden/shared'
 import type React from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -12,7 +14,6 @@ interface ChatProps {
 	onSendMessage: (e: React.FormEvent) => void
 	onKeyPress: (e: React.KeyboardEvent) => void
 	onChatScroll: () => void
-	chatContainerRef?: React.RefObject<HTMLDivElement>
 	// Опциональные пропсы для игры
 	disabled?: boolean
 	placeholder?: string
@@ -28,7 +29,6 @@ export default function Chat({
 	onSendMessage,
 	onKeyPress,
 	onChatScroll,
-	chatContainerRef,
 	disabled = false,
 	placeholder = 'Написать сообщение...',
 	showVoiceTab = true,
@@ -36,18 +36,21 @@ export default function Chat({
 }: ChatProps) {
 	const [activeTab, setActiveTab] = useState<'text' | 'voice'>('text')
 	const messagesContainerRef = useRef<HTMLDivElement>(null)
-	
+
 	// индикатор "в голосе кто-то есть" для вкладки (без числа)
 	const [hasVoiceActivity, setHasVoiceActivity] = useState(false)
 
 	// Обработчик прокрутки колесиком мыши
-	const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
-		if (messagesContainerRef.current) {
-			messagesContainerRef.current.scrollTop += e.deltaY
-			onChatScroll()
-			e.preventDefault()
-		}
-	}, [onChatScroll])
+	const handleWheel = useCallback(
+		(e: React.WheelEvent<HTMLDivElement>) => {
+			if (messagesContainerRef.current) {
+				messagesContainerRef.current.scrollTop += e.deltaY
+				onChatScroll()
+				e.preventDefault()
+			}
+		},
+		[onChatScroll],
+	)
 
 	// Установка обработчика на контейнер сообщений
 	useEffect(() => {
@@ -61,7 +64,7 @@ export default function Chat({
 		}
 
 		container.addEventListener('wheel', wheelHandler, { passive: false })
-		
+
 		return () => {
 			container.removeEventListener('wheel', wheelHandler)
 		}
@@ -71,7 +74,7 @@ export default function Chat({
 		(stats: { participantsCount: number; someoneSpeaking: boolean }) => {
 			setHasVoiceActivity(stats.participantsCount > 0)
 		},
-		[]
+		[],
 	)
 
 	const formatTime = (timestamp: Date | string) => {
@@ -177,9 +180,9 @@ export default function Chat({
 					}`}
 				>
 					{/* Динамический импорт VoicePanel */}
-					<VoicePanelLoader 
-						roomId={roomId} 
-						onStatsChange={handleVoiceStatsChange} 
+					<VoicePanelLoader
+						roomId={roomId}
+						onStatsChange={handleVoiceStatsChange}
 					/>
 				</div>
 			)}
@@ -188,8 +191,24 @@ export default function Chat({
 }
 
 // Компонент-загрузчик для VoicePanel (чтобы избежать ошибок импорта в игре)
-function VoicePanelLoader({ roomId, onStatsChange }: { roomId: string; onStatsChange: (stats: any) => void }) {
-	const [VoicePanelComponent, setVoicePanelComponent] = useState<any>(null)
+function VoicePanelLoader({
+	roomId,
+	onStatsChange,
+}: {
+	roomId: string
+	onStatsChange: (stats: {
+		participantsCount: number
+		someoneSpeaking: boolean
+	}) => void
+}) {
+	const [VoicePanelComponent, setVoicePanelComponent] =
+		useState<React.ComponentType<{
+			lobbyId: string
+			onStatsChange: (stats: {
+				participantsCount: number
+				someoneSpeaking: boolean
+			}) => void
+		}> | null>(null)
 	const [error, setError] = useState(false)
 
 	useEffect(() => {
@@ -209,7 +228,9 @@ function VoicePanelLoader({ roomId, onStatsChange }: { roomId: string; onStatsCh
 	}
 
 	if (!VoicePanelComponent) {
-		return <div className={styles.voiceLoading}>Загрузка голосового чата...</div>
+		return (
+			<div className={styles.voiceLoading}>Загрузка голосового чата...</div>
+		)
 	}
 
 	return <VoicePanelComponent lobbyId={roomId} onStatsChange={onStatsChange} />

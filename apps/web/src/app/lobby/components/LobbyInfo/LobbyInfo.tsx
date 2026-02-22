@@ -1,4 +1,6 @@
+// apps/web/src/app/lobby/components/LobbyInfo/LobbyInfo.tsx
 import { LobbySettings } from '@station-eden/shared'
+import Image from 'next/image'
 import styles from './LobbyInfo.module.css'
 
 interface LobbyInfoProps {
@@ -15,10 +17,13 @@ export default function LobbyInfo({
 	return (
 		<div className={styles.robotBlock}>
 			<div className={styles.robotImageContainer}>
-				<img
+				<Image
 					src='https://cdn.assets.stationeden.ru/web/roboted-optimized.webp'
 					alt='Robot'
 					className={styles.robotImage}
+					width={240}
+					height={240}
+					priority
 				/>
 			</div>
 

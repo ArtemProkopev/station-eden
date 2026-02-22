@@ -367,14 +367,8 @@ export function useLobby(lobbyIdFromProps?: string) {
 		[sendWS, currentUserId],
 	)
 
-	const handleMutePlayer = useCallback(
-		(_playerId: string, _muted: boolean) => {},
-		[],
-	)
-	const handleVolumeChange = useCallback(
-		(_playerId: string, _volume: number) => {},
-		[],
-	)
+	const handleMutePlayer = useCallback(() => {}, [])
+	const handleVolumeChange = useCallback(() => {}, [])
 
 	const handleAddFriend = useCallback(() => {
 		if (selectedPlayer) alert(`Игрок ${selectedPlayer.name} добавлен в друзья!`)

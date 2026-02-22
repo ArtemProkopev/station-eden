@@ -1,102 +1,100 @@
 // apps/web/src/hooks/useAuthLock.ts
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { LockPayload } from '@station-eden/shared'
-import { readLock, writeLock, clearLock, formatRemaining } from '@/src/utils/authLock'
+import { clearLock, formatRemaining, readLock } from '@/src/utils/authLock'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 interface UseAuthLockReturn {
-  lockedUntilIso: string | null
-  setLockedUntilIso: (iso: string | null) => void
-  countdown: string | null
-  attemptsLeft: number | null
-  setAttemptsLeft: (attempts: number | null) => void
-  locked: boolean
+	lockedUntilIso: string | null
+	setLockedUntilIso: (iso: string | null) => void
+	countdown: string | null
+	attemptsLeft: number | null
+	setAttemptsLeft: (attempts: number | null) => void
+	locked: boolean
 }
 
 export const useAuthLock = (): UseAuthLockReturn => {
-  const [lockedUntilIso, setLockedUntilIso] = useState<string | null>(null)
-  const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null)
-  const [countdown, setCountdown] = useState<string | null>(null)
-  
-  const timerRef = useRef<number | null>(null)
+	const [lockedUntilIso, setLockedUntilIso] = useState<string | null>(null)
+	const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null)
+	const [countdown, setCountdown] = useState<string | null>(null)
 
-  // Восстановление из localStorage
-  useEffect(() => {
-    const applyFromStorage = () => {
-      const saved = readLock()
-      if (!saved) return
-      const until = Date.parse(saved.lockedUntilIso)
-      if (!Number.isNaN(until) && until > Date.now()) {
-        setLockedUntilIso(saved.lockedUntilIso)
-        setAttemptsLeft(null)
-      } else {
-        clearLock()
-      }
-    }
+	const timerRef = useRef<number | null>(null)
 
-    applyFromStorage()
-    
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') applyFromStorage()
-    }
+	useEffect(() => {
+		const applyFromStorage = () => {
+			const saved = readLock()
+			if (!saved) return
+			const until = Date.parse(saved.lockedUntilIso)
+			if (!Number.isNaN(until) && until > Date.now()) {
+				setLockedUntilIso(saved.lockedUntilIso)
+				setAttemptsLeft(null)
+			} else {
+				clearLock()
+			}
+		}
 
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [])
+		applyFromStorage()
 
-  // Таймер обратного отсчета
-  useEffect(() => {
-    if (!lockedUntilIso) {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
-      }
-      setCountdown(null)
-      return
-    }
+		const handleVisibilityChange = () => {
+			if (document.visibilityState === 'visible') applyFromStorage()
+		}
 
-    const updateCountdown = () => {
-      const until = Date.parse(lockedUntilIso)
-      const rem = until - Date.now()
-      
-      if (rem <= 0) {
-        setLockedUntilIso(null)
-        setCountdown(null)
-        setAttemptsLeft(null)
-        clearLock()
-        if (timerRef.current) {
-          clearInterval(timerRef.current)
-          timerRef.current = null
-        }
-      } else {
-        setCountdown(formatRemaining(rem))
-      }
-    }
+		document.addEventListener('visibilitychange', handleVisibilityChange)
+		return () =>
+			document.removeEventListener('visibilitychange', handleVisibilityChange)
+	}, [])
 
-    updateCountdown()
-    timerRef.current = window.setInterval(updateCountdown, 1000)
+	useEffect(() => {
+		if (!lockedUntilIso) {
+			if (timerRef.current) {
+				clearInterval(timerRef.current)
+				timerRef.current = null
+			}
+			setCountdown(null)
+			return
+		}
 
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
-      }
-    }
-  }, [lockedUntilIso])
+		const updateCountdown = () => {
+			const until = Date.parse(lockedUntilIso)
+			const rem = until - Date.now()
 
-  const handleSetLockedUntilIso = useCallback((iso: string | null) => {
-    setLockedUntilIso(iso)
-  }, [])
+			if (rem <= 0) {
+				setLockedUntilIso(null)
+				setCountdown(null)
+				setAttemptsLeft(null)
+				clearLock()
+				if (timerRef.current) {
+					clearInterval(timerRef.current)
+					timerRef.current = null
+				}
+			} else {
+				setCountdown(formatRemaining(rem))
+			}
+		}
 
-  const handleSetAttemptsLeft = useCallback((attempts: number | null) => {
-    setAttemptsLeft(attempts)
-  }, [])
+		updateCountdown()
+		timerRef.current = window.setInterval(updateCountdown, 1000)
 
-  return {
-    lockedUntilIso,
-    setLockedUntilIso: handleSetLockedUntilIso,
-    countdown,
-    attemptsLeft,
-    setAttemptsLeft: handleSetAttemptsLeft,
-    locked: Boolean(lockedUntilIso && countdown)
-  }
+		return () => {
+			if (timerRef.current) {
+				clearInterval(timerRef.current)
+				timerRef.current = null
+			}
+		}
+	}, [lockedUntilIso])
+
+	const handleSetLockedUntilIso = useCallback((iso: string | null) => {
+		setLockedUntilIso(iso)
+	}, [])
+
+	const handleSetAttemptsLeft = useCallback((attempts: number | null) => {
+		setAttemptsLeft(attempts)
+	}, [])
+
+	return {
+		lockedUntilIso,
+		setLockedUntilIso: handleSetLockedUntilIso,
+		countdown,
+		attemptsLeft,
+		setAttemptsLeft: handleSetAttemptsLeft,
+		locked: Boolean(lockedUntilIso && countdown),
+	}
 }

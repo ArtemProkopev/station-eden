@@ -1,3 +1,4 @@
+// apps/web/src/app/profile/config.ts
 export const PROFILE_CONFIG = {
 	STORAGE_KEYS: {
 		AVATAR: 'profile_avatar',
@@ -25,14 +26,6 @@ export const PROFILE_CONFIG = {
 	} as const,
 } as const
 
-const BREAKPOINTS = {
-	MOBILE: 768,
-	SMALL_MOBILE: 480,
-} as const
-
-// пер-юзер ключи (чтобы аккаунты не перетирали друг друга в одном браузере)
-export const avatarKey = (userId: string) =>
-	`${PROFILE_CONFIG.STORAGE_KEYS.AVATAR}:${userId}`
-
-export const frameKey = (userId: string) =>
-	`${PROFILE_CONFIG.STORAGE_KEYS.FRAME}:${userId}`
+// Функции для генерации ключей localStorage с учётом userId
+export const avatarKey = (userId: string) => `profile_avatar_${userId}`
+export const frameKey = (userId: string) => `profile_frame_${userId}`

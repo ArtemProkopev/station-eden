@@ -27,8 +27,7 @@ RUN pnpm -s exec tsc -p tsconfig.migrations.json
 
 # делаем "production bundle" с нормальным node_modules
 WORKDIR /app
-RUN pnpm --filter ./apps/api... deploy --prod /app/deploy
-
+RUN pnpm --filter ./apps/api... deploy --prod --legacy /app/deploy
 
 # --- runtime stage ---
 FROM node:20-alpine AS runtime

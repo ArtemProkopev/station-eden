@@ -54,10 +54,11 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 	useEffect(() => {
 		if (isMobile || !cursorRef.current) return
 
+		// фикс для eslint: берём "снимок" ref-объекта, чтобы cleanup не зависел от .current
+		const strengthObj = activeStrengthRef.current
+
 		const originalCursor = document.body.style.cursor
-		if (hideDefaultCursor) {
-			document.body.style.cursor = 'none'
-		}
+		if (hideDefaultCursor) document.body.style.cursor = 'none'
 
 		const cursor = cursorRef.current
 		cornersRef.current = cursor.querySelectorAll<HTMLDivElement>(
@@ -83,9 +84,7 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 		})
 
 		const createSpinTimeline = () => {
-			if (spinTl.current) {
-				spinTl.current.kill()
-			}
+			if (spinTl.current) spinTl.current.kill()
 			spinTl.current = gsap
 				.timeline({ repeat: -1 })
 				.to(cursor, { rotation: '+=360', duration: spinDuration, ease: 'none' })
@@ -101,7 +100,8 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 			) {
 				return
 			}
-			const strength = activeStrengthRef.current.current
+
+			const strength = strengthObj.current
 			if (strength === 0) return
 
 			const cursorX = gsap.getProperty(cursorRef.current, 'x') as number
@@ -141,9 +141,7 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 				elementUnderMouse &&
 				(elementUnderMouse === activeTarget ||
 					elementUnderMouse.closest(targetSelector) === activeTarget)
-			if (!isStillOverTarget) {
-				currentLeaveHandler?.()
-			}
+			if (!isStillOverTarget) currentLeaveHandler?.()
 		}
 		window.addEventListener('scroll', scrollHandler, { passive: true })
 
@@ -165,9 +163,7 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 			const allTargets: Element[] = []
 			let current: Element | null = directTarget
 			while (current && current !== document.body) {
-				if (current.matches(targetSelector)) {
-					allTargets.push(current)
-				}
+				if (current.matches(targetSelector)) allTargets.push(current)
 				current = current.parentElement
 			}
 			const target = allTargets[0] || null
@@ -210,7 +206,7 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 
 			gsap.ticker.add(tickerFnRef.current!)
 
-			gsap.to(activeStrengthRef.current, {
+			gsap.to(strengthObj, {
 				current: 1,
 				duration: hoverDuration,
 				ease: 'power2.out',
@@ -228,7 +224,7 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 			const leaveHandler = () => {
 				gsap.ticker.remove(tickerFnRef.current!)
 				targetCornerPositionsRef.current = null
-				gsap.set(activeStrengthRef.current, { current: 0, overwrite: true })
+				gsap.set(strengthObj, { current: 0, overwrite: true })
 				activeTarget = null
 
 				if (cornersRef.current) {
@@ -303,7 +299,7 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
 			spinTl.current?.kill()
 			document.body.style.cursor = originalCursor
 			targetCornerPositionsRef.current = null
-			activeStrengthRef.current.current = 0
+			strengthObj.current = 0
 		}
 	}, [
 		targetSelector,

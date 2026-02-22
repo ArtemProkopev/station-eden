@@ -350,11 +350,11 @@ export interface GameResults {
   scores?: unknown
 }
 
-export interface RevealedPlayer {
+export type RevealedPlayer = {
   name: string
   cards: Record<string, Partial<CardDetails> | null>
   playerId?: string
-}
+} | null
 
 export interface WsMessage {
   type: string

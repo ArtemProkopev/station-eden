@@ -65,7 +65,7 @@ export const useWebSocket = (
 		onMessageRef.current = onMessage
 	}, [onMessage])
 
-	// ✅ path обязателен: убираем "молчаливый" дефолт '/lobby'
+	// path обязателен: убираем "молчаливый" дефолт '/lobby'
 	const socketPath = options?.path
 	if (!socketPath) {
 		throw new Error(
@@ -77,7 +77,7 @@ export const useWebSocket = (
 	const debugAllEvents = options?.debugAllEvents ?? !isProd
 	const enabled = options?.enabled ?? true
 
-	// ✅ Защита ОТ ВСЕХ сред (включая prod)
+	// Защита от всех сред (включая prod)
 	// gameId не может идти в /lobby, lobbyId не может идти в /game
 	const hasGameId =
 		!!params && Object.prototype.hasOwnProperty.call(params, 'gameId')
@@ -95,15 +95,30 @@ export const useWebSocket = (
 		)
 	}
 
-	// ✅ baseUrl нормализуем до origin
+	// baseUrl нормализуем до origin
 	const resolvedIoUrl = useMemo(() => {
 		const u = safeParseUrl(baseUrl)
 		if (!u) return baseUrl
 		return `${u.origin}`
 	}, [baseUrl])
 
-	// ✅ ключ для пересоздания сокета при изменении query
+	// ключ для пересоздания сокета при изменении query (по содержимому)
 	const paramsKey = useMemo(() => JSON.stringify(params || {}), [params])
+
+	/**
+	 * Стабильный query object:
+	 * - useEffect НЕ использует params напрямую
+	 * - пересоздаётся только когда меняется paramsKey
+	 *
+	 * Важно: JSON.stringify выкидывает undefined (это обычно ок для query).
+	 */
+	const queryParams = useMemo(() => {
+		try {
+			return JSON.parse(paramsKey) as Record<string, string | number | boolean>
+		} catch {
+			return {}
+		}
+	}, [paramsKey])
 
 	const forceDisconnect = useCallback(() => {
 		shouldReconnectRef.current = false
@@ -115,7 +130,7 @@ export const useWebSocket = (
 	}, [])
 
 	useEffect(() => {
-		// ✅ если выключено — отключаем текущий сокет (если был) и выходим
+		// если выключено — отключаем текущий сокет (если был) и выходим
 		if (!enabled) {
 			if (socket.current) {
 				socket.current.disconnect()
@@ -133,13 +148,13 @@ export const useWebSocket = (
 			return
 		}
 
-		// ✅ FIX: если раньше был forceDisconnect() / shouldReconnectRef=false,
+		// FIX: если раньше был forceDisconnect() / shouldReconnectRef=false,
 		// при нормальном enabled снова разрешаем реконнекты
 		shouldReconnectRef.current = true
 
 		const currentSocket = io(resolvedIoUrl, {
 			path: socketPath,
-			query: params || {},
+			query: queryParams,
 			transports: ['websocket'],
 			withCredentials: true,
 			autoConnect: true,
@@ -278,7 +293,7 @@ export const useWebSocket = (
 	}, [
 		resolvedIoUrl,
 		socketPath,
-		paramsKey,
+		queryParams, // вместо params
 		debugAllEvents,
 		forceDisconnect,
 		enabled,

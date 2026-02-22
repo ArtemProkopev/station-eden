@@ -22,28 +22,26 @@ export default function LogoutButton() {
 		console.log('[logout] Starting logout process...')
 		setLoading(true)
 
-		// 1. Устанавливаем глобальные флаги для блокировки keep-alive и ретраев
 		setForcedLogout()
 
-		// 2. Закрываем все WebSocket соединения
 		console.log('[logout] Closing WebSocket connections...')
 		closeAllWebSockets()
 
-		// 3. Отправляем события для всех компонентов
 		try {
 			window.dispatchEvent(new Event('logout'))
 			window.dispatchEvent(
 				new CustomEvent('session-changed', {
 					detail: { loggedIn: false, logout: true },
-				})
+				}),
 			)
 			window.dispatchEvent(new Event('force-close-websocket'))
-		} catch {}
+		} catch {
+			/* noop */
+		}
 
 		let logoutSuccess = false
 
 		try {
-			// 4. Пытаемся выполнить POST logout (основной метод)
 			console.log('[logout] Attempting POST logout...')
 			await api.logout()
 			console.log('[logout] POST logout successful')
@@ -51,7 +49,6 @@ export default function LogoutButton() {
 		} catch (postError) {
 			console.warn('[logout] POST logout failed:', postError)
 
-			// 5. Fallback: пробуем GET logout
 			try {
 				console.log('[logout] Attempting GET logout as fallback...')
 				await api.logoutGet()
@@ -59,24 +56,20 @@ export default function LogoutButton() {
 				logoutSuccess = true
 			} catch (getError) {
 				console.warn('[logout] GET logout also failed:', getError)
-				// Даже если запросы упали, продолжаем с клиентской очисткой
 			}
 		}
 
 		console.log('[logout] API logout result:', logoutSuccess ? 'ok' : 'failed')
 
-		// 6. Всегда выполняем клиентскую очистку (куки, storages, события)
 		console.log('[logout] Performing client-side cleanup...')
 		clearClientAuthData()
 
-		// 7. Очищаем WebSocket кэш
 		try {
 			await clearWebSocketCache()
 		} catch (cacheError) {
 			console.warn('[logout] WebSocket cache clearing failed:', cacheError)
 		}
 
-		// 8. Дополнительная очистка кеша Service Worker
 		try {
 			if ('caches' in window) {
 				const cacheNames = await caches.keys()
@@ -87,14 +80,14 @@ export default function LogoutButton() {
 			console.warn('[logout] Cache clearing failed:', cacheError)
 		}
 
-		// 9. Финальные события
 		try {
 			if ('speechSynthesis' in window) {
 				window.speechSynthesis.cancel()
 			}
-		} catch {}
+		} catch {
+			/* noop */
+		}
 
-		// 10. Редирект
 		console.log('[logout] Redirecting...')
 		setLoading(false)
 
@@ -102,13 +95,10 @@ export default function LogoutButton() {
 			const timestamp = Date.now()
 
 			if (pathname === '/') {
-				// Если уже на главной, форсируем полную перезагрузку
 				window.location.href = `/?logout=${timestamp}&cleared=1&ws=closed`
 			} else {
-				// Иначе используем router для плавного перехода
 				router.push(`/?logout=${timestamp}&cleared=1&ws=closed`)
 
-				// Страховка, если router не сработает
 				setTimeout(() => {
 					if (window.location.pathname !== '/') {
 						window.location.href = `/?logout=${timestamp}&ws=closed`

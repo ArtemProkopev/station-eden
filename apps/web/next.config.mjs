@@ -1,7 +1,11 @@
-// apps/web/next.config.mjs
 import fs from 'fs'
+import { createRequire } from 'module'
 import path from 'path'
 import { fileURLToPath } from 'url'
+
+// Используем require для подключения process
+const require = createRequire(import.meta.url)
+const process = require('process')
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -77,6 +81,22 @@ const nextConfig = {
 		if (!dev && !isServer) {
 			config.devtool = false
 		}
+
+		// Добавляем поддержку process для ES модулей
+		config.resolve.fallback = {
+			...config.resolve.fallback,
+			process: require.resolve('process/browser'),
+			stream: require.resolve('stream-browserify'),
+			url: require.resolve('url'),
+			buffer: require.resolve('buffer'),
+			assert: require.resolve('assert'),
+			crypto: require.resolve('crypto-browserify'),
+			events: require.resolve('events'),
+			os: require.resolve('os-browserify/browser'),
+			path: require.resolve('path-browserify'),
+			util: require.resolve('util/'),
+		}
+
 		return config
 	},
 

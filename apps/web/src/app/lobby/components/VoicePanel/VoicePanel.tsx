@@ -1,4 +1,3 @@
-// apps/web/src/app/lobby/components/VoicePanel/VoicePanel.tsx
 'use client'
 
 import { LocalAudioTrack, Room, RoomEvent, Track } from 'livekit-client'
@@ -38,7 +37,6 @@ function unwrapDataLayers(value: unknown): unknown {
 	return current
 }
 
-// Минимально нужный shape публикации микрофона (без any)
 type TrackPublicationLike = {
 	track?: unknown
 	isMuted?: boolean
@@ -111,7 +109,9 @@ export default function VoicePanel({
 					try {
 						el.muted = flag
 						el.volume = flag ? 0 : 1
-					} catch {}
+					} catch {
+						/* noop */
+					}
 				})
 			})
 		} catch (e: unknown) {
@@ -268,6 +268,7 @@ export default function VoicePanel({
 
 				const micPub = rpLike.getTrackPublication?.(Track.Source.Microphone)
 				const track = micPub?.track
+
 				const trackMuted = !!(isRecord(track) &&
 				('isMuted' in track || 'muted' in track)
 					? ((track as Record<string, unknown>).isMuted ??
@@ -344,13 +345,19 @@ export default function VoicePanel({
 			list.forEach(el => {
 				try {
 					if (track) track.detach(el)
-				} catch {}
+				} catch {
+					/* noop */
+				}
 				try {
 					el.pause()
-				} catch {}
+				} catch {
+					/* noop */
+				}
 				try {
 					;(el as HTMLMediaElement).srcObject = null
-				} catch {}
+				} catch {
+					/* noop */
+				}
 				el.remove()
 			})
 
@@ -366,13 +373,19 @@ export default function VoicePanel({
 				.forEach(el => {
 					try {
 						el.pause()
-					} catch {}
+					} catch {
+						/* noop */
+					}
 					try {
 						;(el as HTMLMediaElement).srcObject = null
-					} catch {}
+					} catch {
+						/* noop */
+					}
 					try {
 						el.remove()
-					} catch {}
+					} catch {
+						/* noop */
+					}
 				})
 		}
 
@@ -382,9 +395,13 @@ export default function VoicePanel({
 				stream.getTracks().forEach(t => {
 					try {
 						t.stop()
-					} catch {}
+					} catch {
+						/* noop */
+					}
 				})
-			} catch {}
+			} catch {
+				/* noop */
+			}
 		}
 
 		selfMonitorStreamRef.current = null
@@ -450,8 +467,6 @@ export default function VoicePanel({
 			r.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
 				if (!participant.isLocal && track.kind === Track.Kind.Audio) {
 					attachAudioForParticipant(participant.sid, track)
-
-					// если self-monitor активен — новые треки тоже глушим
 					if (selfMonitorActiveRef.current) setRemoteAudioMuted(true)
 				}
 			})
@@ -580,7 +595,9 @@ export default function VoicePanel({
 
 			try {
 				await r.localParticipant.setMicrophoneEnabled(false)
-			} catch {}
+			} catch {
+				/* noop */
+			}
 
 			// жёсткий stop локального трека без any
 			try {
@@ -589,25 +606,37 @@ export default function VoicePanel({
 				if (isLocalAudioTrack(t)) {
 					try {
 						await r.localParticipant.unpublishTrack(t)
-					} catch {}
+					} catch {
+						/* noop */
+					}
 					try {
 						t.stop()
-					} catch {}
+					} catch {
+						/* noop */
+					}
 				}
-			} catch {}
+			} catch {
+				/* noop */
+			}
 
 			// чистим remote audio
 			audioElementsRef.current.forEach(els => {
 				els.forEach(el => {
 					try {
 						el.pause()
-					} catch {}
+					} catch {
+						/* noop */
+					}
 					try {
 						;(el as HTMLMediaElement).srcObject = null
-					} catch {}
+					} catch {
+						/* noop */
+					}
 					try {
 						el.remove()
-					} catch {}
+					} catch {
+						/* noop */
+					}
 				})
 			})
 			audioElementsRef.current.clear()
@@ -615,7 +644,9 @@ export default function VoicePanel({
 			try {
 				r.disconnect()
 				r.removeAllListeners()
-			} catch {}
+			} catch {
+				/* noop */
+			}
 
 			roomRef.current = null
 			setJoined(false)
@@ -637,14 +668,15 @@ export default function VoicePanel({
 			const nextEnabled = muted // muted=true => включаем
 			await r.localParticipant.setMicrophoneEnabled(nextEnabled)
 
-			// добиваем трек, если это LocalAudioTrack
 			const pub = getMicrophonePublication(r.localParticipant)
 			const t = pub?.track
 			if (isLocalAudioTrack(t)) {
 				try {
 					if (nextEnabled) await t.unmute()
 					else await t.mute()
-				} catch {}
+				} catch {
+					/* noop */
+				}
 			}
 
 			setMuted(!nextEnabled)
@@ -660,35 +692,33 @@ export default function VoicePanel({
 
 		try {
 			if (selfMonitorActiveRef.current) {
-				// выключаем self-monitor
 				disableSelfMonitor()
 				selfMonitorActiveRef.current = false
 				setSelfMonitor(false)
 				setRemoteAudioMuted(false)
 
-				// восстановить микрофон как был
 				const shouldEnable = micEnabledBeforeSelfMonitorRef.current
 				try {
 					await r.localParticipant.setMicrophoneEnabled(shouldEnable)
-				} catch {}
+				} catch {
+					/* noop */
+				}
 				setMuted(!shouldEnable)
 
 				updateParticipants(r)
 				return
 			}
 
-			// включаем self-monitor
 			micEnabledBeforeSelfMonitorRef.current = !muted
 
-			// выключить микрофон для других
 			try {
 				await r.localParticipant.setMicrophoneEnabled(false)
-			} catch {}
+			} catch {
+				/* noop */
+			}
 			setMuted(true)
 
-			// выключить звук других локально
 			setRemoteAudioMuted(true)
-
 			await enableSelfMonitor()
 
 			selfMonitorActiveRef.current = true
@@ -722,40 +752,55 @@ export default function VoicePanel({
 		return () => window.removeEventListener('pagehide', handler)
 	}, [leaveVoice])
 
+	// ВАЖНО: фикс eslint warning про audioElementsRef.current — берём "снимок" (на самом деле это тот же Map-объект)
 	useEffect(() => {
+		const audioMap = audioElementsRef.current
+
 		return () => {
 			try {
 				disableSelfMonitor()
-			} catch {}
+			} catch {
+				/* noop */
+			}
 
 			try {
-				// eslint warning fix: копируем ref в переменную
-				const map = audioElementsRef.current
-				map.forEach(els => {
+				audioMap.forEach(els => {
 					els.forEach(el => {
 						try {
 							el.pause()
-						} catch {}
+						} catch {
+							/* noop */
+						}
 						try {
 							;(el as HTMLMediaElement).srcObject = null
-						} catch {}
+						} catch {
+							/* noop */
+						}
 						try {
 							el.remove()
-						} catch {}
+						} catch {
+							/* noop */
+						}
 					})
 				})
-				map.clear()
-			} catch {}
+				audioMap.clear()
+			} catch {
+				/* noop */
+			}
 
 			const r = roomRef.current
 			if (r) {
 				try {
 					r.localParticipant.setMicrophoneEnabled(false)
-				} catch {}
+				} catch {
+					/* noop */
+				}
 				try {
 					r.disconnect()
 					r.removeAllListeners()
-				} catch {}
+				} catch {
+					/* noop */
+				}
 			}
 
 			roomRef.current = null
@@ -763,14 +808,16 @@ export default function VoicePanel({
 
 			try {
 				syncSpeakingToPlayersList([])
-			} catch {}
+			} catch {
+				/* noop */
+			}
 		}
 	}, [disableSelfMonitor, syncSpeakingToPlayersList])
 
-	// ---- UI ----
 	const participantsCount = participants.length
 	const hasParticipantsInRoom = participantsCount > 0
 	const hasParticipants = joined && hasParticipantsInRoom
+
 	const participantsLabel = !joined
 		? 'Подключитесь, чтобы увидеть, кто в голосе'
 		: !hasParticipantsInRoom
@@ -783,9 +830,7 @@ export default function VoicePanel({
 
 	return (
 		<div
-			className={`${styles.voiceBlock} ${
-				someoneSpeaking ? styles.voiceActive : ''
-			}`}
+			className={`${styles.voiceBlock} ${someoneSpeaking ? styles.voiceActive : ''}`}
 		>
 			<div className={styles.headerRow}>
 				<div className={styles.loader} aria-hidden='true'>
@@ -854,9 +899,7 @@ export default function VoicePanel({
 					<>
 						<div className={styles.buttonsGroupLeft}>
 							<button
-								className={`${styles.controlButton} ${
-									muted ? styles.controlButtonMuted : ''
-								}`}
+								className={`${styles.controlButton} ${muted ? styles.controlButtonMuted : ''}`}
 								onClick={toggleMute}
 								disabled={selfMonitor}
 								title={
@@ -869,9 +912,7 @@ export default function VoicePanel({
 							</button>
 
 							<button
-								className={`${styles.controlButton} ${
-									selfMonitor ? styles.controlButtonActive : ''
-								}`}
+								className={`${styles.controlButton} ${selfMonitor ? styles.controlButtonActive : ''}`}
 								onClick={toggleSelfMonitor}
 							>
 								{selfMonitor ? 'Скрыть себя' : 'Слышать себя'}

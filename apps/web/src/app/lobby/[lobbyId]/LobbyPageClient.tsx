@@ -102,7 +102,7 @@ const LobbyContent = memo(function LobbyContent({
 							onSendMessage={lobby.handleSendMessage}
 							onKeyPress={lobby.handleKeyPress}
 							onChatScroll={lobby.handleChatScroll}
-							chatContainerRef={lobby.chatContainerRef}
+							// chatContainerRef временно убран, так как не используется в Chat
 						/>
 					</div>
 				</div>
@@ -113,9 +113,9 @@ const LobbyContent = memo(function LobbyContent({
 						totalPlayersCount={lobby.players.length}
 						isConnected={lobby.isConnected}
 						minPlayersRequired={2}
-						lobbyId={lobbyId}
 						isLobbyCreator={lobby.isLobbyCreator}
 						onStartGame={lobby.handleStartGame}
+						// lobbyId убран, так как не требуется в StartGameButton
 					/>
 				</div>
 

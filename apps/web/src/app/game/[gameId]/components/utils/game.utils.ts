@@ -1,4 +1,3 @@
-// apps/web/src/app/game/[gameId]/utils/game.utils.ts
 import { CardType, GamePhase } from '@station-eden/shared'
 
 export const formatTime = (seconds: number): string => {
@@ -127,11 +126,4 @@ export const getServerCardType = (clientType: CardType): string => {
     default:
       return 'profession'
   }
-}
-
-export const formatMessageTime = (timestamp: Date): string => {
-  return timestamp.toLocaleTimeString('ru-RU', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }

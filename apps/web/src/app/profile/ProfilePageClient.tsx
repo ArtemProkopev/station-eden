@@ -75,7 +75,7 @@ export default function ProfilePageClient() {
 			} catch (e) {
 				// На всякий случай: если loadUserData кинет исключение — покажем ошибку через profile.status=error
 				// и всё равно не будем висеть в лоадере.
-				// eslint-disable-next-line no-console
+				 
 				console.error('Profile init error:', e)
 			} finally {
 				if (!cancelled) {

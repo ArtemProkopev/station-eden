@@ -1,256 +1,285 @@
-// apps/web/src/app/game/[gameId]/GameSessionClient.tsx
 'use client'
 
-import { useGameSession } from './components/hooks/useGameSession'
-import GameHeader from './components/GameHeader'
+import {
+	ExtendedGamePlayer,
+	ExtendedGameState,
+	GameChatMessage,
+} from '@station-eden/shared'
+import { useCallback, useMemo } from 'react'
+import GameChat from './components/GameChat'
 import GameFooter from './components/GameFooter'
-import PlayersPanel from './components/PlayersPanel'
+import GameHeader from './components/GameHeader'
 import GamePhasePanel from './components/GamePhasePanel'
-import ChatSection from './components/ChatSection'
-import NarrationScreen from './components/screens/NarrationScreen'
-import WaitingRoom from './components/screens/WaitingRoom'
-import LoadingScreen from './components/screens/LoadingScreen'
-import MyCardsModal from './components/modals/MyCardsModal'
+import { useGameSession } from './components/hooks/useGameSession'
 import CardsTableModal from './components/modals/CardsTableModal'
-import RevealedPlayerModal from './components/modals/RevealedPlayerModal'
 import CrisisModal from './components/modals/CrisisModal'
 import GameResultsModal from './components/modals/GameResultsModal'
-import { ExtendedGameState as GameState, ExtendedGamePlayer as GamePlayer } from '@station-eden/shared'
+import MyCardsModal from './components/modals/MyCardsModal'
+import RevealedPlayerModal from './components/modals/RevealedPlayerModal'
+import PlayersPanel from './components/PlayersPanel'
+import LoadingScreen from './components/screens/LoadingScreen'
+import NarrationScreen from './components/screens/NarrationScreen'
+import WaitingRoom from './components/screens/WaitingRoom'
 import styles from './page.module.css'
 
 type Props = {
-  gameId: string
+	gameId: string
 }
 
 export default function GameSessionClient({ gameId }: Props) {
-  const {
-    // Состояния
-    gameState,
-    myCards,
-    selectedVote,
-    phaseTimeLeft,
-    narration,
-    activeCrisis,
-    showMyCards,
-    showCardsTable,
-    gameResults,
-    allPlayersCards,
-    myRevealedCardsThisRound,
-    myAllRevealedCards,
-    cardsReceivedThisRound,
-    canSkipNarration,
-    newCardsThisRound,
-    
-    // Состояния раскрытия
-    revealingCards,
-    revealedCards,
-    currentRevealIndex,
-    isRevealing,
-    revealedPlayer,
-    
-    // Чат
-    chatMessages,
-    newMessage,
-    chatContainerRef,
-    
-    // Профиль
-    userId,
-    username,
-    profile,
-    isConnected,
-    
-    // Сеттеры
-    setShowMyCards,
-    setShowCardsTable,
-    setActiveCrisis,
-    setGameResults,
-    setRevealedPlayer,
-    resetReveal,
-    
-    // Обработчики
-    handleSendMessage,
-    handleKeyPress,
-    handleMessageChange,
-    handleStartGame,
-    handleSkipNarration,
-    handleStartDiscussion,
-    handleRevealCard,
-    handleVote,
-    handleRequestVote,
-    handleUseAbility,
-    handleSolveCrisis,
-    handleCloseCrisis,
-    handleLeaveGame,
-    setSelectedVote,
-    addToChat,
-  } = useGameSession(gameId)
+	const {
+		gameState,
+		myCards,
+		phaseTimeLeft,
+		narration,
+		activeCrisis,
+		showMyCards,
+		showCardsTable,
+		gameResults,
+		allPlayersCards,
+		myRevealedCardsThisRound,
+		myAllRevealedCards,
+		cardsReceivedThisRound,
+		canSkipNarration,
+		newCardsThisRound,
 
-  if (!gameState) {
-    return (
-      <LoadingScreen
-        isConnected={isConnected}
-        profile={profile}
-        gameId={gameId}
-        onRetryJoin={() => {}}
-      />
-    )
-  }
+		revealingCards,
+		revealedCards,
+		currentRevealIndex,
+		isRevealing,
+		revealedPlayer,
 
-  if (gameState.status === 'waiting') {
-    return (
-      <WaitingRoom
-        gameState={gameState}
-        gameId={gameId}
-        userId={userId}
-        isConnected={isConnected}
-        onStartGame={handleStartGame}
-        onLeaveGame={handleLeaveGame}
-      />
-    )
-  }
+		chatMessages,
+		newMessage,
 
-  const currentPlayer = userId ? gameState.players?.find((p: GamePlayer) => p.id === userId) : undefined
-  const alivePlayers = gameState.players?.filter((p: GamePlayer) => p.isAlive) || []
-  const phaseDurationDisplay = getPhaseDuration(gameState, phaseTimeLeft)
+		userId,
+		profile,
+		isConnected,
 
-  return (
-    <div className={styles.container}>
-      {narration && (
-        <NarrationScreen
-          narration={narration}
-          phaseTimeLeft={phaseTimeLeft}
-          canSkipNarration={canSkipNarration}
-          onSkip={handleSkipNarration}
-        />
-      )}
-      
-      {showMyCards && (
-        <MyCardsModal
-          myCards={myCards}
-          cardsReceivedThisRound={cardsReceivedThisRound}
-          myRevealedCardsThisRound={myRevealedCardsThisRound}
-          myAllRevealedCards={myAllRevealedCards}
-          newCardsThisRound={newCardsThisRound}
-          gameState={gameState}
-          userId={userId}
-          onClose={() => setShowMyCards(false)}
-          onRevealCard={handleRevealCard}
-        />
-      )}
-      
-      {showCardsTable && (
-        <CardsTableModal
-          allPlayersCards={allPlayersCards}
-          myCards={myCards}
-          userId={userId}
-          onClose={() => setShowCardsTable(false)}
-        />
-      )}
-      
-      {revealedPlayer && (
-        <RevealedPlayerModal
-          revealedPlayer={revealedPlayer}
-          revealedCards={revealedCards}
-          revealingCards={revealingCards}
-          currentRevealIndex={currentRevealIndex}
-          isRevealing={isRevealing}
-          onClose={resetReveal}
-        />
-      )}
-      
-      {activeCrisis && (
-        <CrisisModal
-          crisis={activeCrisis}
-          phaseTimeLeft={phaseTimeLeft}
-          currentPlayer={currentPlayer}
-          isConnected={isConnected}
-          onSolve={handleSolveCrisis}
-          onClose={handleCloseCrisis}
-        />
-      )}
-      
-      {gameResults && (
-        <GameResultsModal
-          gameResults={gameResults}
-          onLeaveGame={handleLeaveGame}
-        />
-      )}
+		setShowMyCards,
+		setShowCardsTable,
+		setActiveCrisis,
+		resetReveal,
 
-      <GameHeader
-        gameState={gameState}
-        phaseTimeLeft={phaseTimeLeft}
-        myRevealedCardsThisRound={myRevealedCardsThisRound}
-        userId={userId}
-        onLeaveGame={handleLeaveGame}
-      />
+		handleSendMessage,
+		handleKeyPress,
+		handleMessageChange,
+		handleStartGame,
+		handleSkipNarration,
+		handleStartDiscussion,
+		handleRevealCard,
+		handleVote,
+		handleSolveCrisis,
+		handleCloseCrisis,
+		handleLeaveGame,
+	} = useGameSession(gameId)
 
-      <main className={styles.mainContent}>
-        <PlayersPanel
-          gameState={gameState}
-          userId={userId}
-          gamePhase={gameState.phase as string}
-          currentPlayer={currentPlayer}
-          onVote={handleVote}
-          onShowMyCards={() => setShowMyCards(true)}
-          onShowCardsTable={() => setShowCardsTable(true)}
-        />
+	// Нормализация myAllRevealedCards для разных компонентов
+	const myAllRevealedCardIds = useMemo((): string[] => {
+		if (!myAllRevealedCards) return []
+		if (Array.isArray(myAllRevealedCards)) {
+			// Если массив объектов, извлекаем id (если есть) или name
+			return myAllRevealedCards.map(card => (card as any).id ?? card.name)
+		} else {
+			// Если объект, ключи — это ID карт
+			return Object.keys(myAllRevealedCards)
+		}
+	}, [myAllRevealedCards])
 
-        <GamePhasePanel
-          gameState={gameState}
-          phaseTimeLeft={phaseTimeLeft}
-          phaseDurationDisplay={phaseDurationDisplay}
-          userId={userId}
-          currentPlayer={currentPlayer}
-          alivePlayers={alivePlayers}
-          myRevealedCardsThisRound={myRevealedCardsThisRound}
-          myAllRevealedCards={myAllRevealedCards}
-          revealingCards={revealingCards}
-          currentRevealIndex={currentRevealIndex}
-          isRevealing={isRevealing}
-          revealedPlayer={revealedPlayer}
-          onShowMyCards={() => setShowMyCards(true)}
-          onShowCardsTable={() => setShowCardsTable(true)}
-          onStartDiscussion={handleStartDiscussion}
-          onVote={handleVote}
-          onSolveCrisis={handleSolveCrisis}
-          onSetActiveCrisis={setActiveCrisis}
-        />
+	const myAllRevealedCardsObject = useMemo((): Record<
+		string,
+		{ name: string; type: string }
+	> => {
+		if (!myAllRevealedCards) return {}
+		if (Array.isArray(myAllRevealedCards)) {
+			// Преобразуем массив объектов в Record по id (или name)
+			return myAllRevealedCards.reduce(
+				(acc, card) => {
+					const key = (card as any).id ?? card.name
+					acc[key] = { name: card.name, type: card.type }
+					return acc
+				},
+				{} as Record<string, { name: string; type: string }>,
+			)
+		} else {
+			// Уже объект
+			return myAllRevealedCards
+		}
+	}, [myAllRevealedCards])
 
-        <ChatSection
-          chatMessages={chatMessages}
-          newMessage={newMessage}
-          chatContainerRef={chatContainerRef}
-          isConnected={isConnected}
-          gameState={gameState}
-          profile={profile}
-          userId={userId}
-          onMessageChange={handleMessageChange}
-          onSendMessage={handleSendMessage}
-          onKeyPress={handleKeyPress}
-        />
-      </main>
+	// Обработчик скролла чата (заглушка) – теперь без параметров, как требует GameChat
+	const handleChatScroll = useCallback(() => {
+		// Здесь можно реализовать подгрузку истории при скролле, если потребуется
+	}, [])
 
-      <GameFooter
-        gameState={gameState}
-        currentPlayer={currentPlayer}
-        myRevealedCardsThisRound={myRevealedCardsThisRound}
-        myAllRevealedCards={myAllRevealedCards}
-        alivePlayers={alivePlayers}
-        onShowCardsTable={() => setShowCardsTable(true)}
-      />
-    </div>
-  )
+	if (!gameState) {
+		return (
+			<LoadingScreen
+				isConnected={isConnected}
+				profile={profile}
+				gameId={gameId}
+				onRetryJoin={() => {}}
+				userId={userId}
+			/>
+		)
+	}
+
+	if (gameState.status === 'waiting') {
+		return (
+			<WaitingRoom
+				gameState={gameState}
+				gameId={gameId}
+				userId={userId}
+				isConnected={isConnected}
+				onStartGame={handleStartGame}
+				onLeaveGame={handleLeaveGame}
+			/>
+		)
+	}
+
+	const players = (gameState.players || []) as ExtendedGamePlayer[]
+	const currentPlayer = userId ? players.find(p => p.id === userId) : undefined
+	const alivePlayers = players.filter(p => p.isAlive)
+	const phaseDurationDisplay = getPhaseDuration(gameState, phaseTimeLeft)
+
+	return (
+		<div className={styles.container}>
+			{narration && (
+				<NarrationScreen
+					narration={narration}
+					phaseTimeLeft={phaseTimeLeft}
+					canSkipNarration={canSkipNarration}
+					onSkip={handleSkipNarration}
+				/>
+			)}
+
+			{showMyCards && (
+				<MyCardsModal
+					myCards={myCards}
+					cardsReceivedThisRound={cardsReceivedThisRound}
+					myRevealedCardsThisRound={myRevealedCardsThisRound}
+					myAllRevealedCards={myAllRevealedCards}
+					newCardsThisRound={newCardsThisRound}
+					gameState={gameState}
+					userId={userId}
+					onClose={() => setShowMyCards(false)}
+					onRevealCard={handleRevealCard}
+				/>
+			)}
+
+			{showCardsTable && (
+				<CardsTableModal
+					allPlayersCards={allPlayersCards}
+					myCards={myCards}
+					userId={userId}
+					onClose={() => setShowCardsTable(false)}
+				/>
+			)}
+
+			{revealedPlayer && (
+				<RevealedPlayerModal
+					revealedPlayer={revealedPlayer}
+					revealedCards={revealedCards}
+					revealingCards={revealingCards}
+					currentRevealIndex={currentRevealIndex}
+					isRevealing={isRevealing}
+					onClose={resetReveal}
+				/>
+			)}
+
+			{activeCrisis && (
+				<CrisisModal
+					crisis={activeCrisis}
+					phaseTimeLeft={phaseTimeLeft}
+					currentPlayer={currentPlayer}
+					isConnected={isConnected}
+					onSolve={handleSolveCrisis}
+					onClose={handleCloseCrisis}
+				/>
+			)}
+
+			{gameResults && (
+				<GameResultsModal
+					gameResults={gameResults}
+					onLeaveGame={handleLeaveGame}
+				/>
+			)}
+
+			<GameHeader
+				gameState={gameState}
+				phaseTimeLeft={phaseTimeLeft}
+				myRevealedCardsThisRound={myRevealedCardsThisRound}
+				userId={userId}
+				onLeaveGame={handleLeaveGame}
+			/>
+
+			<main className={styles.mainContent}>
+				<PlayersPanel
+					gameState={gameState}
+					userId={userId}
+					gamePhase={gameState.phase as string}
+					currentPlayer={currentPlayer}
+					onVote={handleVote}
+					onShowMyCards={() => setShowMyCards(true)}
+					onShowCardsTable={() => setShowCardsTable(true)}
+				/>
+
+				<GamePhasePanel
+					gameState={gameState}
+					phaseTimeLeft={phaseTimeLeft}
+					phaseDurationDisplay={phaseDurationDisplay}
+					userId={userId}
+					currentPlayer={currentPlayer}
+					alivePlayers={alivePlayers}
+					myRevealedCardsThisRound={myRevealedCardsThisRound}
+					myAllRevealedCards={myAllRevealedCardIds} // передаём string[]
+					revealingCards={revealingCards}
+					currentRevealIndex={currentRevealIndex}
+					isRevealing={isRevealing}
+					revealedPlayer={revealedPlayer}
+					onShowMyCards={() => setShowMyCards(true)}
+					onShowCardsTable={() => setShowCardsTable(true)}
+					onStartDiscussion={handleStartDiscussion}
+					onVote={handleVote}
+					onSolveCrisis={handleSolveCrisis}
+					onSetActiveCrisis={setActiveCrisis}
+				/>
+
+				<GameChat
+					gameId={gameId}
+					messages={chatMessages as GameChatMessage[]}
+					newMessage={newMessage}
+					onMessageChange={handleMessageChange}
+					onSendMessage={handleSendMessage}
+					onKeyPress={
+						handleKeyPress as (e: React.KeyboardEvent<Element>) => void
+					}
+					onChatScroll={handleChatScroll} // теперь () => void
+					disabled={!isConnected || gameState.phase === 'game_over'}
+					currentUserId={userId}
+				/>
+			</main>
+
+			<GameFooter
+				gameState={gameState}
+				currentPlayer={currentPlayer}
+				myRevealedCardsThisRound={myRevealedCardsThisRound}
+				myAllRevealedCards={myAllRevealedCardsObject} // передаём Record
+				alivePlayers={alivePlayers}
+				onShowCardsTable={() => setShowCardsTable(true)}
+			/>
+		</div>
+	)
 }
 
-// Вспомогательная функция с типами
-function getPhaseDuration(gameState: GameState, phaseTimeLeft: number): number {
-  if (gameState.phase === 'voting') {
-    return 30
-  } else if (gameState.phase === 'discussion' && phaseTimeLeft > 0) {
-    return 60
-  } else if (gameState.phase === 'crisis') {
-    return 60
-  } else {
-    return typeof gameState.phaseDuration === 'number' ? gameState.phaseDuration : 180
-  }
+function getPhaseDuration(
+	gameState: ExtendedGameState,
+	phaseTimeLeft: number,
+): number {
+	if (gameState.phase === 'voting') return 30
+	if (gameState.phase === 'discussion' && phaseTimeLeft > 0) return 60
+	if (gameState.phase === 'crisis') return 60
+	return typeof gameState.phaseDuration === 'number'
+		? gameState.phaseDuration
+		: 180
 }

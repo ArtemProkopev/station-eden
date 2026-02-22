@@ -55,7 +55,6 @@ export async function POST(request: NextRequest) {
 		const lobbyId =
 			typeof bodyUnknown.lobbyId === 'string' ? bodyUnknown.lobbyId : ''
 		const playersRaw = bodyUnknown.players
-		const _creatorId = bodyUnknown.creatorId
 		const settingsRaw = bodyUnknown.settings
 
 		const players = Array.isArray(playersRaw)
@@ -121,15 +120,12 @@ export async function GET(request: NextRequest) {
 	const { searchParams } = new URL(request.url)
 	const gameId = searchParams.get('gameId')
 
-	if (!gameId) {
+	if (!gameId)
 		return NextResponse.json({ error: 'ID игры не указан' }, { status: 400 })
-	}
 
 	const gameState = games.get(gameId)
-
-	if (!gameState) {
+	if (!gameState)
 		return NextResponse.json({ error: 'Игра не найдена' }, { status: 404 })
-	}
 
 	return NextResponse.json({ success: true, gameState })
 }

@@ -1,6 +1,7 @@
 // apps/web/src/components/TopHUD/components/Icon.tsx
 'use client'
 
+import Image from 'next/image'
 import React from 'react'
 import styles from './Icon.module.css'
 
@@ -69,12 +70,7 @@ function IconLoader({
 	className,
 	...props
 }: IconLoaderProps) {
-	const [isLoaded, setIsLoaded] = React.useState(false)
 	const [hasError, setHasError] = React.useState(false)
-
-	React.useEffect(() => {
-		if (isLoaded) onLoadStatus?.(true)
-	}, [isLoaded, onLoadStatus])
 
 	const handleError = () => {
 		setHasError(true)
@@ -82,18 +78,18 @@ function IconLoader({
 	}
 
 	const handleLoad = () => {
-		setIsLoaded(true)
+		onLoadStatus?.(true)
 	}
 
-	if (hasError) {
-		return <>{FALLBACKS[type]}</>
-	}
+	if (hasError) return <>{FALLBACKS[type]}</>
 
 	return (
-		<img
+		<Image
 			src={ICON_PATHS[type]}
-			alt={alt}
+			alt={alt ?? ''}
 			className={className}
+			width={64}
+			height={64}
 			onError={handleError}
 			onLoad={handleLoad}
 			{...props}

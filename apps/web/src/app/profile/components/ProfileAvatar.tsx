@@ -1,3 +1,5 @@
+// apps/web/src/app/profile/components/ProfileAvatar.tsx
+/* eslint-disable @next/next/no-img-element */
 'use client'
 
 import ImgCdn from '@/components/ImgCdn'
