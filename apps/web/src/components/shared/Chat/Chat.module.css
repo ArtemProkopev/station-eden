@@ -258,6 +258,46 @@
 	opacity: 0.5;
 }
 
+.emptyChat {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	color: rgba(255, 255, 255, 0.5);
+	text-align: center;
+}
+
+.emptyHint {
+	font-size: 12px;
+	margin-top: 8px;
+	opacity: 0.7;
+}
+
+.myMessage {
+	background: rgba(99, 239, 255, 0.15);
+	border-color: rgba(99, 239, 255, 0.4);
+}
+
+.myMessage .chatName {
+	color: #fff;
+	text-shadow: 0 0 8px rgba(99, 239, 255, 0.8);
+}
+
+.voiceLoading,
+.voiceError {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	color: rgba(255, 255, 255, 0.5);
+	font-size: 14px;
+}
+
+.voiceError {
+	color: rgba(255, 107, 107, 0.8);
+}
+
 /* Адаптивность */
 @media (max-width: 768px) {
 	.chatBlock {
