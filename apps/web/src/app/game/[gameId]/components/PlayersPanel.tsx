@@ -1,12 +1,12 @@
 // apps/web/src/app/game/[gameId]/components/PlayersPanel.tsx
-import { GameState, GamePlayer } from './types/game.types'
+import { ExtendedGameState, ExtendedGamePlayer, GamePlayer } from '@station-eden/shared'
 import styles from '../page.module.css'
 
 interface PlayersPanelProps {
-  gameState: GameState
+  gameState: ExtendedGameState
   userId?: string
   gamePhase: string
-  currentPlayer?: GamePlayer
+  currentPlayer?: ExtendedGamePlayer
   onVote: (targetPlayerId: string) => void
   onShowMyCards: () => void
   onShowCardsTable: () => void
@@ -21,8 +21,9 @@ export default function PlayersPanel({
   onShowMyCards,
   onShowCardsTable
 }: PlayersPanelProps) {
-  const alivePlayers = gameState.players?.filter(p => p.isAlive) || []
-  const ejectedPlayers = gameState.players?.filter(p => !p.isAlive) || []
+  const players = (gameState.players as ExtendedGamePlayer[]) || []
+  const alivePlayers = players.filter(p => p.isAlive)
+  const ejectedPlayers = players.filter(p => !p.isAlive)
 
   return (
     <section className={styles.playersPanel}>
@@ -39,7 +40,7 @@ export default function PlayersPanel({
       </div>
 
       <div className={styles.playersList}>
-        {gameState.players?.map(player => (
+        {players.map(player => (
           <PlayerCard
             key={player.id}
             player={player}
@@ -69,11 +70,11 @@ export default function PlayersPanel({
 }
 
 interface PlayerCardProps {
-  player: GamePlayer
+  player: ExtendedGamePlayer  // Здесь используем ExtendedGamePlayer
   userId?: string
   gamePhase: string
   creatorId?: string
-  currentPlayer?: GamePlayer
+  currentPlayer?: ExtendedGamePlayer
   onVote: (targetPlayerId: string) => void
 }
 

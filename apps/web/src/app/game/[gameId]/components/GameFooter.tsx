@@ -1,13 +1,13 @@
 // apps/web/src/app/game/[gameId]/components/GameFooter.tsx
-import { GameState, GamePlayer } from './types/game.types'
+import { ExtendedGameState, ExtendedGamePlayer } from '@station-eden/shared'
 import styles from '../page.module.css'
 
 interface GameFooterProps {
-  gameState: GameState
-  currentPlayer?: GamePlayer
+  gameState: ExtendedGameState
+  currentPlayer?: ExtendedGamePlayer
   myRevealedCardsThisRound: string[]
   myAllRevealedCards: Record<string, { name: string; type: string }>
-  alivePlayers: GamePlayer[]
+  alivePlayers: ExtendedGamePlayer[]
   onShowCardsTable: () => void
 }
 
@@ -19,6 +19,14 @@ export default function GameFooter({
   alivePlayers, 
   onShowCardsTable 
 }: GameFooterProps) {
+  // Приводим players к ExtendedGamePlayer[]
+  const players = (gameState.players || []) as ExtendedGamePlayer[]
+  
+  // Считаем игроков, которые раскрыли карты
+  const playersWithRevealedCards = players.filter(
+    p => p.revealedCards && p.revealedCards > 0
+  ).length
+
   return (
     <footer className={styles.footer}>
       <div className={styles.playerStatusInfo}>
@@ -37,10 +45,7 @@ export default function GameFooter({
               <span>
                 {' '}
                 | Игроков раскрыли карты:{' '}
-                {gameState.players?.filter(
-                  p => p.revealedCards && p.revealedCards > 0
-                ).length || 0}
-                /{alivePlayers.length}
+                {playersWithRevealedCards}/{alivePlayers.length}
               </span>
             )}
           </>

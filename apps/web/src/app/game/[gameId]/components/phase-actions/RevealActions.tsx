@@ -1,5 +1,5 @@
 // apps/web/src/app/game/[gameId]/components/phase-actions/RevealActions.tsx
-import { RevealedPlayer } from '../types/game.types'
+import { RevealedPlayer } from '@station-eden/shared'
 import { getCardTypeDisplayName } from '../utils/game.utils'
 import styles from '../../page.module.css'
 

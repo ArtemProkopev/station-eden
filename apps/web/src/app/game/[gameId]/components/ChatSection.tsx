@@ -1,15 +1,22 @@
 // apps/web/src/app/game/[gameId]/components/ChatSection.tsx
 import { RefObject } from 'react'
-import { GameChatMessage, GameState } from './types/game.types'
+import { GameChatMessage, ExtendedGameState } from '@station-eden/shared'
 import { formatMessageTime } from './utils/game.utils'
 import styles from '../page.module.css'
 
-interface ProfileType {
-  status: 'idle' | 'loading' | 'ok' | 'unauth' | 'error'
+// Тип для профиля (можно будет потом тоже перенести в shared)
+export type ProfileStatus = 'idle' | 'loading' | 'ok' | 'unauth' | 'error'
+
+export interface ProfileState {
+  status: ProfileStatus
   data?: {
     id?: string
     username?: string | null
+    avatar?: string | null
+    frame?: string | null
+    email?: string
   } | null
+  error?: string | null
 }
 
 interface ChatSectionProps {
@@ -17,8 +24,8 @@ interface ChatSectionProps {
   newMessage: string
   chatContainerRef: RefObject<HTMLDivElement>
   isConnected: boolean
-  gameState: GameState | null
-  profile: ProfileType
+  gameState: ExtendedGameState | null
+  profile: ProfileState
   userId?: string
   onMessageChange: (message: string) => void
   onSendMessage: (e?: React.FormEvent) => void

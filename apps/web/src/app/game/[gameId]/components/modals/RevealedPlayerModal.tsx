@@ -1,5 +1,5 @@
 // apps/web/src/app/game/[gameId]/components/modals/RevealedPlayerModal.tsx
-import { RevealedPlayer } from '../types/game.types'
+import { RevealedPlayer, CardDetails } from '@station-eden/shared'
 import { getCardTypeDisplayName } from '../utils/game.utils'
 import styles from '../../page.module.css'
 

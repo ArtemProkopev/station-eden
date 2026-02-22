@@ -1,9 +1,9 @@
 // apps/web/src/app/game/[gameId]/components/screens/WaitingRoom.tsx
-import { GameState } from '../types/game.types'
+import { ExtendedGameState } from '@station-eden/shared'
 import styles from '../../page.module.css'
 
 interface WaitingRoomProps {
-  gameState: GameState
+  gameState: ExtendedGameState
   gameId: string
   userId?: string
   isConnected: boolean

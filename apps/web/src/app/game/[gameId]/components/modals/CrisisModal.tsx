@@ -1,12 +1,12 @@
 // apps/web/src/app/game/[gameId]/components/modals/CrisisModal.tsx
-import { CrisisInfo, GamePlayer } from '../types/game.types'
+import { CrisisInfo, ExtendedGamePlayer } from '@station-eden/shared'
 import { formatTime } from '../utils/game.utils'
 import styles from '../../page.module.css'
 
 interface CrisisModalProps {
   crisis: CrisisInfo
   phaseTimeLeft: number
-  currentPlayer?: GamePlayer
+  currentPlayer?: ExtendedGamePlayer
   isConnected: boolean
   onSolve: () => void
   onClose: () => void

@@ -1,12 +1,12 @@
 // apps/web/src/app/game/[gameId]/components/phase-actions/CrisisActions.tsx
-import { CrisisInfo, GamePlayer } from '../types/game.types'
+import { CrisisInfo, ExtendedGamePlayer } from '@station-eden/shared'
 import styles from '../../page.module.css'
 
 interface CrisisActionsProps {
   currentCrisis?: CrisisInfo | null
   onViewCrisis: () => void
   onSolveCrisis: () => void
-  currentPlayer?: GamePlayer
+  currentPlayer?: ExtendedGamePlayer
 }
 
 export default function CrisisActions({ 

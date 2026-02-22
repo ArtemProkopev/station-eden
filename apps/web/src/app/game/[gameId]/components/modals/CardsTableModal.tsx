@@ -1,5 +1,5 @@
 // apps/web/src/app/game/[gameId]/components/modals/CardsTableModal.tsx
-import { PlayerCardInfo, CardDetails } from '../types/game.types'
+import { PlayerCardInfo, CardDetails } from '@station-eden/shared'
 import { getCardTypeDisplayName } from '../utils/game.utils'
 import styles from '../../page.module.css'
 

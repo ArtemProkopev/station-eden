@@ -1,13 +1,15 @@
 // apps/web/src/app/game/[gameId]/hooks/useCardReveal.ts
 import { useState, useEffect } from 'react'
-import { RevealedPlayer } from '../types/game.types'
+import { RevealedPlayer } from '@station-eden/shared'
+import { getCardTypeDisplayName } from '../utils/game.utils'
 
 export function useCardReveal(addToChat: (playerName: string, text: string, isSystem?: boolean, playerId?: string) => void) {
   const [revealingCards, setRevealingCards] = useState<string[]>([])
   const [revealedCards, setRevealedCards] = useState<Record<string, boolean>>({})
   const [currentRevealIndex, setCurrentRevealIndex] = useState<number>(0)
   const [isRevealing, setIsRevealing] = useState<boolean>(false)
-  const [revealedPlayer, setRevealedPlayer] = useState<RevealedPlayer>(null)
+  // Используем RevealedPlayer | null для начального состояния
+  const [revealedPlayer, setRevealedPlayer] = useState<RevealedPlayer | null>(null)
 
   useEffect(() => {
     if (!isRevealing || revealingCards.length === 0) return
@@ -47,6 +49,8 @@ export function useCardReveal(addToChat: (playerName: string, text: string, isSy
     setRevealedPlayer(null)
     setIsRevealing(false)
     setRevealingCards([])
+    setRevealedCards({})
+    setCurrentRevealIndex(0)
   }
 
   return {
@@ -58,31 +62,5 @@ export function useCardReveal(addToChat: (playerName: string, text: string, isSy
     setRevealedPlayer,
     startReveal,
     resetReveal,
-  }
-}
-
-// Вспомогательная функция (нужно импортировать или дублировать)
-function getCardTypeDisplayName(type: string): string {
-  switch (type) {
-    case 'profession':
-      return 'Профессия'
-    case 'health':
-      return 'Состояние здоровья'
-    case 'trait':
-      return 'Психологическая черта'
-    case 'secret':
-      return 'Секрет'
-    case 'role':
-      return 'Скрытая роль'
-    case 'resource':
-      return 'Ресурс'
-    case 'gender':
-      return 'Пол'
-    case 'age':
-      return 'Возраст'
-    case 'body':
-      return 'Телосложение'
-    default:
-      return type
   }
 }

@@ -1,5 +1,5 @@
 // apps/web/src/app/game/[gameId]/utils/game.utils.ts
-import { CardType, GamePhase } from '../types/game.types'
+import { CardType, GamePhase } from '@station-eden/shared'
 
 export const formatTime = (seconds: number): string => {
   if (seconds === undefined || seconds === null) return '0:00'

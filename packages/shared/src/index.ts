@@ -253,3 +253,110 @@ export interface FriendsState {
 	pendingRequests: FriendRequestNotification[]
 	isLoading: boolean
 }
+
+// ==============================================================================
+// GAME TYPES (добавлено из game.types.ts)
+// ==============================================================================
+export type CardType =
+  | 'profession'
+  | 'health'
+  | 'trait'
+  | 'secret'
+  | 'role'
+  | 'resource'
+  | 'gender'
+  | 'age'
+  | 'body'
+
+export interface CardDetails {
+  id: string
+  name: string
+  description: string
+  pros?: string[]
+  cons?: string[]
+  effects?: string[]
+  goal?: string
+  abilities?: string[]
+  bonuses?: string[]
+  range?: string
+  specialAbility?: string
+  winCondition?: string
+}
+
+export interface CrisisInfo {
+  id: string
+  name: string
+  description: string
+  type: string
+  penalty: string
+  isActive: boolean
+  priorityProfessions?: string[]
+}
+
+export type GamePhase =
+  | 'introduction'
+  | 'preparation'
+  | 'discussion'
+  | 'voting'
+  | 'reveal'
+  | 'crisis'
+  | 'intermission'
+  | 'game_over'
+
+export interface GameChatMessage {
+  id: string
+  playerId: string
+  playerName: string
+  text: string
+  type: 'player' | 'system'
+  timestamp: Date
+}
+
+export interface PlayerCardInfo {
+  playerId: string
+  playerName: string
+  revealedCards: Record<string, { name: string; type: string; cardId: string }>
+}
+
+export interface RevealedCardInfo {
+  name: string
+  type: string
+  id?: string
+}
+
+export interface ExtendedGamePlayer extends GamePlayer {
+  isAlive: boolean
+  vote?: string
+  votesAgainst?: number
+  profession?: string
+  revealedCards?: number
+  revealedCardsInfo?: Record<string, RevealedCardInfo>
+}
+
+export interface ExtendedGameState extends GameState {
+  phase?: GamePhase
+  phaseEndTime?: string
+  phaseDuration?: number
+  creatorId?: string
+  currentCrisis?: CrisisInfo | null
+  occupiedSlots?: number
+  capsuleSlots?: number
+  [key: string]: unknown
+}
+
+export interface GameResults {
+  winners: string[]
+  reason?: string
+  scores?: unknown
+}
+
+export interface RevealedPlayer {
+  name: string
+  cards: Record<string, Partial<CardDetails> | null>
+  playerId?: string
+}
+
+export interface WsMessage {
+  type: string
+  [key: string]: unknown
+}

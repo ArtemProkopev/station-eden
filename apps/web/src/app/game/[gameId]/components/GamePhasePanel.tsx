@@ -1,5 +1,11 @@
 // apps/web/src/app/game/[gameId]/components/GamePhasePanel.tsx
-import { GameState, GamePhase, GamePlayer, CrisisInfo, RevealedPlayer } from './types/game.types'
+import { 
+  ExtendedGameState, 
+  GamePhase, 
+  ExtendedGamePlayer, 
+  CrisisInfo, 
+  RevealedPlayer 
+} from '@station-eden/shared'
 import { formatTime, getPhaseName, getPhaseDescription } from './utils/game.utils'
 import styles from '../page.module.css'
 import PreparationActions from './phase-actions/PreparationActions'
@@ -10,12 +16,12 @@ import CrisisActions from './phase-actions/CrisisActions'
 import GameOverActions from './phase-actions/GameOverActions'
 
 interface GamePhasePanelProps {
-  gameState: GameState
+  gameState: ExtendedGameState
   phaseTimeLeft: number
   phaseDurationDisplay: number
   userId?: string
-  currentPlayer?: GamePlayer
-  alivePlayers: GamePlayer[]
+  currentPlayer?: ExtendedGamePlayer
+  alivePlayers: ExtendedGamePlayer[]
   myRevealedCardsThisRound: string[]
   myAllRevealedCards: Record<string, { name: string; type: string }>
   revealingCards: string[]
@@ -37,6 +43,8 @@ export default function GamePhasePanel({
   userId,
   currentPlayer,
   alivePlayers,
+  myRevealedCardsThisRound,
+  myAllRevealedCards,
   revealingCards,
   currentRevealIndex,
   isRevealing,

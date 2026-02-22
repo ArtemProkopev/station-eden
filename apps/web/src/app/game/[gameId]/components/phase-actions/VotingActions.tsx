@@ -1,13 +1,13 @@
 // apps/web/src/app/game/[gameId]/components/phase-actions/VotingActions.tsx
-import { GamePlayer } from '../types/game.types'
+import { ExtendedGamePlayer } from '@station-eden/shared'
 import { formatTime } from '../utils/game.utils'
 import styles from '../../page.module.css'
 
 interface VotingActionsProps {
   phaseTimeLeft: number
-  alivePlayers: GamePlayer[]
+  alivePlayers: ExtendedGamePlayer[]
   userId?: string
-  currentPlayer?: GamePlayer
+  currentPlayer?: ExtendedGamePlayer
   onVote: (targetPlayerId: string) => void
 }
 
@@ -41,8 +41,8 @@ export default function VotingActions({
 }
 
 interface VoteOptionProps {
-  player: GamePlayer
-  currentPlayer?: GamePlayer
+  player: ExtendedGamePlayer
+  currentPlayer?: ExtendedGamePlayer
   onVote: (targetPlayerId: string) => void
 }
 

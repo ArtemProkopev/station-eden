@@ -1,10 +1,10 @@
 // apps/web/src/app/game/[gameId]/components/GameHeader.tsx
-import { GameState, GamePhase } from './types/game.types'
+import { ExtendedGameState, GamePhase, ExtendedGamePlayer } from '@station-eden/shared'
 import { formatTime, getPhaseName } from './utils/game.utils'
 import styles from '../page.module.css'
 
 interface GameHeaderProps {
-  gameState: GameState
+  gameState: ExtendedGameState
   phaseTimeLeft: number
   myRevealedCardsThisRound: string[]
   userId?: string
@@ -18,8 +18,11 @@ export default function GameHeader({
   userId, 
   onLeaveGame 
 }: GameHeaderProps) {
-  const currentPlayer = userId ? gameState.players?.find(p => p.id === userId) : null
-  const alivePlayers = gameState.players?.filter(p => p.isAlive) || []
+  // Приводим players к ExtendedGamePlayer[]
+  const players = (gameState.players || []) as ExtendedGamePlayer[]
+  
+  const currentPlayer = userId ? players.find(p => p.id === userId) : undefined
+  const alivePlayers = players.filter(p => p.isAlive)
 
   return (
     <header className={styles.header}>
@@ -48,7 +51,7 @@ export default function GameHeader({
             🚀 {Number(gameState.occupiedSlots || 0)}/
             {Number(
               gameState.capsuleSlots ||
-                Math.floor(((gameState.players?.length || 0) as number) / 2),
+                Math.floor((players.length) / 2),
             )}{' '}
             мест
           </span>
@@ -56,7 +59,7 @@ export default function GameHeader({
         <div className={styles.statItem}>
           <span className={styles.statLabel}>Выжило:</span>
           <span className={styles.statValue}>
-            👥 {alivePlayers.length}/{gameState.players?.length || 0}
+            👥 {alivePlayers.length}/{players.length}
           </span>
         </div>
         {currentPlayer && (

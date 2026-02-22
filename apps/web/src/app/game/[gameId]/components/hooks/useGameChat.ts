@@ -1,6 +1,6 @@
 // apps/web/src/app/game/[gameId]/hooks/useGameChat.ts
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { GameChatMessage } from '../types/game.types'
+import { GameChatMessage } from '@station-eden/shared'
 
 export function useGameChat() {
   const [chatMessages, setChatMessages] = useState<GameChatMessage[]>([])

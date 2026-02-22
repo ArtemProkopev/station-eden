@@ -1,5 +1,5 @@
 // apps/web/src/app/game/[gameId]/components/modals/GameResultsModal.tsx
-import { GameResults } from '../types/game.types'
+import { GameResults } from '@station-eden/shared'
 import styles from '../../page.module.css'
 
 interface GameResultsModalProps {
@@ -12,7 +12,7 @@ export default function GameResultsModal({ gameResults, onLeaveGame }: GameResul
     <div className={styles.modalOverlay}>
       <div className={styles.modalContent}>
         <div className={styles.resultsContent}>
-          <h2>🎉 Игра завершена! 🎉</h2>
+          <h2>Игра завершена!</h2>
 
           <div className={styles.resultsActions}>
             <button className={styles.leaveButton} onClick={onLeaveGame}>

@@ -1,6 +1,6 @@
 // apps/web/src/app/game/[gameId]/hooks/useGameTimer.ts
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { GameState } from '../types/game.types'
+import { ExtendedGameState } from '@station-eden/shared'
 
 export function useGameTimer() {
   const [phaseTimeLeft, setPhaseTimeLeft] = useState<number>(0)
@@ -54,7 +54,7 @@ export function useGameTimer() {
   )
 
   const syncTimerWithServer = useCallback(
-    (game: GameState) => {
+    (game: ExtendedGameState) => {
       if (!game?.phase || !game.phaseEndTime) {
         setPhaseTimeLeft(0)
         stopTimer()

@@ -15,7 +15,7 @@ import CardsTableModal from './components/modals/CardsTableModal'
 import RevealedPlayerModal from './components/modals/RevealedPlayerModal'
 import CrisisModal from './components/modals/CrisisModal'
 import GameResultsModal from './components/modals/GameResultsModal'
-import { GameState, GamePlayer } from './components/types/game.types' 
+import { ExtendedGameState as GameState, ExtendedGamePlayer as GamePlayer } from '@station-eden/shared'
 import styles from './page.module.css'
 
 type Props = {

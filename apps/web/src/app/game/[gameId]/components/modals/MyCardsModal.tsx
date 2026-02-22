@@ -1,5 +1,5 @@
 // apps/web/src/app/game/[gameId]/components/modals/MyCardsModal.tsx
-import { CardDetails, CardType, GameState } from '../types/game.types'
+import { CardDetails, CardType, ExtendedGameState } from '@station-eden/shared'
 import { getCardTypeName } from '../utils/game.utils'
 import styles from '../../page.module.css'
 
@@ -9,7 +9,7 @@ interface MyCardsModalProps {
   myRevealedCardsThisRound: string[]
   myAllRevealedCards: Record<string, { name: string; type: string }>
   newCardsThisRound?: CardDetails[]
-  gameState: GameState | null
+  gameState: ExtendedGameState | null
   userId?: string
   onClose: () => void
   onRevealCard: (cardType: CardType) => void
@@ -31,6 +31,11 @@ export default function MyCardsModal({
   const isNewCard = (card: CardDetails): boolean => {
     return newCardsThisRound.some(newCard => newCard.id === card.id)
   }
+
+  // Приводим players к ExtendedGamePlayer[] для проверки isAlive
+  const currentPlayer = userId && gameState?.players 
+    ? (gameState.players as any[]).find(p => p.id === userId)
+    : undefined
 
   return (
     <div className={styles.modalOverlay}>
@@ -76,7 +81,7 @@ export default function MyCardsModal({
               canReveal={
                 gameState?.phase === 'discussion' &&
                 !!userId &&
-                !!gameState?.players?.find(p => p.id === userId)?.isAlive &&
+                !!currentPlayer?.isAlive &&
                 myRevealedCardsThisRound.length < 1 &&
                 !myAllRevealedCards[type]
               }
