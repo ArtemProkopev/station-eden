@@ -25,10 +25,7 @@ interface GamePhasePanelProps {
   onShowMyCards: () => void
   onShowCardsTable: () => void
   onStartDiscussion: () => void
-  onRevealCard: (cardType: any) => void
   onVote: (targetPlayerId: string) => void
-  onRequestVote: () => void
-  onUseAbility: (ability: string, targetPlayerId?: string) => void
   onSolveCrisis: () => void
   onSetActiveCrisis: (crisis: CrisisInfo | null) => void
 }
@@ -40,8 +37,6 @@ export default function GamePhasePanel({
   userId,
   currentPlayer,
   alivePlayers,
-  myRevealedCardsThisRound,
-  myAllRevealedCards,
   revealingCards,
   currentRevealIndex,
   isRevealing,
@@ -49,17 +44,14 @@ export default function GamePhasePanel({
   onShowMyCards,
   onShowCardsTable,
   onStartDiscussion,
-  onRevealCard,
   onVote,
-  onRequestVote,
-  onUseAbility,
   onSolveCrisis,
   onSetActiveCrisis
 }: GamePhasePanelProps) {
   const phase = gameState.phase as GamePhase
   const isCreator = userId === gameState.creatorId
   const allPlayersRevealed = alivePlayers.every(
-    player => player.revealedCards && player.revealedCards > 0
+    player => (player.revealedCards ?? 0) > 0
   )
 
   const renderPhaseActions = () => {
@@ -109,7 +101,6 @@ export default function GamePhasePanel({
       case 'crisis':
         return (
           <CrisisActions
-            currentCrisis={gameState.currentCrisis}
             onViewCrisis={() => onSetActiveCrisis(gameState.currentCrisis || null)}
             onSolveCrisis={onSolveCrisis}
             currentPlayer={currentPlayer}

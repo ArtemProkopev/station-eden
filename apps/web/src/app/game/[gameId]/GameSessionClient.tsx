@@ -15,7 +15,7 @@ import CardsTableModal from './components/modals/CardsTableModal'
 import RevealedPlayerModal from './components/modals/RevealedPlayerModal'
 import CrisisModal from './components/modals/CrisisModal'
 import GameResultsModal from './components/modals/GameResultsModal'
-import { GameState, GamePlayer } from './components/types/game.types'
+import { GameState, GamePlayer } from './components/types/game.types' 
 import styles from './page.module.css'
 
 type Props = {
@@ -39,6 +39,7 @@ export default function GameSessionClient({ gameId }: Props) {
     myAllRevealedCards,
     cardsReceivedThisRound,
     canSkipNarration,
+    newCardsThisRound,
     
     // Состояния раскрытия
     revealingCards,
@@ -129,6 +130,7 @@ export default function GameSessionClient({ gameId }: Props) {
           cardsReceivedThisRound={cardsReceivedThisRound}
           myRevealedCardsThisRound={myRevealedCardsThisRound}
           myAllRevealedCards={myAllRevealedCards}
+          newCardsThisRound={newCardsThisRound}
           gameState={gameState}
           userId={userId}
           onClose={() => setShowMyCards(false)}
@@ -209,10 +211,7 @@ export default function GameSessionClient({ gameId }: Props) {
           onShowMyCards={() => setShowMyCards(true)}
           onShowCardsTable={() => setShowCardsTable(true)}
           onStartDiscussion={handleStartDiscussion}
-          onRevealCard={handleRevealCard}
           onVote={handleVote}
-          onRequestVote={handleRequestVote}
-          onUseAbility={handleUseAbility}
           onSolveCrisis={handleSolveCrisis}
           onSetActiveCrisis={setActiveCrisis}
         />

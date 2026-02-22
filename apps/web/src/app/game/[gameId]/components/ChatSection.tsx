@@ -1,16 +1,24 @@
 // apps/web/src/app/game/[gameId]/components/ChatSection.tsx
 import { RefObject } from 'react'
-import { GameChatMessage } from './types/game.types'
+import { GameChatMessage, GameState } from './types/game.types'
 import { formatMessageTime } from './utils/game.utils'
 import styles from '../page.module.css'
+
+interface ProfileType {
+  status: 'idle' | 'loading' | 'ok' | 'unauth' | 'error'
+  data?: {
+    id?: string
+    username?: string | null
+  } | null
+}
 
 interface ChatSectionProps {
   chatMessages: GameChatMessage[]
   newMessage: string
   chatContainerRef: RefObject<HTMLDivElement>
   isConnected: boolean
-  gameState: any
-  profile: any
+  gameState: GameState | null
+  profile: ProfileType
   userId?: string
   onMessageChange: (message: string) => void
   onSendMessage: (e?: React.FormEvent) => void

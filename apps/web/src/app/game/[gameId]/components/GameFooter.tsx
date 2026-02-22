@@ -6,7 +6,7 @@ interface GameFooterProps {
   gameState: GameState
   currentPlayer?: GamePlayer
   myRevealedCardsThisRound: string[]
-  myAllRevealedCards: Record<string, any>
+  myAllRevealedCards: Record<string, { name: string; type: string }>
   alivePlayers: GamePlayer[]
   onShowCardsTable: () => void
 }
