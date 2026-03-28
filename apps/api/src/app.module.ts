@@ -1,3 +1,4 @@
+// apps/api/src/app.module.ts
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { APP_FILTER } from '@nestjs/core'
@@ -15,6 +16,7 @@ import { NotFoundExceptionFilter } from './common/filters/not-found.filter'
 import { EnvSchema } from './config/env.schema'
 import { GameModule } from './game/game.module'
 import { LobbyModule } from './lobby/lobby.module'
+import { TimeModule } from './time/time.module' // Добавляем импорт TimeModule
 import { User } from './users/user.entity'
 import { UsersModule } from './users/users.module'
 import { VoiceModule } from './voice/voice.module'
@@ -117,6 +119,7 @@ function resolveEnvPaths(): string[] {
 		GameModule,
 		LobbyModule,
 		VoiceModule,
+		TimeModule, // Добавляем TimeModule в imports
 	],
 	providers: [{ provide: APP_FILTER, useClass: NotFoundExceptionFilter }],
 })

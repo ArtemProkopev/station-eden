@@ -1,3 +1,4 @@
+// apps/web/src/app/game/[gameId]/components/GamePhasePanel.tsx
 import {
 	CrisisInfo,
 	ExtendedGamePlayer,
@@ -35,8 +36,8 @@ interface GamePhasePanelProps {
 	onVote: (targetPlayerId: string) => void
 	onSolveCrisis: () => void
 	onSetActiveCrisis: (crisis: CrisisInfo | null) => void
-	myRevealedCardsThisRound: string[] // Массив строк
-	myAllRevealedCards: string[] // Массив строк
+	myRevealedCardsThisRound: string[]
+	myAllRevealedCards: string[]
 }
 
 export default function GamePhasePanel({
@@ -135,11 +136,10 @@ export default function GamePhasePanel({
 		}
 	}
 
-	// Исправление: добавлен тип проверки и конвертация массива карт
-	const revealedCardsObject =
-		Array.isArray(myAllRevealedCards) || !myAllRevealedCards
-			? myAllRevealedCards // Оставляем как массив
-			: Object.entries(myAllRevealedCards).map(([key, value]) => value) // Преобразуем в массив, если это объект
+	// Нормализация массива карт
+	const revealedCardsArray = Array.isArray(myAllRevealedCards) 
+		? myAllRevealedCards 
+		: Object.values(myAllRevealedCards || {}).map((card: any) => card.id || card.name)
 
 	return (
 		<section className={styles.gamePanel}>

@@ -18,16 +18,14 @@ export default function GameHeader({
   userId, 
   onLeaveGame 
 }: GameHeaderProps) {
-  // Приводим players к ExtendedGamePlayer[]
   const players = (gameState.players || []) as ExtendedGamePlayer[]
-  
   const currentPlayer = userId ? players.find(p => p.id === userId) : undefined
-  const alivePlayers = players.filter(p => p.isAlive)
+  const alivePlayers = players.filter(p => p.isAlive === true)
 
   return (
     <header className={styles.header}>
       <div className={styles.gameTitle}>
-        <h1>Станция &quot;Эдем&quot;</h1>
+        <h1>Станция "Эдем"</h1>
         <div className={styles.gameSubtitle}>
           <span className={styles.round}>
             Раунд {Number(gameState.round || 1)}/{Number(gameState.maxRounds || 10)}
@@ -42,13 +40,13 @@ export default function GameHeader({
         <div className={styles.statItem}>
           <span className={styles.statLabel}>Время:</span>
           <span className={styles.statValue}>
-            ⏱️ {formatTime(phaseTimeLeft)}
+            {formatTime(phaseTimeLeft)}
           </span>
         </div>
         <div className={styles.statItem}>
           <span className={styles.statLabel}>Капсула:</span>
           <span className={styles.statValue}>
-            🚀 {Number(gameState.occupiedSlots || 0)}/
+            {Number(gameState.occupiedSlots || 0)}/
             {Number(
               gameState.capsuleSlots ||
                 Math.floor((players.length) / 2),
@@ -59,7 +57,7 @@ export default function GameHeader({
         <div className={styles.statItem}>
           <span className={styles.statLabel}>Выжило:</span>
           <span className={styles.statValue}>
-            👥 {alivePlayers.length}/{players.length}
+            {alivePlayers.length}/{players.length}
           </span>
         </div>
         {currentPlayer && (
@@ -67,7 +65,7 @@ export default function GameHeader({
             <div className={styles.statItem}>
               <span className={styles.statLabel}>Раскрыто:</span>
               <span className={styles.statValue}>
-                🎴 {myRevealedCardsThisRound.length}/1
+                {myRevealedCardsThisRound.length}/1
               </span>
             </div>
             {gameState.creatorId === userId && (

@@ -13,7 +13,7 @@ import {
 import * as cookie from 'cookie'
 import { Server, Socket } from 'socket.io'
 
-// Типы для игровых карт (оставляем как было)
+// Типы для игровых карт
 type Profession = {
   id: string
   name: string
@@ -101,9 +101,7 @@ type GamePlayer = {
   score: number
   order: number
   isActive: boolean
-  isAlive: boolean // ← ВАЖНО: всегда должно быть инициализировано
-  vote?: string
-  votesAgainst: number
+  isAlive: boolean // ВАЖНО: всегда должно быть инициализировано
   
   // Карты игрока
   profession?: Profession
@@ -124,18 +122,20 @@ type GamePlayer = {
   isSeniorOfficer?: boolean
   hasUsedAbility?: boolean
   revealedCards: string[] // ID раскрытых карт
+  vote?: string
+  votesAgainst: number
 }
 
 // Фазы игры
 type GamePhase = 
-  | 'introduction'    // Заставка
-  | 'preparation'     // Подготовка
-  | 'discussion'      // Обсуждение
-  | 'voting'          // Голосование
-  | 'reveal'          // Раскрытие
-  | 'crisis'          // Кризис
-  | 'intermission'    // Между раундами
-  | 'game_over'       // Конец игры
+  | 'introduction'
+  | 'preparation'
+  | 'discussion'
+  | 'voting'
+  | 'reveal'
+  | 'crisis'
+  | 'intermission'
+  | 'game_over'
 
 // Кризис
 type Crisis = {
@@ -202,15 +202,15 @@ type GameState = {
   timerInterval?: NodeJS.Timeout
   
   // Голосование
-  voteTriggerCount: number // сколько игроков нажало кнопку голосования
-  voteRequests: Set<string> // ID игроков, запросивших голосование
+  voteTriggerCount: number
+  voteRequests: Set<string>
 }
 
 const GAME_ID_RE = /^game-[a-zA-Z0-9_-]+$/
 const MSG_WINDOW_MS = 10_000
 const MSG_MAX_PER_WINDOW = 15
 
-// Колоды карт (упрощенная версия)
+// Колоды карт
 const PROFESSIONS: Profession[] = [
   {
     id: 'prof_engineer',
@@ -396,7 +396,7 @@ export class GameGateway
   }
 
   afterInit() {
-    this.logger.log('GameGateway initialized')
+    this.logger.log('GameGateway инициализирован')
   }
 
   async handleConnection(socket: Socket) {
@@ -411,8 +411,8 @@ export class GameGateway
       const token = cookies[accessCookieName]
 
       if (!token) {
-        this.logger.warn(`Unauthorized game connection attempt`)
-        socket.emit('ERROR', { message: 'Authentication required' })
+        this.logger.warn(`Неавторизованная попытка подключения к игре`)
+        socket.emit('ERROR', { message: 'Требуется аутентификация' })
         socket.disconnect(true)
         return
       }
@@ -427,8 +427,8 @@ export class GameGateway
           secret: jwtSecret,
         })
       } catch (err) {
-        this.logger.warn(`Invalid game token: ${(err as Error).message || err}`)
-        socket.emit('ERROR', { message: 'Invalid authentication token' })
+        this.logger.warn(`Неверный токен игры: ${(err as Error).message || err}`)
+        socket.emit('ERROR', { message: 'Неверный токен аутентификации' })
         socket.disconnect(true)
         return
       }
@@ -438,27 +438,27 @@ export class GameGateway
       const gameId = (socket.handshake.query.gameId as string) || ''
 
       if (!userId) {
-        socket.emit('ERROR', { message: 'Invalid authentication token' })
+        socket.emit('ERROR', { message: 'Неверный токен аутентификации' })
         socket.disconnect(true)
         return
       }
 
       if (!gameId || !GAME_ID_RE.test(gameId)) {
-        this.logger.warn(`Invalid gameId: "${gameId}"`)
-        socket.emit('ERROR', { message: 'Invalid game id' })
+        this.logger.warn(`Неверный gameId: "${gameId}"`)
+        socket.emit('ERROR', { message: 'Неверный идентификатор игры' })
         socket.disconnect(true)
         return
       }
 
       const game = this.games.get(gameId)
       if (!game) {
-        socket.emit('ERROR', { message: 'Game not found' })
+        socket.emit('ERROR', { message: 'Игра не найдена' })
         socket.disconnect(true)
         return
       }
 
       if (game.status !== 'active' && game.status !== 'waiting') {
-        socket.emit('ERROR', { message: 'Game is not active' })
+        socket.emit('ERROR', { message: 'Игра не активна' })
         socket.disconnect(true)
         return
       }
@@ -471,17 +471,17 @@ export class GameGateway
 
       game.connections.set(userId, socket)
 
-      this.logger.log(`Player connected to game: ${username} (${userId}) to game ${gameId}`)
+      this.logger.log(`Игрок подключился к игре: ${username} (${userId}) в игру ${gameId}`)
 
-      // ОТЛАДКА: проверяем состояние игрока
+      // Отладка: проверяем состояние игрока
       const player = game.players.get(userId)
       if (player) {
-        this.logger.debug(`Player ${player.name} isAlive: ${player.isAlive}, status: ${game.status}`)
+        this.logger.debug(`Игрок ${player.name} isAlive: ${player.isAlive}, статус: ${game.status}`)
         
         // Если игра еще не началась, гарантируем что игрок жив
         if (game.status === 'waiting' && player.isAlive === undefined) {
           player.isAlive = true
-          this.logger.debug(`Fixed undefined isAlive for player ${player.name}`)
+          this.logger.debug(`Исправлен undefined isAlive для игрока ${player.name}`)
         }
       }
 
@@ -490,7 +490,7 @@ export class GameGateway
         gameState: this.serializeGameState(game),
       })
 
-      // Если игра еще не началась (фаза waiting), отправляем карты
+      // Если игра еще не началась, отправляем карты
       if (game.status === 'waiting') {
         const player = game.players.get(userId)
         if (player) {
@@ -499,8 +499,8 @@ export class GameGateway
       }
 
     } catch (error) {
-      this.logger.error('Game connection error:', error)
-      socket.emit('ERROR', { message: 'Connection failed' })
+      this.logger.error('Ошибка подключения к игре:', error)
+      socket.emit('ERROR', { message: 'Ошибка подключения' })
       socket.disconnect(true)
     }
   }
@@ -514,17 +514,17 @@ export class GameGateway
 
     game.connections.delete(userId)
 
-    this.logger.log(`Player disconnected from game: ${userId} from game ${gameId}`)
+    this.logger.log(`Игрок отключился от игры: ${userId} из игры ${gameId}`)
 
-    // Если все отключились, можно очистить игру через некоторое время
+    // Если все отключились, очищаем игру через некоторое время
     if (game.connections.size === 0) {
       setTimeout(() => {
         const currentGame = this.games.get(gameId)
         if (currentGame && currentGame.connections.size === 0) {
           this.games.delete(gameId)
-          this.logger.log(`Game ${gameId} cleaned up (no connections)`)
+          this.logger.log(`Игра ${gameId} очищена (нет подключений)`)
         }
-      }, 300000) // 5 минут
+      }, 300000)
     }
   }
 
@@ -534,26 +534,25 @@ export class GameGateway
     const targetGameId = data?.gameId || socketGameId
     
     if (!targetGameId) {
-      socket.emit('ERROR', { message: 'Game ID is required' })
+      socket.emit('ERROR', { message: 'Требуется ID игры' })
       return
     }
 
     const game = this.games.get(targetGameId)
     if (!game) {
-      socket.emit('ERROR', { message: 'Game not found' })
+      socket.emit('ERROR', { message: 'Игра не найдена' })
       return
     }
 
     const player = game.players.get(userId)
     if (!player) {
-      socket.emit('ERROR', { message: 'You are not a player in this game' })
+      socket.emit('ERROR', { message: 'Вы не являетесь игроком в этой игре' })
       return
     }
 
-    this.logger.log(`Player ${username} joined game ${targetGameId}`)
-    this.logger.debug(`Player ${player.name} state: isAlive=${player.isAlive}, score=${player.score}`)
+    this.logger.log(`Игрок ${username} присоединился к игре ${targetGameId}`)
+    this.logger.debug(`Игрок ${player.name} состояние: isAlive=${player.isAlive}, score=${player.score}`)
 
-    // Отправляем обновленное состояние всем
     this.broadcastGameState(targetGameId)
   }
 
@@ -570,16 +569,15 @@ export class GameGateway
     game.connections.delete(userId)
     socket.leave(targetGameId)
 
-    this.logger.log(`Player ${username} left game ${targetGameId}`)
+    this.logger.log(`Игрок ${username} покинул игру ${targetGameId}`)
 
-    // Уведомляем остальных игроков
     this.server.to(targetGameId).emit('PLAYER_LEFT_GAME', {
       playerId: userId,
       playerName: username,
     })
 
     socket.emit('LEAVE_CONFIRMED', {
-      message: 'You left the game',
+      message: 'Вы покинули игру',
     })
   }
 
@@ -590,22 +588,20 @@ export class GameGateway
       const game = this.games.get(gameId)
       
       if (!game) {
-        socket.emit('ERROR', { message: 'Game not found' })
+        socket.emit('ERROR', { message: 'Игра не найдена' })
         return
       }
 
-      // Только создатель может начать игровую сессию
       if (game.creatorId !== userId) {
-        socket.emit('ERROR', { message: 'Only game creator can start the session' })
+        socket.emit('ERROR', { message: 'Только создатель игры может начать сессию' })
         return
       }
 
-      // Начинаем игровую сессию
       await this.startGameSession(game)
       
     } catch (error) {
-      this.logger.error('Error starting game session:', error)
-      socket.emit('ERROR', { message: 'Failed to start game session' })
+      this.logger.error('Ошибка запуска игровой сессии:', error)
+      socket.emit('ERROR', { message: 'Не удалось начать игровую сессию' })
     }
   }
 
@@ -615,23 +611,20 @@ export class GameGateway
     const game = this.games.get(gameId)
     
     if (!game || game.phase !== 'discussion') {
-      socket.emit('ERROR', { message: 'Cannot reveal card now' })
+      socket.emit('ERROR', { message: 'Сейчас нельзя раскрыть карту' })
       return
     }
 
     const player = game.players.get(userId)
     if (!player) return
 
-    // Проверяем, не раскрывал ли уже эту карту
     if (player.revealedCards.includes(data.cardId)) {
-      socket.emit('ERROR', { message: 'Card already revealed' })
+      socket.emit('ERROR', { message: 'Карта уже раскрыта' })
       return
     }
 
-    // Добавляем карту в раскрытые
     player.revealedCards.push(data.cardId)
 
-    // Логика раскрытия карты
     this.broadcastToGame(gameId, 'CARD_REVEALED', {
       playerId: userId,
       playerName: player.name,
@@ -640,7 +633,6 @@ export class GameGateway
       cardDetails: this.getCardDetails(data.cardType, data.cardId)
     })
 
-    // Обновляем состояние игры
     this.broadcastGameState(gameId)
   }
 
@@ -650,7 +642,7 @@ export class GameGateway
     const game = this.games.get(gameId)
     
     if (!game || game.phase !== 'voting') {
-      socket.emit('ERROR', { message: 'Not voting phase' })
+      socket.emit('ERROR', { message: 'Сейчас не фаза голосования' })
       return
     }
 
@@ -658,17 +650,13 @@ export class GameGateway
     const targetPlayer = game.players.get(data.targetPlayerId)
     
     if (!player || !targetPlayer || !player.isAlive || !targetPlayer.isAlive) {
-      socket.emit('ERROR', { message: 'Invalid vote target' })
+      socket.emit('ERROR', { message: 'Неверная цель голосования' })
       return
     }
 
-    // Игрок голосует
     player.vote = data.targetPlayerId
-    
-    // Увеличиваем счет голосов против цели
     targetPlayer.votesAgainst = (targetPlayer.votesAgainst || 0) + 1
 
-    // Отправляем уведомление о голосе
     this.broadcastToGame(gameId, 'PLAYER_VOTED', {
       voterId: userId,
       voterName: player.name,
@@ -676,12 +664,10 @@ export class GameGateway
       targetName: targetPlayer.name
     })
 
-    // Проверяем, все ли живые игроки проголосовали
-    const alivePlayers = Array.from(game.players.values()).filter(p => p.isAlive)
+    const alivePlayers = Array.from(game.players.values()).filter(p => p.isAlive === true)
     const votedPlayers = alivePlayers.filter(p => p.vote)
     
     if (votedPlayers.length === alivePlayers.length) {
-      // Все проголосовали, обрабатываем результаты
       this.processVotingResults(game)
     }
 
@@ -694,26 +680,25 @@ export class GameGateway
     const game = this.games.get(gameId)
     
     if (!game || game.phase !== 'discussion') {
-      socket.emit('ERROR', { message: 'Can only request vote during discussion' })
+      socket.emit('ERROR', { message: 'Можно запросить голосование только во время обсуждения' })
       return
     }
 
-    // Добавляем игрока в список запросивших голосование
     if (!game.voteRequests.has(userId)) {
       game.voteRequests.add(userId)
       game.voteTriggerCount++
+      
+      const aliveCount = Array.from(game.players.values()).filter(p => p.isAlive === true).length
+      const requiredVotes = Math.floor(aliveCount / 2)
       
       this.broadcastToGame(gameId, 'VOTE_REQUESTED', {
         playerId: userId,
         playerName: game.players.get(userId)?.name,
         voteCount: game.voteTriggerCount,
-        requiredCount: Math.floor(Array.from(game.players.values()).filter(p => p.isAlive).length / 2)
+        requiredCount: requiredVotes
       })
 
-      // Проверяем, достигнуто ли необходимое количество
-      const aliveCount = Array.from(game.players.values()).filter(p => p.isAlive).length
-      if (game.voteTriggerCount >= Math.floor(aliveCount / 2)) {
-        // Начинаем голосование
+      if (game.voteTriggerCount >= requiredVotes) {
         this.startVotingPhase(game)
       }
     }
@@ -728,11 +713,10 @@ export class GameGateway
 
     const player = game.players.get(userId)
     if (!player || player.hasUsedAbility) {
-      socket.emit('ERROR', { message: 'Cannot use ability' })
+      socket.emit('ERROR', { message: 'Нельзя использовать способность' })
       return
     }
 
-    // Логика использования способности в зависимости от роли/карты
     switch (data.ability) {
       case 'captain_veto':
         if (player.roleCard?.id === 'role_captain') {
@@ -769,23 +753,20 @@ export class GameGateway
     const game = this.games.get(gameId)
     
     if (!game || game.phase !== 'crisis' || !game.currentCrisis?.isActive) {
-      socket.emit('ERROR', { message: 'No active crisis to solve' })
+      socket.emit('ERROR', { message: 'Нет активного кризиса для решения' })
       return
     }
 
     const player = game.players.get(userId)
     if (!player) return
 
-    // Проверяем, подходит ли профессия игрока для решения кризиса
     const canSolve = player.profession && 
       game.currentCrisis.priorityProfessions.includes(player.profession.id)
     
     if (canSolve) {
-      // Игрок решает кризис
       game.currentCrisis.isActive = false
       game.currentCrisis.solvedBy = userId
       
-      // Награждаем игрока
       player.score += 20
       
       this.broadcastToGame(gameId, 'CRISIS_SOLVED', {
@@ -794,12 +775,11 @@ export class GameGateway
         crisis: game.currentCrisis.name
       })
       
-      // Переходим к новому раунду
       setTimeout(() => {
         this.startNewRound(game)
       }, 5000)
     } else {
-      socket.emit('ERROR', { message: 'Your profession is not suited for this crisis' })
+      socket.emit('ERROR', { message: 'Ваша профессия не подходит для решения этого кризиса' })
     }
   }
 
@@ -815,12 +795,12 @@ export class GameGateway
 
     const game = this.games.get(targetGameId)
     if (!game) {
-      socket.emit('ERROR', { message: 'Game not found' })
+      socket.emit('ERROR', { message: 'Игра не найдена' })
       return
     }
 
     if (game.status !== 'active') {
-      socket.emit('ERROR', { message: 'Game is not active' })
+      socket.emit('ERROR', { message: 'Игра не активна' })
       return
     }
 
@@ -835,20 +815,26 @@ export class GameGateway
         this.handlePlayerAction(game, userId, data.payload)
         break
       default:
-        socket.emit('ERROR', { message: 'Unknown action' })
+        socket.emit('ERROR', { message: 'Неизвестное действие' })
         return
     }
 
     this.broadcastGameState(targetGameId)
   }
 
-  // Основная игровая логика
+  @SubscribeMessage('HEARTBEAT')
+  handleHeartbeat(socket: Socket) {
+    socket.emit('HEARTBEAT_ACK', { timestamp: Date.now() })
+  }
+
+  // ОСНОВНАЯ ИГРОВАЯ ЛОГИКА
+
   private async startGameSession(game: GameState) {
-    this.logger.log(`Starting game session for ${game.id}`)
+    this.logger.log(`Запуск игровой сессии для ${game.id}`)
     
-    // Убедитесь, что все игроки живы перед началом
+    // Убеждаемся, что все игроки живы перед началом
     Array.from(game.players.values()).forEach(player => {
-      player.isAlive = true // ← ЯВНО УСТАНАВЛИВАЕМ true
+      player.isAlive = true
       player.score = 0
       player.votesAgainst = 0
       player.revealedCards = []
@@ -857,15 +843,13 @@ export class GameGateway
       player.isSuspicious = false
       player.vote = undefined
       
-      this.logger.debug(`Player ${player.name} initialized: isAlive=${player.isAlive}`)
+      this.logger.debug(`Игрок ${player.name} инициализирован: isAlive=${player.isAlive}`)
     })
     
-    // Раздаем карты перед началом игры
     this.dealCardsToPlayers(game)
     
-    // Устанавливаем фазу введения
     game.phase = 'introduction'
-    game.phaseDuration = 30 // секунд на заставку
+    game.phaseDuration = 30
     game.status = 'active'
     game.round = 1
     game.voteTriggerCount = 0
@@ -873,16 +857,13 @@ export class GameGateway
     
     this.broadcastGameState(game.id)
     
-    // Заставка
     this.broadcastToGame(game.id, 'GAME_NARRATION', {
       title: '2247 год. Станция "Эдем"',
       text: `Научно-исследовательская станция «Эдем», находящаяся на орбите таинственной планеты Хелиос, подвергается нападению неизвестных сил. Системы жизнеобеспечения повреждены. Единственная спасательная капсула «Надежда» может вместить только ${Math.floor(game.players.size / 2)} человек. Экипаж из ${game.players.size} человек должен решить, кто выживет.`
     })
     
-    // Запускаем таймер фазы
     this.startPhaseTimer(game)
     
-    // Через 30 секунд начинаем подготовку
     setTimeout(() => {
       this.startPreparationPhase(game)
     }, 30000)
@@ -890,14 +871,13 @@ export class GameGateway
 
   private startPreparationPhase(game: GameState) {
     game.phase = 'preparation'
-    game.phaseDuration = 60 // 1 минута
+    game.phaseDuration = 60
     
-    this.logger.log(`Starting preparation phase for game ${game.id}`)
+    this.logger.log(`Запуск фазы подготовки для игры ${game.id}`)
     
     this.broadcastGameState(game.id)
     this.startPhaseTimer(game)
     
-    // Таймер подготовки
     setTimeout(() => {
       this.startDiscussionPhase(game)
     }, 60000)
@@ -909,7 +889,6 @@ export class GameGateway
     game.voteTriggerCount = 0
     game.voteRequests = new Set()
     
-    // Сбрасываем голоса
     Array.from(game.players.values()).forEach(player => {
       player.vote = undefined
       player.votesAgainst = 0
@@ -918,10 +897,9 @@ export class GameGateway
     this.broadcastGameState(game.id)
     this.startPhaseTimer(game)
     
-    // Таймер обсуждения
     setTimeout(() => {
-      // Если никто не запросил голосование, проверяем кризис
-      if (game.voteTriggerCount < Math.floor(Array.from(game.players.values()).filter(p => p.isAlive).length / 2)) {
+      const aliveCount = Array.from(game.players.values()).filter(p => p.isAlive === true).length
+      if (game.voteTriggerCount < Math.floor(aliveCount / 2)) {
         this.checkForCrisis(game)
       }
     }, game.settings.discussionTime * 1000)
@@ -932,7 +910,6 @@ export class GameGateway
     game.phaseDuration = game.settings.votingTime
     game.votingResults = new Map()
     
-    // Сбрасываем голоса
     Array.from(game.players.values()).forEach(player => {
       player.vote = undefined
       player.votesAgainst = 0
@@ -941,7 +918,6 @@ export class GameGateway
     this.broadcastGameState(game.id)
     this.startPhaseTimer(game)
     
-    // Таймер голосования
     setTimeout(() => {
       this.processVotingResults(game)
     }, game.settings.votingTime * 1000)
@@ -950,15 +926,13 @@ export class GameGateway
   private processVotingResults(game: GameState) {
     if (!game.votingResults) return
     
-    // Считаем голоса
     Array.from(game.players.values()).forEach(player => {
-      if (player.vote && player.isAlive) {
+      if (player.vote && player.isAlive === true) {
         const currentVotes = game.votingResults!.get(player.vote) || 0
         game.votingResults!.set(player.vote, currentVotes + 1)
       }
     })
     
-    // Находим игрока с максимальным количеством голосов
     let maxVotes = 0
     let ejectedPlayerId = ''
     
@@ -975,9 +949,8 @@ export class GameGateway
         ejectedPlayer.isAlive = false
         game.ejectedPlayers.push(ejectedPlayerId)
         
-        // Увеличиваем счет выжившим
         Array.from(game.players.values())
-          .filter(p => p.isAlive)
+          .filter(p => p.isAlive === true)
           .forEach(p => p.score += 10)
         
         this.broadcastToGame(game.id, 'PLAYER_EJECTED', {
@@ -986,16 +959,13 @@ export class GameGateway
           votes: maxVotes
         })
         
-        // Переходим к фазе раскрытия
         this.startRevealPhase(game, ejectedPlayer)
       }
     } else {
-      // Ничья или никто не проголосовал
       this.broadcastToGame(game.id, 'VOTE_TIED', {
         message: 'Голосование завершилось ничьей'
       })
       
-      // Проверяем кризис
       setTimeout(() => {
         this.checkForCrisis(game)
       }, 3000)
@@ -1006,7 +976,6 @@ export class GameGateway
     game.phase = 'reveal'
     game.phaseDuration = 30
     
-    // Раскрываем карты выбывшего игрока
     this.broadcastToGame(game.id, 'PLAYER_REVEAL', {
       playerId: ejectedPlayer.id,
       playerName: ejectedPlayer.name,
@@ -1029,24 +998,20 @@ export class GameGateway
   }
 
   private checkGameEnd(game: GameState) {
-    const alivePlayers = Array.from(game.players.values()).filter(p => p.isAlive)
+    const alivePlayers = Array.from(game.players.values()).filter(p => p.isAlive === true)
     const capsuleCapacity = Math.floor(game.players.size / 2)
     
-    // 1. Проверяем скрытые роли
     const hiddenRoleWinners = this.checkHiddenRoleWins(game)
     if (hiddenRoleWinners.length > 0) {
       this.endGame(game, hiddenRoleWinners, 'hidden_role_win')
       return
     }
     
-    // 2. Проверяем, осталось ли место в капсуле
     if (alivePlayers.length <= capsuleCapacity) {
-      // Все выжившие попадают в капсулу
       this.endGame(game, alivePlayers.map(p => p.id), 'capsule_full')
       return
     }
     
-    // 3. Проверяем кризисы
     if (game.currentCrisis && !game.currentCrisis.solvedBy) {
       this.applyCrisisPenalty(game)
     } else {
@@ -1055,8 +1020,7 @@ export class GameGateway
   }
 
   private checkForCrisis(game: GameState) {
-    // Шанс возникновения кризиса зависит от сложности
-    let crisisChance = 0.3 // 30% по умолчанию
+    let crisisChance = 0.3
     switch (game.settings.difficulty) {
       case 'easy': crisisChance = 0.2; break
       case 'hard': crisisChance = 0.4; break
@@ -1073,7 +1037,6 @@ export class GameGateway
     game.phase = 'crisis'
     game.phaseDuration = 60
     
-    // Выбираем случайный кризис
     const crisisTypes = ['technological', 'biological', 'external']
     const randomType = crisisTypes[Math.floor(Math.random() * crisisTypes.length)]
     
@@ -1124,7 +1087,6 @@ export class GameGateway
     this.broadcastGameState(game.id)
     this.startPhaseTimer(game)
     
-    // Таймер на решение кризиса
     setTimeout(() => {
       if (game.currentCrisis?.isActive) {
         this.applyCrisisPenalty(game)
@@ -1135,20 +1097,15 @@ export class GameGateway
   private applyCrisisPenalty(game: GameState) {
     if (!game.currentCrisis) return
     
-    const penalty = game.currentCrisis.penalty
-    
-    // Применяем штраф в зависимости от типа кризиса
     switch (game.currentCrisis.id) {
       case 'crisis_leak':
-        // -1 место в капсуле
         game.capsuleSlots = Math.max(1, game.capsuleSlots - 1)
         this.broadcastToGame(game.id, 'CRISIS_PENALTY', {
           message: 'Утечка не устранена! Количество мест в капсуле уменьшено на 1.'
         })
         break
       case 'crisis_pathogen':
-        // Заражаем случайного игрока
-        const alivePlayers = Array.from(game.players.values()).filter(p => p.isAlive)
+        const alivePlayers = Array.from(game.players.values()).filter(p => p.isAlive === true)
         if (alivePlayers.length > 0) {
           const randomPlayer = alivePlayers[Math.floor(Math.random() * alivePlayers.length)]
           randomPlayer.isInfected = true
@@ -1162,7 +1119,6 @@ export class GameGateway
     
     game.currentCrisis.isActive = false
     
-    // Переходим к новому раунду
     setTimeout(() => {
       this.startNewRound(game)
     }, 5000)
@@ -1176,7 +1132,6 @@ export class GameGateway
     game.voteTriggerCount = 0
     game.voteRequests = new Set()
     
-    // Сбрасываем использованные способности
     Array.from(game.players.values()).forEach(player => {
       player.hasUsedAbility = false
     })
@@ -1188,13 +1143,10 @@ export class GameGateway
       if (game.round <= (game.maxRounds || 10)) {
         this.startDiscussionPhase(game)
       } else {
-        // Игра завершена по таймауту раундов
-        const survivors = Array.from(game.players.values()).filter(p => p.isAlive)
+        const survivors = Array.from(game.players.values()).filter(p => p.isAlive === true)
         const winners = survivors.map(p => p.id)
         
-        // Если выживших больше, чем мест, выбираем случайных победителей
         if (winners.length > game.capsuleSlots) {
-          // Перемешиваем и берем первых N
           const shuffled = [...winners].sort(() => Math.random() - 0.5)
           winners.length = 0
           winners.push(...shuffled.slice(0, game.capsuleSlots))
@@ -1211,19 +1163,17 @@ export class GameGateway
     game.finishedAt = new Date().toISOString()
     game.winnerId = winnerIds[0]
     
-    // Останавливаем таймер
     if (game.timerInterval) {
       clearInterval(game.timerInterval)
       game.timerInterval = undefined
     }
     
-    // Подсчитываем финальные очки
     Array.from(game.players.values()).forEach(player => {
       if (winnerIds.includes(player.id)) {
-        player.score += 50 // бонус за победу
+        player.score += 50
       }
-      if (player.isAlive) {
-        player.score += 20 // бонус за выживание
+      if (player.isAlive === true) {
+        player.score += 20
       }
     })
     
@@ -1243,7 +1193,6 @@ export class GameGateway
   }
 
   private dealCardsToPlayers(game: GameState) {
-    // Инициализируем колоды
     game.deck = {
       professions: [...PROFESSIONS],
       healthStatuses: [...HEALTH_STATUSES],
@@ -1254,20 +1203,17 @@ export class GameGateway
       roleCards: []
     }
     
-    // Инициализируем капсулу
     game.capsuleSlots = Math.floor(game.players.size / 2)
     game.occupiedSlots = 0
     game.ejectedPlayers = []
     game.crisisHistory = []
     
-    // Раздаем карты каждому игроку
     const playerArray = Array.from(game.players.values())
     
-    this.logger.log(`Dealing cards to ${playerArray.length} players`)
+    this.logger.log(`Раздача карт ${playerArray.length} игрокам`)
     
     playerArray.forEach((player, index) => {
-      // ВАЖНО: Сбрасываем состояние (хотя уже должно быть установлено)
-      player.isAlive = true // ← ГАРАНТИРУЕМ что игрок жив
+      player.isAlive = true
       player.score = 0
       player.votesAgainst = 0
       player.revealedCards = []
@@ -1276,41 +1222,34 @@ export class GameGateway
       player.isSuspicious = false
       player.vote = undefined
       
-      this.logger.debug(`Initializing player ${player.name}: isAlive=${player.isAlive}`)
+      this.logger.debug(`Инициализация игрока ${player.name}: isAlive=${player.isAlive}`)
       
-      // Профессия
       if (game.deck.professions.length > 0) {
         const professionIndex = Math.floor(Math.random() * game.deck.professions.length)
         player.profession = game.deck.professions[professionIndex]
       }
       
-      // Состояние здоровья
       if (game.deck.healthStatuses.length > 0) {
         const healthIndex = Math.floor(Math.random() * game.deck.healthStatuses.length)
         player.healthStatus = game.deck.healthStatuses[healthIndex]
       }
       
-      // Психологическая черта
       if (game.deck.psychologicalTraits.length > 0) {
         const traitIndex = Math.floor(Math.random() * game.deck.psychologicalTraits.length)
         player.psychologicalTrait = game.deck.psychologicalTraits[traitIndex]
       }
       
-      // Секрет (не всем)
       if (game.deck.secrets.length > 0 && Math.random() < 0.3) {
         const secretIndex = Math.floor(Math.random() * game.deck.secrets.length)
         player.secret = game.deck.secrets[secretIndex]
       }
       
-      // Скрытая роль (по настройкам игры)
       if (index < game.settings.hiddenRolesCount && game.deck.hiddenRoles.length > 0) {
         const roleIndex = Math.floor(Math.random() * game.deck.hiddenRoles.length)
         player.hiddenRole = game.deck.hiddenRoles[roleIndex]
-        // Убираем использованную роль из колоды
         game.deck.hiddenRoles.splice(roleIndex, 1)
       }
       
-      // Ролевая карта (Капитан/Старший офицер)
       if (index === 0) {
         player.roleCard = { 
           id: 'role_captain', 
@@ -1334,25 +1273,21 @@ export class GameGateway
         player.isSeniorOfficer = false
       }
       
-      // Пол
       if (GENDERS.length > 0) {
         const genderIndex = Math.floor(Math.random() * GENDERS.length)
         player.gender = GENDERS[genderIndex]
       }
       
-      // Возраст
       if (AGES.length > 0) {
         const ageIndex = Math.floor(Math.random() * AGES.length)
         player.age = AGES[ageIndex]
       }
       
-      // Телосложение
       if (BODY_TYPES.length > 0) {
         const bodyIndex = Math.floor(Math.random() * BODY_TYPES.length)
         player.bodyType = BODY_TYPES[bodyIndex]
       }
       
-      // Проверяем, занимает ли телосложение дополнительное место
       if (player.bodyType?.id === 'body_huge') {
         game.occupiedSlots += 2
       } else if (player.age?.id === 'age_elder') {
@@ -1361,11 +1296,10 @@ export class GameGateway
         game.occupiedSlots += 1
       }
       
-      // Отправляем карты игроку
       this.sendPlayerCards(game, player)
     })
     
-    this.logger.log(`Cards dealt to ${playerArray.length} players. All players should be alive.`)
+    this.logger.log(`Карты розданы ${playerArray.length} игрокам`)
   }
 
   private sendPlayerCards(game: GameState, player: GamePlayer) {
@@ -1384,57 +1318,43 @@ export class GameGateway
         bodyType: player.bodyType
       })
       
-      this.logger.debug(`Sent cards to player ${player.name}, isAlive=${player.isAlive}`)
+      this.logger.debug(`Отправлены карты игроку ${player.name}, isAlive=${player.isAlive}`)
     }
   }
 
-  private checkHiddenRoleWins(game: GameState): string[] {
-    const winners: string[] = []
-    
-    Array.from(game.players.values()).forEach(player => {
-      if (player.hiddenRole && player.isAlive) {
-        switch (player.hiddenRole.id) {
-          case 'role_saboteur':
-            // Саботажник побеждает, если капсула не улетела и игра закончилась
-            if (game.status === 'finished' && game.phase === 'game_over') {
-              winners.push(player.id)
-            }
-            break
-          case 'role_xenophag':
-            // Агент ксенофагов побеждает, если заражен хотя бы один игрок
-            const infectedPlayers = Array.from(game.players.values()).filter(p => p.isInfected)
-            if (infectedPlayers.length > 0) {
-              winners.push(player.id)
-            }
-            break
-        }
-      }
-    })
-    
-    return winners
-  }
-
+  // ИСПРАВЛЕННЫЙ МЕТОД ЗАПУСКА ТАЙМЕРА
   private startPhaseTimer(game: GameState) {
-    // Останавливаем предыдущий таймер
     if (game.timerInterval) {
       clearInterval(game.timerInterval)
     }
     
-    // Устанавливаем время окончания фазы
-    game.phaseEndTime = new Date(Date.now() + game.phaseDuration * 1000).toISOString()
+    const startTime = Date.now()
+    const endTime = startTime + (game.phaseDuration * 1000)
+    game.phaseEndTime = new Date(endTime).toISOString()
     
-    // Запускаем новый таймер
+    this.logger.debug(`Запущен таймер фазы ${game.phase} на ${game.phaseDuration} секунд`)
+    
+    let expectedTime = startTime
+    let drift = 0
+    
     game.timerInterval = setInterval(() => {
       const now = Date.now()
-      const endTime = new Date(game.phaseEndTime!).getTime()
+      const elapsed = now - expectedTime
+      drift += elapsed
       
-      if (now >= endTime) {
+      const timeRemaining = endTime - now
+      
+      if (timeRemaining <= 0) {
+        this.logger.debug(`Таймер фазы ${game.phase} истек`)
         clearInterval(game.timerInterval)
         game.timerInterval = undefined
-        
-        // Фаза завершилась, обрабатываем таймаут
         this.handlePhaseTimeout(game)
+      } else if (Math.abs(drift) >= 1000) {
+        drift = 0
+        this.broadcastGameState(game.id)
       }
+      
+      expectedTime = now
     }, 1000)
   }
 
@@ -1466,7 +1386,30 @@ export class GameGateway
     }
   }
 
-  // Вспомогательные методы
+  private checkHiddenRoleWins(game: GameState): string[] {
+    const winners: string[] = []
+    
+    Array.from(game.players.values()).forEach(player => {
+      if (player.hiddenRole && player.isAlive === true) {
+        switch (player.hiddenRole.id) {
+          case 'role_saboteur':
+            if (game.status === 'finished' && game.phase === 'game_over') {
+              winners.push(player.id)
+            }
+            break
+          case 'role_xenophag':
+            const infectedPlayers = Array.from(game.players.values()).filter(p => p.isInfected === true)
+            if (infectedPlayers.length > 0) {
+              winners.push(player.id)
+            }
+            break
+        }
+      }
+    })
+    
+    return winners
+  }
+
   private getCardDetails(cardType: string, cardId: string): any {
     switch (cardType) {
       case 'profession':
@@ -1485,7 +1428,6 @@ export class GameGateway
   }
 
   private handleCaptainVeto(game: GameState, userId: string) {
-    // Капитан использует право вето на текущее голосование
     game.votingResults?.clear()
     
     this.broadcastToGame(game.id, 'CAPTAIN_VETO_USED', {
@@ -1494,14 +1436,12 @@ export class GameGateway
       message: 'Капитан использовал право вето на голосование!'
     })
     
-    // Переходим к обсуждению
     setTimeout(() => {
       this.startDiscussionPhase(game)
     }, 3000)
   }
 
   private handleSabotage(game: GameState, userId: string) {
-    // Саботажник вызывает неисправность
     game.capsuleSlots = Math.max(1, game.capsuleSlots - 1)
     
     this.broadcastToGame(game.id, 'SABOTAGE_OCCURRED', {
@@ -1515,7 +1455,7 @@ export class GameGateway
     if (!targetPlayerId) return
     
     const targetPlayer = game.players.get(targetPlayerId)
-    if (targetPlayer && targetPlayer.isAlive) {
+    if (targetPlayer && targetPlayer.isAlive === true) {
       targetPlayer.isInfected = true
       
       this.broadcastToGame(game.id, 'PLAYER_INFECTED', {
@@ -1528,7 +1468,6 @@ export class GameGateway
   }
 
   private handleNonbinaryAbility(game: GameState, userId: string) {
-    // Небинарная персона отменяет один голос против себя
     const player = game.players.get(userId)
     if (player) {
       player.votesAgainst = Math.max(0, player.votesAgainst - 1)
@@ -1542,21 +1481,20 @@ export class GameGateway
   }
 
   private handleSkipTurn(game: GameState) {
-    this.logger.log(`Skipping turn in game ${game.id}`)
+    this.logger.log(`Пропуск хода в игре ${game.id}`)
   }
 
   private handleEndGame(game: GameState, userId: string) {
     if (game.creatorId !== userId) {
-      this.logger.warn(`Player ${userId} tried to end game without permission`)
+      this.logger.warn(`Игрок ${userId} попытался завершить игру без разрешения`)
       return
     }
     
     game.status = 'cancelled'
     game.finishedAt = new Date().toISOString()
     
-    this.logger.log(`Game ${game.id} cancelled by ${userId}`)
+    this.logger.log(`Игра ${game.id} отменена пользователем ${userId}`)
     
-    // Уведомляем всех
     this.server.to(game.id).emit('GAME_FINISHED', {
       gameState: this.serializeGameState(game),
       reason: 'cancelled_by_creator'
@@ -1570,24 +1508,7 @@ export class GameGateway
     }
   }
 
-  // Методы связи
-  private broadcastGameState(gameId: string) {
-    const game = this.games.get(gameId)
-    if (!game) return
-    
-    const serializedState = this.serializeGameState(game)
-    this.logger.debug(`Broadcasting game state for ${gameId}, players: ${serializedState.players.length}`)
-    
-    this.server.to(gameId).emit('GAME_STATE', {
-      gameState: serializedState
-    })
-  }
-
-  private broadcastToGame(gameId: string, event: string, data: any) {
-    this.server.to(gameId).emit(event, data)
-  }
-
-  // ИСПРАВЛЕННАЯ СЕРИАЛИЗАЦИЯ
+  // ИСПРАВЛЕННЫЙ МЕТОД СЕРИАЛИЗАЦИИ
   private serializeGameState(game: GameState) {
     const players = Array.from(game.players.values()).map(p => ({
       id: p.id,
@@ -1597,8 +1518,8 @@ export class GameGateway
       avatar: p.avatar,
       score: p.score || 0,
       order: p.order || 0,
-      isActive: p.isActive !== false, // по умолчанию true
-      isAlive: p.isAlive !== false, // ← ВАЖНО: преобразуем undefined в true
+      isActive: p.isActive !== false,
+      isAlive: p.isAlive === true,
       vote: p.vote,
       votesAgainst: p.votesAgainst || 0,
       profession: p.profession?.name,
@@ -1607,18 +1528,10 @@ export class GameGateway
       isCaptain: p.isCaptain || false,
       isSeniorOfficer: p.isSeniorOfficer || false,
       revealedCards: p.revealedCards?.length || 0,
-      hasUsedAbility: p.hasUsedAbility || false,
-      // Добавляем отладочную информацию
-      _debug: {
-        rawIsAlive: p.isAlive,
-        typeof: typeof p.isAlive
-      }
+      hasUsedAbility: p.hasUsedAbility || false
     }))
     
-    // Отладочный лог
-    if (players.length > 0) {
-      this.logger.debug(`Serializing ${players.length} players. First player: ${players[0].name}, isAlive=${players[0].isAlive}`)
-    }
+    this.logger.debug(`Сериализация ${players.length} игроков. Первый игрок: ${players[0]?.name}, isAlive=${players[0]?.isAlive}`)
     
     return {
       id: game.id,
@@ -1644,14 +1557,13 @@ export class GameGateway
     }
   }
 
-  // МЕТОД СОЗДАНИЯ ИГРЫ - ИСПРАВЛЕННАЯ ВЕРСИЯ
+  // ИСПРАВЛЕННЫЙ МЕТОД СОЗДАНИЯ ИГРЫ
   createGameFromLobby(lobbyId: string, gameId: string, players: any[], creatorId: string, settings: any) {
     const gamePlayers = new Map<string, GamePlayer>()
     
-    this.logger.log(`Creating game ${gameId} from lobby ${lobbyId} with ${players.length} players`)
+    this.logger.log(`Создание игры ${gameId} из лобби ${lobbyId} с ${players.length} игроками`)
     
     players.forEach((player, index) => {
-      // ВАЖНО: ВСЕГДА устанавливаем isAlive в true при создании
       const gamePlayer: GamePlayer = {
         id: player.id,
         name: player.name || `Игрок ${index + 1}`,
@@ -1661,7 +1573,7 @@ export class GameGateway
         score: 0,
         order: index + 1,
         isActive: true,
-        isAlive: true, // ← ГАРАНТИРОВАННО true
+        isAlive: true,
         vote: undefined,
         votesAgainst: 0,
         revealedCards: [],
@@ -1673,13 +1585,13 @@ export class GameGateway
       }
       
       gamePlayers.set(player.id, gamePlayer)
-      this.logger.debug(`Created player ${gamePlayer.name} with isAlive=${gamePlayer.isAlive}`)
+      this.logger.debug(`Создан игрок ${gamePlayer.name} с isAlive=${gamePlayer.isAlive}`)
     })
 
     const gameState: GameState = {
       id: gameId,
       lobbyId,
-      status: 'waiting', // Начинаем в режиме ожидания
+      status: 'waiting',
       phase: 'introduction',
       players: gamePlayers,
       connections: new Map(),
@@ -1691,8 +1603,8 @@ export class GameGateway
         gameMode: settings?.gameMode || 'standard',
         maxPlayers: settings?.maxPlayers || 4,
         maxRounds: settings?.maxRounds || 10,
-        discussionTime: settings?.discussionTime || 180, // 3 минуты
-        votingTime: settings?.votingTime || 60, // 1 минута
+        discussionTime: settings?.discussionTime || 180,
+        votingTime: settings?.votingTime || 60,
         hiddenRolesCount: Math.min(settings?.hiddenRolesCount || 1, players.length),
         enableCrises: settings?.enableCrises !== false,
         difficulty: settings?.difficulty || 'normal',
@@ -1717,7 +1629,7 @@ export class GameGateway
     }
 
     this.games.set(gameId, gameState)
-    this.logger.log(`Game created: ${gameId}. Players: ${Array.from(gamePlayers.values()).map(p => `${p.name}(${p.isAlive})`).join(', ')}`)
+    this.logger.log(`Игра создана: ${gameId}. Игроки: ${Array.from(gamePlayers.values()).map(p => `${p.name}(${p.isAlive})`).join(', ')}`)
     
     return gameState
   }
@@ -1736,5 +1648,21 @@ export class GameGateway
       round: game.round,
       startedAt: game.startedAt,
     }))
+  }
+
+  private broadcastGameState(gameId: string) {
+    const game = this.games.get(gameId)
+    if (!game) return
+    
+    const serializedState = this.serializeGameState(game)
+    this.logger.debug(`Отправка состояния игры для ${gameId}, игроков: ${serializedState.players.length}`)
+    
+    this.server.to(gameId).emit('GAME_STATE', {
+      gameState: serializedState
+    })
+  }
+
+  private broadcastToGame(gameId: string, event: string, data: any) {
+    this.server.to(gameId).emit(event, data)
   }
 }

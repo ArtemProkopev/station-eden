@@ -1,3 +1,4 @@
+// apps/web/src/app/game/[gameId]/GameSessionClient.tsx
 'use client'
 
 import {
@@ -78,10 +79,8 @@ export default function GameSessionClient({ gameId }: Props) {
 	const myAllRevealedCardIds = useMemo((): string[] => {
 		if (!myAllRevealedCards) return []
 		if (Array.isArray(myAllRevealedCards)) {
-			// Если массив объектов, извлекаем id (если есть) или name
-			return myAllRevealedCards.map(card => (card as any).id ?? card.name)
+			return myAllRevealedCards.map(card => (card as any).id ?? (card as any).name)
 		} else {
-			// Если объект, ключи — это ID карт
 			return Object.keys(myAllRevealedCards)
 		}
 	}, [myAllRevealedCards])
@@ -92,24 +91,24 @@ export default function GameSessionClient({ gameId }: Props) {
 	> => {
 		if (!myAllRevealedCards) return {}
 		if (Array.isArray(myAllRevealedCards)) {
-			// Преобразуем массив объектов в Record по id (или name)
 			return myAllRevealedCards.reduce(
 				(acc, card) => {
-					const key = (card as any).id ?? card.name
-					acc[key] = { name: card.name, type: card.type }
+					const key = (card as any).id ?? (card as any).name
+					acc[key] = { 
+						name: (card as any).name, 
+						type: (card as any).type 
+					}
 					return acc
 				},
 				{} as Record<string, { name: string; type: string }>,
 			)
 		} else {
-			// Уже объект
 			return myAllRevealedCards
 		}
 	}, [myAllRevealedCards])
 
-	// Обработчик скролла чата (заглушка) – теперь без параметров, как требует GameChat
 	const handleChatScroll = useCallback(() => {
-		// Здесь можно реализовать подгрузку истории при скролле, если потребуется
+		// Здесь можно реализовать подгрузку истории при скролле
 	}, [])
 
 	if (!gameState) {
@@ -139,7 +138,7 @@ export default function GameSessionClient({ gameId }: Props) {
 
 	const players = (gameState.players || []) as ExtendedGamePlayer[]
 	const currentPlayer = userId ? players.find(p => p.id === userId) : undefined
-	const alivePlayers = players.filter(p => p.isAlive)
+	const alivePlayers = players.filter(p => p.isAlive === true)
 	const phaseDurationDisplay = getPhaseDuration(gameState, phaseTimeLeft)
 
 	return (
@@ -158,7 +157,7 @@ export default function GameSessionClient({ gameId }: Props) {
 					myCards={myCards}
 					cardsReceivedThisRound={cardsReceivedThisRound}
 					myRevealedCardsThisRound={myRevealedCardsThisRound}
-					myAllRevealedCards={myAllRevealedCards}
+					myAllRevealedCards={myAllRevealedCardsObject}
 					newCardsThisRound={newCardsThisRound}
 					gameState={gameState}
 					userId={userId}
@@ -232,7 +231,7 @@ export default function GameSessionClient({ gameId }: Props) {
 					currentPlayer={currentPlayer}
 					alivePlayers={alivePlayers}
 					myRevealedCardsThisRound={myRevealedCardsThisRound}
-					myAllRevealedCards={myAllRevealedCardIds} // передаём string[]
+					myAllRevealedCards={myAllRevealedCardIds}
 					revealingCards={revealingCards}
 					currentRevealIndex={currentRevealIndex}
 					isRevealing={isRevealing}
@@ -254,7 +253,7 @@ export default function GameSessionClient({ gameId }: Props) {
 					onKeyPress={
 						handleKeyPress as (e: React.KeyboardEvent<Element>) => void
 					}
-					onChatScroll={handleChatScroll} // теперь () => void
+					onChatScroll={handleChatScroll}
 					disabled={!isConnected || gameState.phase === 'game_over'}
 					currentUserId={userId}
 				/>
@@ -264,7 +263,7 @@ export default function GameSessionClient({ gameId }: Props) {
 				gameState={gameState}
 				currentPlayer={currentPlayer}
 				myRevealedCardsThisRound={myRevealedCardsThisRound}
-				myAllRevealedCards={myAllRevealedCardsObject} // передаём Record
+				myAllRevealedCards={myAllRevealedCardsObject}
 				alivePlayers={alivePlayers}
 				onShowCardsTable={() => setShowCardsTable(true)}
 			/>
@@ -277,7 +276,7 @@ function getPhaseDuration(
 	phaseTimeLeft: number,
 ): number {
 	if (gameState.phase === 'voting') return 30
-	if (gameState.phase === 'discussion' && phaseTimeLeft > 0) return 60
+	if (gameState.phase === 'discussion' && phaseTimeLeft > 0) return 180
 	if (gameState.phase === 'crisis') return 60
 	return typeof gameState.phaseDuration === 'number'
 		? gameState.phaseDuration

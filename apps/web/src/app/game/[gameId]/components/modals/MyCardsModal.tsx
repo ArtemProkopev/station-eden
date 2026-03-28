@@ -1,5 +1,4 @@
 // apps/web/src/app/game/[gameId]/components/modals/MyCardsModal.tsx
-
 import {
 	CardDetails,
 	CardType,
@@ -13,12 +12,19 @@ interface MyCardsModalProps {
 	myCards: Record<string, CardDetails>
 	cardsReceivedThisRound: number
 	myRevealedCardsThisRound: string[]
-	myAllRevealedCards: Record<string, { name: string; type: string }>
+	myAllRevealedCards: Record<string, { name: string; type: string }> | string[]
 	newCardsThisRound?: CardDetails[]
 	gameState: ExtendedGameState | null
 	userId?: string
 	onClose: () => void
 	onRevealCard: (cardType: CardType) => void
+}
+
+// Type guard для проверки типа myAllRevealedCards
+function isRevealedCardsObject(
+	cards: Record<string, { name: string; type: string }> | string[]
+): cards is Record<string, { name: string; type: string }> {
+	return cards && typeof cards === 'object' && !Array.isArray(cards)
 }
 
 export default function MyCardsModal({
@@ -36,44 +42,53 @@ export default function MyCardsModal({
 		return newCardsThisRound.some(newCard => newCard.id === card.id)
 	}
 
-	// В ExtendedGameState.players по типам это GamePlayer[]
-	// но по факту в режиме игры у тебя там ExtendedGamePlayer (с isAlive).
-	// Поэтому безопасно (без any) приводим к массиву ExtendedGamePlayer и берём текущего.
 	const players = (gameState?.players ?? []) as ExtendedGamePlayer[]
-
 	const currentPlayer = userId ? players.find(p => p.id === userId) : undefined
+
+	// Нормализация myAllRevealedCards для проверки
+	const isCardRevealed = (cardType: string): boolean => {
+		if (isRevealedCardsObject(myAllRevealedCards)) {
+			return !!myAllRevealedCards[cardType]
+		}
+		return myAllRevealedCards.includes(cardType)
+	}
 
 	return (
 		<div className={styles.modalOverlay}>
 			<div className={styles.modalContent}>
-				<h2>Ваши карты</h2>
-				<button onClick={onClose}>✕</button>
+				<div className={styles.modalHeader}>
+					<h2>Ваши карты</h2>
+					<button className={styles.closeButton} onClick={onClose}>✕</button>
+				</div>
 
-				<div>
+				<div className={styles.cardsStats}>
 					<p>Всего карт: {Object.keys(myCards).length}</p>
 					<p>В этом раунде получено: {cardsReceivedThisRound}</p>
 					<p>Раскрыто в этом раунде: {myRevealedCardsThisRound.length}/1</p>
 				</div>
 
-				<div>
-					{Object.entries(myCards).map(([type, card]) => (
-						<CardItem
-							key={type}
-							type={type as CardType}
-							card={card}
-							isRevealed={!!myAllRevealedCards[type]}
-							isNew={isNewCard(card)}
-							myRevealedCardsThisRound={myRevealedCardsThisRound}
-							canReveal={
-								gameState?.phase === 'discussion' &&
-								!!userId &&
-								!!currentPlayer?.isAlive &&
-								myRevealedCardsThisRound.length < 1 &&
-								!myAllRevealedCards[type]
-							}
-							onReveal={onRevealCard}
-						/>
-					))}
+				<div className={styles.cardsList}>
+					{Object.entries(myCards).map(([type, card]) => {
+						const isRevealed = isCardRevealed(type)
+						const canReveal = 
+							gameState?.phase === 'discussion' &&
+							!!userId &&
+							!!currentPlayer?.isAlive &&
+							myRevealedCardsThisRound.length < 1 &&
+							!isRevealed
+
+						return (
+							<CardItem
+								key={type}
+								type={type as CardType}
+								card={card}
+								isRevealed={isRevealed}
+								isNew={isNewCard(card)}
+								canReveal={canReveal}
+								onReveal={onRevealCard}
+							/>
+						)
+					})}
 				</div>
 			</div>
 		</div>
@@ -85,7 +100,6 @@ function CardItem({
 	card,
 	isRevealed,
 	isNew,
-	myRevealedCardsThisRound,
 	canReveal,
 	onReveal,
 }: {
@@ -93,32 +107,47 @@ function CardItem({
 	card: CardDetails
 	isRevealed: boolean
 	isNew: boolean
-	myRevealedCardsThisRound: string[]
 	canReveal: boolean
 	onReveal: (cardType: CardType) => void
 }) {
 	return (
 		<div className={`${styles.cardItem} ${isNew ? styles.newCard : ''}`}>
 			<h3>{getCardTypeName(type)}</h3>
-			{isNew && <span>Новая</span>}
+			{isNew && <span className={styles.newBadge}>Новая</span>}
 
 			<h4>{card.name}</h4>
 			<p>{card.description}</p>
 
-			{card.pros?.map((pro: string, i: number) => (
-				<p key={i}>{pro}</p>
-			))}
+			{card.pros && card.pros.length > 0 && (
+				<div className={styles.cardPros}>
+					<strong>Преимущества:</strong>
+					<ul>
+						{card.pros.map((pro: string, i: number) => (
+							<li key={i}>{pro}</li>
+						))}
+					</ul>
+				</div>
+			)}
 
-			{card.cons?.map((con: string, i: number) => (
-				<p key={i}>{con}</p>
-			))}
+			{card.cons && card.cons.length > 0 && (
+				<div className={styles.cardCons}>
+					<strong>Недостатки:</strong>
+					<ul>
+						{card.cons.map((con: string, i: number) => (
+							<li key={i}>{con}</li>
+						))}
+					</ul>
+				</div>
+			)}
 
-			<button onClick={() => onReveal(type)} disabled={!canReveal}>
+			<button 
+				className={styles.revealButton}
+				onClick={() => onReveal(type)} 
+				disabled={!canReveal}
+			>
 				{isRevealed
 					? 'Уже раскрыта'
-					: myRevealedCardsThisRound.length >= 1
-						? 'Лимит раскрытий'
-						: 'Раскрыть карту'}
+					: 'Раскрыть карту'}
 			</button>
 		</div>
 	)

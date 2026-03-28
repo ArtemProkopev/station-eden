@@ -23,8 +23,8 @@ export default function PlayersPanel({
 	onShowCardsTable,
 }: PlayersPanelProps) {
 	const players = (gameState.players as ExtendedGamePlayer[]) || []
-	const alivePlayers = players.filter(p => p.isAlive)
-	const ejectedPlayers = players.filter(p => !p.isAlive)
+	const alivePlayers = players.filter(p => p.isAlive === true)
+	const ejectedPlayers = players.filter(p => p.isAlive !== true)
 
 	return (
 		<section className={styles.playersPanel}>
@@ -87,11 +87,14 @@ function PlayerCard({
 	currentPlayer,
 	onVote,
 }: PlayerCardProps) {
+	const isAlive = player.isAlive === true
+	const hasVoted = currentPlayer?.vote === player.id
+	
 	return (
 		<div
-			className={`${styles.playerCard} ${!player.isAlive ? styles.dead : ''} ${
+			className={`${styles.playerCard} ${!isAlive ? styles.dead : ''} ${
 				userId && player.id === userId ? styles.me : ''
-			} ${userId && player.vote === userId ? styles.votedForMe : ''}`}
+			} ${hasVoted ? styles.votedForMe : ''}`}
 		>
 			<div className={styles.playerHeader}>
 				<div className={styles.playerAvatar}>
@@ -114,7 +117,7 @@ function PlayerCard({
 						{player.id === creatorId && ' 👑'}
 					</h3>
 					<div className={styles.playerStatus}>
-						{player.isAlive ? (
+						{isAlive ? (
 							<span className={styles.alive}>Жив</span>
 						) : (
 							<span className={styles.deadStatus}>Выбыл</span>
@@ -133,7 +136,7 @@ function PlayerCard({
 			</div>
 
 			{gamePhase === 'voting' &&
-				player.isAlive &&
+				isAlive &&
 				userId &&
 				player.id !== userId && (
 					<div className={styles.voteSection}>
