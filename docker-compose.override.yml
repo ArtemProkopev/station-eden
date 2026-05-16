@@ -1,0 +1,77 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: station-eden-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: station_eden_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - station_eden_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d station_eden_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: station-eden-api:local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - apps/api/.env.local
+    environment:
+      NODE_ENV: development
+      API_PORT: 4000
+      BIND_HOST: 0.0.0.0
+
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: station_eden_dev
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/station_eden_dev?sslmode=disable
+
+      API_CORS_ORIGIN: https://localhost,http://localhost:3000,http://127.0.0.1:3000
+      COOKIE_SECURE: "true"
+      CSRF_COOKIE_DOMAIN: ""
+      AUTH_COOKIE_DOMAIN: ""
+
+      GOOGLE_REDIRECT_URL: https://localhost/auth/google/callback
+      YANDEX_REDIRECT_URL: https://localhost/auth/yandex/callback
+      WEB_AFTER_LOGIN_URL: https://localhost/profile
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE: /api
+        NEXT_PUBLIC_WS_BASE: https://localhost
+        NEXT_PUBLIC_ENABLE_GOOGLE: ${NEXT_PUBLIC_ENABLE_GOOGLE}
+        NEXT_PUBLIC_ENABLE_YANDEX: ${NEXT_PUBLIC_ENABLE_YANDEX}
+        NEXT_PUBLIC_ASSETS_BASE: ${NEXT_PUBLIC_ASSETS_BASE}
+    image: station-eden-web:local
+    environment:
+      NEXT_PUBLIC_API_BASE: /api
+      NEXT_PUBLIC_WS_BASE: https://localhost
+      NEXT_PUBLIC_ENABLE_GOOGLE: ${NEXT_PUBLIC_ENABLE_GOOGLE}
+      NEXT_PUBLIC_ENABLE_YANDEX: ${NEXT_PUBLIC_ENABLE_YANDEX}
+      NEXT_PUBLIC_ASSETS_BASE: ${NEXT_PUBLIC_ASSETS_BASE}
+
+  caddy:
+    environment:
+      PUBLIC_BASE_HOST: localhost
+
+  watchtower:
+    profiles: ["prod"]
+
+volumes:
+  station_eden_pgdata:
