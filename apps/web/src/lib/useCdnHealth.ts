@@ -1,8 +1,11 @@
 // apps/web/src/lib/useCdnHealth.ts
+
 'use client'
 
 import { useEffect, useState } from 'react'
+
 import { PRIMARY } from './asset'
+import { checkImage } from './checkImage'
 
 interface CdnHealthState {
 	isPrimaryHealthy: boolean
@@ -24,58 +27,53 @@ export function useCdnHealth(checkInterval: number = 30000): CdnHealthState {
 
 		const checkCdnHealth = async () => {
 			if (!mounted) return
-			setState(prev => ({ ...prev, isChecking: true, error: null }))
+
+			setState(prev => ({
+				...prev,
+				isChecking: true,
+				error: null,
+			}))
+
 			try {
 				const isHealthy = await checkPrimaryCdnHealth()
-				if (mounted) {
-					setState({
-						isPrimaryHealthy: isHealthy,
-						isChecking: false,
-						lastChecked: new Date(),
-						error: isHealthy ? null : 'Primary CDN недоступен',
-					})
-				}
+
+				if (!mounted) return
+
+				setState({
+					isPrimaryHealthy: isHealthy,
+					isChecking: false,
+					lastChecked: new Date(),
+					error: isHealthy ? null : 'Primary CDN недоступен',
+				})
 			} catch (error) {
-				if (mounted) {
-					setState({
-						isPrimaryHealthy: false,
-						isChecking: false,
-						lastChecked: new Date(),
-						error:
-							error instanceof Error ? error.message : 'Ошибка проверки CDN',
-					})
-				}
+				if (!mounted) return
+
+				setState({
+					isPrimaryHealthy: false,
+					isChecking: false,
+					lastChecked: new Date(),
+					error: error instanceof Error ? error.message : 'Ошибка проверки CDN',
+				})
 			}
 		}
 
-		// Первая проверка сразу
 		checkCdnHealth()
-		// Периодические проверки
-		const interval = setInterval(checkCdnHealth, checkInterval)
+
+		const interval = window.setInterval(checkCdnHealth, checkInterval)
+
 		return () => {
 			mounted = false
-			clearInterval(interval)
+			window.clearInterval(interval)
 		}
 	}, [checkInterval])
 
 	return state
 }
 
-// Вспомогательная функция для проверки здоровья primary CDN
 async function checkPrimaryCdnHealth(): Promise<boolean> {
-	// Если PRIMARY не настроен, считаем что проверка не нужна
 	if (!PRIMARY) return true
-	try {
-		// HEAD-запрос на гарантированный статический файл
-		const testUrl = `${PRIMARY}/web/favicon.ico?health-check=${Date.now()}`
-		const response = await fetch(testUrl, {
-			method: 'HEAD',
-			cache: 'no-cache',
-			headers: { 'Cache-Control': 'no-cache' },
-		})
-		// Здоров, если не 403/500
-		return response.status !== 403 && response.status !== 500
-	} catch {
-		return false
-	}
+
+	const testUrl = `${PRIMARY}/web/favicon.ico?health-check=${Date.now()}`
+
+	return checkImage(testUrl)
 }

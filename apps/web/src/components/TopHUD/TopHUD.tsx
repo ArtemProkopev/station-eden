@@ -4,6 +4,9 @@
 import { Friend, Notification } from '@station-eden/shared'
 import Link from 'next/link'
 import React from 'react'
+
+import { asset } from '@/lib/asset'
+
 import styles from './TopHUD.module.css'
 import { ChatWindow } from './components/ChatWindow'
 import { Currency } from './components/Currency'
@@ -29,7 +32,7 @@ interface TopHUDProps {
 	variant?: 'default' | 'main'
 }
 
-const FALLBACK_AVATAR = '/avatars/avatar1.png'
+const FALLBACK_AVATAR = asset('/avatars/avatar1.png')
 const GUEST_USERNAME = 'Гость'
 
 export default function TopHUD({
@@ -144,7 +147,9 @@ export default function TopHUD({
 		}
 	}, [profile])
 
-	const finalAvatar = avatar || FALLBACK_AVATAR
+	const finalAvatar = React.useMemo(() => {
+		return avatar ? asset(avatar) : FALLBACK_AVATAR
+	}, [avatar])
 
 	const handleDropdownToggle = React.useCallback(() => {
 		setIsDropdownOpen(prev => !prev)

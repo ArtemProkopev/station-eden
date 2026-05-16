@@ -1,7 +1,10 @@
 // apps/web/src/app/profile/hooks/useProfile.ts
+
 import { api } from '@/lib/api'
 import { asset } from '@/lib/asset'
+import { checkImage } from '@/lib/checkImage'
 import { useCallback, useEffect, useRef, useState } from 'react'
+
 import { PROFILE_CONFIG, avatarKey, frameKey } from '../config'
 import { ProfileIconsStatus, ProfileState } from '../types'
 
@@ -14,6 +17,7 @@ const migrateToAbsoluteUrl = (
 	url: string | null | undefined,
 ): string | undefined => {
 	if (!url) return undefined
+
 	return url.startsWith('http') ? url : asset(url)
 }
 
@@ -27,9 +31,15 @@ function unwrapAny<T = unknown>(v: unknown): T {
 	// - {user: {...}}
 	// - {status:'signed-in', user:{...}}
 	if (!isRecord(v)) return v as T
+
 	if (isRecord(v.data)) return v.data as T
-	if (v.status === 'signed-in' && isRecord(v.user)) return v.user as T
+
+	if (v.status === 'signed-in' && isRecord(v.user)) {
+		return v.user as T
+	}
+
 	if (isRecord(v.user)) return v.user as T
+
 	return v as T
 }
 
@@ -66,11 +76,13 @@ export const useProfile = () => {
 
 	// ✅ держим актуальный profile в ref, чтобы колбэки не зависели от profile в deps
 	const profileRef = useRef(profile)
+
 	useEffect(() => {
 		profileRef.current = profile
 	}, [profile])
 
 	const openUsernameModal = useCallback(() => setIsUsernameModalOpen(true), [])
+
 	const closeUsernameModal = useCallback(
 		() => setIsUsernameModalOpen(false),
 		[],
@@ -84,6 +96,7 @@ export const useProfile = () => {
 	const loadSavedAssets = useCallback((userId?: string) => {
 		try {
 			const currentProfile = profileRef.current
+
 			const uid =
 				userId ||
 				(currentProfile.status === 'ok' ? currentProfile.data?.id : undefined)
@@ -100,6 +113,7 @@ export const useProfile = () => {
 				setAssets(prev => ({ ...prev, avatar: migratedAvatar }))
 				localStorage.setItem(avatarKey(uid), migratedAvatar)
 			}
+
 			if (migratedFrame) {
 				setAssets(prev => ({ ...prev, frame: migratedFrame }))
 				localStorage.setItem(frameKey(uid), migratedFrame)
@@ -115,13 +129,10 @@ export const useProfile = () => {
 
 		await Promise.allSettled(
 			Object.entries(toCheck).map(async ([key, p]) => {
-				try {
-					const url = asset(p)
-					const resp = await fetch(url, { method: 'HEAD', cache: 'no-store' })
-					statusUpdates[key as keyof ProfileIconsStatus] = resp.ok
-				} catch {
-					statusUpdates[key as keyof ProfileIconsStatus] = false
-				}
+				const url = asset(p)
+				const ok = await checkImage(url)
+
+				statusUpdates[key as keyof ProfileIconsStatus] = ok
 			}),
 		)
 
@@ -141,8 +152,10 @@ export const useProfile = () => {
 						message:
 							'Вы не авторизованы. Войдите в аккаунт, чтобы открыть профиль.',
 					})
+
 					return null
 				}
+
 				throw e
 			})
 
@@ -185,6 +198,7 @@ export const useProfile = () => {
 
 			if (!userId || !email) {
 				console.error('[profile] /auth/me raw=', raw)
+
 				throw new Error('Некорректный формат ответа /auth/me')
 			}
 
@@ -209,7 +223,10 @@ export const useProfile = () => {
 				localStorage.setItem(avatarKey(userId), avatarAbs)
 			} else {
 				const cached = localStorage.getItem(avatarKey(userId))
-				if (cached) setAssets(prev => ({ ...prev, avatar: cached }))
+
+				if (cached) {
+					setAssets(prev => ({ ...prev, avatar: cached }))
+				}
 			}
 
 			if (frameAbs) {
@@ -217,7 +234,10 @@ export const useProfile = () => {
 				localStorage.setItem(frameKey(userId), frameAbs)
 			} else {
 				const cached = localStorage.getItem(frameKey(userId))
-				if (cached) setAssets(prev => ({ ...prev, frame: cached }))
+
+				if (cached) {
+					setAssets(prev => ({ ...prev, frame: cached }))
+				}
 			}
 
 			// подтягиваем кэш “на всякий”
@@ -234,6 +254,7 @@ export const useProfile = () => {
 							? error.userMessage
 							: 'Не удалось загрузить профиль',
 				})
+
 				return
 			}
 
@@ -271,10 +292,14 @@ export const useProfile = () => {
 					migrateToAbsoluteUrl(newFrame) ??
 					newFrame
 
-				setAssets({ avatar: avatarAbs, frame: frameAbs })
+				setAssets({
+					avatar: avatarAbs,
+					frame: frameAbs,
+				})
 
 				setProfile(prev => {
 					if (prev.status !== 'ok' || !prev.data) return prev
+
 					return {
 						...prev,
 						data: {
@@ -293,8 +318,10 @@ export const useProfile = () => {
 						status: 'unauth',
 						message: 'Сессия истекла. Войдите заново.',
 					})
+
 					throw new Error('Unauthorized')
 				}
+
 				throw e
 			}
 		},
@@ -308,16 +335,20 @@ export const useProfile = () => {
 			}
 
 			const value = newUsername.trim()
+
 			if (!value) throw new Error('Введите никнейм')
 
 			try {
-				const data = await api.updateProfile({ username: value })
+				const data = await api.updateProfile({
+					username: value,
+				})
 
 				const usernameFromServer =
 					(typeof data?.username === 'string' && data.username) || value
 
 				setProfile(prev => {
 					if (prev.status !== 'ok' || !prev.data) return prev
+
 					return {
 						...prev,
 						data: {
@@ -332,8 +363,10 @@ export const useProfile = () => {
 						status: 'unauth',
 						message: 'Сессия истекла. Войдите заново.',
 					})
+
 					throw new Error('Unauthorized')
 				}
+
 				throw e
 			}
 		},
@@ -343,8 +376,13 @@ export const useProfile = () => {
 	const handleIconError = useCallback((iconName: string) => {
 		setIconsStatus(prev => {
 			if (!(iconName in prev)) return prev
+
 			const key = iconName as keyof ProfileIconsStatus
-			return { ...prev, [key]: false }
+
+			return {
+				...prev,
+				[key]: false,
+			}
 		})
 	}, [])
 

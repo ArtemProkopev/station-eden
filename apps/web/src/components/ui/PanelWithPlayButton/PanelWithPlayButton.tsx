@@ -1,7 +1,7 @@
 'use client'
 
-import Image from 'next/image'
 import { memo, useCallback, useState } from 'react'
+
 import styles from './PanelWithPlayButton.module.css'
 
 interface PanelWithPlayButtonProps {
@@ -23,19 +23,21 @@ function PanelWithPlayButton({
 	}, [onPlayClick])
 
 	const handleMouseEnter = useCallback(() => setIsHovered(true), [])
+
 	const handleMouseLeave = useCallback(() => setIsHovered(false), [])
 
 	return (
 		<div className={`${styles.mainButtonContainer} ${className}`}>
-			<Image
+			<img
 				src={PANEL_IMAGE_URL}
-				alt='Panel Background'
+				alt=''
+				aria-hidden='true'
 				className={styles.panelBackground}
 				width={600}
 				height={400}
-				quality={85}
-				priority={true}
-				unoptimized={true}
+				loading='eager'
+				decoding='async'
+				fetchPriority='high'
 			/>
 
 			<button
@@ -43,10 +45,11 @@ function PanelWithPlayButton({
 				onClick={handlePlayClick}
 				onMouseEnter={handleMouseEnter}
 				onMouseLeave={handleMouseLeave}
-				aria-label='Play Station Eden'
+				type='button'
+				aria-label='Начать игру'
 			>
+				<span className={styles.topEdge} data-hovered={isHovered} />
 				<span className={styles.playText}>Играть</span>
-				<div className={styles.topEdge} data-hovered={isHovered}></div>
 			</button>
 		</div>
 	)
