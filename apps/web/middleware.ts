@@ -1,4 +1,5 @@
 // apps/web/middleware.ts
+
 import { NextResponse, type NextRequest } from 'next/server'
 
 export const config = {
@@ -11,28 +12,33 @@ function buildCsp() {
 	const api = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
 	const ws = process.env.NEXT_PUBLIC_WS_BASE || ''
 
-	// CSP без strict-dynamic и без nonce — зато не ломает Next.
-	// В dev иногда нужен unsafe-eval (React/Next дев-режим).
+	const cdn =
+		process.env.NEXT_PUBLIC_ASSETS_BASE || 'https://cdn.assets.stationeden.ru'
+
+	const fallback =
+		process.env.NEXT_PUBLIC_ASSETS_FALLBACK ||
+		'https://station-eden-media.s3.ru-1.storage.selcloud.ru'
+
 	const isDev = process.env.NODE_ENV !== 'production'
 	const scriptExtra = isDev ? " 'unsafe-eval'" : ''
 
 	return `
-		default-src 'self';
-		script-src 'self' 'unsafe-inline'${scriptExtra};
-		style-src 'self' 'unsafe-inline';
-		img-src 'self' blob: data: https://cdn.assets.stationeden.ru https://stationeden.ru;
-		font-src 'self' data:;
-		object-src 'none';
-		base-uri 'self';
-		form-action 'self';
-		frame-ancestors 'none';
-		connect-src
-			'self'
-			${api}
-			${ws}
-			https://*.livekit.cloud
-			wss://*.livekit.cloud;
-	`
+    default-src 'self';
+    script-src 'self' 'unsafe-inline'${scriptExtra};
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' blob: data: ${cdn} ${fallback} https://stationeden.ru;
+    font-src 'self' data: ${cdn} ${fallback};
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    connect-src
+      'self'
+      ${api}
+      ${ws}
+      https://*.livekit.cloud
+      wss://*.livekit.cloud;
+  `
 		.replace(/\s{2,}/g, ' ')
 		.trim()
 }
@@ -40,7 +46,7 @@ function buildCsp() {
 export async function middleware(req: NextRequest) {
 	const cspHeader = buildCsp()
 
-	// --- Проверка авторизации (только /profile) ---
+	// --- Проверка авторизации только для /profile ---
 	if (req.nextUrl.pathname.startsWith('/profile')) {
 		const apiBase = process.env.NEXT_PUBLIC_API_BASE
 		const cookie = req.headers.get('cookie') || ''
@@ -55,14 +61,19 @@ export async function middleware(req: NextRequest) {
 					cache: 'no-store',
 					signal: ac.signal,
 				})
+
 				clearTimeout(to)
 
-				if (!res.ok) throw new Error('Not auth')
+				if (!res.ok) {
+					throw new Error('Not auth')
+				}
 			} catch {
 				clearTimeout(to)
+
 				const url = req.nextUrl.clone()
 				url.pathname = '/login'
 				url.searchParams.set('next', req.nextUrl.pathname)
+
 				return NextResponse.redirect(url)
 			}
 		}
@@ -70,5 +81,6 @@ export async function middleware(req: NextRequest) {
 
 	const response = NextResponse.next()
 	response.headers.set('Content-Security-Policy', cspHeader)
+
 	return response
 }

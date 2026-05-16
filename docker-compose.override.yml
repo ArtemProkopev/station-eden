@@ -16,6 +16,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    networks:
+      - webnet
 
   api:
     build:
@@ -55,16 +57,20 @@ services:
       args:
         NEXT_PUBLIC_API_BASE: /api
         NEXT_PUBLIC_WS_BASE: https://localhost
-        NEXT_PUBLIC_ENABLE_GOOGLE: ${NEXT_PUBLIC_ENABLE_GOOGLE}
-        NEXT_PUBLIC_ENABLE_YANDEX: ${NEXT_PUBLIC_ENABLE_YANDEX}
-        NEXT_PUBLIC_ASSETS_BASE: ${NEXT_PUBLIC_ASSETS_BASE}
+        NEXT_PUBLIC_ENABLE_GOOGLE: ${NEXT_PUBLIC_ENABLE_GOOGLE:-true}
+        NEXT_PUBLIC_ENABLE_YANDEX: ${NEXT_PUBLIC_ENABLE_YANDEX:-true}
+        NEXT_PUBLIC_ASSETS_BASE: https://cdn.assets.stationeden.ru
+        NEXT_PUBLIC_ASSETS_FALLBACK: https://station-eden-media.s3.ru-1.storage.selcloud.ru
+        NEXT_PUBLIC_CDN_IMAGE_QUALITY: "80"
     image: station-eden-web:local
     environment:
       NEXT_PUBLIC_API_BASE: /api
       NEXT_PUBLIC_WS_BASE: https://localhost
-      NEXT_PUBLIC_ENABLE_GOOGLE: ${NEXT_PUBLIC_ENABLE_GOOGLE}
-      NEXT_PUBLIC_ENABLE_YANDEX: ${NEXT_PUBLIC_ENABLE_YANDEX}
-      NEXT_PUBLIC_ASSETS_BASE: ${NEXT_PUBLIC_ASSETS_BASE}
+      NEXT_PUBLIC_ENABLE_GOOGLE: ${NEXT_PUBLIC_ENABLE_GOOGLE:-true}
+      NEXT_PUBLIC_ENABLE_YANDEX: ${NEXT_PUBLIC_ENABLE_YANDEX:-true}
+      NEXT_PUBLIC_ASSETS_BASE: https://cdn.assets.stationeden.ru
+      NEXT_PUBLIC_ASSETS_FALLBACK: https://station-eden-media.s3.ru-1.storage.selcloud.ru
+      NEXT_PUBLIC_CDN_IMAGE_QUALITY: "80"
 
   caddy:
     environment:

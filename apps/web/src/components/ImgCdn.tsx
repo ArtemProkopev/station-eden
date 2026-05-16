@@ -1,51 +1,66 @@
 // apps/web/src/components/ImgCdn.tsx
+
 'use client'
 
 /* eslint-disable @next/next/no-img-element */
 
 import type { ImgHTMLAttributes } from 'react'
-import { useEffect, useState } from 'react'
-import { asset, FALLBACK } from '../lib/asset'
-import { useCdnHealth } from '../lib/useCdnHealth'
+import { useEffect, useMemo, useState } from 'react'
+import { asset, FALLBACK, rawAsset } from '../lib/asset'
 
 type Props = Omit<
 	ImgHTMLAttributes<HTMLImageElement>,
 	'src' | 'loading' | 'decoding'
 > & {
 	src: string
+
 	/**
-	 * Для ключевых картинок (лого, аватар в HUD, фоновая на первом экране)
-	 * ставим priority={true}, остальное будет lazy.
+	 * Для ключевых картинок: лого, аватар в HUD, фон первого экрана.
+	 * priority={true} грузит картинку eager, остальные lazy.
 	 */
 	priority?: boolean
 }
 
-export default function ImgCdn({ src, priority, style, alt, ...rest }: Props) {
-	const { isPrimaryHealthy } = useCdnHealth()
+export default function ImgCdn({
+	src,
+	priority,
+	style,
+	alt,
+	onError,
+	...rest
+}: Props) {
 	const isRel = !/^https?:\/\//i.test(src)
 
-	// Собираем primary и fallback варианты
-	const primary = isRel ? asset(src) : src
-	const fallback = isRel
-		? asset(src).replace(/(https?:\/\/[^/]+)/, FALLBACK)
-		: src.replace(/(https?:\/\/[^/]+)/, FALLBACK)
+	const primary = useMemo(() => {
+		return isRel ? asset(src) : src
+	}, [isRel, src])
 
-	// Если primary CDN недоступен, сразу используем fallback
-	const [cur, setCur] = useState(isPrimaryHealthy ? primary : fallback)
+	const fallback = useMemo(() => {
+		if (isRel) {
+			return rawAsset(src, FALLBACK)
+		}
 
-	// Синхронизация с пропсом src и состоянием CDN
+		return src.replace(/(https?:\/\/[^/]+)/, FALLBACK)
+	}, [isRel, src])
+
+	const [cur, setCur] = useState(primary)
+
 	useEffect(() => {
-		setCur(isPrimaryHealthy ? primary : fallback)
-	}, [primary, fallback, isPrimaryHealthy])
+		setCur(primary)
+	}, [primary])
 
 	return (
 		<img
 			src={cur}
-			alt={typeof alt === 'string' ? alt : ''} // ✅ обязательный alt для jsx-a11y
+			alt={alt || ''}
 			loading={priority ? 'eager' : 'lazy'}
-			decoding='async'
-			onError={() => {
-				if (cur !== fallback) setCur(fallback)
+			decoding={priority ? 'sync' : 'async'}
+			onError={event => {
+				if (cur !== fallback) {
+					setCur(fallback)
+				}
+
+				onError?.(event)
 			}}
 			style={{
 				maxWidth: '100%',

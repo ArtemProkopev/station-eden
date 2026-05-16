@@ -37,13 +37,14 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://localhost:4000/auth/csrf",
+          "http://127.0.0.1:4000/api/time",
         ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    networks: [webnet]
+    networks:
+      - webnet
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
@@ -56,6 +57,8 @@ services:
       NEXT_PUBLIC_ENABLE_GOOGLE: "true"
       NEXT_PUBLIC_ENABLE_YANDEX: "true"
       NEXT_PUBLIC_ASSETS_BASE: "https://cdn.assets.stationeden.ru"
+      NEXT_PUBLIC_ASSETS_FALLBACK: "https://station-eden-media.s3.ru-1.storage.selcloud.ru"
+      NEXT_PUBLIC_CDN_IMAGE_QUALITY: "80"
     depends_on:
       api:
         condition: service_healthy
@@ -67,13 +70,14 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://localhost:3000",
+          "http://127.0.0.1:3000",
         ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
-    networks: [webnet]
+    networks:
+      - webnet
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
@@ -94,15 +98,16 @@ services:
         condition: service_healthy
       api:
         condition: service_healthy
-    networks: [webnet]
+    networks:
+      - webnet
 
   watchtower:
     image: ghcr.io/containrrr/watchtower:latest
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    # обновляем только контейнеры с label enable=true
     command: --interval 30 --cleanup --label-enable
+    profiles: ["prod"]
 
 networks:
   webnet:
