@@ -1,157 +1,305 @@
 # Station Eden
 
-Модульная платформа, состоящая из серверного приложения (NestJS API), клиентского веб-интерфейса (Next.js) и дополнительных пакетов, включая генератор имён на Rust/WASM.
+Браузерная многопользовательская игра с авторизацией, лобби, игровой логикой и real-time взаимодействием через WebSocket.
 
----
+## Стек
 
-## Requirements
+| Часть          | Технологии                                  |
+| -------------- | ------------------------------------------- |
+| Backend        | NestJS, TypeORM, PostgreSQL, Socket.IO, JWT |
+| Frontend       | Next.js, React, Socket.IO Client            |
+| Shared         | TypeScript, Zod                             |
+| Infrastructure | Docker Compose, Caddy, GitHub Actions       |
 
-Для корректной работы требуется:
+## Структура проекта
 
-1. **Node.js ≥ 18**
-2. **pnpm ≥ 9**
-3. **Rust & Cargo** (для сборки WASM)
-4. **wasm-bindgen-cli**
-
-   ```bash
-   cargo install wasm-bindgen-cli
-   ```
-5. **Docker Compose** (для контейнерного запуска)
-6. Настроенные `.env` файлы
-
----
-
-## Branches
-
-Непосредственный запуск любых веток поддерживается, однако рекомендуется работать только со стабильными и staging-ветками.
-
-| branch type      | branch name | description                          |
-| ---------------- | ----------- | ------------------------------------ |
-| stable           | `main`      | Основная стабильная ветка проекта.   |
-| development      | `dev`   | Основная ветка активной разработки.  |
-| feature branches | `feature/*` | Ветки разработки отдельных функций.  |
-| staging          | `release/*` | Используются перед выпуском релизов. |
-
----
-
-## Workspace structure
-
-Проект состоит из нескольких пакетов, организованных через pnpm workspaces:
-
-| package            | path                          | description                                                 |
-| ------------------ | ----------------------------- | ----------------------------------------------------------- |
-| API                | `apps/api`                    | Backend (NestJS), авторизация, лобби, база данных           |
-| Web                | `apps/web`                    | Next.js приложение, интерфейсы, компоненты, WASM интеграция |
-| Shared             | `packages/shared`             | Общие типы, утилиты                                         |
-| Username Generator | `packages/username-generator` | Rust/WASM генератор случайных имён                          |
-
----
-
-## Environment Setup
-
-Перед запуском необходимо создать файлы окружения:
-
+```text
+station-eden/
+├── apps/
+│   ├── api/              # серверная часть
+│   └── web/              # клиентская часть
+├── packages/
+│   └── shared/           # общие типы и схемы
+├── scripts/              # служебные скрипты
+├── docker-compose.yml
+├── docker-compose.override.yml
+├── Caddyfile
+├── package.json
+└── pnpm-workspace.yaml
 ```
-.env
+
+## Требования
+
+| Инструмент     | Версия            |
+| -------------- | ----------------- |
+| Node.js        | 20 LTS            |
+| pnpm           | 10.30.1           |
+| Docker Compose | актуальная версия |
+| Git            | актуальная версия |
+
+PostgreSQL отдельно устанавливать не нужно: для локального запуска база поднимается через Docker Compose.
+
+Включить нужную версию pnpm:
+
+```bash
+corepack enable
+corepack prepare pnpm@10.30.1 --activate
+```
+
+Проверить версии:
+
+```bash
+node -v
+pnpm -v
+docker compose version
+git --version
+```
+
+## Файлы окружения
+
+Для запуска проекта нужны локальные файлы окружения:
+
+```text
 apps/api/.env.local
 apps/web/.env.local
 ```
 
-## Installation
+Файлы окружения не хранятся в репозитории. Чтобы проект работал, их нужно скопировать из рабочей копии проекта или получить у разработчика.
 
-Установка зависимостей выполняется в корне:
+Для полного Docker-запуска дополнительно используется файл:
 
-```bash
-pnpm i
+```text
+.env
 ```
 
-pnpm автоматически установит зависимости всех workspace-пакетов.
+## Быстрый запуск
 
----
+```bash
+git clone https://github.com/ArtemProkopev/station-eden.git
+cd station-eden
 
-## Database Migrations
+corepack enable
+corepack prepare pnpm@10.30.1 --activate
 
-Для применения миграций используйте:
+pnpm install
+docker compose up -d postgres
+pnpm migrate:run
+pnpm dev
+```
+
+Перед запуском `pnpm dev` должны быть добавлены файлы окружения:
+
+```text
+apps/api/.env.local
+apps/web/.env.local
+```
+
+После запуска:
+
+| Сервис | Адрес                   |
+| ------ | ----------------------- |
+| Web    | `http://localhost:3000` |
+| API    | `http://localhost:4000` |
+
+## База данных
+
+Запустить PostgreSQL:
+
+```bash
+docker compose up -d postgres
+```
+
+Проверить контейнеры:
+
+```bash
+docker compose ps
+```
+
+Остановить PostgreSQL:
+
+```bash
+docker compose stop postgres
+```
+
+Остановить контейнеры и удалить данные базы:
+
+```bash
+docker compose down -v
+```
+
+## Миграции
+
+Применить миграции:
 
 ```bash
 pnpm migrate:run
 ```
 
-Откат миграций:
+Откатить последнюю миграцию:
 
 ```bash
 pnpm migrate:revert
 ```
 
----
+## Разработка
 
-## Building
+Запуск API и Web вместе:
 
-### Полная сборка проекта
+```bash
+pnpm dev
+```
+
+Запуск только API:
+
+```bash
+pnpm dev:api
+```
+
+Запуск только Web:
+
+```bash
+pnpm dev:web
+```
+
+Запуск без кэша Next.js:
+
+```bash
+pnpm dev:nocache
+```
+
+## Сборка
+
+Собрать проект:
 
 ```bash
 pnpm build
 ```
 
-### Сборка WASM модуля
+## Проверки
+
+E2E-тесты API:
 
 ```bash
-pnpm build:wasm
+pnpm --filter @station-eden/api test:e2e
 ```
 
-Собранные артефакты попадут в:
-
-```
-apps/web/public/wasm
-```
-
----
-
-## Development
-
-Для разработки доступны следующие команды:
-
-| command            | description                          |
-| ------------------ | ------------------------------------ |
-| `pnpm dev`         | Запуск API + Web в общем dev-режиме  |
-| `pnpm dev:nocache` | То же, но с отключением кэша Next.js |
-| `pnpm dev:web`     | Запуск только веб-клиента            |
-| `pnpm dev:api`     | Запуск только API                    |
-
-### Примечание
-
-Команда `dev:api` использует локальный `.env.local`:
+Проверка проекта:
 
 ```bash
-dotenv -e apps/api/.env.local -- pnpm --filter @station-eden/api start:dev
+pnpm check
 ```
 
----
-
-## Cleaning
-
-| command                | description                          |
-| ---------------------- | ------------------------------------ |
-| `pnpm clean:artifacts` | Удаление артефактов сборки           |
-| `pnpm clean`           | Полная очистка, включая node_modules |
-
----
-
-## Running with Docker
-
-Для контейнерного запуска:
+Полная CI-проверка:
 
 ```bash
-docker compose up -d
+pnpm ci
 ```
 
----
+## Docker
 
-## Contributing
+Для локальной разработки обычно достаточно поднять только PostgreSQL:
 
-Pull-requests приветствуются. Перед отправкой убедитесь, что:
+```bash
+docker compose up -d postgres
+pnpm dev
+```
 
-* код проходит линтинг,
-* миграции корректно применяются,
-* сборка WASM проходит успешно,
-* API и Web успешно запускаются в dev-режиме.
+Полный запуск через Docker:
+
+```bash
+docker compose up --build
+```
+
+Запуск в фоне:
+
+```bash
+docker compose up --build -d
+```
+
+Просмотр логов:
+
+```bash
+docker compose logs -f
+```
+
+Остановка контейнеров:
+
+```bash
+docker compose down
+```
+
+Остановка с удалением данных PostgreSQL:
+
+```bash
+docker compose down -v
+```
+
+## Команды
+
+| Команда                                    | Назначение                        |
+| ------------------------------------------ | --------------------------------- |
+| `pnpm install`                             | установка зависимостей            |
+| `pnpm dev`                                 | запуск API и Web                  |
+| `pnpm dev:api`                             | запуск только API                 |
+| `pnpm dev:web`                             | запуск только Web                 |
+| `pnpm dev:nocache`                         | запуск без кэша Next.js           |
+| `pnpm build`                               | сборка проекта                    |
+| `pnpm migrate:run`                         | применение миграций               |
+| `pnpm migrate:revert`                      | откат последней миграции          |
+| `pnpm --filter @station-eden/api test:e2e` | E2E-тесты API                     |
+| `pnpm check`                               | проверка проекта                  |
+| `pnpm ci`                                  | полная CI-проверка                |
+| `pnpm clean`                               | очистка зависимостей и артефактов |
+
+## Частые проблемы
+
+### Web не подключается к API
+
+Проверьте, что API запущен:
+
+```bash
+curl http://localhost:4000/api/time
+```
+
+Также проверьте файл окружения клиента:
+
+```text
+apps/web/.env.local
+```
+
+### API не подключается к базе
+
+Проверьте PostgreSQL:
+
+```bash
+docker compose ps postgres
+```
+
+Если база не запущена:
+
+```bash
+docker compose up -d postgres
+```
+
+### Миграции не применяются
+
+Запустите миграции вручную:
+
+```bash
+pnpm migrate:run
+```
+
+Если локальная база повреждена, пересоздайте её:
+
+```bash
+docker compose down -v
+docker compose up -d postgres
+pnpm migrate:run
+```
+
+### Зависимости работают некорректно
+
+```bash
+pnpm clean
+pnpm install
+```
