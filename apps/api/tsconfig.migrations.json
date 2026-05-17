@@ -3,7 +3,8 @@
 	"compilerOptions": {
 		"outDir": "./dist/migrations",
 		"rootDir": "./migrations",
-		"module": "commonjs",
+		"module": "Node16",
+		"moduleResolution": "node16",
 		"target": "ES2020",
 		"sourceMap": false,
 		"declaration": false,

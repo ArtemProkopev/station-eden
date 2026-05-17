@@ -1,15 +1,15 @@
 {
 	"extends": "../../tsconfig.json",
 	"compilerOptions": {
-		"module": "commonjs",
-		"moduleResolution": "node",
+		"module": "Node16",
+		"moduleResolution": "node16",
 		"target": "es2020",
-		"rootDir": "src",
+		"rootDir": ".",
 		"outDir": "dist",
 		"experimentalDecorators": true,
 		"emitDecoratorMetadata": true,
-		"baseUrl": "./",
-		"types": ["node", "cookie-parser"]
+		"types": ["node", "cookie-parser", "jest"],
+		"ignoreDeprecations": "5.0"
 	},
-	"include": ["src/**/*.ts"]
+	"include": ["src/**/*.ts", "test/**/*.ts"]
 }
