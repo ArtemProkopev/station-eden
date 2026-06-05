@@ -91,7 +91,7 @@ type BodyType = {
   effects: string[]
 }
 
-// Игрок в игре - ИСПРАВЛЕННАЯ ВЕРСИЯ
+// Игрок в игре
 type GamePlayer = {
   id: string
   name: string
@@ -101,7 +101,7 @@ type GamePlayer = {
   score: number
   order: number
   isActive: boolean
-  isAlive: boolean // ВАЖНО: всегда должно быть инициализировано
+  isAlive: boolean
   
   // Карты игрока
   profession?: Profession
@@ -121,7 +121,7 @@ type GamePlayer = {
   isCaptain?: boolean
   isSeniorOfficer?: boolean
   hasUsedAbility?: boolean
-  revealedCards: string[] // ID раскрытых карт
+  revealedCards: string[]
   vote?: string
   votesAgainst: number
 }
@@ -473,24 +473,20 @@ export class GameGateway
 
       this.logger.log(`Игрок подключился к игре: ${username} (${userId}) в игру ${gameId}`)
 
-      // Отладка: проверяем состояние игрока
       const player = game.players.get(userId)
       if (player) {
         this.logger.debug(`Игрок ${player.name} isAlive: ${player.isAlive}, статус: ${game.status}`)
         
-        // Если игра еще не началась, гарантируем что игрок жив
         if (game.status === 'waiting' && player.isAlive === undefined) {
           player.isAlive = true
           this.logger.debug(`Исправлен undefined isAlive для игрока ${player.name}`)
         }
       }
 
-      // Отправляем текущее состояние игры
       socket.emit('GAME_STATE', {
         gameState: this.serializeGameState(game),
       })
 
-      // Если игра еще не началась, отправляем карты
       if (game.status === 'waiting') {
         const player = game.players.get(userId)
         if (player) {
@@ -516,7 +512,6 @@ export class GameGateway
 
     this.logger.log(`Игрок отключился от игры: ${userId} из игры ${gameId}`)
 
-    // Если все отключились, очищаем игру через некоторое время
     if (game.connections.size === 0) {
       setTimeout(() => {
         const currentGame = this.games.get(gameId)
@@ -602,6 +597,50 @@ export class GameGateway
     } catch (error) {
       this.logger.error('Ошибка запуска игровой сессии:', error)
       socket.emit('ERROR', { message: 'Не удалось начать игровую сессию' })
+    }
+  }
+
+  @SubscribeMessage('REQUEST_ROUND_CARDS')
+  handleRequestRoundCards(socket: Socket) {
+    const { userId, gameId } = socket.data
+    const game = this.games.get(gameId)
+    
+    if (!game || game.status !== 'active') {
+      socket.emit('ERROR', { message: 'Игра не активна' })
+      return
+    }
+    
+    const player = game.players.get(userId)
+    if (!player) return
+    
+    this.sendRoundCards(game, player)
+  }
+
+  @SubscribeMessage('SKIP_NARRATION')
+  handleSkipNarration(socket: Socket) {
+    const { gameId } = socket.data
+    const game = this.games.get(gameId)
+    
+    if (game && game.phase === 'introduction') {
+      if (game.timerInterval) {
+        clearInterval(game.timerInterval)
+        game.timerInterval = undefined
+      }
+      this.startPreparationPhase(game)
+    }
+  }
+
+  @SubscribeMessage('START_DISCUSSION')
+  handleStartDiscussion(socket: Socket) {
+    const { gameId } = socket.data
+    const game = this.games.get(gameId)
+    
+    if (game && game.phase === 'preparation') {
+      if (game.timerInterval) {
+        clearInterval(game.timerInterval)
+        game.timerInterval = undefined
+      }
+      this.startDiscussionPhase(game)
     }
   }
 
@@ -832,7 +871,6 @@ export class GameGateway
   private async startGameSession(game: GameState) {
     this.logger.log(`Запуск игровой сессии для ${game.id}`)
     
-    // Убеждаемся, что все игроки живы перед началом
     Array.from(game.players.values()).forEach(player => {
       player.isAlive = true
       player.score = 0
@@ -1141,6 +1179,11 @@ export class GameGateway
     
     setTimeout(() => {
       if (game.round <= (game.maxRounds || 10)) {
+        Array.from(game.players.values()).forEach(player => {
+          if (player.isAlive === true) {
+            this.sendRoundCards(game, player)
+          }
+        })
         this.startDiscussionPhase(game)
       } else {
         const survivors = Array.from(game.players.values()).filter(p => p.isAlive === true)
@@ -1210,7 +1253,7 @@ export class GameGateway
     
     const playerArray = Array.from(game.players.values())
     
-    this.logger.log(`Раздача карт ${playerArray.length} игрокам`)
+    this.logger.log(`Раздача базовых карт ${playerArray.length} игрокам`)
     
     playerArray.forEach((player, index) => {
       player.isAlive = true
@@ -1222,32 +1265,24 @@ export class GameGateway
       player.isSuspicious = false
       player.vote = undefined
       
-      this.logger.debug(`Инициализация игрока ${player.name}: isAlive=${player.isAlive}`)
-      
       if (game.deck.professions.length > 0) {
         const professionIndex = Math.floor(Math.random() * game.deck.professions.length)
         player.profession = game.deck.professions[professionIndex]
       }
       
-      if (game.deck.healthStatuses.length > 0) {
-        const healthIndex = Math.floor(Math.random() * game.deck.healthStatuses.length)
-        player.healthStatus = game.deck.healthStatuses[healthIndex]
-      }
-      
-      if (game.deck.psychologicalTraits.length > 0) {
-        const traitIndex = Math.floor(Math.random() * game.deck.psychologicalTraits.length)
-        player.psychologicalTrait = game.deck.psychologicalTraits[traitIndex]
-      }
-      
-      if (game.deck.secrets.length > 0 && Math.random() < 0.3) {
-        const secretIndex = Math.floor(Math.random() * game.deck.secrets.length)
-        player.secret = game.deck.secrets[secretIndex]
-      }
+      player.healthStatus = undefined
+      player.psychologicalTrait = undefined
+      player.secret = undefined
+      player.gender = undefined
+      player.age = undefined
+      player.bodyType = undefined
       
       if (index < game.settings.hiddenRolesCount && game.deck.hiddenRoles.length > 0) {
         const roleIndex = Math.floor(Math.random() * game.deck.hiddenRoles.length)
         player.hiddenRole = game.deck.hiddenRoles[roleIndex]
         game.deck.hiddenRoles.splice(roleIndex, 1)
+      } else {
+        player.hiddenRole = undefined
       }
       
       if (index === 0) {
@@ -1273,56 +1308,229 @@ export class GameGateway
         player.isSeniorOfficer = false
       }
       
-      if (GENDERS.length > 0) {
-        const genderIndex = Math.floor(Math.random() * GENDERS.length)
-        player.gender = GENDERS[genderIndex]
-      }
-      
-      if (AGES.length > 0) {
-        const ageIndex = Math.floor(Math.random() * AGES.length)
-        player.age = AGES[ageIndex]
-      }
-      
-      if (BODY_TYPES.length > 0) {
-        const bodyIndex = Math.floor(Math.random() * BODY_TYPES.length)
-        player.bodyType = BODY_TYPES[bodyIndex]
-      }
-      
-      if (player.bodyType?.id === 'body_huge') {
-        game.occupiedSlots += 2
-      } else if (player.age?.id === 'age_elder') {
-        game.occupiedSlots += 1
-      } else {
-        game.occupiedSlots += 1
-      }
-      
-      this.sendPlayerCards(game, player)
+      this.logger.debug(`Игрок ${player.name} получил профессию: ${player.profession?.name}`)
     })
     
-    this.logger.log(`Карты розданы ${playerArray.length} игрокам`)
+    this.logger.log(`Базовые карты розданы ${playerArray.length} игрокам`)
+  }
+
+  private sendRoundCards(game: GameState, player: GamePlayer) {
+    const socket = game.connections.get(player.id)
+    if (!socket) return
+    
+    const cardsToSend: any[] = []
+    
+    switch (game.round) {
+      case 1:
+        if (player.profession) {
+          cardsToSend.push({
+            id: player.profession.id,
+            name: player.profession.name,
+            description: player.profession.description,
+            type: 'profession',
+            pros: player.profession.pros,
+            cons: player.profession.cons
+          })
+        }
+        const secondaryCard = this.getRandomSecondaryCard(player, game)
+        if (secondaryCard) {
+          cardsToSend.push(secondaryCard)
+        }
+        break
+        
+      case 2:
+        const card1 = this.getRandomSecondaryCard(player, game)
+        const card2 = this.getRandomSecondaryCard(player, game)
+        if (card1) cardsToSend.push(card1)
+        if (card2 && card1?.type !== card2.type) cardsToSend.push(card2)
+        break
+        
+      default:
+        const remainingCards = this.getRemainingCards(player)
+        const toSend = remainingCards.slice(0, 2)
+        cardsToSend.push(...toSend)
+        break
+    }
+    
+    if (cardsToSend.length > 0) {
+      socket.emit('NEW_CARDS', {
+        cards: cardsToSend,
+        round: game.round
+      })
+      
+      this.logger.log(`Игрок ${player.name} получил ${cardsToSend.length} новых карт в раунде ${game.round}`)
+    }
+  }
+
+  private getRandomSecondaryCard(player: GamePlayer, game: GameState): any | null {
+    const availableCards = []
+    
+    if (!player.gender && GENDERS.length > 0) {
+      availableCards.push({
+        type: 'gender',
+        getCard: () => {
+          const card = GENDERS[Math.floor(Math.random() * GENDERS.length)]
+          player.gender = card
+          return {
+            id: card.id,
+            name: card.name,
+            description: card.bonuses?.join(', ') || '',
+            type: 'gender',
+            bonuses: card.bonuses
+          }
+        }
+      })
+    }
+    
+    if (!player.age && AGES.length > 0) {
+      availableCards.push({
+        type: 'age',
+        getCard: () => {
+          const card = AGES[Math.floor(Math.random() * AGES.length)]
+          player.age = card
+          return {
+            id: card.id,
+            name: card.name,
+            description: `${card.range}: ${card.effects?.join(', ')}`,
+            type: 'age',
+            range: card.range,
+            effects: card.effects
+          }
+        }
+      })
+    }
+    
+    if (!player.bodyType && BODY_TYPES.length > 0) {
+      availableCards.push({
+        type: 'body',
+        getCard: () => {
+          const card = BODY_TYPES[Math.floor(Math.random() * BODY_TYPES.length)]
+          player.bodyType = card
+          return {
+            id: card.id,
+            name: card.name,
+            description: card.effects?.join(', ') || '',
+            type: 'body',
+            effects: card.effects
+          }
+        }
+      })
+    }
+    
+    if (!player.healthStatus && HEALTH_STATUSES.length > 0 && Math.random() < 0.5) {
+      availableCards.push({
+        type: 'health',
+        getCard: () => {
+          const card = HEALTH_STATUSES[Math.floor(Math.random() * HEALTH_STATUSES.length)]
+          player.healthStatus = card
+          return {
+            id: card.id,
+            name: card.name,
+            description: card.description,
+            type: 'health',
+            effects: card.effects
+          }
+        }
+      })
+    }
+    
+    if (!player.psychologicalTrait && PSYCHOLOGICAL_TRAITS.length > 0 && Math.random() < 0.5) {
+      availableCards.push({
+        type: 'trait',
+        getCard: () => {
+          const card = PSYCHOLOGICAL_TRAITS[Math.floor(Math.random() * PSYCHOLOGICAL_TRAITS.length)]
+          player.psychologicalTrait = card
+          return {
+            id: card.id,
+            name: card.name,
+            description: card.description,
+            type: 'trait',
+            effects: card.effects,
+            triggers: card.triggers
+          }
+        }
+      })
+    }
+    
+    if (availableCards.length === 0) return null
+    
+    const selected = availableCards[Math.floor(Math.random() * availableCards.length)]
+    return selected.getCard()
+  }
+
+  private getRemainingCards(player: GamePlayer): any[] {
+    const remaining = []
+    
+    if (!player.gender && GENDERS.length > 0) {
+      remaining.push({
+        id: GENDERS[0].id,
+        name: GENDERS[0].name,
+        description: GENDERS[0].bonuses?.join(', ') || '',
+        type: 'gender'
+      })
+    }
+    
+    if (!player.age && AGES.length > 0) {
+      remaining.push({
+        id: AGES[0].id,
+        name: AGES[0].name,
+        description: AGES[0].effects?.join(', ') || '',
+        type: 'age'
+      })
+    }
+    
+    if (!player.bodyType && BODY_TYPES.length > 0) {
+      remaining.push({
+        id: BODY_TYPES[0].id,
+        name: BODY_TYPES[0].name,
+        description: BODY_TYPES[0].effects?.join(', ') || '',
+        type: 'body'
+      })
+    }
+    
+    if (!player.healthStatus && HEALTH_STATUSES.length > 0) {
+      remaining.push({
+        id: HEALTH_STATUSES[0].id,
+        name: HEALTH_STATUSES[0].name,
+        description: HEALTH_STATUSES[0].description,
+        type: 'health'
+      })
+    }
+    
+    if (!player.psychologicalTrait && PSYCHOLOGICAL_TRAITS.length > 0) {
+      remaining.push({
+        id: PSYCHOLOGICAL_TRAITS[0].id,
+        name: PSYCHOLOGICAL_TRAITS[0].name,
+        description: PSYCHOLOGICAL_TRAITS[0].description,
+        type: 'trait'
+      })
+    }
+    
+    return remaining
   }
 
   private sendPlayerCards(game: GameState, player: GamePlayer) {
     const socket = game.connections.get(player.id)
     if (socket) {
-      socket.emit('YOUR_CARDS', {
-        profession: player.profession,
-        healthStatus: player.healthStatus,
-        psychologicalTrait: player.psychologicalTrait,
-        secret: player.secret,
-        hiddenRole: player.hiddenRole,
-        resource: player.resource,
-        roleCard: player.roleCard,
-        gender: player.gender,
-        age: player.age,
-        bodyType: player.bodyType
-      })
+      const currentCards: any = {}
       
-      this.logger.debug(`Отправлены карты игроку ${player.name}, isAlive=${player.isAlive}`)
+      if (player.profession) currentCards.profession = player.profession
+      if (player.healthStatus) currentCards.healthStatus = player.healthStatus
+      if (player.psychologicalTrait) currentCards.psychologicalTrait = player.psychologicalTrait
+      if (player.secret) currentCards.secret = player.secret
+      if (player.hiddenRole) currentCards.hiddenRole = player.hiddenRole
+      if (player.resource) currentCards.resource = player.resource
+      if (player.roleCard) currentCards.roleCard = player.roleCard
+      if (player.gender) currentCards.gender = player.gender
+      if (player.age) currentCards.age = player.age
+      if (player.bodyType) currentCards.bodyType = player.bodyType
+      
+      socket.emit('YOUR_CARDS', currentCards)
+      
+      this.logger.debug(`Отправлены карты игроку ${player.name}: ${Object.keys(currentCards).join(', ')}`)
     }
   }
 
-  // ИСПРАВЛЕННЫЙ МЕТОД ЗАПУСКА ТАЙМЕРА
   private startPhaseTimer(game: GameState) {
     if (game.timerInterval) {
       clearInterval(game.timerInterval)
@@ -1508,7 +1716,6 @@ export class GameGateway
     }
   }
 
-  // ИСПРАВЛЕННЫЙ МЕТОД СЕРИАЛИЗАЦИИ
   private serializeGameState(game: GameState) {
     const players = Array.from(game.players.values()).map(p => ({
       id: p.id,
@@ -1557,7 +1764,6 @@ export class GameGateway
     }
   }
 
-  // ИСПРАВЛЕННЫЙ МЕТОД СОЗДАНИЯ ИГРЫ
   createGameFromLobby(lobbyId: string, gameId: string, players: any[], creatorId: string, settings: any) {
     const gamePlayers = new Map<string, GamePlayer>()
     

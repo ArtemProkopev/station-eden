@@ -88,6 +88,9 @@ export function useGameSession(gameId: string) {
 		useState<number>(0)
 	const [canSkipNarration, setCanSkipNarration] = useState<boolean>(false)
 	const [newCardsThisRound, setNewCardsThisRound] = useState<CardDetails[]>([])
+	
+	// Добавляем отслеживание текущего раунда для сброса
+	const currentRoundRef = useRef<number>(0)
 
 	// load profile once
 	const loadedProfileRef = useRef(false)
@@ -170,25 +173,20 @@ export function useGameSession(gameId: string) {
 		[myAllRevealedCards, userId],
 	)
 
-	// phase side-effects (chat hints)
-	useEffect(() => {
-		if (!gameState?.phase) return
+	// Сброс состояния для нового раунда
+	const resetForNewRound = useCallback(() => {
+		console.log('🔄 Сброс состояния для нового раунда')
+		setMyCards({})
+		setNewCardsThisRound([])
+		setCardsReceivedThisRound(0)
+		setMyRevealedCardsThisRound([])
+	}, [])
 
-		if (gameState.phase === 'preparation') {
-			if (cardsReceivedThisRound === 0) {
-				addToChat(
-					'Система',
-					'Подготовка к раунду - скоро будут выданы карты...',
-					true,
-				)
-			}
-		}
-	}, [gameState?.phase, cardsReceivedThisRound, addToChat])
-
-	// ---- websocket
+	// ---- websocket - объявляем sendRef ДО того, как используем его в эффектах
 	const sendRef = useRef<((msg: unknown) => void) | null>(null)
 	const isConnectedRef = useRef<boolean>(false)
 
+	// Теперь определяем handleWebSocketMessage с использованием sendRef и isConnectedRef
 	const handleWebSocketMessage = useCallback(
 		(data: unknown) => {
 			if (!data || typeof data !== 'object') return
@@ -250,6 +248,7 @@ export function useGameSession(gameId: string) {
 				}
 
 				case 'YOUR_CARDS': {
+					// Полная замена карт
 					const cards: Record<string, CardDetails> = {}
 					const newCards: CardDetails[] = []
 					let cardCount = 0
@@ -259,8 +258,13 @@ export function useGameSession(gameId: string) {
 						cardType: CardType,
 					) => {
 						if (!card) return
-						cards[cardType] = card
-						newCards.push(card)
+						// Создаём карту с type (не мутируем оригинал)
+						const cardWithType: CardDetails = { 
+							...card, 
+							type: cardType 
+						}
+						cards[cardType] = cardWithType
+						newCards.push(cardWithType)
 						cardCount++
 					}
 
@@ -275,21 +279,61 @@ export function useGameSession(gameId: string) {
 					addCard(msg.age as CardDetails | undefined, 'age')
 					addCard(msg.bodyType as CardDetails | undefined, 'body')
 
-					setMyCards(prev =>
-						Object.keys(prev).length === 0 ? cards : { ...prev, ...cards },
-					)
+					console.log('📦 YOUR_CARDS: полная замена карт', {
+						oldCount: Object.keys(myCards).length,
+						newCount: cardCount,
+						cardTypes: Object.keys(cards)
+					})
+
+					setMyCards(cards)
 					setNewCardsThisRound(newCards)
 					setCardsReceivedThisRound(cardCount)
 
 					if (newCards.length > 0 && gameState?.phase === 'preparation') {
 						addToChat(
 							'Система',
-							`Вам выдано ${cardCount} новых карт в этом раунде!`,
+							`Вам выдано ${cardCount} карт в этом раунде!`,
 							true,
 						)
 						const cardNames = newCards.map(c => c.name).join(', ')
 						addToChat('Система', `Карты: ${cardNames}`, true)
-						setMyRevealedCardsThisRound([])
+					}
+					break
+				}
+
+				case 'NEW_CARDS': {
+					const newCardsData = msg.cards as CardDetails[]
+					const roundNumber = safeNumber(msg.round, gameState?.round || 1)
+					
+					if (newCardsData && newCardsData.length > 0) {
+						console.log('✨ NEW_CARDS: получено новых карт', newCardsData.length)
+						
+						// Добавляем type к каждой карте (если его нет)
+						const cardsWithTypes: CardDetails[] = newCardsData.map(card => ({
+							...card,
+							type: card.type || 'unknown'
+						}))
+						
+						// Добавляем новые карты к существующим
+						setMyCards(prev => {
+							const updated = { ...prev }
+							cardsWithTypes.forEach(card => {
+								const cardType = (card.type || 'unknown') as CardType
+								updated[cardType] = card
+							})
+							return updated
+						})
+						
+						setNewCardsThisRound(cardsWithTypes)
+						setCardsReceivedThisRound(prev => prev + cardsWithTypes.length)
+						
+						addToChat(
+							'Система',
+							`Раунд ${roundNumber}: вы получили ${cardsWithTypes.length} новых карт!`,
+							true,
+						)
+						const cardNames = cardsWithTypes.map(c => c.name).join(', ')
+						addToChat('Система', `Новые карты: ${cardNames}`, true)
 					}
 					break
 				}
@@ -302,14 +346,11 @@ export function useGameSession(gameId: string) {
 
 					addToChat(
 						'Система',
-						`Начался раунд ${roundNumber}. Игрокам выдано по 2 новые карты!`,
+						`Начался раунд ${roundNumber}.`,
 						true,
 					)
 
-					setMyRevealedCardsThisRound([])
-					setCardsReceivedThisRound(0)
-					setNewCardsThisRound([])
-
+					resetForNewRound()
 					setGameState(prev => (prev ? { ...prev, round: roundNumber } : prev))
 					break
 				}
@@ -554,6 +595,8 @@ export function useGameSession(gameId: string) {
 			addToChat,
 			gameState,
 			getCardDisplayName,
+			myCards,
+			resetForNewRound,
 			startReveal,
 			startTimer,
 			stopTimer,
@@ -566,6 +609,7 @@ export function useGameSession(gameId: string) {
 		],
 	)
 
+	// Теперь подключаем WebSocket
 	const { sendMessage, isConnected } = useWebSocket(
 		wsUrl,
 		handleWebSocketMessage,
@@ -576,10 +620,34 @@ export function useGameSession(gameId: string) {
 		},
 	)
 
+	// Обновляем refs после получения isConnected
 	useEffect(() => {
 		sendRef.current = sendMessage as unknown as (msg: unknown) => void
 		isConnectedRef.current = Boolean(isConnected)
 	}, [sendMessage, isConnected])
+
+	// Отслеживание смены раунда
+	useEffect(() => {
+		if (gameState?.round && currentRoundRef.current !== gameState.round) {
+			const prevRound = currentRoundRef.current
+			const newRound = gameState.round
+			
+			if (prevRound !== 0 && newRound > prevRound) {
+				console.log(`🏆 Смена раунда: ${prevRound} -> ${newRound}`)
+				resetForNewRound()
+			}
+			
+			currentRoundRef.current = newRound
+		}
+	}, [gameState?.round, resetForNewRound])
+
+	// Отслеживание фазы preparation для запроса карт
+	useEffect(() => {
+		if (gameState?.phase === 'preparation' && isConnected && sendRef.current) {
+			console.log('📋 Фаза подготовки, запрос карт для раунда', gameState.round)
+			sendRef.current({ type: 'REQUEST_ROUND_CARDS' })
+		}
+	}, [gameState?.phase, gameState?.round, isConnected])
 
 	// join once per connection
 	const joinedRef = useRef(false)

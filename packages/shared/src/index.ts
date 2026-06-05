@@ -272,6 +272,7 @@ export interface CardDetails {
   id: string
   name: string
   description: string
+  type?: string
   pros?: string[]
   cons?: string[]
   effects?: string[]
