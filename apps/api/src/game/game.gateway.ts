@@ -1265,11 +1265,13 @@ export class GameGateway
       player.isSuspicious = false
       player.vote = undefined
       
+      // Только профессия в первом раунде
       if (game.deck.professions.length > 0) {
         const professionIndex = Math.floor(Math.random() * game.deck.professions.length)
         player.profession = game.deck.professions[professionIndex]
       }
       
+      // Остальные карты не выдаём в первом раунде
       player.healthStatus = undefined
       player.psychologicalTrait = undefined
       player.secret = undefined
@@ -1369,7 +1371,8 @@ export class GameGateway
       availableCards.push({
         type: 'gender',
         getCard: () => {
-          const card = GENDERS[Math.floor(Math.random() * GENDERS.length)]
+          const randomIndex = Math.floor(Math.random() * GENDERS.length)
+          const card = GENDERS[randomIndex]
           player.gender = card
           return {
             id: card.id,
@@ -1386,7 +1389,8 @@ export class GameGateway
       availableCards.push({
         type: 'age',
         getCard: () => {
-          const card = AGES[Math.floor(Math.random() * AGES.length)]
+          const randomIndex = Math.floor(Math.random() * AGES.length)
+          const card = AGES[randomIndex]
           player.age = card
           return {
             id: card.id,
@@ -1404,7 +1408,8 @@ export class GameGateway
       availableCards.push({
         type: 'body',
         getCard: () => {
-          const card = BODY_TYPES[Math.floor(Math.random() * BODY_TYPES.length)]
+          const randomIndex = Math.floor(Math.random() * BODY_TYPES.length)
+          const card = BODY_TYPES[randomIndex]
           player.bodyType = card
           return {
             id: card.id,
@@ -1421,7 +1426,8 @@ export class GameGateway
       availableCards.push({
         type: 'health',
         getCard: () => {
-          const card = HEALTH_STATUSES[Math.floor(Math.random() * HEALTH_STATUSES.length)]
+          const randomIndex = Math.floor(Math.random() * HEALTH_STATUSES.length)
+          const card = HEALTH_STATUSES[randomIndex]
           player.healthStatus = card
           return {
             id: card.id,
@@ -1438,7 +1444,8 @@ export class GameGateway
       availableCards.push({
         type: 'trait',
         getCard: () => {
-          const card = PSYCHOLOGICAL_TRAITS[Math.floor(Math.random() * PSYCHOLOGICAL_TRAITS.length)]
+          const randomIndex = Math.floor(Math.random() * PSYCHOLOGICAL_TRAITS.length)
+          const card = PSYCHOLOGICAL_TRAITS[randomIndex]
           player.psychologicalTrait = card
           return {
             id: card.id,
@@ -1463,46 +1470,51 @@ export class GameGateway
     
     if (!player.gender && GENDERS.length > 0) {
       remaining.push({
-        id: GENDERS[0].id,
-        name: GENDERS[0].name,
-        description: GENDERS[0].bonuses?.join(', ') || '',
-        type: 'gender'
+        id: 'gender_unknown',
+        name: 'Пол',
+        description: 'Ваш пол ещё не определён',
+        type: 'gender',
+        isPlaceholder: true
       })
     }
     
     if (!player.age && AGES.length > 0) {
       remaining.push({
-        id: AGES[0].id,
-        name: AGES[0].name,
-        description: AGES[0].effects?.join(', ') || '',
-        type: 'age'
+        id: 'age_unknown',
+        name: 'Возраст',
+        description: 'Ваш возраст ещё не определён',
+        type: 'age',
+        isPlaceholder: true
       })
     }
     
     if (!player.bodyType && BODY_TYPES.length > 0) {
       remaining.push({
-        id: BODY_TYPES[0].id,
-        name: BODY_TYPES[0].name,
-        description: BODY_TYPES[0].effects?.join(', ') || '',
-        type: 'body'
+        id: 'body_unknown',
+        name: 'Телосложение',
+        description: 'Ваше телосложение ещё не определено',
+        type: 'body',
+        isPlaceholder: true
       })
     }
     
     if (!player.healthStatus && HEALTH_STATUSES.length > 0) {
       remaining.push({
-        id: HEALTH_STATUSES[0].id,
-        name: HEALTH_STATUSES[0].name,
-        description: HEALTH_STATUSES[0].description,
-        type: 'health'
+        id: 'health_unknown',
+        name: 'Здоровье',
+        description: 'Ваш статус здоровья ещё не определён',
+        type: 'health',
+        isPlaceholder: true
       })
     }
     
     if (!player.psychologicalTrait && PSYCHOLOGICAL_TRAITS.length > 0) {
       remaining.push({
-        id: PSYCHOLOGICAL_TRAITS[0].id,
-        name: PSYCHOLOGICAL_TRAITS[0].name,
-        description: PSYCHOLOGICAL_TRAITS[0].description,
-        type: 'trait'
+        id: 'trait_unknown',
+        name: 'Черта характера',
+        description: 'Ваша черта характера ещё не определена',
+        type: 'trait',
+        isPlaceholder: true
       })
     }
     
