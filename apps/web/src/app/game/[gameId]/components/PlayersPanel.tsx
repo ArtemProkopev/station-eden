@@ -30,14 +30,6 @@ export default function PlayersPanel({
 		<section className={styles.playersPanel}>
 			<div className={styles.panelHeader}>
 				<h2>Экипаж ({alivePlayers.length} живых)</h2>
-				<div className={styles.panelActions}>
-					<button className={styles.smallButton} onClick={onShowMyCards}>
-						Мои карты
-					</button>
-					<button className={styles.smallButton} onClick={onShowCardsTable}>
-						Таблица карт
-					</button>
-				</div>
 			</div>
 
 			<div className={styles.playersList}>

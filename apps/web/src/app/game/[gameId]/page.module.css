@@ -17,7 +17,8 @@
 
 .header {
 	width: 100%;
-	max-width: 1600px;
+	max-width: 2000px;
+	margin: 0 auto 20px auto;
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
@@ -26,7 +27,6 @@
 	border-radius: 12px;
 	padding: 12px 24px;
 	border: 1px solid rgba(99, 239, 255, 0.3);
-	margin-bottom: 20px;
 }
 
 .gameTitle h1 {
@@ -103,13 +103,14 @@
 	border-color: #ff6b6b;
 }
 
-/* Основное поле - новая сетка с чатом справа */
+/* Основное поле - центрированная сетка */
 .mainContent {
 	width: 100%;
-	max-width: 1600px;
+	max-width: 2000px;
+	margin: 0 auto;
 	display: grid;
-	grid-template-columns: 320px 1fr 320px;
-	gap: 20px;
+	grid-template-columns: 320px minmax(500px, 1fr) 380px;
+	gap: 24px;
 }
 
 /* Панель игроков */
@@ -121,6 +122,7 @@
 	border: 1px solid rgba(99, 239, 255, 0.3);
 	display: flex;
 	flex-direction: column;
+	min-width: 280px;
 }
 
 .panelHeader {
@@ -390,6 +392,7 @@
 	display: flex;
 	flex-direction: column;
 	gap: 20px;
+	min-width: 400px;
 }
 
 .phaseInfo {
@@ -492,12 +495,29 @@
 	cursor: not-allowed;
 }
 
+/* Центрирование кнопки "Мои карты" в фазе обсуждения */
 .discussionActions {
 	display: flex;
-	flex-wrap: wrap;
+	flex-direction: column;
+	align-items: center;
 	justify-content: center;
-	gap: 10px;
+	gap: 16px;
 	margin-bottom: 16px;
+}
+
+.discussionActions .actionButton {
+	width: 200px;
+	text-align: center;
+}
+
+.discussionActions .startDiscussionButton {
+	width: 200px;
+	text-align: center;
+}
+
+.discussionActions .waitingText {
+	text-align: center;
+	margin: 0;
 }
 
 .voteInfo {
@@ -599,7 +619,7 @@
 	padding: 8px;
 }
 
-/* Чат - теперь справа */
+/* Чат - расширенный и стилизованный */
 .chatSection {
 	display: flex;
 	flex-direction: column;
@@ -610,6 +630,7 @@
 	border-radius: 12px;
 	overflow: hidden;
 	border: 1px solid rgba(99, 239, 255, 0.3);
+	min-width: 320px;
 }
 
 .chatHeader {
@@ -636,6 +657,47 @@
 	gap: 6px;
 }
 
+/* Вкладки чата */
+.chatTabs {
+	display: flex;
+	border-bottom: 1px solid rgba(99, 239, 255, 0.2);
+	background: rgba(0, 0, 0, 0.3);
+}
+
+.chatTab {
+	flex: 1;
+	background: transparent;
+	border: none;
+	color: rgba(255, 255, 255, 0.5);
+	padding: 10px;
+	font-family: 'RussoOne', sans-serif;
+	font-size: 12px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	border-bottom: 2px solid transparent;
+}
+
+.chatTabActive {
+	color: #63efff;
+	border-bottom-color: #63efff;
+}
+
+.chatTabHasVoice {
+	position: relative;
+}
+
+.chatTabHasVoice::after {
+	content: '';
+	position: absolute;
+	top: 6px;
+	right: 20px;
+	width: 6px;
+	height: 6px;
+	background-color: #4caf50;
+	border-radius: 50%;
+	animation: pulse 1.5s infinite;
+}
+
 .chatMessages {
 	flex: 1;
 	overflow-y: auto;
@@ -647,11 +709,9 @@
 }
 
 .chatMessage {
-	padding: 6px 10px;
+	padding: 8px 12px;
 	background: rgba(255, 255, 255, 0.03);
 	border-radius: 6px;
-	font-size: 12px;
-	line-height: 1.4;
 	border-left: 2px solid rgba(99, 239, 255, 0.3);
 }
 
@@ -660,19 +720,37 @@
 	border-left-color: #63efff;
 }
 
+.chatMessage.myMessage {
+	background: rgba(99, 239, 255, 0.08);
+	border-left-color: #63efff;
+}
+
+.chatMessageHeader {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	margin-bottom: 4px;
+}
+
 .messageSender {
-	font-weight: normal;
-	color: #63efff;
-	margin-right: 6px;
 	font-size: 11px;
+	color: #63efff;
 }
 
 .systemMessage .messageSender {
 	color: #f39c12;
 }
 
+.messageTime {
+	font-size: 9px;
+	color: rgba(255, 255, 255, 0.3);
+}
+
 .messageText {
-	color: rgba(255, 255, 255, 0.8);
+	font-size: 12px;
+	color: rgba(255, 255, 255, 0.85);
+	line-height: 1.4;
+	word-break: break-word;
 }
 
 .chatInput {
@@ -724,11 +802,70 @@
 	cursor: not-allowed;
 }
 
+.emptyChat {
+	text-align: center;
+	padding: 40px 20px;
+}
+
+.emptyChat p {
+	color: rgba(255, 255, 255, 0.3);
+	font-size: 12px;
+	margin: 4px 0;
+}
+
+/* Голосовой чат */
+.voiceTab {
+	flex: 1;
+	overflow-y: auto;
+	padding: 12px;
+	background: rgba(0, 0, 0, 0.2);
+}
+
+.voiceLoading, .voiceError {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	font-size: 12px;
+}
+
+.voiceLoading {
+	color: rgba(255, 255, 255, 0.5);
+}
+
+.voiceError {
+	color: #ff6b6b;
+}
+
+/* Скроллбар */
+.chatMessages::-webkit-scrollbar,
+.voiceTab::-webkit-scrollbar {
+	width: 4px;
+}
+
+.chatMessages::-webkit-scrollbar-track,
+.voiceTab::-webkit-scrollbar-track {
+	background: rgba(255, 255, 255, 0.05);
+	border-radius: 2px;
+}
+
+.chatMessages::-webkit-scrollbar-thumb,
+.voiceTab::-webkit-scrollbar-thumb {
+	background: rgba(99, 239, 255, 0.3);
+	border-radius: 2px;
+}
+
+.chatMessages::-webkit-scrollbar-thumb:hover,
+.voiceTab::-webkit-scrollbar-thumb:hover {
+	background: rgba(99, 239, 255, 0.5);
+}
+
 /* Футер - скрыт на десктопе, показывается только на мобильных */
 .footer {
 	display: none;
 	width: 100%;
-	max-width: 1600px;
+	max-width: 2000px;
+	margin: 20px auto 0 auto;
 	justify-content: space-between;
 	align-items: center;
 	background: rgba(0, 0, 0, 0.6);
@@ -736,7 +873,6 @@
 	border-radius: 12px;
 	padding: 12px 20px;
 	border: 1px solid rgba(99, 239, 255, 0.3);
-	margin-top: 20px;
 }
 
 .playerStatusInfo {
@@ -1488,7 +1624,24 @@
 	font-weight: normal;
 }
 
+/* Анимация пульсации */
+@keyframes pulse {
+	0%, 100% {
+		opacity: 0.4;
+	}
+	50% {
+		opacity: 1;
+	}
+}
+
 /* Медиа-запросы */
+@media (max-width: 1400px) {
+	.mainContent {
+		grid-template-columns: 300px minmax(400px, 1fr) 340px;
+		gap: 20px;
+	}
+}
+
 @media (max-width: 1200px) {
 	.mainContent {
 		grid-template-columns: 1fr;
@@ -1496,8 +1649,8 @@
 	}
 	
 	.chatSection {
-		height: 350px;
-		min-height: 350px;
+		height: 400px;
+		min-height: 400px;
 	}
 	
 	.footer {
@@ -1559,6 +1712,11 @@
 
 	.narrationText {
 		font-size: 14px;
+	}
+	
+	.chatSection {
+		height: 350px;
+		min-height: 350px;
 	}
 }
 

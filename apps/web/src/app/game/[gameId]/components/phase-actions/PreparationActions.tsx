@@ -12,9 +12,6 @@ export default function PreparationActions({ onShowMyCards, onShowCardsTable }: 
       <button className={styles.actionButton} onClick={onShowMyCards}>
         Просмотреть свои карты
       </button>
-      <button className={styles.tableButton} onClick={onShowCardsTable}>
-        Общая таблица карт
-      </button>
       <p className={styles.phaseHint}>
         Изучите свои карты и подготовьтесь к обсуждению
       </p>

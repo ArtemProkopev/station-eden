@@ -32,10 +32,6 @@ export default function DiscussionActions({
 					Мои карты
 				</button>
 
-				<button className={styles.tableButton} onClick={onShowCardsTable}>
-					Общая таблица карт
-				</button>
-
 				<button
 					className={styles.startDiscussionButton}
 					onClick={onRequestVote}

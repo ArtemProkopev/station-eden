@@ -257,9 +257,7 @@ export default function GameSessionClient({ gameId }: Props) {
 					newMessage={newMessage}
 					onMessageChange={handleMessageChange}
 					onSendMessage={handleSendMessage}
-					onKeyPress={
-						handleKeyPress as (e: React.KeyboardEvent<Element>) => void
-					}
+					onKeyPress={handleKeyPress as (e: React.KeyboardEvent<Element>) => void}
 					onChatScroll={handleChatScroll}
 					disabled={!isConnected || gameState.phase === 'game_over'}
 					currentUserId={userId}
