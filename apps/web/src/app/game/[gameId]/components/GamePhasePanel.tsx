@@ -1,12 +1,12 @@
 // apps/web/src/app/game/[gameId]/components/GamePhasePanel.tsx
 import {
+	CardDetails,
 	CrisisInfo,
 	ExtendedGamePlayer,
 	ExtendedGameState,
 	GamePhase,
-	RevealedPlayer,
 	PlayerCardInfo,
-	CardDetails,
+	RevealedPlayer,
 } from '@station-eden/shared'
 import styles from '../page.module.css'
 import CardsTable from './CardsTable'
@@ -36,12 +36,12 @@ interface GamePhasePanelProps {
 	onShowMyCards: () => void
 	onShowCardsTable: () => void
 	onStartDiscussion: () => void
+	onRequestVote: () => void
 	onVote: (targetPlayerId: string) => void
 	onSolveCrisis: () => void
 	onSetActiveCrisis: (crisis: CrisisInfo | null) => void
 	myRevealedCardsThisRound: string[]
 	myAllRevealedCards: string[]
-	// ✅ Новые пропсы для таблицы карт
 	allPlayersCards: PlayerCardInfo[]
 	myCards: Record<string, CardDetails>
 }
@@ -60,19 +60,33 @@ export default function GamePhasePanel({
 	onShowMyCards,
 	onShowCardsTable,
 	onStartDiscussion,
+	onRequestVote,
 	onVote,
 	onSolveCrisis,
 	onSetActiveCrisis,
-	myRevealedCardsThisRound,
-	myAllRevealedCards,
 	allPlayersCards,
 	myCards,
 }: GamePhasePanelProps) {
 	const phase = gameState.phase as GamePhase
 	const isCreator = userId === gameState.creatorId
+
 	const allPlayersRevealed = alivePlayers.every(
 		player => (player.revealedCards ?? 0) > 0,
 	)
+
+	const voteRequestPlayerIds = Array.isArray(gameState.voteRequestPlayerIds)
+		? (gameState.voteRequestPlayerIds as string[])
+		: []
+
+	const hasRequestedVote = !!userId && voteRequestPlayerIds.includes(userId)
+
+	const voteTriggerCount =
+		typeof gameState.voteTriggerCount === 'number'
+			? gameState.voteTriggerCount
+			: 0
+
+	const requiredVotes =
+		typeof gameState.requiredVotes === 'number' ? gameState.requiredVotes : 1
 
 	const renderPhaseActions = () => {
 		switch (phase) {
@@ -89,11 +103,14 @@ export default function GamePhasePanel({
 					<DiscussionActions
 						onShowMyCards={onShowMyCards}
 						onShowCardsTable={onShowCardsTable}
-						onStartDiscussion={onStartDiscussion}
+						onRequestVote={onRequestVote}
 						isCreator={isCreator}
 						allPlayersRevealed={allPlayersRevealed}
 						isConnected={true}
 						phaseTimeLeft={phaseTimeLeft}
+						voteTriggerCount={voteTriggerCount}
+						requiredVotes={requiredVotes}
+						hasRequestedVote={hasRequestedVote}
 					/>
 				)
 
@@ -144,10 +161,6 @@ export default function GamePhasePanel({
 		}
 	}
 
-	const revealedCardsArray = Array.isArray(myAllRevealedCards) 
-		? myAllRevealedCards 
-		: Object.values(myAllRevealedCards || {}).map((card: any) => card.id || card.name)
-
 	return (
 		<section className={styles.gamePanel}>
 			<div className={styles.phaseInfo}>
@@ -157,7 +170,9 @@ export default function GamePhasePanel({
 				{(phase === 'voting' ||
 					phase === 'discussion' ||
 					phase === 'crisis' ||
-					phase === 'introduction') &&
+					phase === 'introduction' ||
+					phase === 'preparation' ||
+					phase === 'intermission') &&
 					phaseTimeLeft > 0 && (
 						<div className={styles.phaseTimer}>
 							<div className={styles.timerBar}>
@@ -178,11 +193,10 @@ export default function GamePhasePanel({
 					)}
 			</div>
 
-			{/* ✅ Таблица карт встроена прямо в интерфейс */}
-			<CardsTable 
-				allPlayersCards={allPlayersCards} 
-				myCards={myCards} 
-				userId={userId} 
+			<CardsTable
+				allPlayersCards={allPlayersCards}
+				myCards={myCards}
+				userId={userId}
 			/>
 
 			<div className={styles.gameActions}>{renderPhaseActions()}</div>

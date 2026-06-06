@@ -1,77 +1,59 @@
 // apps/web/src/app/game/[gameId]/components/phase-actions/DiscussionActions.tsx
 import styles from '../../page.module.css'
+import { formatTime } from '../utils/game.utils'
 
 interface DiscussionActionsProps {
-  onShowMyCards: () => void
-  onShowCardsTable: () => void
-  onStartDiscussion: () => void
-  isCreator: boolean
-  allPlayersRevealed: boolean
-  isConnected: boolean
-  phaseTimeLeft: number
+	onShowMyCards: () => void
+	onShowCardsTable: () => void
+	onRequestVote: () => void
+	isCreator: boolean
+	allPlayersRevealed: boolean
+	isConnected: boolean
+	phaseTimeLeft: number
+	voteTriggerCount: number
+	requiredVotes: number
+	hasRequestedVote: boolean
 }
 
 export default function DiscussionActions({
-  onShowMyCards,
-  onShowCardsTable,
-  onStartDiscussion,
-  isCreator,
-  allPlayersRevealed,
-  isConnected,
-  phaseTimeLeft
+	onShowMyCards,
+	onShowCardsTable,
+	onRequestVote,
+	isConnected,
+	phaseTimeLeft,
+	voteTriggerCount,
+	requiredVotes,
+	hasRequestedVote,
 }: DiscussionActionsProps) {
-  return (
-    <div className={styles.phaseActions}>
-      <div className={styles.discussionActions}>
-        <button
-          className={styles.actionButton}
-          onClick={onShowMyCards}
-        >
-          Мои карты
-        </button>
-        <button
-          className={styles.tableButton}
-          onClick={onShowCardsTable}
-        >
-          Общая таблица карт
-        </button>
+	return (
+		<div className={styles.phaseActions}>
+			<div className={styles.discussionActions}>
+				<button className={styles.actionButton} onClick={onShowMyCards}>
+					Мои карты
+				</button>
 
-        {isCreator && allPlayersRevealed && (
-          <button
-            className={styles.startDiscussionButton}
-            onClick={onStartDiscussion}
-            disabled={!isConnected}
-          >
-            Начать общее обсуждение
-          </button>
-        )}
+				<button className={styles.tableButton} onClick={onShowCardsTable}>
+					Общая таблица карт
+				</button>
 
-        {!allPlayersRevealed && isCreator && (
-          <p className={styles.waitingText}>
-            Ожидание раскрытия карт всеми игроками...
-          </p>
-        )}
+				<button
+					className={styles.startDiscussionButton}
+					onClick={onRequestVote}
+					disabled={!isConnected || hasRequestedVote}
+				>
+					{hasRequestedVote ? 'Голосование запрошено' : 'Запросить голосование'}
+				</button>
 
-        {allPlayersRevealed && !isCreator && (
-          <p className={styles.waitingText}>
-            Все карты раскрыты. Ожидайте начала общего обсуждения от
-            создателя лобби.
-          </p>
-        )}
-      </div>
+				<p className={styles.waitingText}>
+					Запросов на голосование: {voteTriggerCount}/{requiredVotes}
+				</p>
+			</div>
 
-      {phaseTimeLeft > 0 && (
-        <div className={styles.discussionTimer}>
-          <p>Общее обсуждение: {formatTime(phaseTimeLeft)}</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Вспомогательная функция
-function formatTime(seconds: number) {
-  const mins = Math.floor(Math.max(0, seconds) / 60)
-  const secs = Math.max(0, seconds) % 60
-  return `${mins}:${secs < 10 ? '0' : ''}${secs}`
+			{phaseTimeLeft > 0 && (
+				<div className={styles.discussionTimer}>
+					<p>Обсуждение: {formatTime(phaseTimeLeft)}</p>
+				</div>
+			)}
+		</div>
+	)
 }

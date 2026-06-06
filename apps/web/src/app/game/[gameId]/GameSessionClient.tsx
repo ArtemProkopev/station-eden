@@ -68,6 +68,7 @@ export default function GameSessionClient({ gameId }: Props) {
 		handleStartGame,
 		handleSkipNarration,
 		handleStartDiscussion,
+		handleRequestVote,
 		handleRevealCard,
 		handleVote,
 		handleSolveCrisis,
@@ -75,14 +76,16 @@ export default function GameSessionClient({ gameId }: Props) {
 		handleLeaveGame,
 	} = useGameSession(gameId)
 
-	// Нормализация myAllRevealedCards для разных компонентов
 	const myAllRevealedCardIds = useMemo((): string[] => {
 		if (!myAllRevealedCards) return []
+
 		if (Array.isArray(myAllRevealedCards)) {
-			return myAllRevealedCards.map(card => (card as any).id ?? (card as any).name)
-		} else {
-			return Object.keys(myAllRevealedCards)
+			return myAllRevealedCards.map(
+				card => (card as any).id ?? (card as any).name,
+			)
 		}
+
+		return Object.keys(myAllRevealedCards)
 	}, [myAllRevealedCards])
 
 	const myAllRevealedCardsObject = useMemo((): Record<
@@ -90,26 +93,25 @@ export default function GameSessionClient({ gameId }: Props) {
 		{ name: string; type: string }
 	> => {
 		if (!myAllRevealedCards) return {}
+
 		if (Array.isArray(myAllRevealedCards)) {
 			return myAllRevealedCards.reduce(
 				(acc, card) => {
 					const key = (card as any).id ?? (card as any).name
-					acc[key] = { 
-						name: (card as any).name, 
-						type: (card as any).type 
+					acc[key] = {
+						name: (card as any).name,
+						type: (card as any).type,
 					}
 					return acc
 				},
 				{} as Record<string, { name: string; type: string }>,
 			)
-		} else {
-			return myAllRevealedCards
 		}
+
+		return myAllRevealedCards
 	}, [myAllRevealedCards])
 
-	const handleChatScroll = useCallback(() => {
-		// Здесь можно реализовать подгрузку истории при скролле
-	}, [])
+	const handleChatScroll = useCallback(() => {}, [])
 
 	if (!gameState) {
 		return (
@@ -137,8 +139,10 @@ export default function GameSessionClient({ gameId }: Props) {
 	}
 
 	const players = (gameState.players || []) as ExtendedGamePlayer[]
-	const currentPlayer = userId ? players.find(p => p.id === userId) : undefined
-	const alivePlayers = players.filter(p => p.isAlive === true)
+	const currentPlayer = userId
+		? players.find(player => player.id === userId)
+		: undefined
+	const alivePlayers = players.filter(player => player.isAlive === true)
 	const phaseDurationDisplay = getPhaseDuration(gameState, phaseTimeLeft)
 
 	return (
@@ -239,6 +243,7 @@ export default function GameSessionClient({ gameId }: Props) {
 					onShowMyCards={() => setShowMyCards(true)}
 					onShowCardsTable={() => setShowCardsTable(true)}
 					onStartDiscussion={handleStartDiscussion}
+					onRequestVote={handleRequestVote}
 					onVote={handleVote}
 					onSolveCrisis={handleSolveCrisis}
 					onSetActiveCrisis={setActiveCrisis}
@@ -277,10 +282,18 @@ function getPhaseDuration(
 	gameState: ExtendedGameState,
 	phaseTimeLeft: number,
 ): number {
-	if (gameState.phase === 'voting') return 30
-	if (gameState.phase === 'discussion' && phaseTimeLeft > 0) return 180
+	if (
+		typeof gameState.phaseDuration === 'number' &&
+		gameState.phaseDuration > 0
+	) {
+		return gameState.phaseDuration
+	}
+
+	if (gameState.phase === 'voting') return 60
+	if (gameState.phase === 'discussion') return 180
 	if (gameState.phase === 'crisis') return 60
-	return typeof gameState.phaseDuration === 'number'
-		? gameState.phaseDuration
-		: 180
+	if (gameState.phase === 'preparation') return 30
+	if (gameState.phase === 'intermission') return 10
+
+	return phaseTimeLeft > 0 ? phaseTimeLeft : 30
 }

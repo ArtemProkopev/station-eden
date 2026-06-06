@@ -1,4 +1,4 @@
-// apps/web/src/app/game/[gameId]/hooks/useGameSession.ts
+// apps/web/src/app/game/[gameId]/components/hooks/useGameSession.ts
 import { useProfile } from '@/app/profile/hooks/useProfile'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import {
@@ -17,13 +17,14 @@ import { useCardReveal } from './useCardReveal'
 import { useGameChat } from './useGameChat'
 import { useGameTimer } from './useGameTimer'
 
-// ---------- helpers ----------
 const safeNumber = (value: unknown, defaultValue = 1): number => {
 	if (typeof value === 'number') return value
+
 	if (typeof value === 'string') {
 		const parsed = parseInt(value, 10)
 		return Number.isNaN(parsed) ? defaultValue : parsed
 	}
+
 	return defaultValue
 }
 
@@ -33,9 +34,11 @@ type GameResults = {
 	scores?: unknown
 }
 
-// ---------- hook ----------
+type ServerCardPayload = Record<string, CardDetails | undefined>
+
 export function useGameSession(gameId: string) {
 	const { profile, loadUserData } = useProfile()
+
 	const {
 		phaseTimeLeft,
 		startTimer,
@@ -88,14 +91,16 @@ export function useGameSession(gameId: string) {
 		useState<number>(0)
 	const [canSkipNarration, setCanSkipNarration] = useState<boolean>(false)
 	const [newCardsThisRound, setNewCardsThisRound] = useState<CardDetails[]>([])
-	
-	// Добавляем отслеживание текущего раунда
-	const currentRoundRef = useRef<number>(0)
 
-	// load profile once
+	const currentRoundRef = useRef<number>(0)
+	const sendRef = useRef<((msg: unknown) => void) | null>(null)
+	const isConnectedRef = useRef<boolean>(false)
 	const loadedProfileRef = useRef(false)
+	const joinedRef = useRef(false)
+
 	useEffect(() => {
 		if (loadedProfileRef.current) return
+
 		loadedProfileRef.current = true
 		loadUserData().catch(() => {})
 	}, [loadUserData])
@@ -111,9 +116,8 @@ export function useGameSession(gameId: string) {
 	const canConnect = isProfileReady && profile.status === 'ok'
 	const socketQuery = useMemo(() => ({ gameId }), [gameId])
 
-	const getCardTypeDisplayNameRef = useRef(getCardTypeDisplayName)
-	useEffect(() => {
-		getCardTypeDisplayNameRef.current = getCardTypeDisplayName
+	const getTypeName = useCallback((cardType: string) => {
+		return getCardTypeDisplayName(cardType)
 	}, [])
 
 	const getCardDisplayName = useCallback(
@@ -124,227 +128,267 @@ export function useGameSession(gameId: string) {
 		[myCards],
 	)
 
-	const updateCardsTable = useCallback(
-		(game: ExtendedGameState) => {
-			if (!game?.players) return
+	const updateCardsTable = useCallback((game: ExtendedGameState) => {
+		if (!game?.players) return
 
-			const getTypeName = getCardTypeDisplayNameRef.current
-
-			const playersInfo: PlayerCardInfo[] = (game.players || []).map(player => {
-				const revealedCardsMap: Record<
+		const playersInfo: PlayerCardInfo[] = (game.players || []).map(player => {
+			const extPlayer = player as ExtendedGamePlayer & {
+				revealedCardsInfo?: Record<
 					string,
-					{ name: string; type: string; cardId: string }
-				> = {}
+					{ name: string; type: string; id?: string }
+				>
+			}
 
-				if (player.id === userId) {
-					Object.entries(myAllRevealedCards).forEach(([cardType, cardInfo]) => {
-						revealedCardsMap[cardType] = {
-							name: cardInfo.name,
-							type: getTypeName(cardType),
-							cardId: cardType,
-						}
-					})
-				} else if ((player as ExtendedGamePlayer).revealedCardsInfo) {
-					const extPlayer = player as ExtendedGamePlayer
-					Object.entries(extPlayer.revealedCardsInfo || {}).forEach(
-						([cardType, card]) => {
-							if (card && typeof card === 'object' && 'name' in card) {
-								const c = card as { name: string; type: string; id?: string }
-								revealedCardsMap[cardType] = {
-									name: String(c.name),
-									type: getTypeName(cardType),
-									cardId: String(c.id ?? cardType),
-								}
-							}
-						},
-					)
-				}
+			const revealedCardsMap: Record<
+				string,
+				{ name: string; type: string; cardId: string }
+			> = {}
 
-				return {
-					playerId: player.id,
-					playerName: player.name,
-					revealedCards: revealedCardsMap,
-				}
-			})
+			Object.entries(extPlayer.revealedCardsInfo || {}).forEach(
+				([cardType, card]) => {
+					if (!card || typeof card !== 'object') return
 
-			setAllPlayersCards(playersInfo)
+					revealedCardsMap[cardType] = {
+						name: String(card.name),
+						type: String(card.type || cardType),
+						cardId: String(card.id ?? cardType),
+					}
+				},
+			)
+
+			return {
+				playerId: player.id,
+				playerName: player.name,
+				revealedCards: revealedCardsMap,
+			}
+		})
+
+		setAllPlayersCards(playersInfo)
+	}, [])
+
+	const restoreMyRevealState = useCallback(
+		(game: ExtendedGameState) => {
+			if (!game?.players || !userId) return
+
+			const currentPlayer = game.players.find(
+				player => player.id === userId,
+			) as
+				| (ExtendedGamePlayer & {
+						revealedCardsInfo?: Record<
+							string,
+							{ name: string; type: string; id?: string }
+						>
+						revealedCardsThisRound?: string[]
+				  })
+				| undefined
+
+			if (!currentPlayer) return
+
+			const restoredRevealedCards: Record<
+				string,
+				{ name: string; type: string }
+			> = {}
+
+			Object.entries(currentPlayer.revealedCardsInfo || {}).forEach(
+				([cardType, cardInfo]) => {
+					restoredRevealedCards[cardType] = {
+						name: cardInfo.name,
+						type: cardInfo.type || cardType,
+					}
+				},
+			)
+
+			setMyAllRevealedCards(restoredRevealedCards)
+
+			if (Array.isArray(currentPlayer.revealedCardsThisRound)) {
+				setMyRevealedCardsThisRound(currentPlayer.revealedCardsThisRound)
+			}
 		},
-		[myAllRevealedCards, userId],
+		[userId],
 	)
 
-	// Сброс состояния для нового раунда (НО НЕ СБРАСЫВАЕМ myCards полностью)
 	const resetForNewRound = useCallback(() => {
-		console.log('🔄 Сброс состояния для нового раунда')
 		setNewCardsThisRound([])
 		setCardsReceivedThisRound(0)
 		setMyRevealedCardsThisRound([])
-		// НЕ сбрасываем myCards и myAllRevealedCards
+		setSelectedVote('')
 	}, [])
 
-	const sendRef = useRef<((msg: unknown) => void) | null>(null)
-	const isConnectedRef = useRef<boolean>(false)
+	const buildCardsFromPayload = useCallback((payload: ServerCardPayload) => {
+		const cards: Record<string, CardDetails> = {}
+
+		const addCard = (card: CardDetails | undefined, cardType: CardType) => {
+			if (!card) return
+
+			cards[cardType] = {
+				...card,
+				type: cardType,
+			}
+		}
+
+		addCard(payload.profession, 'profession')
+		addCard(payload.healthStatus, 'health')
+		addCard(payload.psychologicalTrait, 'trait')
+		addCard(payload.secret, 'secret')
+		addCard(payload.resource, 'resource')
+		addCard(payload.hiddenRole, 'role')
+		addCard(payload.roleCard, 'role')
+		addCard(payload.gender, 'gender')
+		addCard(payload.age, 'age')
+		addCard(payload.bodyType, 'body')
+
+		return cards
+	}, [])
+
+	const clearNarration = useCallback(() => {
+		setNarration(null)
+		setCanSkipNarration(false)
+	}, [])
 
 	const handleWebSocketMessage = useCallback(
 		(data: unknown) => {
 			if (!data || typeof data !== 'object') return
-			const msg = data as WsMessage
 
+			const msg = data as WsMessage
 			const send = sendRef.current
 			const isConnected = isConnectedRef.current
-			const getTypeName = getCardTypeDisplayNameRef.current
 
 			switch (msg.type) {
 				case 'GAME_STATE': {
-						const game = (msg.gameState as ExtendedGameState) || null
-						if (game?.round !== undefined) {
-							game.round = safeNumber(game.round, 1)
-						}
-						setGameState(game)
+					const game = (msg.gameState as ExtendedGameState) || null
 
-						if (game) {
-							updateCardsTable(game)
-							syncTimerWithServer(game)
-							
-							// Восстанавливаем раскрытые карты из gameState
-							if (game.players && userId) {
-							const currentPlayer = game.players.find(p => p.id === userId) as ExtendedGamePlayer
-							if (currentPlayer?.revealedCardsInfo) {
-								const restoredRevealedCards: Record<string, { name: string; type: string }> = {}
-								Object.entries(currentPlayer.revealedCardsInfo).forEach(([cardType, cardInfo]) => {
-								restoredRevealedCards[cardType] = {
-									name: cardInfo.name,
-									type: cardInfo.type
-								}
-								})
-								setMyAllRevealedCards(restoredRevealedCards)
-								
-								// Восстанавливаем количество раскрытых карт в этом раунде
-								// (нужно будет хранить это на сервере или вычислять)
-							}
-							}
-
-							if (game.phase === 'introduction') {
-							setTimeout(() => setCanSkipNarration(true), 3000)
-							} else {
-							setCanSkipNarration(false)
-							}
-
-							if (game.phase !== 'crisis' && activeCrisis) {
-							setActiveCrisis(null)
-							}
-						}
-						break
+					if (game?.round !== undefined) {
+						game.round = safeNumber(game.round, 1)
 					}
+
+					setGameState(game)
+
+					if (game) {
+						updateCardsTable(game)
+						syncTimerWithServer(game)
+						restoreMyRevealState(game)
+
+						if (game.phase === 'introduction') {
+							setTimeout(() => setCanSkipNarration(true), 3000)
+						} else {
+							clearNarration()
+						}
+
+						if (game.phase !== 'crisis' && activeCrisis) {
+							setActiveCrisis(null)
+						}
+					}
+
+					break
+				}
 
 				case 'PHASE_CHANGED': {
-					const newPhase = String(msg.newPhase ?? '')
-					const phaseDuration =
-						typeof msg.duration === 'number' ? msg.duration : undefined
+					const phase = String(msg.phase || '')
+					const duration = safeNumber(msg.duration, 30)
+					const phaseEndTime = String(msg.phaseEndTime || '')
 
-					stopTimer()
-					setPhaseTimeLeft(0)
+					const incomingGameState = msg.gameState as
+						| ExtendedGameState
+						| undefined
 
-					if (newPhase === 'voting') {
-						setPhaseTimeLeft(30)
-						startTimer(30)
-					} else if (newPhase === 'discussion') {
-						setPhaseTimeLeft(60)
-						startTimer(60)
-					} else if (newPhase === 'crisis') {
-						setPhaseTimeLeft(60)
-						startTimer(60)
-					} else if (newPhase === 'introduction') {
-						const introDuration = phaseDuration || 30
-						setPhaseTimeLeft(introDuration)
-						startTimer(introDuration)
+					if (incomingGameState) {
+						if (incomingGameState.round !== undefined) {
+							incomingGameState.round = safeNumber(incomingGameState.round, 1)
+						}
+
+						setGameState(incomingGameState)
+						updateCardsTable(incomingGameState)
+						restoreMyRevealState(incomingGameState)
+						syncTimerWithServer(incomingGameState)
+					} else {
+						setGameState(prev => {
+							if (!prev) return prev
+
+							const next = {
+								...prev,
+								phase,
+								phaseDuration: duration,
+								phaseEndTime,
+							} as ExtendedGameState
+
+							updateCardsTable(next)
+							restoreMyRevealState(next)
+							syncTimerWithServer(next)
+
+							return next
+						})
+					}
+
+					if (phase !== 'introduction') {
+						clearNarration()
+					} else {
 						setTimeout(() => setCanSkipNarration(true), 3000)
 					}
+
+					setPhaseTimeLeft(duration)
+					startTimer(duration)
+
+					break
+				}
+
+				case 'NARRATION_ENDED': {
+					clearNarration()
+					stopTimer()
+
+					const skippedByName = msg.skippedByName
+						? String(msg.skippedByName)
+						: ''
+
+					if (skippedByName && skippedByName !== 'Система') {
+						addToChat(
+							'Система',
+							`Игрок ${skippedByName} пропустил предысторию.`,
+							true,
+						)
+					}
+
 					break
 				}
 
 				case 'YOUR_CARDS': {
-					// ✅ Полная замена карт (только для начальной загрузки)
-					const cards: Record<string, CardDetails> = {}
-					const newCards: CardDetails[] = []
-					let cardCount = 0
-
-					const addCard = (
-						card: CardDetails | undefined,
-						cardType: CardType,
-					) => {
-						if (!card) return
-						const cardWithType: CardDetails = { 
-							...card, 
-							type: cardType 
-						}
-						cards[cardType] = cardWithType
-						newCards.push(cardWithType)
-						cardCount++
-					}
-
-					addCard(msg.profession as CardDetails | undefined, 'profession')
-					addCard(msg.healthStatus as CardDetails | undefined, 'health')
-					addCard(msg.psychologicalTrait as CardDetails | undefined, 'trait')
-					addCard(msg.secret as CardDetails | undefined, 'secret')
-					addCard(msg.hiddenRole as CardDetails | undefined, 'role')
-					addCard(msg.resource as CardDetails | undefined, 'resource')
-					addCard(msg.roleCard as CardDetails | undefined, 'role')
-					addCard(msg.gender as CardDetails | undefined, 'gender')
-					addCard(msg.age as CardDetails | undefined, 'age')
-					addCard(msg.bodyType as CardDetails | undefined, 'body')
-
-					console.log('📦 YOUR_CARDS: полная замена карт', {
-						oldCount: Object.keys(myCards).length,
-						newCount: cardCount,
-						cardTypes: Object.keys(cards)
-					})
-
+					const cards = buildCardsFromPayload(msg as ServerCardPayload)
 					setMyCards(cards)
-					setNewCardsThisRound(newCards)
-					setCardsReceivedThisRound(cardCount)
-
-					if (newCards.length > 0 && gameState?.phase === 'preparation') {
-						addToChat(
-							'Система',
-							`Вам выдано ${cardCount} карт в этом раунде!`,
-							true,
-						)
-					}
 					break
 				}
 
 				case 'NEW_CARDS': {
-					// ✅ ДОБАВЛЯЕМ новые карты к существующим
 					const newCardsData = msg.cards as CardDetails[]
 					const roundNumber = safeNumber(msg.round, gameState?.round || 1)
-					
-					if (newCardsData && newCardsData.length > 0) {
-						console.log('✨ NEW_CARDS: получено новых карт', newCardsData.length)
-						
-						const cardsWithTypes: CardDetails[] = newCardsData.map(card => ({
-							...card,
-							type: card.type || 'unknown'
-						}))
-						
-						// ✅ Добавляем к существующим картам
-						setMyCards(prev => {
-							const updated = { ...prev }
-							cardsWithTypes.forEach(card => {
-								const cardType = (card.type || 'unknown') as CardType
-								updated[cardType] = card
-							})
-							return updated
-						})
-						
-						setNewCardsThisRound(prev => [...prev, ...cardsWithTypes])
-						setCardsReceivedThisRound(prev => prev + cardsWithTypes.length)
-						
-						addToChat(
-							'Система',
-							`Раунд ${roundNumber}: вы получили ${cardsWithTypes.length} новых карт!`,
-							true,
-						)
+
+					if (!Array.isArray(newCardsData) || newCardsData.length === 0) {
+						break
 					}
+
+					const cardsWithTypes: CardDetails[] = newCardsData.map(card => ({
+						...card,
+						type: card.type || 'unknown',
+					}))
+
+					setMyCards(prev => {
+						const updated = { ...prev }
+
+						cardsWithTypes.forEach(card => {
+							const cardType = (card.type || 'unknown') as CardType
+							updated[cardType] = card
+						})
+
+						return updated
+					})
+
+					setNewCardsThisRound(prev => [...prev, ...cardsWithTypes])
+					setCardsReceivedThisRound(prev => prev + cardsWithTypes.length)
+
+					addToChat(
+						'Система',
+						`Раунд ${roundNumber}: вы получили ${cardsWithTypes.length} новых карт!`,
+						true,
+					)
+
 					break
 				}
 
@@ -361,6 +405,15 @@ export function useGameSession(gameId: string) {
 				}
 
 				case 'GAME_NARRATION': {
+					if (
+						gameState &&
+						gameState.phase &&
+						gameState.phase !== 'introduction'
+					) {
+						clearNarration()
+						break
+					}
+
 					const title = String(msg.title ?? '')
 					const text = String(msg.text ?? '')
 					const duration = typeof msg.duration === 'number' ? msg.duration : 30
@@ -369,23 +422,27 @@ export function useGameSession(gameId: string) {
 					setPhaseTimeLeft(duration)
 					startTimer(duration)
 					setTimeout(() => setCanSkipNarration(true), 3000)
+
 					break
 				}
 
 				case 'CRISIS_TRIGGERED': {
 					const crisis = (msg.crisis as CrisisInfo) || null
+
 					setActiveCrisis(crisis)
+
 					if (crisis?.isActive) {
 						setPhaseTimeLeft(60)
 						startTimer(60)
 					}
+
 					break
 				}
 
 				case 'CRISIS_SOLVED': {
 					addToChat(
 						'Система',
-						`Кризис "${String(msg.crisis ?? '')}" решен игроком ${String(
+						`Кризис "${String(msg.crisis ?? '')}" решён игроком ${String(
 							msg.playerName ?? '',
 						)}!`,
 						true,
@@ -414,22 +471,22 @@ export function useGameSession(gameId: string) {
 					const cards = msg.cards as
 						| Record<string, Partial<CardDetails> | null>
 						| undefined
-					const playerName = String(msg.playerName ?? '')
-					const playerIdMsg = msg.playerId ? String(msg.playerId) : undefined
 
 					if (cards) {
 						setRevealedPlayer({
-							name: playerName,
+							name: String(msg.playerName ?? ''),
 							cards,
-							playerId: playerIdMsg,
+							playerId: msg.playerId ? String(msg.playerId) : undefined,
 						})
 					}
+
 					break
 				}
 
 				case 'PLAYER_REVEAL': {
 					const playerCards =
 						(msg.cards as Record<string, Partial<CardDetails> | null>) || {}
+
 					const cardTypes = Object.keys(playerCards)
 
 					startReveal(
@@ -440,6 +497,7 @@ export function useGameSession(gameId: string) {
 						},
 						cardTypes,
 					)
+
 					break
 				}
 
@@ -448,51 +506,82 @@ export function useGameSession(gameId: string) {
 					const cardId = String(msg.cardId ?? '')
 					const playerName = String(msg.playerName ?? '')
 					const playerIdMsg = String(msg.playerId ?? '')
-					const cardDetails = msg.cardDetails as { name: string; type: string; id?: string }
+					const cardDetails = msg.cardDetails as
+						| { name: string; type: string; id?: string }
+						| undefined
 
-					const cardName = cardDetails?.name || getCardDisplayName(cardType, cardId)
-					addToChat('Система', `${playerName} раскрыл(а) карту: ${cardName}`, true)
+					const cardName =
+						cardDetails?.name || getCardDisplayName(cardType, cardId)
 
-					// ✅ Обновляем состояние игры для ВСЕХ игроков
-					if (gameState) {
-						const updatedGame: ExtendedGameState = { ...gameState }
-						const players = (updatedGame.players || []).slice()
-						const idx = players.findIndex(p => p.id === playerIdMsg)
+					addToChat(
+						'Система',
+						`${playerName} раскрыл(а) карту: ${cardName}`,
+						true,
+					)
 
-						if (idx !== -1) {
-							const player = { ...players[idx] } as ExtendedGamePlayer
-							const info = { ...(player.revealedCardsInfo || {}) }
-							info[cardType] = { 
-								name: cardName, 
-								type: getTypeName(cardType), 
-								id: cardId 
-							}
-							player.revealedCardsInfo = info
-							player.revealedCards = (player.revealedCards || 0) + 1
-							players[idx] = player
-							updatedGame.players = players
+					setGameState(prev => {
+						if (!prev) return prev
 
-							setGameState(updatedGame)
-							updateCardsTable(updatedGame)
+						const players = ((prev.players || []) as ExtendedGamePlayer[]).map(
+							player => {
+								if (player.id !== playerIdMsg) return player
+
+								const updatedPlayer = { ...player } as ExtendedGamePlayer & {
+									revealedCardsInfo?: Record<
+										string,
+										{ name: string; type: string; id?: string }
+									>
+								}
+
+								updatedPlayer.revealedCardsInfo = {
+									...(updatedPlayer.revealedCardsInfo || {}),
+									[cardType]: {
+										name: cardName,
+										type: cardType,
+										id: cardId,
+									},
+								}
+
+								updatedPlayer.revealedCards =
+									(updatedPlayer.revealedCards || 0) + 1
+
+								return updatedPlayer
+							},
+						)
+
+						const updatedGame = {
+							...prev,
+							players,
 						}
-					}
 
-					// ✅ Для текущего игрока обновляем личные данные
+						updateCardsTable(updatedGame)
+
+						return updatedGame
+					})
+
 					if (playerIdMsg && userId && playerIdMsg === userId) {
 						setMyRevealedCardsThisRound(prev => [...prev, cardType])
 						setMyAllRevealedCards(prev => ({
 							...prev,
-							[cardType]: { name: cardName, type: getTypeName(cardType) },
+							[cardType]: {
+								name: cardName,
+								type: getTypeName(cardType),
+							},
 						}))
 
 						if (isConnected && send) {
-							send({ type: 'CARD_REVEALED_CONFIRMATION', cardType, cardId })
+							send({
+								type: 'CARD_REVEALED_CONFIRMATION',
+								cardType,
+								cardId,
+							})
 						}
 					}
+
 					break
 				}
 
-				case 'PLAYER_VOTED':
+				case 'PLAYER_VOTED': {
 					addToChat(
 						'Система',
 						`${String(msg.voterName ?? '')} проголосовал(а) против ${String(
@@ -501,8 +590,9 @@ export function useGameSession(gameId: string) {
 						true,
 					)
 					break
+				}
 
-				case 'VOTE_REQUESTED':
+				case 'VOTE_REQUESTED': {
 					addToChat(
 						'Система',
 						`${String(msg.playerName ?? '')} запросил(а) голосование (${String(
@@ -511,50 +601,54 @@ export function useGameSession(gameId: string) {
 						true,
 					)
 					break
+				}
 
 				case 'VOTE_TIED':
 				case 'CAPTAIN_VETO_USED':
 				case 'SABOTAGE_OCCURRED':
-				case 'NONBINARY_ABILITY_USED':
+				case 'NONBINARY_ABILITY_USED': {
 					addToChat('Система', String(msg.message ?? ''), true)
 					break
+				}
 
-				case 'PLAYER_INFECTED':
+				case 'PLAYER_INFECTED': {
 					addToChat(
 						'Система',
-						`Игрок ${String(msg.playerName ?? '')} заражен игроком ${String(
+						`Игрок ${String(msg.playerName ?? '')} заражён игроком ${String(
 							msg.infectedByName ?? '',
 						)}!`,
 						true,
 					)
 					break
+				}
 
 				case 'GAME_FINISHED': {
 					const winnerIds = (msg.winnerIds as string[]) || []
+
 					setGameResults({
 						winners: Array.isArray(winnerIds) ? winnerIds.map(String) : [],
 						reason: msg.reason ? String(msg.reason) : undefined,
 						scores: msg.finalScores,
 					})
+
 					setGameState(prev => (prev ? { ...prev, phase: 'game_over' } : null))
+					clearNarration()
 					stopTimer()
 					break
 				}
 
-				case 'ERROR':
-					addToChat('Система', `Ошибка: ${String(msg.message ?? '')}`, true)
-					break
-
 				case 'CHAT_MESSAGE': {
 					const raw = msg.message
+
 					if (raw && typeof raw === 'object') {
 						const m = raw as Record<string, unknown>
+
 						const chatMsg: GameChatMessage = {
 							id: String(m.id ?? `${Date.now()}-${Math.random()}`),
 							playerId: String(m.playerId ?? 'player'),
 							playerName: String(m.playerName ?? 'Игрок'),
 							text: String(m.text ?? '').slice(0, 300),
-							type: 'player',
+							type: m.type === 'system' ? 'system' : 'player',
 							timestamp: new Date(
 								typeof m.timestamp === 'string' ||
 									typeof m.timestamp === 'number'
@@ -562,37 +656,37 @@ export function useGameSession(gameId: string) {
 									: Date.now(),
 							),
 						}
-						setChatMessages(prev => [...prev.slice(-50), chatMsg])
+
+						setChatMessages(prev => {
+							if (prev.some(message => message.id === chatMsg.id)) {
+								return prev
+							}
+
+							return [...prev.slice(-50), chatMsg]
+						})
 					}
+
 					break
 				}
 
-				case 'REVEAL_PHASE_START':
-					setGameState(prev => (prev ? { ...prev, phase: 'reveal' } : prev))
-					addToChat('Система', 'Началось раскрытие карт выбывшего игрока', true)
+				case 'ERROR': {
+					addToChat('Система', `Ошибка: ${String(msg.message ?? '')}`, true)
 					break
+				}
 
-				case 'DISCUSSION_STARTED':
-					addToChat('Система', 'Началось общее обсуждение на 1 минуту!', true)
-					setPhaseTimeLeft(60)
-					startTimer(60)
-					break
-
-				case 'ALL_CARDS_REVEALED':
-					addToChat(
-						'Система',
-						'Все игроки раскрыли по карте в этом раунде!',
-						true,
-					)
-					break
-
-				case 'TIMER_UPDATE':
+				case 'TIMER_UPDATE': {
 					if (typeof msg.timeLeft === 'number') {
 						setPhaseTimeLeft(msg.timeLeft)
-						if (msg.timeLeft > 0) startTimer(msg.timeLeft)
-						else stopTimer()
+
+						if (msg.timeLeft > 0) {
+							startTimer(msg.timeLeft)
+						} else {
+							stopTimer()
+						}
 					}
+
 					break
+				}
 
 				default:
 					break
@@ -601,19 +695,22 @@ export function useGameSession(gameId: string) {
 		[
 			activeCrisis,
 			addToChat,
+			buildCardsFromPayload,
+			clearNarration,
 			gameState,
 			getCardDisplayName,
-			myCards,
+			getTypeName,
 			resetForNewRound,
+			restoreMyRevealState,
+			setChatMessages,
+			setPhaseTimeLeft,
+			setRevealedPlayer,
 			startReveal,
 			startTimer,
 			stopTimer,
 			syncTimerWithServer,
 			updateCardsTable,
 			userId,
-			setChatMessages,
-			setPhaseTimeLeft,
-			setRevealedPlayer,
 		],
 	)
 
@@ -632,35 +729,31 @@ export function useGameSession(gameId: string) {
 		isConnectedRef.current = Boolean(isConnected)
 	}, [sendMessage, isConnected])
 
-	// Отслеживание смены раунда
 	useEffect(() => {
 		if (gameState?.round && currentRoundRef.current !== gameState.round) {
 			const prevRound = currentRoundRef.current
 			const newRound = gameState.round
-			
+
 			if (prevRound !== 0 && newRound > prevRound) {
-				console.log(`🏆 Смена раунда: ${prevRound} -> ${newRound}`)
 				resetForNewRound()
 			}
-			
+
 			currentRoundRef.current = newRound
 		}
 	}, [gameState?.round, resetForNewRound])
 
-	// Отслеживание фазы preparation для запроса карт
 	useEffect(() => {
 		if (gameState?.phase === 'preparation' && isConnected && sendRef.current) {
-			console.log('📋 Фаза подготовки, запрос карт для раунда', gameState.round)
 			sendRef.current({ type: 'REQUEST_ROUND_CARDS' })
 		}
 	}, [gameState?.phase, gameState?.round, isConnected])
 
-	const joinedRef = useRef(false)
 	useEffect(() => {
 		if (!isConnected) {
 			joinedRef.current = false
 			return
 		}
+
 		if (!gameId) return
 		if (joinedRef.current) return
 		if (profile.status !== 'ok' || !userId) return
@@ -683,10 +776,10 @@ export function useGameSession(gameId: string) {
 		}
 
 		const interval = setInterval(syncTimer, 5000)
+
 		return () => clearInterval(interval)
 	}, [gameState, phaseTimeLeft, setPhaseTimeLeft])
 
-	// ---- UI handlers ----
 	const handleSendMessage = useCallback(
 		(e?: React.FormEvent) => {
 			e?.preventDefault()
@@ -694,24 +787,15 @@ export function useGameSession(gameId: string) {
 			if (profile.status !== 'ok' || !userId) return
 			if (!newMessage.trim() || !isConnected) return
 
-			const playerName = username
-			const myId = userId
-
 			sendRef.current?.({
 				type: 'SEND_MESSAGE',
-				message: { text: newMessage.trim(), playerName, gameId },
+				message: {
+					text: newMessage.trim(),
+					playerName: username,
+					gameId,
+				},
 			})
 
-			const tempMessage: GameChatMessage = {
-				id: `temp-${Date.now()}-${Math.random()}`,
-				playerId: myId,
-				playerName,
-				text: newMessage.trim(),
-				type: 'player',
-				timestamp: new Date(),
-			}
-
-			setChatMessages(prev => [...prev.slice(-50), tempMessage])
 			setNewMessage('')
 		},
 		[
@@ -719,7 +803,6 @@ export function useGameSession(gameId: string) {
 			isConnected,
 			newMessage,
 			profile.status,
-			setChatMessages,
 			setNewMessage,
 			userId,
 			username,
@@ -739,23 +822,33 @@ export function useGameSession(gameId: string) {
 	const handleStartGame = () => {
 		if (!isConnected) return
 		if (profile.status !== 'ok' || !userId) return
+
 		sendRef.current?.({ type: 'START_GAME_SESSION' })
 	}
 
 	const handleSkipNarration = () => {
 		if (!canSkipNarration || !isConnected) return
+
 		sendRef.current?.({ type: 'SKIP_NARRATION' })
-		setNarration(null)
+		clearNarration()
 		stopTimer()
 	}
 
 	const handleStartDiscussion = () => {
 		if (!isConnected) return
+
 		sendRef.current?.({ type: 'START_DISCUSSION' })
+	}
+
+	const handleRequestVote = () => {
+		if (!isConnected) return
+
+		sendRef.current?.({ type: 'REQUEST_VOTE' })
 	}
 
 	const handleRevealCard = (cardType: CardType) => {
 		const card = myCards[cardType]
+
 		if (!card || !isConnected) return
 
 		if (myRevealedCardsThisRound.includes(cardType)) {
@@ -786,22 +879,20 @@ export function useGameSession(gameId: string) {
 
 	const handleVote = (targetPlayerId: string) => {
 		if (!isConnected) return
+
 		setSelectedVote(targetPlayerId)
 		sendRef.current?.({ type: 'VOTE_PLAYER', targetPlayerId })
 	}
 
-	const handleRequestVote = () => {
-		if (!isConnected) return
-		sendRef.current?.({ type: 'REQUEST_VOTE' })
-	}
-
 	const handleUseAbility = (ability: string, targetPlayerId?: string) => {
 		if (!isConnected) return
+
 		sendRef.current?.({ type: 'USE_ABILITY', ability, targetPlayerId })
 	}
 
 	const handleSolveCrisis = () => {
 		if (!isConnected) return
+
 		sendRef.current?.({ type: 'SOLVE_CRISIS' })
 	}
 
@@ -811,6 +902,7 @@ export function useGameSession(gameId: string) {
 		if (!window.confirm('Вы уверены, что хотите покинуть игру?')) return
 
 		sendRef.current?.({ type: 'LEAVE_GAME', gameId })
+
 		setTimeout(() => {
 			window.location.href = '/lobby'
 		}, 1000)
@@ -857,9 +949,9 @@ export function useGameSession(gameId: string) {
 		handleStartGame,
 		handleSkipNarration,
 		handleStartDiscussion,
+		handleRequestVote,
 		handleRevealCard,
 		handleVote,
-		handleRequestVote,
 		handleUseAbility,
 		handleSolveCrisis,
 		handleCloseCrisis,

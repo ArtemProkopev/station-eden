@@ -19,10 +19,8 @@ export default function GameFooter({
   alivePlayers, 
   onShowCardsTable 
 }: GameFooterProps) {
-  // Приводим players к ExtendedGamePlayer[]
   const players = (gameState.players || []) as ExtendedGamePlayer[]
   
-  // Считаем игроков, которые раскрыли карты
   const playersWithRevealedCards = players.filter(
     p => p.revealedCards && p.revealedCards > 0
   ).length
@@ -32,21 +30,11 @@ export default function GameFooter({
       <div className={styles.playerStatusInfo}>
         {currentPlayer && (
           <>
-            <span>Ваш статус: {currentPlayer.isAlive ? 'Жив' : 'Выбыл'}</span>
-            <span>
-              {' '}
-              | Карт раскрыто в раунде: {myRevealedCardsThisRound.length}/1
-            </span>
-            <span>
-              {' '}
-              | Всего карт раскрыто: {Object.keys(myAllRevealedCards).length}
-            </span>
+            <span>Статус: {currentPlayer.isAlive ? 'Жив' : 'Выбыл'}</span>
+            <span>Раскрыто в раунде: {myRevealedCardsThisRound.length}/1</span>
+            <span>Всего раскрыто: {Object.keys(myAllRevealedCards).length}</span>
             {gameState.phase === 'discussion' && (
-              <span>
-                {' '}
-                | Игроков раскрыли карты:{' '}
-                {playersWithRevealedCards}/{alivePlayers.length}
-              </span>
+              <span>Раскрыли карты: {playersWithRevealedCards}/{alivePlayers.length}</span>
             )}
           </>
         )}
