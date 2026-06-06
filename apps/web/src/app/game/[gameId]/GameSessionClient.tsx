@@ -242,6 +242,8 @@ export default function GameSessionClient({ gameId }: Props) {
 					onVote={handleVote}
 					onSolveCrisis={handleSolveCrisis}
 					onSetActiveCrisis={setActiveCrisis}
+					allPlayersCards={allPlayersCards}
+					myCards={myCards}
 				/>
 
 				<GameChat

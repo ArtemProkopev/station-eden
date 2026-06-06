@@ -5,8 +5,11 @@ import {
 	ExtendedGameState,
 	GamePhase,
 	RevealedPlayer,
+	PlayerCardInfo,
+	CardDetails,
 } from '@station-eden/shared'
 import styles from '../page.module.css'
+import CardsTable from './CardsTable'
 import CrisisActions from './phase-actions/CrisisActions'
 import DiscussionActions from './phase-actions/DiscussionActions'
 import GameOverActions from './phase-actions/GameOverActions'
@@ -38,6 +41,9 @@ interface GamePhasePanelProps {
 	onSetActiveCrisis: (crisis: CrisisInfo | null) => void
 	myRevealedCardsThisRound: string[]
 	myAllRevealedCards: string[]
+	// ✅ Новые пропсы для таблицы карт
+	allPlayersCards: PlayerCardInfo[]
+	myCards: Record<string, CardDetails>
 }
 
 export default function GamePhasePanel({
@@ -59,6 +65,8 @@ export default function GamePhasePanel({
 	onSetActiveCrisis,
 	myRevealedCardsThisRound,
 	myAllRevealedCards,
+	allPlayersCards,
+	myCards,
 }: GamePhasePanelProps) {
 	const phase = gameState.phase as GamePhase
 	const isCreator = userId === gameState.creatorId
@@ -136,7 +144,6 @@ export default function GamePhasePanel({
 		}
 	}
 
-	// Нормализация массива карт
 	const revealedCardsArray = Array.isArray(myAllRevealedCards) 
 		? myAllRevealedCards 
 		: Object.values(myAllRevealedCards || {}).map((card: any) => card.id || card.name)
@@ -170,6 +177,13 @@ export default function GamePhasePanel({
 						</div>
 					)}
 			</div>
+
+			{/* ✅ Таблица карт встроена прямо в интерфейс */}
+			<CardsTable 
+				allPlayersCards={allPlayersCards} 
+				myCards={myCards} 
+				userId={userId} 
+			/>
 
 			<div className={styles.gameActions}>{renderPhaseActions()}</div>
 		</section>

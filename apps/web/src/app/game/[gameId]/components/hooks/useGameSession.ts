@@ -89,7 +89,7 @@ export function useGameSession(gameId: string) {
 	const [canSkipNarration, setCanSkipNarration] = useState<boolean>(false)
 	const [newCardsThisRound, setNewCardsThisRound] = useState<CardDetails[]>([])
 	
-	// Добавляем отслеживание текущего раунда для сброса
+	// Добавляем отслеживание текущего раунда
 	const currentRoundRef = useRef<number>(0)
 
 	// load profile once
@@ -111,7 +111,6 @@ export function useGameSession(gameId: string) {
 	const canConnect = isProfileReady && profile.status === 'ok'
 	const socketQuery = useMemo(() => ({ gameId }), [gameId])
 
-	// stabilize function so hooks deps don't complain
 	const getCardTypeDisplayNameRef = useRef(getCardTypeDisplayName)
 	useEffect(() => {
 		getCardTypeDisplayNameRef.current = getCardTypeDisplayName
@@ -173,20 +172,18 @@ export function useGameSession(gameId: string) {
 		[myAllRevealedCards, userId],
 	)
 
-	// Сброс состояния для нового раунда
+	// Сброс состояния для нового раунда (НО НЕ СБРАСЫВАЕМ myCards полностью)
 	const resetForNewRound = useCallback(() => {
 		console.log('🔄 Сброс состояния для нового раунда')
-		setMyCards({})
 		setNewCardsThisRound([])
 		setCardsReceivedThisRound(0)
 		setMyRevealedCardsThisRound([])
+		// НЕ сбрасываем myCards и myAllRevealedCards
 	}, [])
 
-	// ---- websocket - объявляем sendRef ДО того, как используем его в эффектах
 	const sendRef = useRef<((msg: unknown) => void) | null>(null)
 	const isConnectedRef = useRef<boolean>(false)
 
-	// Теперь определяем handleWebSocketMessage с использованием sendRef и isConnectedRef
 	const handleWebSocketMessage = useCallback(
 		(data: unknown) => {
 			if (!data || typeof data !== 'object') return
@@ -198,28 +195,46 @@ export function useGameSession(gameId: string) {
 
 			switch (msg.type) {
 				case 'GAME_STATE': {
-					const game = (msg.gameState as ExtendedGameState) || null
-					if (game?.round !== undefined) {
-						game.round = safeNumber(game.round, 1)
-					}
-					setGameState(game)
+						const game = (msg.gameState as ExtendedGameState) || null
+						if (game?.round !== undefined) {
+							game.round = safeNumber(game.round, 1)
+						}
+						setGameState(game)
 
-					if (game) {
-						updateCardsTable(game)
-						syncTimerWithServer(game)
+						if (game) {
+							updateCardsTable(game)
+							syncTimerWithServer(game)
+							
+							// Восстанавливаем раскрытые карты из gameState
+							if (game.players && userId) {
+							const currentPlayer = game.players.find(p => p.id === userId) as ExtendedGamePlayer
+							if (currentPlayer?.revealedCardsInfo) {
+								const restoredRevealedCards: Record<string, { name: string; type: string }> = {}
+								Object.entries(currentPlayer.revealedCardsInfo).forEach(([cardType, cardInfo]) => {
+								restoredRevealedCards[cardType] = {
+									name: cardInfo.name,
+									type: cardInfo.type
+								}
+								})
+								setMyAllRevealedCards(restoredRevealedCards)
+								
+								// Восстанавливаем количество раскрытых карт в этом раунде
+								// (нужно будет хранить это на сервере или вычислять)
+							}
+							}
 
-						if (game.phase === 'introduction') {
+							if (game.phase === 'introduction') {
 							setTimeout(() => setCanSkipNarration(true), 3000)
-						} else {
+							} else {
 							setCanSkipNarration(false)
-						}
+							}
 
-						if (game.phase !== 'crisis' && activeCrisis) {
+							if (game.phase !== 'crisis' && activeCrisis) {
 							setActiveCrisis(null)
+							}
 						}
+						break
 					}
-					break
-				}
 
 				case 'PHASE_CHANGED': {
 					const newPhase = String(msg.newPhase ?? '')
@@ -248,7 +263,7 @@ export function useGameSession(gameId: string) {
 				}
 
 				case 'YOUR_CARDS': {
-					// Полная замена карт
+					// ✅ Полная замена карт (только для начальной загрузки)
 					const cards: Record<string, CardDetails> = {}
 					const newCards: CardDetails[] = []
 					let cardCount = 0
@@ -258,7 +273,6 @@ export function useGameSession(gameId: string) {
 						cardType: CardType,
 					) => {
 						if (!card) return
-						// Создаём карту с type (не мутируем оригинал)
 						const cardWithType: CardDetails = { 
 							...card, 
 							type: cardType 
@@ -295,26 +309,24 @@ export function useGameSession(gameId: string) {
 							`Вам выдано ${cardCount} карт в этом раунде!`,
 							true,
 						)
-						const cardNames = newCards.map(c => c.name).join(', ')
-						addToChat('Система', `Карты: ${cardNames}`, true)
 					}
 					break
 				}
 
 				case 'NEW_CARDS': {
+					// ✅ ДОБАВЛЯЕМ новые карты к существующим
 					const newCardsData = msg.cards as CardDetails[]
 					const roundNumber = safeNumber(msg.round, gameState?.round || 1)
 					
 					if (newCardsData && newCardsData.length > 0) {
 						console.log('✨ NEW_CARDS: получено новых карт', newCardsData.length)
 						
-						// Добавляем type к каждой карте (если его нет)
 						const cardsWithTypes: CardDetails[] = newCardsData.map(card => ({
 							...card,
 							type: card.type || 'unknown'
 						}))
 						
-						// Добавляем новые карты к существующим
+						// ✅ Добавляем к существующим картам
 						setMyCards(prev => {
 							const updated = { ...prev }
 							cardsWithTypes.forEach(card => {
@@ -324,7 +336,7 @@ export function useGameSession(gameId: string) {
 							return updated
 						})
 						
-						setNewCardsThisRound(cardsWithTypes)
+						setNewCardsThisRound(prev => [...prev, ...cardsWithTypes])
 						setCardsReceivedThisRound(prev => prev + cardsWithTypes.length)
 						
 						addToChat(
@@ -332,8 +344,6 @@ export function useGameSession(gameId: string) {
 							`Раунд ${roundNumber}: вы получили ${cardsWithTypes.length} новых карт!`,
 							true,
 						)
-						const cardNames = cardsWithTypes.map(c => c.name).join(', ')
-						addToChat('Система', `Новые карты: ${cardNames}`, true)
 					}
 					break
 				}
@@ -344,12 +354,7 @@ export function useGameSession(gameId: string) {
 						gameState?.round ? gameState.round + 1 : 1,
 					)
 
-					addToChat(
-						'Система',
-						`Начался раунд ${roundNumber}.`,
-						true,
-					)
-
+					addToChat('Система', `Начался раунд ${roundNumber}.`, true)
 					resetForNewRound()
 					setGameState(prev => (prev ? { ...prev, round: roundNumber } : prev))
 					break
@@ -443,14 +448,12 @@ export function useGameSession(gameId: string) {
 					const cardId = String(msg.cardId ?? '')
 					const playerName = String(msg.playerName ?? '')
 					const playerIdMsg = String(msg.playerId ?? '')
+					const cardDetails = msg.cardDetails as { name: string; type: string; id?: string }
 
-					const cardName = getCardDisplayName(cardType, cardId)
-					addToChat(
-						'Система',
-						`${playerName} раскрыл(а) карту: ${cardName}`,
-						true,
-					)
+					const cardName = cardDetails?.name || getCardDisplayName(cardType, cardId)
+					addToChat('Система', `${playerName} раскрыл(а) карту: ${cardName}`, true)
 
+					// ✅ Обновляем состояние игры для ВСЕХ игроков
 					if (gameState) {
 						const updatedGame: ExtendedGameState = { ...gameState }
 						const players = (updatedGame.players || []).slice()
@@ -459,7 +462,11 @@ export function useGameSession(gameId: string) {
 						if (idx !== -1) {
 							const player = { ...players[idx] } as ExtendedGamePlayer
 							const info = { ...(player.revealedCardsInfo || {}) }
-							info[cardType] = { name: cardName, type: cardType, id: cardId }
+							info[cardType] = { 
+								name: cardName, 
+								type: getTypeName(cardType), 
+								id: cardId 
+							}
 							player.revealedCardsInfo = info
 							player.revealedCards = (player.revealedCards || 0) + 1
 							players[idx] = player
@@ -470,6 +477,7 @@ export function useGameSession(gameId: string) {
 						}
 					}
 
+					// ✅ Для текущего игрока обновляем личные данные
 					if (playerIdMsg && userId && playerIdMsg === userId) {
 						setMyRevealedCardsThisRound(prev => [...prev, cardType])
 						setMyAllRevealedCards(prev => ({
@@ -609,7 +617,6 @@ export function useGameSession(gameId: string) {
 		],
 	)
 
-	// Теперь подключаем WebSocket
 	const { sendMessage, isConnected } = useWebSocket(
 		wsUrl,
 		handleWebSocketMessage,
@@ -620,7 +627,6 @@ export function useGameSession(gameId: string) {
 		},
 	)
 
-	// Обновляем refs после получения isConnected
 	useEffect(() => {
 		sendRef.current = sendMessage as unknown as (msg: unknown) => void
 		isConnectedRef.current = Boolean(isConnected)
@@ -649,7 +655,6 @@ export function useGameSession(gameId: string) {
 		}
 	}, [gameState?.phase, gameState?.round, isConnected])
 
-	// join once per connection
 	const joinedRef = useRef(false)
 	useEffect(() => {
 		if (!isConnected) {
@@ -664,7 +669,6 @@ export function useGameSession(gameId: string) {
 		sendRef.current?.({ type: 'JOIN_GAME', gameId })
 	}, [isConnected, gameId, profile.status, userId])
 
-	// periodic timer drift sync (client vs server)
 	useEffect(() => {
 		const syncTimer = () => {
 			if (!gameState?.phase || !gameState.phaseEndTime) return
@@ -813,7 +817,6 @@ export function useGameSession(gameId: string) {
 	}
 
 	return {
-		// state
 		gameState,
 		myCards,
 		selectedVote,
@@ -829,26 +832,18 @@ export function useGameSession(gameId: string) {
 		cardsReceivedThisRound,
 		canSkipNarration,
 		newCardsThisRound,
-
-		// reveal state
 		revealingCards,
 		revealedCards,
 		currentRevealIndex,
 		isRevealing,
 		revealedPlayer,
-
-		// chat
 		chatMessages,
 		newMessage,
 		chatContainerRef,
-
-		// profile/socket
 		userId,
 		username,
 		profile,
 		isConnected,
-
-		// setters for UI
 		setShowMyCards,
 		setShowCardsTable,
 		setActiveCrisis,
@@ -856,8 +851,6 @@ export function useGameSession(gameId: string) {
 		setRevealedPlayer,
 		resetReveal,
 		setSelectedVote,
-
-		// handlers
 		handleSendMessage,
 		handleKeyPress,
 		handleMessageChange,
