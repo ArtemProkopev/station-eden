@@ -36,6 +36,13 @@ type GameResults = {
 	winners: string[]
 	reason?: string
 	scores?: unknown
+	finalScores?: Array<{
+		id: string
+		name: string
+		score: number
+		survived: boolean
+		role: string
+	}>
 }
 
 type ServerCardPayload = Record<string, CardDetails | undefined>
@@ -248,7 +255,7 @@ export function useGameSession(gameId: string) {
 		addCard(payload.secret, 'secret')
 		addCard(payload.resource, 'resource')
 		addCard(payload.hiddenRole, 'role')
-		addCard(payload.roleCard, 'role')
+		// roleCard НЕ добавляем - это служебная роль, не карта
 		addCard(payload.gender, 'gender')
 		addCard(payload.age, 'age')
 		addCard(payload.bodyType, 'body')
@@ -541,6 +548,48 @@ export function useGameSession(gameId: string) {
 						})
 					}
 
+					// Обновляем таблицу карт для выбывшего игрока - показываем все его карты
+					const ejectedCards = cards
+					const ejectedPlayerId = msg.playerId ? String(msg.playerId) : undefined
+
+					if (ejectedCards && ejectedPlayerId) {
+						setAllPlayersCards(prev => {
+							const existingPlayer = prev.find(p => p.playerId === ejectedPlayerId)
+							
+							const newRevealedCards = Object.entries(ejectedCards).reduce((acc, [cardType, card]) => {
+								if (card && card.name) {
+									acc[cardType] = {
+										name: card.name,
+										type: card.type || cardType,
+										cardId: card.id || cardType
+									}
+								}
+								return acc
+							}, {} as Record<string, { name: string; type: string; cardId: string }>)
+
+							if (existingPlayer) {
+								return prev.map(p => 
+									p.playerId === ejectedPlayerId 
+										? { 
+												...p, 
+												revealedCards: {
+													...p.revealedCards,
+													...newRevealedCards
+												}
+											}
+										: p
+								)
+							} else {
+								const newPlayer: PlayerCardInfo = {
+									playerId: ejectedPlayerId,
+									playerName: String(msg.playerName ?? ''),
+									revealedCards: newRevealedCards
+								}
+								return [...prev, newPlayer]
+							}
+						})
+					}
+
 					break
 				}
 
@@ -690,6 +739,7 @@ export function useGameSession(gameId: string) {
 						winners: Array.isArray(winnerIds) ? winnerIds.map(String) : [],
 						reason: msg.reason ? String(msg.reason) : undefined,
 						scores: msg.finalScores,
+						finalScores: msg.finalScores as GameResults['finalScores'],
 					})
 
 					setGameState(prev => (prev ? { ...prev, phase: 'game_over' } : null))
@@ -746,6 +796,37 @@ export function useGameSession(gameId: string) {
 						}
 					}
 
+					break
+				}
+
+				case 'SPEAKER_CHANGED': {
+					// Обновляем текущего говорящего в состоянии игры
+					setGameState(prev => {
+						if (!prev) return prev
+						return {
+							...prev,
+							currentSpeakerId: msg.speakerId ? String(msg.speakerId) : undefined,
+						}
+					})
+					
+					const speakerName = msg.speakerName ? String(msg.speakerName) : 'никто'
+					addToChat('Система', `Сейчас говорит: ${speakerName}.`, true)
+					break
+				}
+
+				case 'REVEAL_QUEUE_CHANGED': {
+					// Обновляем очередь раскрытия карт
+					setGameState(prev => {
+						if (!prev) return prev
+						return {
+							...prev,
+							currentRevealPlayerId: msg.currentPlayerId ? String(msg.currentPlayerId) : undefined,
+							revealQueue: Array.isArray(msg.queue) ? msg.queue as string[] : [],
+						}
+					})
+					
+					const currentPlayerName = msg.currentPlayerName ? String(msg.currentPlayerName) : 'никто'
+					addToChat('Система', `Сейчас раскрывает карту: ${currentPlayerName}.`, true)
 					break
 				}
 

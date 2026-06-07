@@ -392,6 +392,12 @@ export interface ExtendedGamePlayer extends GamePlayer {
 	profession?: string
 	revealedCards?: number
 	revealedCardsInfo?: Record<string, RevealedCardInfo>
+	revealedCardsThisRound?: string[]
+	isCaptain?: boolean
+	isSeniorOfficer?: boolean
+	isInfected?: boolean
+	isSuspicious?: boolean
+	hasUsedAbility?: boolean
 }
 
 export interface ExtendedGameState extends GameState {
@@ -402,6 +408,16 @@ export interface ExtendedGameState extends GameState {
 	currentCrisis?: CrisisInfo | null
 	occupiedSlots?: number
 	capsuleSlots?: number
+	voteTriggerCount?: number
+	voteRequestPlayerIds?: string[]
+	requiredVotes?: number
+	introSkipProgress?: {
+		skippedCount: number
+		playersCount: number
+	}
+	currentSpeakerId?: string
+	currentRevealPlayerId?: string  
+	revealQueue?: string[]
 	[key: string]: unknown
 }
 
@@ -409,6 +425,13 @@ export interface GameResults {
 	winners: string[]
 	reason?: string
 	scores?: unknown
+	finalScores?: Array<{
+		id: string
+		name: string
+		score: number
+		survived: boolean
+		role: string
+	}>
 }
 
 export type RevealedPlayer = {

@@ -290,6 +290,15 @@
 	border-radius: 3px;
 }
 
+.playerProfessionUnknown {
+	color: rgba(255, 255, 255, 0.3);
+	font-size: 10px;
+	background: rgba(255, 255, 255, 0.02);
+	padding: 2px 6px;
+	border-radius: 3px;
+	font-style: italic;
+}
+
 .playerStats {
 	display: flex;
 	gap: 8px;
@@ -309,6 +318,28 @@
 .revealedBadge {
 	font-size: 14px;
 	color: #63efff;
+}
+
+.currentSpeaker {
+	display: inline-block;
+	background: rgba(99, 239, 255, 0.2);
+	color: #63efff;
+	font-size: 10px;
+	padding: 2px 8px;
+	border-radius: 4px;
+	margin-left: 8px;
+	animation: pulse 1.5s infinite;
+}
+
+.revealingNow {
+	display: inline-block;
+	background: rgba(76, 175, 80, 0.2);
+	color: #4caf50;
+	font-size: 10px;
+	padding: 2px 8px;
+	border-radius: 4px;
+	margin-left: 8px;
+	animation: pulse 1.5s infinite;
 }
 
 .voteSection {
@@ -477,6 +508,20 @@
 	color: #ff6b6b;
 }
 
+.voteRequestButtonActive {
+	animation: pulse 2s infinite;
+}
+
+.voteRequestButtonActive:hover {
+	background: rgba(255, 107, 107, 0.2);
+	transform: scale(1.02);
+	box-shadow: 0 0 15px rgba(255, 107, 107, 0.3);
+}
+
+.voteRequestButtonActive:active {
+	transform: scale(0.98);
+}
+
 .abilityButton {
 	border-color: #9b59b6;
 	color: #9b59b6;
@@ -503,11 +548,14 @@
 	justify-content: center;
 	gap: 16px;
 	margin-bottom: 16px;
+	width: 100%;
 }
 
 .discussionActions .actionButton {
 	width: 200px;
 	text-align: center;
+	margin: 0 auto;
+	display: block;
 }
 
 .discussionActions .startDiscussionButton {
@@ -517,6 +565,35 @@
 
 .discussionActions .waitingText {
 	text-align: center;
+	margin: 0;
+}
+
+.voteRequestContainer {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+}
+
+.waitingHint {
+	color: rgba(255, 255, 255, 0.5);
+	font-size: 11px;
+	margin: 0;
+	text-align: center;
+}
+
+.voteProgress {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	margin-top: 8px;
+}
+
+.timerHint {
+	color: rgba(99, 239, 255, 0.6);
+	font-size: 11px;
 	margin: 0;
 }
 
@@ -624,7 +701,8 @@
 	display: flex;
 	flex-direction: column;
 	height: calc(100vh - 180px);
-	min-height: 500px;
+	min-height: 400px;
+	max-height: 600px;
 	background: rgba(0, 0, 0, 0.6);
 	backdrop-filter: blur(8px);
 	border-radius: 12px;
@@ -1079,6 +1157,50 @@
 	margin: 2px 0;
 }
 
+.cardEffects {
+	background: rgba(155, 89, 182, 0.08);
+	border-left: 2px solid #9b59b6;
+	padding: 8px;
+	margin: 8px 0;
+	border-radius: 4px;
+}
+
+.cardEffects strong {
+	color: #9b59b6;
+	font-size: 11px;
+	display: block;
+	margin-bottom: 4px;
+}
+
+.cardEffects ul {
+	margin: 0;
+	padding-left: 16px;
+}
+
+.cardEffects li {
+	color: rgba(255, 255, 255, 0.7);
+	font-size: 11px;
+	margin: 2px 0;
+}
+
+.cardGoal {
+	background: rgba(241, 196, 15, 0.08);
+	border-left: 2px solid #f1c40f;
+	padding: 8px;
+	margin: 8px 0;
+	border-radius: 4px;
+	font-size: 12px;
+}
+
+.cardSpecialAbility {
+	background: rgba(52, 152, 219, 0.08);
+	border-left: 2px solid #3498db;
+	padding: 8px;
+	margin: 8px 0;
+	border-radius: 4px;
+	font-size: 12px;
+}
+
 .revealButton {
 	width: 100%;
 	background: transparent;
@@ -1141,6 +1263,38 @@
 	margin-bottom: 8px;
 }
 
+/* Детали карты в модальном окне */
+.cardDetailsModal {
+	background: #0a0a1a;
+	border-radius: 12px;
+	padding: 24px;
+	max-width: 500px;
+	width: 100%;
+	border: 1px solid #63efff;
+}
+
+.cardDetailsContent {
+	text-align: center;
+}
+
+.cardDetailsContent h3 {
+	color: #63efff;
+	font-size: 24px;
+	margin-bottom: 12px;
+}
+
+.cardType {
+	color: rgba(255, 255, 255, 0.5);
+	font-size: 12px;
+	margin-bottom: 16px;
+}
+
+.cardDescription {
+	color: rgba(255, 255, 255, 0.8);
+	font-size: 14px;
+	line-height: 1.5;
+}
+
 /* Кризис */
 .crisisAlert {
 	text-align: center;
@@ -1184,6 +1338,11 @@
 	color: #63efff;
 }
 
+.crisisHelp {
+	color: #f39c12;
+	font-style: italic;
+}
+
 .crisisActions {
 	margin-top: 24px;
 }
@@ -1207,6 +1366,23 @@
 	font-size: 12px;
 }
 
+.closeCrisisButton {
+	background: transparent;
+	border: 1px solid rgba(255, 255, 255, 0.3);
+	color: rgba(255, 255, 255, 0.7);
+	padding: 8px 20px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-family: 'RussoOne', sans-serif;
+	font-size: 14px;
+	transition: all 0.2s ease;
+	margin: 4px;
+}
+
+.closeCrisisButton:hover {
+	background: rgba(255, 255, 255, 0.05);
+}
+
 /* Результаты игры */
 .resultsContent {
 	text-align: center;
@@ -1222,6 +1398,64 @@
 	color: #f39c12;
 	font-size: 18px;
 	margin-bottom: 24px;
+}
+
+.finalScores {
+	background: rgba(0, 0, 0, 0.3);
+	border-radius: 8px;
+	padding: 20px;
+	margin-bottom: 24px;
+	border: 1px solid rgba(99, 239, 255, 0.2);
+}
+
+.finalScores h3 {
+	color: #63efff;
+	font-size: 18px;
+	margin-bottom: 16px;
+}
+
+.scoresList {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.scoreRow {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 10px;
+	background: rgba(255, 255, 255, 0.03);
+	border-radius: 6px;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+.playerName {
+	color: white;
+	font-size: 14px;
+	flex: 1;
+	text-align: left;
+}
+
+.playerRole {
+	color: #63efff;
+	font-size: 12px;
+	flex: 1;
+}
+
+.playerScore {
+	color: #f1c40f;
+	font-weight: bold;
+	font-size: 14px;
+}
+
+.survivedBadge {
+	color: #4caf50;
+	font-size: 11px;
+	background: rgba(76, 175, 80, 0.1);
+	padding: 2px 8px;
+	border-radius: 4px;
 }
 
 .winnersList {
@@ -1240,7 +1474,7 @@
 
 .winnerItem {
 	display: flex;
-	justify-content: space-between;
+	justify-content: center;
 	align-items: center;
 	padding: 10px;
 	margin: 8px 0;
@@ -1266,6 +1500,22 @@
 
 .resultsActions {
 	margin-top: 24px;
+}
+
+.leaveButton {
+	background: transparent;
+	border: 1px solid #ff6b6b;
+	color: #ff6b6b;
+	padding: 10px 24px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-family: 'RussoOne', sans-serif;
+	font-size: 14px;
+	transition: all 0.2s ease;
+}
+
+.leaveButton:hover {
+	background: rgba(255, 107, 107, 0.1);
 }
 
 /* Загрузка и ожидание */
@@ -1451,6 +1701,18 @@
 	}
 }
 
+@keyframes pulse {
+	0% {
+		box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.4);
+	}
+	70% {
+		box-shadow: 0 0 0 10px rgba(255, 107, 107, 0);
+	}
+	100% {
+		box-shadow: 0 0 0 0 rgba(255, 107, 107, 0);
+	}
+}
+
 /* Общая таблица карт */
 .cardsTableContainer {
 	margin: 16px 0;
@@ -1536,6 +1798,13 @@
 	padding: 4px;
 	background: rgba(76, 175, 80, 0.05);
 	border-radius: 4px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.revealedCardCell:hover {
+	background: rgba(76, 175, 80, 0.15);
+	transform: scale(1.02);
 }
 
 .revealedCardCell strong {
@@ -1648,14 +1917,60 @@
 	font-weight: normal;
 }
 
-/* Анимация пульсации */
-@keyframes pulse {
-	0%,
-	100% {
-		opacity: 0.4;
+.cardsGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+	gap: 16px;
+	margin-top: 20px;
+}
+
+.revealCard {
+	position: relative;
+}
+
+.revealCard.hidden {
+	opacity: 0.7;
+}
+
+.cardBack {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.8);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 8px;
+}
+
+.cardBackText {
+	color: rgba(255, 255, 255, 0.5);
+	font-size: 12px;
+}
+
+.cardContent {
+	animation: fadeIn 0.3s ease;
+}
+
+@keyframes spin {
+	0% {
+		transform: rotate(0deg);
 	}
-	50% {
+	100% {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	to {
 		opacity: 1;
+		transform: translateY(0);
 	}
 }
 
@@ -1743,6 +2058,18 @@
 		height: 350px;
 		min-height: 350px;
 	}
+	
+	.scoreRow {
+		flex-direction: column;
+		text-align: center;
+		gap: 6px;
+	}
+	
+	.playerName,
+	.playerRole,
+	.playerScore {
+		text-align: center;
+	}
 }
 
 @media (max-width: 480px) {
@@ -1770,6 +2097,14 @@
 @media (prefers-reduced-motion: reduce) {
 	.preIntroCenter,
 	.transitionTitle {
+		animation: none;
+	}
+	
+	.revealedCardCell:hover {
+		transform: none;
+	}
+	
+	.voteRequestButtonActive {
 		animation: none;
 	}
 }

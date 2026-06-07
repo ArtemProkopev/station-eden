@@ -6,6 +6,7 @@ export function useGameTimer() {
 	const [phaseTimeLeft, setPhaseTimeLeft] = useState<number>(0)
 	const [serverTimeOffset, setServerTimeOffset] = useState<number>(0)
 	const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+	const lastSyncRef = useRef<{ time: number; value: number }>({ time: 0, value: 0 })
 
 	const stopTimer = useCallback(() => {
 		if (intervalRef.current) {
@@ -25,15 +26,26 @@ export function useGameTimer() {
 
 			// Если есть точное время окончания от сервера - используем его
 			if (endTime && !isNaN(endTime)) {
+				let lastValue = duration
+				
 				const updateTimer = () => {
 					const now = Date.now() + (serverTimeOffset || 0)
 					const remaining = Math.max(0, Math.floor((endTime - now) / 1000))
 					
 					if (!isNaN(remaining)) {
-						setPhaseTimeLeft(remaining)
+						// Сглаживание: не обновляем если разница меньше 1 секунды
+						const diff = Math.abs(remaining - lastValue)
+						if (diff <= 1 && lastValue > 0) {
+							// Плавное уменьшение
+							setPhaseTimeLeft(prev => Math.max(0, prev - 1))
+							lastValue = Math.max(0, lastValue - 1)
+						} else {
+							setPhaseTimeLeft(remaining)
+							lastValue = remaining
+						}
 					}
 					
-					if (remaining <= 0) {
+					if (lastValue <= 0) {
 						stopTimer()
 					}
 				}
@@ -84,7 +96,16 @@ export function useGameTimer() {
 				const secondsLeft = Math.max(0, Math.floor((endTime - serverTime) / 1000))
 
 				if (!isNaN(secondsLeft)) {
-					setPhaseTimeLeft(secondsLeft)
+					// Сглаживание: не обновляем если разница меньше 2 секунд и таймер уже идет
+					const diff = Math.abs(secondsLeft - phaseTimeLeft)
+					const now = Date.now()
+					const timeSinceLastSync = now - lastSyncRef.current.time
+					
+					// Обновляем только если разница значительная или прошло много времени с последней синхронизации
+					if (diff > 2 || timeSinceLastSync > 10000) {
+						setPhaseTimeLeft(secondsLeft)
+						lastSyncRef.current = { time: now, value: secondsLeft }
+					}
 				}
 
 				if (secondsLeft > 0) {
@@ -98,7 +119,7 @@ export function useGameTimer() {
 				stopTimer()
 			}
 		},
-		[startTimer, stopTimer, serverTimeOffset],
+		[startTimer, stopTimer, serverTimeOffset, phaseTimeLeft],
 	)
 
 	// Синхронизация времени с сервером
@@ -110,7 +131,7 @@ export function useGameTimer() {
 				headers: {
 					'Content-Type': 'application/json',
 				},
-				credentials: 'include', // Важно для отправки cookies
+				credentials: 'include',
 			})
 			
 			if (!response.ok) {
@@ -128,7 +149,7 @@ export function useGameTimer() {
 			const estimatedServerTime = data.timestamp + (roundTripTime / 2)
 			const offset = estimatedServerTime - endTime
 			
-			if (!isNaN(offset)) {
+			if (!isNaN(offset) && Math.abs(offset) < 10000) { // Ограничиваем максимальное смещение
 				setServerTimeOffset(offset)
 				console.log(`Смещение времени сервера: ${offset}ms (RTT: ${roundTripTime}ms)`)
 			}
@@ -138,10 +159,10 @@ export function useGameTimer() {
 		}
 	}, [])
 
-	// Синхронизируем время каждую минуту
+	// Синхронизируем время каждые 30 секунд (чаще для точности)
 	useEffect(() => {
 		syncServerTime()
-		const interval = setInterval(syncServerTime, 60000)
+		const interval = setInterval(syncServerTime, 30000)
 		return () => clearInterval(interval)
 	}, [syncServerTime])
 

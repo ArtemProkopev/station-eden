@@ -111,6 +111,7 @@ export default function GamePhasePanel({
 						voteTriggerCount={voteTriggerCount}
 						requiredVotes={requiredVotes}
 						hasRequestedVote={hasRequestedVote}
+						alivePlayers={alivePlayers}
 					/>
 				)
 
@@ -152,9 +153,6 @@ export default function GamePhasePanel({
 			default:
 				return (
 					<div className={styles.phaseActions}>
-						<button className={styles.tableButton} onClick={onShowCardsTable}>
-							Общая таблица карт
-						</button>
 						<p className={styles.phaseHint}>{getPhaseDescription(phase)}</p>
 					</div>
 				)
@@ -194,10 +192,10 @@ export default function GamePhasePanel({
 			</div>
 
 			<CardsTable
-				allPlayersCards={allPlayersCards}
-				myCards={myCards}
-				userId={userId}
-			/>
+  allPlayersCards={allPlayersCards}
+  myCards={myCards}
+  userId={userId}
+/>
 
 			<div className={styles.gameActions}>{renderPhaseActions()}</div>
 		</section>

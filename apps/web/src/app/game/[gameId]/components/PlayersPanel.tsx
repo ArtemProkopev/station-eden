@@ -82,6 +82,9 @@ function PlayerCard({
 	const isAlive = player.isAlive === true
 	const hasVoted = currentPlayer?.vote === player.id
 	
+	// Проверяем, раскрыта ли профессия
+	const isProfessionRevealed = player.revealedCardsInfo?.profession !== undefined
+	
 	return (
 		<div
 			className={`${styles.playerCard} ${!isAlive ? styles.dead : ''} ${
@@ -106,7 +109,7 @@ function PlayerCard({
 					<h3>
 						{player.name}
 						{userId && player.id === userId && ' (Вы)'}
-						{player.id === creatorId && ' 👑'}
+						{player.id === creatorId && ' (Создатель)'}
 					</h3>
 					<div className={styles.playerStatus}>
 						{isAlive ? (
@@ -114,16 +117,35 @@ function PlayerCard({
 						) : (
 							<span className={styles.deadStatus}>Выбыл</span>
 						)}
-						{player.profession && (
+						{player.isInfected && (
+							<span className={styles.infected}>Заражён</span>
+						)}
+						{player.isSuspicious && (
+							<span className={styles.suspicious}>Подозрителен</span>
+						)}
+						{/* Показываем профессию только если карта раскрыта */}
+						{isProfessionRevealed && player.profession && (
 							<span className={styles.playerProfession}>
 								{player.profession}
+							</span>
+						)}
+						{!isProfessionRevealed && isAlive && (
+							<span className={styles.playerProfessionUnknown}>
+								Неизвестно
 							</span>
 						)}
 					</div>
 					<div className={styles.playerStats}>
 						<span>Карт раскрыто: {player.revealedCards || 0}</span>
-						<span> | Очки: {player.score || 0}</span>
 					</div>
+				</div>
+
+				<div className={styles.playerBadges}>
+					{player.revealedCardsThisRound && player.revealedCardsThisRound.length > 0 && (
+						<span className={styles.revealedBadge} title="Раскрыл карту в этом раунде">
+							*
+						</span>
+					)}
 				</div>
 			</div>
 

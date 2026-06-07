@@ -227,6 +227,16 @@ type GameState = {
 	dealtRounds: Set<number>
 	introCompletedBy: Set<string>
 	introSkippedBy: Set<string>
+
+	// Система очереди говорящих
+	currentSpeakerId?: string
+	speakingQueue: string[]
+	speakingTimePerPlayer: number
+	speakerStartTime?: number
+
+	// Система очереди раскрытия карт
+	revealQueue: string[]
+	currentRevealQueueIndex: number
 }
 
 const GAME_ID_RE = /^(?:EDEN-)?[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/
@@ -235,6 +245,7 @@ const MSG_MAX_PER_WINDOW = 15
 const MSG_MAX_LEN = 300
 
 const INTRO_DURATION_SECONDS = 45
+const SPEAKING_TIME_PER_PLAYER = 90 // 1.5 минуты на игрока
 
 function formatCapsuleSlotsCount(value: number) {
 	const safeValue = Math.max(1, Math.floor(value))
@@ -904,6 +915,24 @@ export class GameGateway
 		}
 	}
 
+	@SubscribeMessage('SKIP_SPEAKER')
+	handleSkipSpeaker(socket: Socket) {
+		const { userId, gameId } = socket.data
+		const game = this.games.get(gameId)
+
+		if (!game || game.phase !== 'discussion') {
+			socket.emit('ERROR', { message: 'Сейчас не фаза обсуждения' })
+			return
+		}
+
+		if (game.currentSpeakerId !== userId) {
+			socket.emit('ERROR', { message: 'Сейчас не ваша очередь говорить' })
+			return
+		}
+
+		this.rotateSpeaker(game)
+	}
+
 	@SubscribeMessage('SEND_MESSAGE')
 	handleSendMessage(socket: Socket, data: { message?: any }) {
 		const { userId, username, gameId } = socket.data
@@ -951,6 +980,16 @@ export class GameGateway
 
 		if (!game || game.phase !== 'discussion') {
 			socket.emit('ERROR', { message: 'Сейчас нельзя раскрыть карту' })
+			return
+		}
+
+		// Проверяем, что игрок может раскрыть карту по очереди
+		const currentRevealPlayerId = game.revealQueue[game.currentRevealQueueIndex]
+		if (currentRevealPlayerId !== userId) {
+			const currentPlayerName = game.players.get(currentRevealPlayerId)?.name
+			socket.emit('ERROR', { 
+				message: `Сейчас очередь ${currentPlayerName} раскрывать карту. Подождите своей очереди.` 
+			})
 			return
 		}
 
@@ -1004,6 +1043,20 @@ export class GameGateway
 		})
 
 		this.broadcastGameState(gameId)
+
+		// После раскрытия карты переходим к следующему игроку в очереди раскрытия
+		if (game.currentRevealQueueIndex < game.revealQueue.length - 1) {
+			game.currentRevealQueueIndex++
+		} else {
+			game.currentRevealQueueIndex = 0
+		}
+		
+		this.broadcastToGame(game.id, 'REVEAL_QUEUE_CHANGED', {
+			currentPlayerId: game.revealQueue[game.currentRevealQueueIndex],
+			currentPlayerName: game.players.get(game.revealQueue[game.currentRevealQueueIndex])?.name,
+			queue: game.revealQueue,
+			currentIndex: game.currentRevealQueueIndex,
+		})
 	}
 
 	@SubscribeMessage('REQUEST_VOTE')
@@ -1192,13 +1245,13 @@ export class GameGateway
 
 			this.broadcastSystemMessage(
 				game,
-				`✅ Игрок ${player.name} (${player.profession?.name}) решил кризис "${game.currentCrisis.name}"!`,
+				`Игрок ${player.name} (${player.profession?.name}) решил кризис "${game.currentCrisis.name}"!`,
 			)
 
 			this.startNewRound(game)
 		} else {
 			const needed = game.currentCrisis.priorityProfessions.join(', ')
-			const errorMsg = `❌ Ваша профессия "${
+			const errorMsg = `Ваша профессия "${
 				player.profession?.name || 'Неизвестна'
 			}" не подходит для решения кризиса. Нужны: ${needed}`
 
@@ -1477,13 +1530,90 @@ export class GameGateway
 
 		game.voteTriggerCount = 0
 		game.voteRequests = new Set()
+		game.speakingTimePerPlayer = SPEAKING_TIME_PER_PLAYER
+
+		// Создаем очередь из живых игроков
+		const alivePlayers = this.getAlivePlayers(game)
+		game.speakingQueue = alivePlayers.map(p => p.id)
+		game.currentSpeakerId = game.speakingQueue[0] || undefined
+		game.speakerStartTime = Date.now()
+
+		// Создаем такую же очередь для раскрытия карт
+		game.revealQueue = [...game.speakingQueue]
+		game.currentRevealQueueIndex = 0
 
 		Array.from(game.players.values()).forEach(player => {
 			player.vote = undefined
 			player.votesAgainst = 0
 		})
 
-		this.setPhase(game, 'discussion', game.settings.discussionTime)
+		this.setPhase(game, 'discussion', game.speakingTimePerPlayer)
+
+		this.broadcastToGame(game.id, 'SPEAKER_CHANGED', {
+			speakerId: game.currentSpeakerId,
+			speakerName: game.currentSpeakerId ? game.players.get(game.currentSpeakerId)?.name : null,
+			timeLeft: game.speakingTimePerPlayer,
+		})
+
+		// Отправляем информацию о том, кто сейчас может раскрыть карту
+		this.broadcastToGame(game.id, 'REVEAL_QUEUE_CHANGED', {
+			currentPlayerId: game.revealQueue[game.currentRevealQueueIndex],
+			currentPlayerName: game.players.get(game.revealQueue[game.currentRevealQueueIndex])?.name,
+			queue: game.revealQueue,
+			currentIndex: game.currentRevealQueueIndex,
+		})
+
+		this.broadcastSystemMessage(
+			game,
+			`Начинается обсуждение. Первым говорит ${game.currentSpeakerId ? game.players.get(game.currentSpeakerId)?.name : 'никто'}. У вас ${game.speakingTimePerPlayer} секунд. Сейчас раскрывает карту ${game.players.get(game.revealQueue[game.currentRevealQueueIndex])?.name}.`,
+		)
+	}
+
+	private rotateSpeaker(game: GameState) {
+		if (game.phase !== 'discussion') return
+
+		if (!game.speakingQueue.length) {
+			game.speakingQueue = this.getAlivePlayers(game).map(p => p.id)
+		}
+
+		const currentIndex = game.speakingQueue.indexOf(game.currentSpeakerId || '')
+		const nextIndex = (currentIndex + 1) % game.speakingQueue.length
+
+		if (nextIndex === 0 && currentIndex !== -1) {
+			this.broadcastSystemMessage(game, 'Все игроки высказались.')
+			this.checkForCrisis(game)
+			return
+		}
+
+		game.currentSpeakerId = game.speakingQueue[nextIndex] || undefined
+		game.speakerStartTime = Date.now()
+
+		// Также переключаем очередь раскрытия карт на следующего игрока
+		if (game.currentRevealQueueIndex < game.revealQueue.length - 1) {
+			game.currentRevealQueueIndex++
+		} else {
+			game.currentRevealQueueIndex = 0
+		}
+
+		this.broadcastToGame(game.id, 'SPEAKER_CHANGED', {
+			speakerId: game.currentSpeakerId,
+			speakerName: game.currentSpeakerId ? game.players.get(game.currentSpeakerId)?.name : null,
+			timeLeft: game.speakingTimePerPlayer,
+		})
+
+		this.broadcastToGame(game.id, 'REVEAL_QUEUE_CHANGED', {
+			currentPlayerId: game.revealQueue[game.currentRevealQueueIndex],
+			currentPlayerName: game.players.get(game.revealQueue[game.currentRevealQueueIndex])?.name,
+			queue: game.revealQueue,
+			currentIndex: game.currentRevealQueueIndex,
+		})
+
+		this.broadcastSystemMessage(
+			game,
+			`Теперь говорит ${game.currentSpeakerId ? game.players.get(game.currentSpeakerId)?.name : 'никто'}. Сейчас раскрывает карту ${game.players.get(game.revealQueue[game.currentRevealQueueIndex])?.name}.`,
+		)
+
+		this.setPhase(game, 'discussion', game.speakingTimePerPlayer)
 	}
 
 	private startVotingPhase(game: GameState) {
@@ -1496,7 +1626,7 @@ export class GameGateway
 			player.votesAgainst = 0
 		})
 
-		this.broadcastSystemMessage(game, '🗳 Началось голосование.')
+		this.broadcastSystemMessage(game, 'Началось голосование.')
 		this.setPhase(game, 'voting', game.settings.votingTime)
 	}
 
@@ -1549,11 +1679,14 @@ export class GameGateway
 			player.score += 10
 		})
 
+		// Получаем все карты выбывшего игрока для отображения
+		const ejectedPlayerCards = this.getAllPlayerCards(ejectedPlayer)
+
 		this.broadcastToGame(game.id, 'PLAYER_EJECTED', {
 			playerId: ejectedPlayerId,
 			playerName: ejectedPlayer.name,
 			votes: maxVotes,
-			cards: this.getAllPlayerCards(ejectedPlayer),
+			cards: ejectedPlayerCards,
 		})
 
 		this.startRevealPhase(game, ejectedPlayer)
@@ -1728,6 +1861,11 @@ export class GameGateway
 		game.currentCrisis = undefined
 		game.voteTriggerCount = 0
 		game.voteRequests = new Set()
+		game.currentSpeakerId = undefined
+		game.speakingQueue = []
+		game.speakerStartTime = undefined
+		game.revealQueue = []
+		game.currentRevealQueueIndex = 0
 
 		Array.from(game.players.values()).forEach(player => {
 			player.hasUsedAbility = false
@@ -1833,7 +1971,8 @@ export class GameGateway
 				break
 
 			case 'discussion':
-				this.checkForCrisis(game)
+				// Если время истекло, переключаем на следующего говорящего
+				this.rotateSpeaker(game)
 				break
 
 			case 'voting':
@@ -1966,9 +2105,7 @@ export class GameGateway
 			currentCards.hiddenRole = this.toPublicCard('role', player.hiddenRole)
 		}
 
-		if (player.roleCard) {
-			currentCards.roleCard = this.toPublicCard('role', player.roleCard)
-		}
+		// НЕ отправляем roleCard - это служебная роль, не карта
 
 		if (player.gender) {
 			currentCards.gender = this.toPublicCard('gender', player.gender)
@@ -2091,12 +2228,11 @@ export class GameGateway
 			'trait',
 			'secret',
 			'resource',
-			'role',
+			// 'role' - убираем role из списка карт, так как это служебная роль
 		]
 
 		cardTypes.forEach(type => {
 			const card = this.getPlayerCardDetails(player, type)
-
 			if (card) {
 				cards[type] = card
 			}
@@ -2105,11 +2241,32 @@ export class GameGateway
 		return cards
 	}
 
+	private getDefaultNameForCard(card: any, type: CardKey): string {
+		if (card && typeof card === 'object') {
+			if (card.name) return String(card.name)
+			if (card.title) return String(card.title)
+			if (card.displayName) return String(card.displayName)
+		}
+		
+		switch (type) {
+			case 'profession': return 'Профессия'
+			case 'health': return 'Состояние здоровья'
+			case 'trait': return 'Характеристика'
+			case 'secret': return 'Секрет'
+			case 'role': return 'Роль'
+			case 'resource': return 'Ресурс'
+			case 'gender': return 'Пол'
+			case 'age': return 'Возраст'
+			case 'body': return 'Телосложение'
+			default: return String(type)
+		}
+	}
+
 	private toPublicCard(type: CardKey, card: any): PublicCard {
 		const base: PublicCard = {
 			id: String(card.id),
 			type,
-			name: String(card.name),
+			name: String(card.name || this.getDefaultNameForCard(card, type)),
 			description: String(card.description || ''),
 		}
 
@@ -2260,8 +2417,12 @@ export class GameGateway
 			> = {}
 
 			player.revealedCards.forEach(cardType => {
+				// Пропускаем roleCard (это служебная роль, не карта)
+				if (cardType === 'role' && player.roleCard) {
+					return
+				}
+				
 				const card = this.getPlayerCardDetails(player, cardType)
-
 				if (!card) return
 
 				revealedCardsInfo[cardType] = {
@@ -2323,6 +2484,9 @@ export class GameGateway
 				skippedCount: game.introSkippedBy?.size || 0,
 				playersCount: game.players.size,
 			},
+			currentSpeakerId: game.currentSpeakerId,
+			currentRevealPlayerId: game.revealQueue[game.currentRevealQueueIndex],
+			revealQueue: game.revealQueue,
 		}
 	}
 
@@ -2410,6 +2574,12 @@ export class GameGateway
 			dealtRounds: new Set(),
 			introCompletedBy: new Set(),
 			introSkippedBy: new Set(),
+			currentSpeakerId: undefined,
+			speakingQueue: [],
+			speakingTimePerPlayer: SPEAKING_TIME_PER_PLAYER,
+			speakerStartTime: undefined,
+			revealQueue: [],
+			currentRevealQueueIndex: 0,
 		}
 
 		this.games.set(gameId, gameState)

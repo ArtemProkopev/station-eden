@@ -13,7 +13,6 @@ import GameHeader from './components/GameHeader'
 import GamePhasePanel from './components/GamePhasePanel'
 import { useGameSession } from './components/hooks/useGameSession'
 import IntroCinematic from './components/IntroCinematic/IntroCinematic'
-import CardsTableModal from './components/modals/CardsTableModal'
 import CrisisModal from './components/modals/CrisisModal'
 import GameResultsModal from './components/modals/GameResultsModal'
 import MyCardsModal from './components/modals/MyCardsModal'
@@ -207,14 +206,18 @@ export default function GameSessionClient({ gameId }: Props) {
 				/>
 			)}
 
-			{showCardsTable && (
+			{/* CardsTable теперь отображается внутри GamePhasePanel, 
+			    поэтому отдельное модальное окно не нужно. 
+			    Убираем CardsTableModal, так как он не используется */}
+			
+			{/* {showCardsTable && (
 				<CardsTableModal
 					allPlayersCards={allPlayersCards}
 					myCards={myCards}
 					userId={userId}
 					onClose={() => setShowCardsTable(false)}
 				/>
-			)}
+			)} */}
 
 			{revealedPlayer && (
 				<RevealedPlayerModal

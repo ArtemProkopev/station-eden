@@ -28,6 +28,32 @@ export default function CrisisModal({
       )
     )
 
+  const getCrisisHelp = () => {
+    switch (crisis?.type) {
+      case 'technological':
+        return 'Требуется инженер для ремонта систем станции'
+      case 'biological':
+        return 'Требуется медик или биолог для лечения экипажа'
+      case 'external':
+        return 'Требуется специалист по связи или пилот для навигации'
+      default:
+        return 'Требуется специалист с соответствующей профессией'
+    }
+  }
+
+  const getCrisisTypeName = () => {
+    switch (crisis?.type) {
+      case 'technological':
+        return 'Технологический кризис'
+      case 'biological':
+        return 'Биологический кризис'
+      case 'external':
+        return 'Внешняя угроза'
+      default:
+        return 'Кризис'
+    }
+  }
+
   return (
     <div className={styles.modalOverlay}>
       <div className={styles.modalContent}>
@@ -38,19 +64,30 @@ export default function CrisisModal({
 
           <div className={styles.crisisInfo}>
             <p>
-              <strong>Тип:</strong>{' '}
-              {crisis?.type === 'technological'
-                ? 'Технологический'
-                : crisis?.type === 'biological'
-                  ? 'Биологический'
-                  : 'Внешняя угроза'}
+              <strong>Тип кризиса:</strong> {getCrisisTypeName()}
             </p>
             <p>
-              <strong>Штраф:</strong> {crisis?.penalty}
+              <strong>Что нужно делать?</strong>
+            </p>
+            <p className={styles.crisisHelp}>
+              {getCrisisHelp()}
             </p>
             <p>
-              <strong>Приоритетные профессии:</strong>{' '}
-              {crisis?.priorityProfessions?.join(', ') || 'Все'}
+              <strong>Штраф за нерешение:</strong> {crisis?.penalty}
+            </p>
+            <p>
+              <strong>Кто может решить:</strong>{' '}
+              {crisis?.priorityProfessions?.map(prof => {
+                const profNames: Record<string, string> = {
+                  'prof_engineer': 'Инженер',
+                  'prof_astrobiologist': 'Астробиолог',
+                  'prof_pilot': 'Пилот',
+                  'prof_surgeon': 'Хирург',
+                  'prof_linguist': 'Лингвист',
+                  'prof_security': 'Офицер безопасности'
+                }
+                return profNames[prof] || prof
+              }).join(', ') || 'Любой игрок'}
             </p>
             <p>
               <strong>Ваша профессия:</strong>{' '}
@@ -73,12 +110,20 @@ export default function CrisisModal({
             ) : (
               <div className={styles.cannotSolve}>
                 <p className={styles.cannotSolveText}>
-                  Ваша профессия &quot;{currentPlayer?.profession || 'Неизвестно'}&quot; не может
-                  решить этот кризис.
+                  Ваша профессия "{currentPlayer?.profession || 'Неизвестно'}" не может решить этот кризис.
                 </p>
                 <p className={styles.cannotSolveHint}>
-                  Ждите игрока с подходящей профессией:{' '}
-                  {crisis?.priorityProfessions?.join(', ')}
+                  Ждите игрока с подходящей профессией: {crisis?.priorityProfessions?.map(prof => {
+                    const profNames: Record<string, string> = {
+                      'prof_engineer': 'Инженер',
+                      'prof_astrobiologist': 'Астробиолог',
+                      'prof_pilot': 'Пилот',
+                      'prof_surgeon': 'Хирург',
+                      'prof_linguist': 'Лингвист',
+                      'prof_security': 'Офицер безопасности'
+                    }
+                    return profNames[prof] || prof
+                  }).join(', ')}
                 </p>
               </div>
             )}

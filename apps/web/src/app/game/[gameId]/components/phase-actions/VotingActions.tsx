@@ -57,11 +57,7 @@ function VoteOption({ player, currentPlayer, onVote }: VoteOptionProps) {
     >
       <div className={styles.votePlayerInfo}>
         <span className={styles.votePlayerName}>{player.name}</span>
-        {player.profession && (
-          <span className={styles.votePlayerProfession}>
-            {player.profession}
-          </span>
-        )}
+        {/* Убираем профессию из голосования */}
       </div>
       <div className={styles.voteCount}>
         Голосов: {player.votesAgainst || 0}

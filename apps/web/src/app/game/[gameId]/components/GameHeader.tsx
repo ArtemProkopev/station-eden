@@ -22,13 +22,19 @@ export default function GameHeader({
   const currentPlayer = userId ? players.find(p => p.id === userId) : undefined
   const alivePlayers = players.filter(p => p.isAlive === true)
 
+  // Проверяем, раскрыта ли профессия текущего игрока
+  const isProfessionRevealed = currentPlayer?.revealedCardsInfo?.profession !== undefined
+  const professionDisplay = isProfessionRevealed && currentPlayer?.profession 
+    ? currentPlayer.profession 
+    : 'Неизвестно'
+
   return (
     <header className={styles.header}>
       <div className={styles.gameTitle}>
         <h1>Станция Эдем</h1>
         <div className={styles.gameSubtitle}>
           <span className={styles.round}>
-            Раунд {Number(gameState.round || 1)}/{Number(gameState.maxRounds || 10)}
+            Раунд {Number(gameState.round || 1)}
           </span>
           <span className={styles.phase}>
             {getPhaseName(gameState.phase as GamePhase)}
@@ -65,6 +71,12 @@ export default function GameHeader({
               <span className={styles.statLabel}>Раскрыто</span>
               <span className={styles.statValue}>
                 {myRevealedCardsThisRound.length}/1
+              </span>
+            </div>
+            <div className={styles.statItem}>
+              <span className={styles.statLabel}>Профессия</span>
+              <span className={styles.statValue}>
+                {professionDisplay}
               </span>
             </div>
             {gameState.creatorId === userId && (
