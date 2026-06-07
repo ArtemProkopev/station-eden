@@ -30,6 +30,8 @@ type Player = {
 	isReady: boolean
 }
 
+type LobbyDifficulty = 'easy' | 'normal' | 'hard'
+
 type LobbySettings = {
 	maxPlayers: number
 	gameMode: string
@@ -37,8 +39,8 @@ type LobbySettings = {
 	password: string
 	visibility: LobbyVisibility
 	hasPassword: boolean
-	difficulty?: string
-	turnTime?: string
+	difficulty?: LobbyDifficulty
+	turnTime?: number
 	fastGame?: boolean
 	tournamentMode?: boolean
 	limitedResources?: boolean
@@ -71,6 +73,13 @@ const DEFAULT_LOBBY_SETTINGS: LobbySettings = {
 	password: '',
 	visibility: 'public',
 	hasPassword: false,
+	difficulty: 'normal',
+	turnTime: 180,
+	maxRounds: 10,
+	discussionTime: 180,
+	votingTime: 60,
+	hiddenRolesCount: 1,
+	enableCrises: true,
 }
 
 const LOBBY_ID_RE = /^[a-zA-Z0-9_-]{3,32}$/
@@ -86,6 +95,81 @@ const JOIN_WINDOW_MS = 10_000
 const JOIN_MAX_PER_IP = 5
 const MAX_CONN_PER_IP_TOTAL = 20
 
+const MIN_PLAYERS = 2
+const MIN_MAX_ROUNDS = 3
+const MAX_MAX_ROUNDS = 20
+const MIN_DISCUSSION_TIME = 30
+const MAX_DISCUSSION_TIME = 600
+const MIN_VOTING_TIME = 15
+const MAX_VOTING_TIME = 300
+
+const ALLOWED_GAME_MODES = new Set([
+	'standard',
+	'extended',
+	'competitive',
+	'cooperative',
+])
+
+const ALLOWED_DIFFICULTIES = new Set<LobbyDifficulty>([
+	'easy',
+	'normal',
+	'hard',
+])
+
+const ALLOWED_TURN_TIMES = new Set([60, 180, 300])
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function normalizeIntegerInRange(
+	value: unknown,
+	min: number,
+	max: number,
+): number | undefined {
+	if (typeof value !== 'number' || !Number.isFinite(value)) {
+		return undefined
+	}
+
+	const normalized = Math.trunc(value)
+
+	return Math.max(min, Math.min(max, normalized))
+}
+
+function normalizeBoolean(value: unknown): boolean | undefined {
+	return typeof value === 'boolean' ? value : undefined
+}
+
+function normalizeAllowedNumber(
+	value: unknown,
+	allowedValues: Set<number>,
+): number | undefined {
+	if (typeof value !== 'number' || !Number.isFinite(value)) {
+		return undefined
+	}
+
+	const normalized = Math.trunc(value)
+
+	return allowedValues.has(normalized) ? normalized : undefined
+}
+
+function normalizeGameMode(value: unknown): string | undefined {
+	if (typeof value !== 'string') {
+		return undefined
+	}
+
+	return ALLOWED_GAME_MODES.has(value) ? value : undefined
+}
+
+function normalizeDifficulty(value: unknown): LobbyDifficulty | undefined {
+	if (typeof value !== 'string') {
+		return undefined
+	}
+
+	return ALLOWED_DIFFICULTIES.has(value as LobbyDifficulty)
+		? (value as LobbyDifficulty)
+		: undefined
+}
 @WebSocketGateway({
 	path: '/lobby',
 	cors: {
@@ -274,6 +358,121 @@ export class LobbyGateway
 			visibility: lobby.visibility,
 			isPrivate: lobby.visibility === 'hidden_password',
 		}
+	}
+
+	private normalizeLobbySettingsPatch(
+		rawSettings: unknown,
+		lobby: LobbyState,
+	): Partial<LobbySettings> {
+		if (!isRecord(rawSettings)) {
+			return {}
+		}
+
+		const next: Partial<LobbySettings> = {}
+
+		const maxPlayers = normalizeIntegerInRange(
+			rawSettings.maxPlayers,
+			MIN_PLAYERS,
+			HARD_MAX_PLAYERS,
+		)
+
+		if (maxPlayers !== undefined) {
+			next.maxPlayers = maxPlayers
+		}
+
+		const effectiveMaxPlayers =
+			next.maxPlayers ??
+			Math.min(
+				lobby.settings.maxPlayers || DEFAULT_LOBBY_SETTINGS.maxPlayers,
+				HARD_MAX_PLAYERS,
+			)
+
+		const gameMode = normalizeGameMode(rawSettings.gameMode)
+
+		if (gameMode) {
+			next.gameMode = gameMode
+		}
+
+		const difficulty = normalizeDifficulty(rawSettings.difficulty)
+
+		if (difficulty) {
+			next.difficulty = difficulty
+		}
+
+		const turnTime = normalizeAllowedNumber(
+			rawSettings.turnTime,
+			ALLOWED_TURN_TIMES,
+		)
+
+		if (turnTime !== undefined) {
+			next.turnTime = turnTime
+		}
+
+		const maxRounds = normalizeIntegerInRange(
+			rawSettings.maxRounds,
+			MIN_MAX_ROUNDS,
+			MAX_MAX_ROUNDS,
+		)
+
+		if (maxRounds !== undefined) {
+			next.maxRounds = maxRounds
+		}
+
+		const discussionTime = normalizeIntegerInRange(
+			rawSettings.discussionTime,
+			MIN_DISCUSSION_TIME,
+			MAX_DISCUSSION_TIME,
+		)
+
+		if (discussionTime !== undefined) {
+			next.discussionTime = discussionTime
+		}
+
+		const votingTime = normalizeIntegerInRange(
+			rawSettings.votingTime,
+			MIN_VOTING_TIME,
+			MAX_VOTING_TIME,
+		)
+
+		if (votingTime !== undefined) {
+			next.votingTime = votingTime
+		}
+
+		const hiddenRolesCount = normalizeIntegerInRange(
+			rawSettings.hiddenRolesCount,
+			0,
+			Math.max(0, effectiveMaxPlayers - 1),
+		)
+
+		if (hiddenRolesCount !== undefined) {
+			next.hiddenRolesCount = hiddenRolesCount
+		}
+
+		const enableCrises = normalizeBoolean(rawSettings.enableCrises)
+
+		if (enableCrises !== undefined) {
+			next.enableCrises = enableCrises
+		}
+
+		const fastGame = normalizeBoolean(rawSettings.fastGame)
+
+		if (fastGame !== undefined) {
+			next.fastGame = fastGame
+		}
+
+		const tournamentMode = normalizeBoolean(rawSettings.tournamentMode)
+
+		if (tournamentMode !== undefined) {
+			next.tournamentMode = tournamentMode
+		}
+
+		const limitedResources = normalizeBoolean(rawSettings.limitedResources)
+
+		if (limitedResources !== undefined) {
+			next.limitedResources = limitedResources
+		}
+
+		return next
 	}
 
 	private emitLobbyState(lobbyId: string, lobby: LobbyState) {
@@ -742,16 +941,7 @@ export class LobbyGateway
 			return
 		}
 
-		const next: Partial<LobbySettings> = { ...data.settings }
-
-		delete next.password
-		delete next.hasPassword
-		delete next.visibility
-		delete next.isPrivate
-
-		if (typeof next.maxPlayers === 'number') {
-			next.maxPlayers = Math.max(2, Math.min(HARD_MAX_PLAYERS, next.maxPlayers))
-		}
+		const next = this.normalizeLobbySettingsPatch(data?.settings, lobby)
 
 		Object.assign(lobby.settings, next)
 

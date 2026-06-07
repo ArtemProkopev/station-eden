@@ -117,7 +117,6 @@ export interface PublicLobbyInfo {
 	hasPassword: boolean
 	createdAt: ISODateString
 }
-
 export interface LobbySettings {
 	maxPlayers: number
 	gameMode: string
@@ -125,11 +124,17 @@ export interface LobbySettings {
 	visibility?: LobbyVisibility
 	hasPassword?: boolean
 	password?: string
-	difficulty?: 'easy' | 'medium' | 'hard'
+	difficulty?: 'easy' | 'normal' | 'hard'
 	turnTime?: number
 	fastGame?: boolean
 	tournamentMode?: boolean
 	limitedResources?: boolean
+
+	maxRounds?: number
+	discussionTime?: number
+	votingTime?: number
+	hiddenRolesCount?: number
+	enableCrises?: boolean
 }
 
 export interface LobbyPlayer {
@@ -152,9 +157,14 @@ export interface ChatMessage {
 
 export interface GameSettings {
 	gameMode: string
-	difficulty?: 'easy' | 'medium' | 'hard'
+	difficulty?: 'easy' | 'normal' | 'hard'
 	turnTime?: number
 	maxRounds?: number
+	discussionTime?: number
+	votingTime?: number
+	hiddenRolesCount?: number
+	enableCrises?: boolean
+	tournamentMode?: boolean
 }
 
 export interface GamePlayer {

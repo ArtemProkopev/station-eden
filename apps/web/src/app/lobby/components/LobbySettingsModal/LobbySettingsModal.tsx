@@ -17,7 +17,6 @@ export function LobbySettingsModal({
 	onSaveSettings,
 }: LobbySettingsModalProps) {
 	const [settings, setSettings] = useState<LobbySettings>(currentSettings)
-	const [showPassword, setShowPassword] = useState(false)
 	const [activeTab, setActiveTab] = useState<'basic' | 'advanced'>('basic')
 
 	useEffect(() => {
@@ -25,7 +24,11 @@ export function LobbySettingsModal({
 	}, [isOpen, currentSettings])
 
 	const handleSave = () => {
-		onSaveSettings(settings)
+		onSaveSettings({
+			...settings,
+			difficulty: settings.difficulty || 'normal',
+		})
+
 		onClose()
 	}
 
@@ -41,11 +44,13 @@ export function LobbySettingsModal({
 			competitive: 'Соревновательный',
 			cooperative: 'Кооперативный',
 		}
+
 		return modes[mode] || mode
 	}
 
 	const getTurnTimeLabel = (turnTime?: number) => {
 		if (turnTime == null) return null
+
 		switch (turnTime) {
 			case 60:
 				return '1 минута'
@@ -57,6 +62,23 @@ export function LobbySettingsModal({
 				return `${turnTime} сек`
 		}
 	}
+
+	const getAccessLabel = () => {
+		if (settings.visibility === 'hidden_password') {
+			return '🔒 Скрытое лобби по паролю'
+		}
+
+		if (settings.visibility === 'password' || settings.hasPassword) {
+			return '🔒 Лобби по паролю'
+		}
+
+		return '🔓 Публичное лобби'
+	}
+
+	const isAccessRestricted =
+		settings.visibility === 'hidden_password' ||
+		settings.visibility === 'password' ||
+		!!settings.hasPassword
 
 	if (!isOpen) return null
 
@@ -77,14 +99,19 @@ export function LobbySettingsModal({
 				<div className={styles.tabs}>
 					<button
 						type='button'
-						className={`${styles.tab} ${activeTab === 'basic' ? styles.activeTab : ''}`}
+						className={`${styles.tab} ${
+							activeTab === 'basic' ? styles.activeTab : ''
+						}`}
 						onClick={() => setActiveTab('basic')}
 					>
 						Основные
 					</button>
+
 					<button
 						type='button'
-						className={`${styles.tab} ${activeTab === 'advanced' ? styles.activeTab : ''}`}
+						className={`${styles.tab} ${
+							activeTab === 'advanced' ? styles.activeTab : ''
+						}`}
 						onClick={() => setActiveTab('advanced')}
 					>
 						Дополнительно
@@ -96,6 +123,7 @@ export function LobbySettingsModal({
 						<div className={styles.settingGroup}>
 							<div className={styles.settingItem}>
 								<label className={styles.settingLabel}>Максимум игроков</label>
+
 								<select
 									value={String(settings.maxPlayers)}
 									onChange={e =>
@@ -116,10 +144,14 @@ export function LobbySettingsModal({
 
 							<div className={styles.settingItem}>
 								<label className={styles.settingLabel}>Режим игры</label>
+
 								<select
 									value={settings.gameMode}
 									onChange={e =>
-										setSettings(prev => ({ ...prev, gameMode: e.target.value }))
+										setSettings(prev => ({
+											...prev,
+											gameMode: e.target.value,
+										}))
 									}
 									className={styles.select}
 								>
@@ -129,52 +161,6 @@ export function LobbySettingsModal({
 									<option value='cooperative'>Кооперативный</option>
 								</select>
 							</div>
-
-							<div className={styles.settingItem}>
-								<label className={styles.checkboxLabel}>
-									<input
-										type='checkbox'
-										checked={settings.isPrivate}
-										onChange={e =>
-											setSettings(prev => ({
-												...prev,
-												isPrivate: e.target.checked,
-												// если выключили приватность — пароль можно почистить
-												password: e.target.checked ? prev.password : undefined,
-											}))
-										}
-										className={styles.checkbox}
-									/>
-									Приватное лобби
-								</label>
-							</div>
-
-							{settings.isPrivate && (
-								<div className={styles.settingItem}>
-									<label className={styles.settingLabel}>Пароль доступа</label>
-									<input
-										type={showPassword ? 'text' : 'password'}
-										value={settings.password || ''}
-										onChange={e =>
-											setSettings(prev => ({
-												...prev,
-												password: e.target.value,
-											}))
-										}
-										className={styles.passwordInput}
-										placeholder='Введите пароль...'
-									/>
-									<label className={styles.checkboxLabel}>
-										<input
-											type='checkbox'
-											checked={showPassword}
-											onChange={e => setShowPassword(e.target.checked)}
-											className={styles.checkbox}
-										/>
-										Показать пароль
-									</label>
-								</div>
-							)}
 						</div>
 					)}
 
@@ -182,31 +168,29 @@ export function LobbySettingsModal({
 						<div className={styles.settingGroup}>
 							<div className={styles.settingItem}>
 								<label className={styles.settingLabel}>Сложность</label>
+
 								<select
-									value={settings.difficulty || ''}
+									value={settings.difficulty || 'normal'}
 									onChange={e => {
-										const val = e.target.value
+										const val = e.target.value as 'easy' | 'normal' | 'hard'
+
 										setSettings(prev => ({
 											...prev,
-											difficulty:
-												val === ''
-													? undefined
-													: (val as 'easy' | 'medium' | 'hard'),
+											difficulty: val,
 										}))
 									}}
 									className={styles.select}
 								>
-									<option value=''>Автоматическая</option>
 									<option value='easy'>Лёгкая</option>
-									<option value='medium'>Средняя</option>
+									<option value='normal'>Средняя</option>
 									<option value='hard'>Сложная</option>
 								</select>
 							</div>
 
 							<div className={styles.settingItem}>
 								<label className={styles.settingLabel}>Время на ход</label>
+
 								<select
-									// select хранит string, а в состоянии держим number | undefined
 									value={
 										settings.turnTime == null
 											? 'unlimited'
@@ -214,6 +198,7 @@ export function LobbySettingsModal({
 									}
 									onChange={e => {
 										const v = e.target.value
+
 										setSettings(prev => ({
 											...prev,
 											turnTime: v === 'unlimited' ? undefined : Number(v),
@@ -233,6 +218,7 @@ export function LobbySettingsModal({
 
 				<div className={styles.preview}>
 					<h3 className={styles.previewTitle}>Предпросмотр настроек</h3>
+
 					<div className={styles.previewContent}>
 						<div className={styles.previewItem}>
 							<span>Игроков:</span>
@@ -247,23 +233,20 @@ export function LobbySettingsModal({
 						<div className={styles.previewItem}>
 							<span>Доступ:</span>
 							<span
-								className={settings.isPrivate ? styles.private : styles.public}
+								className={isAccessRestricted ? styles.private : styles.public}
 							>
-								{settings.isPrivate ? '🔒 Приватное' : '🔓 Публичное'}
-								{settings.isPrivate && settings.password && ' (с паролем)'}
+								{getAccessLabel()}
 							</span>
 						</div>
 
-						{settings.difficulty && (
-							<div className={styles.previewItem}>
-								<span>Сложность:</span>
-								<span>
-									{settings.difficulty === 'easy' && 'Лёгкая'}
-									{settings.difficulty === 'medium' && 'Средняя'}
-									{settings.difficulty === 'hard' && 'Сложная'}
-								</span>
-							</div>
-						)}
+						<div className={styles.previewItem}>
+							<span>Сложность:</span>
+							<span>
+								{(settings.difficulty || 'normal') === 'easy' && 'Лёгкая'}
+								{(settings.difficulty || 'normal') === 'normal' && 'Средняя'}
+								{(settings.difficulty || 'normal') === 'hard' && 'Сложная'}
+							</span>
+						</div>
 
 						{settings.turnTime != null && (
 							<div className={styles.previewItem}>
@@ -282,6 +265,7 @@ export function LobbySettingsModal({
 					>
 						Отмена
 					</button>
+
 					<button
 						className={styles.saveButton}
 						onClick={handleSave}
