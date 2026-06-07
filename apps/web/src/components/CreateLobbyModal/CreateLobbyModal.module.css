@@ -466,31 +466,79 @@
 }
 
 .refreshButton {
+	position: relative;
 	flex: 0 0 auto;
-	min-height: 38px;
-	padding: 0 14px;
-	border: 1px solid rgba(99, 239, 255, 0.28);
-	border-radius: 10px;
-	background: rgba(99, 239, 255, 0.07);
+	width: 44px;
+	height: 44px;
+	min-width: 44px;
+	min-height: 44px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	border: 0;
+	background: transparent;
 	color: var(--modal-accent);
-	font-family: 'RussoOne', sans-serif;
-	font-size: 12px;
 	cursor: pointer;
-	transition:
-		transform 180ms ease,
-		background 180ms ease,
-		border-color 180ms ease;
+	box-shadow: none;
+	transition: opacity 160ms ease;
 }
 
 .refreshButton:hover:not(:disabled) {
-	transform: translateY(-1px);
-	background: rgba(99, 239, 255, 0.14);
-	border-color: rgba(99, 239, 255, 0.58);
+	background: transparent;
+	box-shadow: none;
+	transform: none;
+	filter: none;
+}
+
+.refreshButton:active:not(:disabled) {
+	transform: none;
+	filter: none;
+	opacity: 0.78;
+}
+
+.refreshButton:focus-visible {
+	outline: 1px solid rgba(99, 239, 255, 0.72);
+	outline-offset: 4px;
+	box-shadow: none;
 }
 
 .refreshButton:disabled {
-	cursor: not-allowed;
-	opacity: 0.58;
+	cursor: wait;
+	opacity: 0.82;
+	transform: none;
+}
+
+.refreshSpinner {
+	width: 34px;
+	height: 34px;
+	border-radius: 50%;
+	padding: 5px;
+	background:
+		conic-gradient(from 135deg at top, var(--modal-accent) 90deg, transparent 0)
+			0 calc(50% - 3px) / 13px 6.5px,
+		radial-gradient(
+				farthest-side at bottom left,
+				transparent calc(100% - 5px),
+				var(--modal-accent) calc(100% - 4px) 99%,
+				transparent
+			)
+			top right / 50% 50% content-box content-box,
+		radial-gradient(
+				farthest-side at top,
+				transparent calc(100% - 5px),
+				var(--modal-accent) calc(100% - 4px) 99%,
+				transparent
+			)
+			bottom / 100% 50% content-box content-box;
+	background-repeat: no-repeat;
+	filter: drop-shadow(0 0 7px rgba(99, 239, 255, 0.5));
+	transform: rotate(180deg);
+	transform-origin: center;
+}
+
+.refreshSpinnerActive {
+	animation: refreshSpin 900ms linear infinite;
 }
 
 .emptyState {
@@ -808,6 +856,15 @@
 	}
 }
 
+@keyframes refreshSpin {
+	from {
+		transform: rotate(180deg);
+	}
+	to {
+		transform: rotate(540deg);
+	}
+}
+
 @media (max-width: 720px) {
 	.overlay {
 		padding: 72px 14px 20px;
@@ -851,7 +908,9 @@
 	}
 
 	.refreshButton {
-		width: 100%;
+		width: 44px;
+		min-width: 44px;
+		align-self: flex-end;
 	}
 
 	.lobbyTitleRow {

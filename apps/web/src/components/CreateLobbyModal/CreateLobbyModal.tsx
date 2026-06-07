@@ -166,11 +166,29 @@ export function CreateLobbyModal({
 		setIsOpenLobbiesLoading(true)
 		setOpenLobbiesError('')
 
+		const startedAt = Date.now()
+		const minLoadingMs = 650
+
+		const waitForMinLoading = async () => {
+			const elapsed = Date.now() - startedAt
+
+			if (elapsed < minLoadingMs) {
+				await new Promise<void>(resolve => {
+					window.setTimeout(resolve, minLoadingMs - elapsed)
+				})
+			}
+		}
+
 		try {
 			const lobbies = await api.openLobbies()
+
+			await waitForMinLoading()
+
 			setOpenLobbies(normalizeOpenLobbies(lobbies))
 			setNowTick(Date.now())
 		} catch (error) {
+			await waitForMinLoading()
+
 			console.error(error)
 			setOpenLobbiesError('Не удалось загрузить список активных лобби.')
 		} finally {
@@ -424,8 +442,22 @@ export function CreateLobbyModal({
 					className={styles.refreshButton}
 					onClick={loadOpenLobbies}
 					disabled={isOpenLobbiesLoading}
+					aria-label={
+						isOpenLobbiesLoading
+							? 'Обновление списка лобби'
+							: 'Обновить список лобби'
+					}
+					title={
+						isOpenLobbiesLoading ? 'Обновление...' : 'Обновить список лобби'
+					}
+					aria-busy={isOpenLobbiesLoading}
 				>
-					{isOpenLobbiesLoading ? 'Обновление...' : 'Обновить'}
+					<span
+						className={`${styles.refreshSpinner} ${
+							isOpenLobbiesLoading ? styles.refreshSpinnerActive : ''
+						}`}
+						aria-hidden='true'
+					/>
 				</button>
 			</div>
 
