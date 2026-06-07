@@ -1890,9 +1890,14 @@ export class GameGateway
 				return player.secret ? this.toPublicCard('secret', player.secret) : null
 
 			case 'role':
-				if (player.hiddenRole)
+				if (player.roleCard) {
+					return this.toPublicCard('role', player.roleCard)
+				}
+
+				if (player.hiddenRole) {
 					return this.toPublicCard('role', player.hiddenRole)
-				if (player.roleCard) return this.toPublicCard('role', player.roleCard)
+				}
+
 				return null
 
 			case 'resource':
