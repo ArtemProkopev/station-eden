@@ -11,6 +11,7 @@ import {
 	WebSocketServer,
 } from '@nestjs/websockets'
 import * as cookie from 'cookie'
+import { randomBytes } from 'crypto'
 import { Server, Socket } from 'socket.io'
 import { GameGateway } from '../game/game.gateway'
 
@@ -59,6 +60,10 @@ const DEFAULT_LOBBY_SETTINGS: LobbySettings = {
 }
 
 const LOBBY_ID_RE = /^[a-zA-Z0-9_-]{3,32}$/
+const GAME_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+const GAME_CODE_LENGTH = 8
+const GAME_CODE_PREFIX = 'EDEN'
+const GAME_CODE_MAX_ATTEMPTS = 50
 const HARD_MAX_PLAYERS = 6
 const MSG_MAX_LEN = 300
 const MSG_WINDOW_MS = 10_000
@@ -91,7 +96,7 @@ export class LobbyGateway
 	constructor(
 		private readonly jwtService: JwtService,
 		private readonly configService: ConfigService,
-		private readonly gameGateway: GameGateway
+		private readonly gameGateway: GameGateway,
 	) {}
 
 	private lobbies = new Map<string, LobbyState>()
@@ -163,6 +168,45 @@ export class LobbyGateway
 		return true
 	}
 
+	private createRandomGameCode(length = GAME_CODE_LENGTH) {
+		const bytes = randomBytes(length)
+
+		return Array.from(bytes, byte => {
+			const index = byte & 31
+			return GAME_CODE_ALPHABET[index]
+		}).join('')
+	}
+
+	private formatPublicGameId(code: string) {
+		const firstGroup = code.slice(0, 4)
+		const secondGroup = code.slice(4, 8)
+
+		return `${GAME_CODE_PREFIX}-${firstGroup}-${secondGroup}`
+	}
+
+	private isGameIdTaken(gameId: string) {
+		if (this.gameGateway.getGameState(gameId)) {
+			return true
+		}
+
+		return Array.from(this.lobbies.values()).some(
+			lobby => lobby.gameId === gameId,
+		)
+	}
+
+	private generatePublicGameId() {
+		for (let attempt = 0; attempt < GAME_CODE_MAX_ATTEMPTS; attempt++) {
+			const code = this.createRandomGameCode()
+			const gameId = this.formatPublicGameId(code)
+
+			if (!this.isGameIdTaken(gameId)) {
+				return gameId
+			}
+		}
+
+		throw new Error('Не удалось сгенерировать уникальный ID игры')
+	}
+
 	afterInit() {
 		this.logger.log('LobbyGateway initialized')
 	}
@@ -197,7 +241,7 @@ export class LobbyGateway
 				this.logger.warn(
 					`Unauthorized WS connection attempt - no "${accessCookieName}" cookie. Cookies: ${
 						rawCookie || '<empty>'
-					}`
+					}`,
 				)
 				socket.emit('ERROR', { message: 'Authentication required' })
 				socket.disconnect(true)
@@ -210,7 +254,7 @@ export class LobbyGateway
 
 			if (!jwtSecret) {
 				this.logger.error(
-					'JWT secret is not configured (JWT_ACCESS_SECRET / JWT_SECRET)'
+					'JWT secret is not configured (JWT_ACCESS_SECRET / JWT_SECRET)',
 				)
 				socket.emit('ERROR', { message: 'Server auth configuration error' })
 				socket.disconnect(true)
@@ -224,7 +268,7 @@ export class LobbyGateway
 				})
 			} catch (err) {
 				this.logger.warn(
-					`Invalid WS token provided: ${(err as Error).message || err}`
+					`Invalid WS token provided: ${(err as Error).message || err}`,
 				)
 				socket.emit('ERROR', { message: 'Invalid authentication token' })
 				socket.disconnect(true)
@@ -252,7 +296,7 @@ export class LobbyGateway
 			const existingLobby = this.lobbies.get(lobbyId)
 			if (existingLobby?.gameStarted) {
 				this.logger.warn(
-					`Player ${username} tried to join lobby ${lobbyId} after game started`
+					`Player ${username} tried to join lobby ${lobbyId} after game started`,
 				)
 				socket.emit('ERROR', {
 					message: 'Game has already started in this lobby',
@@ -281,7 +325,7 @@ export class LobbyGateway
 			const lobby = this.lobbies.get(lobbyId)!
 			const effectiveMax = Math.min(
 				lobby.settings.maxPlayers || 4,
-				HARD_MAX_PLAYERS
+				HARD_MAX_PLAYERS,
 			)
 
 			if (lobby.players.size >= effectiveMax) {
@@ -302,7 +346,7 @@ export class LobbyGateway
 			})
 
 			this.logger.log(
-				`Player connected: ${username} (${userId}) to lobby ${lobbyId}, players: ${lobby.players.size}`
+				`Player connected: ${username} (${userId}) to lobby ${lobbyId}, players: ${lobby.players.size}`,
 			)
 		} catch (error) {
 			this.logger.error('Connection error:', error)
@@ -329,7 +373,7 @@ export class LobbyGateway
 
 			this.server.to(lobbyId).emit('PLAYER_LEFT', { playerId: userId })
 			this.logger.log(
-				`Player disconnected: ${player.name} from lobby ${lobbyId}`
+				`Player disconnected: ${player.name} from lobby ${lobbyId}`,
 			)
 
 			if (lobby.players.size === 0 && lobby.connections.size === 0) {
@@ -340,7 +384,7 @@ export class LobbyGateway
 				if (remainingPlayers.length > 0) {
 					lobby.creatorId = remainingPlayers[0]
 					this.logger.log(
-						`New lobby creator: ${lobby.creatorId} for lobby ${lobbyId}`
+						`New lobby creator: ${lobby.creatorId} for lobby ${lobbyId}`,
 					)
 				}
 			}
@@ -366,7 +410,7 @@ export class LobbyGateway
 
 		const effectiveMax = Math.min(
 			lobby.settings.maxPlayers || 4,
-			HARD_MAX_PLAYERS
+			HARD_MAX_PLAYERS,
 		)
 		if (lobby.players.size >= effectiveMax) {
 			socket.emit('ERROR', { message: 'Lobby is full' })
@@ -442,7 +486,7 @@ export class LobbyGateway
 	@SubscribeMessage('TOGGLE_READY')
 	handleToggleReady(
 		socket: Socket,
-		data: { playerId?: string; isReady: boolean }
+		data: { playerId?: string; isReady: boolean },
 	) {
 		const { userId, lobbyId } = socket.data
 		const lobby = this.lobbies.get(lobbyId)
@@ -482,7 +526,7 @@ export class LobbyGateway
 	@SubscribeMessage('UPDATE_LOBBY_SETTINGS')
 	handleUpdateLobbySettings(
 		socket: Socket,
-		data: { settings: Partial<LobbySettings> }
+		data: { settings: Partial<LobbySettings> },
 	) {
 		const { userId, lobbyId } = socket.data
 		const lobby = this.lobbies.get(lobbyId)
@@ -511,7 +555,7 @@ export class LobbyGateway
 
 		const effectiveMax = Math.min(
 			lobby.settings.maxPlayers || 4,
-			HARD_MAX_PLAYERS
+			HARD_MAX_PLAYERS,
 		)
 
 		this.server.to(lobbyId).emit('LOBBY_SETTINGS_UPDATED', {
@@ -607,8 +651,8 @@ export class LobbyGateway
 			}
 
 			const notReadyPlayers = Array.from(lobby.players.values())
-				.filter(p => !p.isReady)
-				.map(p => p.name)
+				.filter(player => !player.isReady)
+				.map(player => player.name)
 
 			if (notReadyPlayers.length > 0) {
 				socket.emit('ERROR', {
@@ -617,19 +661,17 @@ export class LobbyGateway
 				return
 			}
 
-			const gameId = `game-${targetLobbyId}-${Date.now()}-${Math.random()
-				.toString(36)
-				.substr(2, 9)}`
+			const gameId = this.generatePublicGameId()
 
 			lobby.gameStarted = true
 			lobby.gameId = gameId
 
-			const playersForGame = Array.from(lobby.players.values()).map(p => ({
-				id: p.id,
-				name: p.name,
-				missions: p.missions,
-				hours: p.hours,
-				avatar: p.avatar,
+			const playersForGame = Array.from(lobby.players.values()).map(player => ({
+				id: player.id,
+				name: player.name,
+				missions: player.missions,
+				hours: player.hours,
+				avatar: player.avatar,
 			}))
 
 			const gameSettingsForGateway = {
@@ -640,7 +682,7 @@ export class LobbyGateway
 				votingTime: lobby.settings.votingTime ?? 60,
 				hiddenRolesCount: Math.min(
 					lobby.settings.hiddenRolesCount ?? 1,
-					playersForGame.length
+					playersForGame.length,
 				),
 				enableCrises: lobby.settings.enableCrises !== false,
 				difficulty:
@@ -653,11 +695,11 @@ export class LobbyGateway
 				gameId,
 				playersForGame,
 				lobby.creatorId,
-				gameSettingsForGateway
+				gameSettingsForGateway,
 			)
 
 			this.logger.log(
-				`Game created via GameGateway: ${gameId} from lobby ${targetLobbyId} by ${username}`
+				`Game created via GameGateway: ${gameId} from lobby ${targetLobbyId} by ${username}`,
 			)
 
 			this.server.to(targetLobbyId).emit('GAME_STARTED', {
@@ -674,13 +716,14 @@ export class LobbyGateway
 				playerName: 'Система',
 				timestamp: new Date().toISOString(),
 			}
+
 			this.server
 				.to(targetLobbyId)
 				.emit('CHAT_MESSAGE', { message: systemMessage })
 
 			setTimeout(() => {
-				const l = this.lobbies.get(targetLobbyId)
-				if (l && l.connections.size === 0) {
+				const currentLobby = this.lobbies.get(targetLobbyId)
+				if (currentLobby && currentLobby.connections.size === 0) {
 					this.lobbies.delete(targetLobbyId)
 					this.logger.log(`Lobby ${targetLobbyId} cleaned up after game start`)
 				}
@@ -712,7 +755,7 @@ export class LobbyGateway
 	getAllLobbies() {
 		return Array.from(this.lobbies.entries()).map(([lobbyId, lobby]) => ({
 			lobbyId,
-			players: Array.from(lobby.players.values()).map(p => p.name),
+			players: Array.from(lobby.players.values()).map(player => player.name),
 			settings: lobby.settings,
 			creatorId: lobby.creatorId,
 			connections: lobby.connections.size,

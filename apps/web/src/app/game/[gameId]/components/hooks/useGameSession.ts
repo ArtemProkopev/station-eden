@@ -974,14 +974,8 @@ export function useGameSession(gameId: string) {
 			return `/lobby/${encodeURIComponent(lobbyId)}`
 		}
 
-		const lobbyIdFromGameId = gameId.match(/^game-(.+)-\d+-[a-z0-9]+$/i)?.[1]
-
-		if (lobbyIdFromGameId && /^[a-zA-Z0-9_-]{3,32}$/.test(lobbyIdFromGameId)) {
-			return `/lobby/${encodeURIComponent(lobbyIdFromGameId)}`
-		}
-
 		return '/lobby'
-	}, [gameId, gameState])
+	}, [gameState])
 
 	const handleLeaveGame = () => {
 		if (!window.confirm('Вы уверены, что хотите покинуть игру?')) return

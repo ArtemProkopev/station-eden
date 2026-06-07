@@ -229,7 +229,7 @@ type GameState = {
 	introSkippedBy: Set<string>
 }
 
-const GAME_ID_RE = /^game-[a-zA-Z0-9_-]+$/
+const GAME_ID_RE = /^(?:EDEN-)?[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/
 const MSG_WINDOW_MS = 10_000
 const MSG_MAX_PER_WINDOW = 15
 const MSG_MAX_LEN = 300
@@ -580,6 +580,17 @@ export class GameGateway
 				this.configService.get<string>('JWT_ACCESS_SECRET') ||
 				this.configService.get<string>('JWT_SECRET')
 
+			if (!jwtSecret) {
+				this.logger.error(
+					'JWT secret is not configured (JWT_ACCESS_SECRET / JWT_SECRET)',
+				)
+				socket.emit('ERROR', {
+					message: 'Ошибка настройки авторизации сервера',
+				})
+				socket.disconnect(true)
+				return
+			}
+
 			let payload: any
 
 			try {
@@ -622,6 +633,16 @@ export class GameGateway
 				return
 			}
 
+			const player = game.players.get(userId)
+
+			if (!player) {
+				socket.emit('ERROR', {
+					message: 'Вы не являетесь участником этой игры',
+				})
+				socket.disconnect(true)
+				return
+			}
+
 			socket.data.userId = userId
 			socket.data.username = username
 			socket.data.gameId = gameId
@@ -630,9 +651,7 @@ export class GameGateway
 
 			game.connections.set(userId, socket)
 
-			const player = game.players.get(userId)
-
-			if (player && player.isAlive === undefined) {
+			if (player.isAlive === undefined) {
 				player.isAlive = true
 			}
 
@@ -671,8 +690,8 @@ export class GameGateway
 		const { userId, gameId: socketGameId } = socket.data
 		const targetGameId = data?.gameId || socketGameId
 
-		if (!targetGameId) {
-			socket.emit('ERROR', { message: 'Требуется ID игры' })
+		if (!targetGameId || !GAME_ID_RE.test(targetGameId)) {
+			socket.emit('ERROR', { message: 'Неверный идентификатор игры' })
 			return
 		}
 
@@ -698,10 +717,24 @@ export class GameGateway
 		const { userId, username, gameId: socketGameId } = socket.data
 		const targetGameId = data?.gameId || socketGameId
 
-		if (!targetGameId) return
+		if (!targetGameId || !GAME_ID_RE.test(targetGameId)) {
+			socket.emit('ERROR', { message: 'Неверный идентификатор игры' })
+			return
+		}
 
 		const game = this.games.get(targetGameId)
-		if (!game) return
+
+		if (!game) {
+			socket.emit('ERROR', { message: 'Игра не найдена' })
+			return
+		}
+
+		if (!game.players.has(userId)) {
+			socket.emit('ERROR', {
+				message: 'Вы не являетесь участником этой игры',
+			})
+			return
+		}
 
 		game.connections.delete(userId)
 		socket.leave(targetGameId)
@@ -1182,7 +1215,10 @@ export class GameGateway
 		const { userId, gameId: socketGameId } = socket.data
 		const targetGameId = data?.gameId || socketGameId
 
-		if (!targetGameId) return
+		if (!targetGameId || !GAME_ID_RE.test(targetGameId)) {
+			socket.emit('ERROR', { message: 'Неверный идентификатор игры' })
+			return
+		}
 
 		const game = this.games.get(targetGameId)
 
@@ -1193,6 +1229,13 @@ export class GameGateway
 
 		if (game.status !== 'active') {
 			socket.emit('ERROR', { message: 'Игра не активна' })
+			return
+		}
+
+		if (!game.players.has(userId)) {
+			socket.emit('ERROR', {
+				message: 'Вы не являетесь участником этой игры',
+			})
 			return
 		}
 
