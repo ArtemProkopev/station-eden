@@ -1,86 +1,299 @@
 .header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-  gap: 16px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	width: 100%;
+	margin-bottom: 16px;
+	flex-wrap: wrap;
+	gap: 16px;
 }
 
 .title {
-  font-size: 32px;
-  font-weight: 700;
-  color: #63EFFF;
-  text-shadow: 0 0 10px rgba(99, 239, 255, 0.6);
-  margin: 0;
+	font-size: 32px;
+	font-weight: 700;
+	color: #63efff;
+	text-shadow: 0 0 10px rgba(99, 239, 255, 0.6);
+	margin: 0;
 }
 
 .headerInfo {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	flex-wrap: wrap;
 }
 
-.lobbyId {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 14px;
-  font-family: 'RussoOne', sans-serif;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(99, 239, 255, 0.3);
+.headerMeta {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+.lobbyIdPill {
+	position: relative;
+	display: inline-flex;
+	align-items: stretch;
+	min-height: 36px;
+	border-radius: 8px;
+	border: 1px solid rgba(99, 239, 255, 0.3);
+	background: rgba(255, 255, 255, 0.1);
+	box-shadow:
+		0 0 10px rgba(99, 239, 255, 0.08),
+		inset 0 0 8px rgba(99, 239, 255, 0.03);
+	overflow: visible;
+}
+
+.lobbyIdText {
+	display: inline-flex;
+	align-items: center;
+	padding: 6px 12px;
+	color: rgba(255, 255, 255, 0.72);
+	font-size: 14px;
+	font-family: 'RussoOne', sans-serif;
+	line-height: 1;
+	white-space: nowrap;
+}
+
+.lobbyIdDivider {
+	width: 1px;
+	align-self: stretch;
+	background: rgba(99, 239, 255, 0.24);
+	box-shadow: 0 0 6px rgba(99, 239, 255, 0.12);
+}
+
+.copyLinkButton {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 38px;
+	min-height: 36px;
+	padding: 0;
+	border: 0;
+	border-radius: 0 8px 8px 0;
+	background: transparent;
+	color: rgba(214, 251, 255, 0.88);
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+	transition:
+		transform 0.18s ease,
+		background 0.18s ease,
+		color 0.18s ease,
+		box-shadow 0.18s ease;
+}
+
+.copyLinkButton::before {
+	content: '';
+	position: absolute;
+	inset: 2px;
+	border-radius: 0 6px 6px 0;
+	background: transparent;
+	transition:
+		background 0.18s ease,
+		box-shadow 0.18s ease;
+	pointer-events: none;
+}
+
+.copyLinkButton:hover::before {
+	background: rgba(99, 239, 255, 0.08);
+	box-shadow: inset 0 0 10px rgba(99, 239, 255, 0.06);
+}
+
+.copyLinkButton:hover {
+	transform: translateY(-1px);
+	color: #dffcff;
+}
+
+.copyLinkButton:active {
+	transform: scale(0.96);
+}
+
+.copyLinkButton:focus-visible {
+	outline: none;
+	color: #dffcff;
+}
+
+.copyLinkButton:focus-visible::before {
+	background: rgba(99, 239, 255, 0.1);
+	box-shadow:
+		inset 0 0 10px rgba(99, 239, 255, 0.08),
+		0 0 0 2px rgba(99, 239, 255, 0.18);
+}
+
+.copyLinkButton.copied {
+	color: #5fffc2;
+}
+
+.copyLinkButton.copied::before {
+	background: rgba(95, 255, 194, 0.08);
+	box-shadow:
+		inset 0 0 12px rgba(95, 255, 194, 0.08),
+		0 0 10px rgba(95, 255, 194, 0.12);
+}
+
+.copyLinkIcon {
+	position: relative;
+	z-index: 1;
+	display: block;
+	width: 20px;
+	height: 20px;
+	filter: drop-shadow(0 0 4px rgba(99, 239, 255, 0.35));
+	transform-origin: center;
+}
+
+.copyLinkChain {
+	transition:
+		stroke 0.18s ease,
+		filter 0.18s ease;
+}
+
+.copyLinkButton.copied .copyLinkIcon {
+	animation: copyBeat 0.7s ease-in-out forwards;
+}
+
+.copyToast {
+	position: fixed;
+	top: 110px;
+	left: 50%;
+	z-index: 5000;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 10px;
+	min-height: 36px;
+	max-width: min(560px, calc(100vw - 32px));
+	padding: 0 14px;
+	border: 1px solid rgba(99, 239, 255, 0.3);
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.1);
+	color: rgba(255, 255, 255, 0.78);
+	font-family: 'RussoOne', sans-serif;
+	font-size: 13px;
+	line-height: 1;
+	text-shadow: 0 0 6px rgba(99, 239, 255, 0.22);
+	box-shadow:
+		0 0 10px rgba(99, 239, 255, 0.08),
+		inset 0 0 8px rgba(99, 239, 255, 0.03);
+	backdrop-filter: blur(8px);
+	pointer-events: none;
+	animation: copyToastIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.copyToastIcon {
+	flex: 0 0 auto;
+	color: rgba(125, 255, 207, 0.86);
+	filter: drop-shadow(0 0 5px rgba(125, 255, 207, 0.22));
 }
 
 .connectionStatus {
-  padding: 6px 12px;
-  border-radius: 15px;
-  font-size: 12px;
-  font-weight: bold;
-  font-family: 'RussoOne', sans-serif;
+	padding: 6px 12px;
+	border-radius: 15px;
+	font-size: 12px;
+	font-weight: bold;
+	font-family: 'RussoOne', sans-serif;
+	white-space: nowrap;
 }
 
 .connectionStatus.connected {
-  background: rgba(76, 175, 80, 0.2);
-  color: #4CAF50;
-  border: 1px solid rgba(76, 175, 80, 0.3);
+	background: rgba(76, 175, 80, 0.2);
+	color: #4caf50;
+	border: 1px solid rgba(76, 175, 80, 0.3);
 }
 
 .connectionStatus.disconnected {
-  background: rgba(244, 67, 54, 0.2);
-  color: #F44336;
-  border: 1px solid rgba(244, 67, 54, 0.3);
+	background: rgba(244, 67, 54, 0.2);
+	color: #f44336;
+	border: 1px solid rgba(244, 67, 54, 0.3);
+}
+
+@keyframes copyBeat {
+	0% {
+		transform: scale(1);
+	}
+
+	45% {
+		transform: scale(1.1);
+	}
+
+	100% {
+		transform: scale(1);
+	}
+}
+
+@keyframes copyToastIn {
+	from {
+		opacity: 0;
+		transform: translateX(-50%) translateY(-10px) scale(0.98);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateX(-50%) translateY(0) scale(1);
+	}
 }
 
 @media (max-width: 768px) {
-  .header {
-    flex-direction: column;
-    text-align: center;
-    gap: 12px;
-  }
-  
-  .title {
-    font-size: 24px;
-  }
-  
-  .headerInfo {
-    justify-content: center;
-  }
+	.header {
+		flex-direction: column;
+		text-align: center;
+		gap: 12px;
+	}
+
+	.title {
+		font-size: 24px;
+	}
+
+	.headerInfo {
+		justify-content: center;
+	}
+
+	.headerMeta {
+		justify-content: center;
+	}
+
+	.copyToast {
+		top: 82px;
+		min-height: 34px;
+		padding: 0 12px;
+		font-size: 12px;
+	}
 }
 
 @media (max-width: 480px) {
-  .title {
-    font-size: 20px;
-  }
-  
-  .headerInfo {
-    flex-direction: column;
-    gap: 8px;
-  }
-  
-  .lobbyId,
-  .connectionStatus {
-    font-size: 12px;
-  }
+	.title {
+		font-size: 20px;
+	}
+
+	.headerInfo {
+		justify-content: center;
+		gap: 8px;
+	}
+
+	.headerMeta {
+		justify-content: center;
+		gap: 8px;
+	}
+
+	.lobbyIdText,
+	.connectionStatus {
+		font-size: 12px;
+	}
+
+	.copyLinkButton {
+		width: 36px;
+		min-height: 34px;
+	}
+
+	.copyLinkIcon {
+		width: 19px;
+		height: 19px;
+	}
+
+	.copyToast {
+		top: 76px;
+		max-width: calc(100vw - 24px);
+		font-size: 11px;
+	}
 }

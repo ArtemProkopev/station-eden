@@ -1,5 +1,9 @@
 // apps/web/src/lib/api.ts
-import type { CreateLobbyDto, CreateLobbyResponse } from '@station-eden/shared'
+import type {
+	CreateLobbyDto,
+	CreateLobbyResponse,
+	PublicLobbyInfo,
+} from '@station-eden/shared'
 import { isForcedLogout } from './authUtils'
 import { getCsrfToken } from './csrf'
 import {
@@ -66,7 +70,10 @@ async function ensureCsrfToken(): Promise<string> {
 					: typeof data.csrf === 'string'
 						? data.csrf
 						: undefined
-			if (typeof csrfFromData === 'string' && csrfFromData) return csrfFromData
+
+			if (typeof csrfFromData === 'string' && csrfFromData) {
+				return csrfFromData
+			}
 		}
 	} catch {
 		// ignore
@@ -83,6 +90,7 @@ function pickServerMessage(json: unknown, raw: string): string | undefined {
 		if (typeof json.error === 'string') return json.error
 		if (typeof json.detail === 'string') return json.detail
 	}
+
 	if (typeof json === 'string') return json
 	return raw && !json ? raw : undefined
 }
@@ -153,12 +161,15 @@ async function fetchWithRetry(
 
 	if (res.status === 401 && !isRefreshCall && !skipRetry && !isForcedLogout()) {
 		const ok = await tryRefreshOnce()
+
 		if (ok) {
 			const retried = await fetch(input, init)
 			if (retried.ok) return retried
+
 			if (retried.status !== 401) {
 				if (!retried.ok) await throwHttpAsApiError(retried, context)
 			}
+
 			return retried
 		}
 	}
@@ -308,6 +319,8 @@ export const api = {
 	createLobby: (payload: CreateLobbyDto) =>
 		postJSON<CreateLobbyResponse>('/lobbies', payload, 'default'),
 
+	openLobbies: () => getJSON<PublicLobbyInfo[]>('/lobbies/open', 'default'),
+
 	updateProfile: (patch: {
 		avatar?: string
 		frame?: string
@@ -322,8 +335,10 @@ export const api = {
 		}>('/users/profile', patch, 'default'),
 
 	users: () => getJSON('/users', 'default'),
+
 	userById: (id: string) =>
 		getJSON(`/users/${encodeURIComponent(id)}`, 'default'),
+
 	deleteUser: (id: string) =>
 		deleteJSON(`/users/${encodeURIComponent(id)}`, 'default'),
 

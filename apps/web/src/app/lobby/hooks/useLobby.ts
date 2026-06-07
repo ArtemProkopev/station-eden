@@ -9,7 +9,15 @@ import {
 	LobbyPlayer as Player,
 } from '@station-eden/shared'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+	type FormEvent,
+	type KeyboardEvent,
+} from 'react'
 import { AddPlayerModal } from '../components/AddPlayerModal/AddPlayerModal'
 import { LobbySettingsModal } from '../components/LobbySettingsModal/LobbySettingsModal'
 import { PlayerManagementModal } from '../components/PlayerManagementModal/PlayerManagementModal'
@@ -18,6 +26,8 @@ const DEFAULT_LOBBY_SETTINGS: LobbySettings = {
 	maxPlayers: 4,
 	gameMode: 'standard',
 	isPrivate: false,
+	visibility: 'public',
+	hasPassword: false,
 	password: '',
 }
 
@@ -46,15 +56,18 @@ function pickNumber(v: unknown): number {
 
 function safeDate(v: unknown): Date {
 	if (v instanceof Date) return v
+
 	if (typeof v === 'string') {
 		const d = new Date(v)
 		return Number.isNaN(d.getTime()) ? new Date() : d
 	}
+
 	return new Date()
 }
 
 function toIsoTimestamp(ts: string | Date): string {
 	if (ts instanceof Date) return ts.toISOString()
+
 	const d = new Date(ts)
 	return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString()
 }
@@ -112,6 +125,25 @@ function getStoredLobbyPassword(lobbyId: string): string | undefined {
 	return value || undefined
 }
 
+function saveStoredLobbyPassword(lobbyId: string, password: string) {
+	if (typeof window === 'undefined') return
+
+	window.sessionStorage.setItem(
+		`station-eden:lobby-password:${lobbyId}`,
+		password,
+	)
+}
+
+function isLobbyPasswordError(message: string) {
+	const normalized = message.toLowerCase()
+
+	return (
+		normalized.includes('пароль') ||
+		normalized.includes('password') ||
+		normalized.includes('lobby_locked')
+	)
+}
+
 export function useLobby(lobbyIdFromProps?: string) {
 	const router = useRouter()
 	const {
@@ -138,6 +170,11 @@ export function useLobby(lobbyIdFromProps?: string) {
 	const [lobbyCreatorId, setLobbyCreatorId] = useState<string>('')
 	const [error, setError] = useState<string>('')
 
+	const [isPasswordPromptOpen, setIsPasswordPromptOpen] = useState(false)
+	const [passwordPromptError, setPasswordPromptError] = useState('')
+	const [isSubmittingLobbyPassword, setIsSubmittingLobbyPassword] =
+		useState(false)
+
 	const chatContainerRef = useRef<HTMLDivElement>(null)
 	const shouldScrollRef = useRef(true)
 	const seenMsgIdsRef = useRef<Set<string>>(new Set())
@@ -159,6 +196,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 	useEffect(() => {
 		lobbyIdRef.current = lobbyIdFromProps || 'default-lobby'
+		hasJoinedRef.current = false
 	}, [lobbyIdFromProps])
 
 	useScrollPrevention()
@@ -171,6 +209,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 				case 'PLAYER_JOINED': {
 					const candidate = (data as Record<string, unknown>).player
 					const player = toLobbyPlayer(candidate)
+
 					if (!player) break
 
 					setPlayers(prev => {
@@ -179,6 +218,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 						if (prev.length >= lobbySettingsRef.current.maxPlayers) return prev
 						return [...prev, player]
 					})
+
 					break
 				}
 
@@ -187,7 +227,11 @@ export function useLobby(lobbyIdFromProps?: string) {
 						typeof (data as Record<string, unknown>).playerId === 'string'
 							? ((data as Record<string, unknown>).playerId as string)
 							: ''
-					if (playerId) setPlayers(prev => prev.filter(p => p.id !== playerId))
+
+					if (playerId) {
+						setPlayers(prev => prev.filter(p => p.id !== playerId))
+					}
+
 					break
 				}
 
@@ -197,6 +241,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 					const id = typeof msg.id === 'string' ? msg.id : makeId('srv')
 					if (seenMsgIdsRef.current.has(id)) break
+
 					seenMsgIdsRef.current.add(id)
 
 					const nextMessage: ChatMessage = {
@@ -217,11 +262,11 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 				case 'LOBBY_STATE': {
 					const list = (data as Record<string, unknown>).players
-					if (Array.isArray(list)) {
-						setPlayers(list.map(toLobbyPlayer).filter(Boolean) as Player[])
-					} else {
-						setPlayers([])
-					}
+					const normalizedPlayers = Array.isArray(list)
+						? (list.map(toLobbyPlayer).filter(Boolean) as Player[])
+						: []
+
+					setPlayers(normalizedPlayers)
 
 					const settings = (data as Record<string, unknown>).settings
 					setLobbySettings(normalizeSettings(settings))
@@ -230,8 +275,35 @@ export function useLobby(lobbyIdFromProps?: string) {
 						typeof (data as Record<string, unknown>).creatorId === 'string'
 							? ((data as Record<string, unknown>).creatorId as string)
 							: ''
+
 					if (creatorId) setLobbyCreatorId(creatorId)
 
+					const hasCurrentUser = currentUserId
+						? normalizedPlayers.some(player => player.id === currentUserId)
+						: false
+
+					if (hasCurrentUser) {
+						hasJoinedRef.current = true
+						setIsPasswordPromptOpen(false)
+						setPasswordPromptError('')
+						setIsSubmittingLobbyPassword(false)
+						setError('')
+					}
+
+					break
+				}
+
+				case 'LOBBY_LOCKED': {
+					const message =
+						typeof (data as Record<string, unknown>).message === 'string'
+							? ((data as Record<string, unknown>).message as string)
+							: 'Для подключения к лобби нужен пароль'
+
+					hasJoinedRef.current = false
+					setPasswordPromptError(message)
+					setIsPasswordPromptOpen(true)
+					setIsSubmittingLobbyPassword(false)
+					setError('')
 					break
 				}
 
@@ -246,9 +318,11 @@ export function useLobby(lobbyIdFromProps?: string) {
 							: false
 
 					if (!playerId) break
+
 					setPlayers(prev =>
 						prev.map(p => (p.id === playerId ? { ...p, isReady } : p)),
 					)
+
 					break
 				}
 
@@ -263,6 +337,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 						typeof (data as Record<string, unknown>).redirectUrl === 'string'
 							? ((data as Record<string, unknown>).redirectUrl as string)
 							: ''
+
 					if (!redirectUrl) break
 
 					setChatMessages(prev => [
@@ -286,13 +361,25 @@ export function useLobby(lobbyIdFromProps?: string) {
 						typeof (data as Record<string, unknown>).message === 'string'
 							? ((data as Record<string, unknown>).message as string)
 							: 'Произошла ошибка'
+
 					console.error('Server error:', message)
+
+					if (isLobbyPasswordError(message)) {
+						hasJoinedRef.current = false
+						setPasswordPromptError(message)
+						setIsPasswordPromptOpen(true)
+						setIsSubmittingLobbyPassword(false)
+						setError('')
+						break
+					}
+
 					setError(message)
+					setIsSubmittingLobbyPassword(false)
 					break
 				}
 			}
 		},
-		[router],
+		[router, currentUserId],
 	)
 
 	const wsBase = process.env.NEXT_PUBLIC_WS_BASE || 'http://localhost:4000'
@@ -304,7 +391,6 @@ export function useLobby(lobbyIdFromProps?: string) {
 		lobbyId,
 	)
 
-	// При дисконнекте — сбрасываем hasJoined, чтобы после реконнекта заджойниться снова
 	useEffect(() => {
 		if (reconnectTimeoutRef.current) {
 			clearTimeout(reconnectTimeoutRef.current)
@@ -329,14 +415,12 @@ export function useLobby(lobbyIdFromProps?: string) {
 		if (isConnected) setError('')
 	}, [isConnected])
 
-	// JOIN_LOBBY
-	useEffect(() => {
-		if (!isConnected) return
-		if (hasJoinedRef.current) return
-		if (!currentUserId || !profile.data) return
+	const buildCurrentPlayer = useCallback((): Player | null => {
+		if (!currentUserId || !profile.data) return null
 
 		const data = profile.data as unknown as Record<string, unknown>
-		const currentUser: Player = {
+
+		return {
 			id: currentUserId,
 			name: profile.data.username || 'Игрок',
 			missions: pickNumber(data.missionsCompleted),
@@ -344,14 +428,61 @@ export function useLobby(lobbyIdFromProps?: string) {
 			avatar: assets.avatar,
 			isReady: false,
 		}
+	}, [currentUserId, profile.data, assets.avatar])
 
-		const ok = sendWS({
-			type: 'JOIN_LOBBY',
-			player: currentUser,
-			password: getStoredLobbyPassword(lobbyIdRef.current),
-		})
-		if (ok) hasJoinedRef.current = true
-	}, [isConnected, currentUserId, profile.data, assets.avatar, sendWS])
+	const joinCurrentLobby = useCallback(
+		(password?: string) => {
+			const currentUser = buildCurrentPlayer()
+			if (!currentUser) return false
+
+			return sendWS({
+				type: 'JOIN_LOBBY',
+				player: currentUser,
+				password,
+			})
+		},
+		[buildCurrentPlayer, sendWS],
+	)
+
+	useEffect(() => {
+		if (!isConnected) return
+		if (hasJoinedRef.current) return
+
+		const storedPassword = getStoredLobbyPassword(lobbyIdRef.current)
+		joinCurrentLobby(storedPassword)
+	}, [isConnected, joinCurrentLobby])
+
+	const handleSubmitLobbyPassword = useCallback(
+		(password: string) => {
+			const normalizedPassword = password.trim()
+
+			if (normalizedPassword.length < 4) {
+				setPasswordPromptError('Пароль должен содержать минимум 4 символа.')
+				return
+			}
+
+			setIsSubmittingLobbyPassword(true)
+			setPasswordPromptError('')
+			saveStoredLobbyPassword(lobbyIdRef.current, normalizedPassword)
+
+			const ok = joinCurrentLobby(normalizedPassword)
+
+			if (!ok) {
+				setIsSubmittingLobbyPassword(false)
+				setPasswordPromptError(
+					'Не удалось отправить пароль. Проверьте соединение.',
+				)
+			}
+		},
+		[joinCurrentLobby],
+	)
+
+	const handleCancelLobbyPassword = useCallback(() => {
+		setIsPasswordPromptOpen(false)
+		setPasswordPromptError('')
+		setIsSubmittingLobbyPassword(false)
+		router.push('/')
+	}, [router])
 
 	const handlePlayerMenuClick = useCallback((player: Player) => {
 		setSelectedPlayer(player)
@@ -373,13 +504,16 @@ export function useLobby(lobbyIdFromProps?: string) {
 			alert('Только создатель лобби может менять настройки')
 			return
 		}
+
 		setShowLobbySettingsModal(true)
 	}, [isLobbyCreator])
 
 	const handleSaveLobbySettings = useCallback(
 		(settings: LobbySettings) => {
 			const normalized = normalizeSettings(settings)
+
 			setLobbySettings(normalized)
+
 			sendWS({
 				type: 'UPDATE_LOBBY_SETTINGS',
 				settings: normalized,
@@ -486,6 +620,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 		}
 
 		const sent = sendWS({ type: 'SEND_MESSAGE', message: outgoing })
+
 		if (sent) {
 			setNewMessage('')
 			shouldScrollRef.current = true
@@ -493,7 +628,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 	}, [newMessage, profile.data, sendWS, currentUserId])
 
 	const handleSendMessage = useCallback(
-		(e: React.FormEvent) => {
+		(e: FormEvent) => {
 			e.preventDefault()
 			sendChat()
 		},
@@ -501,7 +636,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 	)
 
 	const handleKeyPress = useCallback(
-		(e: React.KeyboardEvent) => {
+		(e: KeyboardEvent) => {
 			if (e.key === 'Enter' && !e.shiftKey) {
 				e.preventDefault()
 				sendChat()
@@ -512,24 +647,26 @@ export function useLobby(lobbyIdFromProps?: string) {
 
 	const handleChatScroll = useCallback(() => {
 		if (!chatContainerRef.current) return
+
 		const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current
 		shouldScrollRef.current = scrollHeight - scrollTop - clientHeight < 100
 	}, [])
 
-	// Автоскролл только когда нужно
 	useEffect(() => {
 		if (!shouldScrollRef.current) return
+
 		const el = chatContainerRef.current
 		if (!el) return
+
 		el.scrollTop = el.scrollHeight
 	}, [chatMessages.length])
 
-	// Init profile/assets
 	useEffect(() => {
 		let cancelled = false
 
 		const init = async () => {
 			setIsLoading(true)
+
 			try {
 				await loadUserData()
 				if (cancelled) return
@@ -540,6 +677,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 		}
 
 		init()
+
 		return () => {
 			cancelled = true
 		}
@@ -548,6 +686,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 	useEffect(() => {
 		const uid = profile.data?.id
 		if (!uid) return
+
 		loadSavedAssets(uid)
 	}, [profile.data?.id, loadSavedAssets])
 
@@ -568,6 +707,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 		}
 
 		const notReadyPlayers = players.filter(p => !p.isReady)
+
 		if (notReadyPlayers.length > 0) {
 			alert(
 				`Следующие игроки не готовы: ${notReadyPlayers.map(p => p.name).join(', ')}`,
@@ -612,6 +752,11 @@ export function useLobby(lobbyIdFromProps?: string) {
 		chatContainerRef,
 		error,
 		isLobbyCreator,
+		isPasswordPromptOpen,
+		passwordPromptError,
+		isSubmittingLobbyPassword,
+		handleSubmitLobbyPassword,
+		handleCancelLobbyPassword,
 		handleStartGame,
 		setShowAddPlayerModal,
 		setShowLobbySettingsModal,

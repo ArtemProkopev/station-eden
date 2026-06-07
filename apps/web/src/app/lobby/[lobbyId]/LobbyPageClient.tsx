@@ -8,6 +8,7 @@ import { memo, useMemo } from 'react'
 import Chat from '../components/Chat/Chat'
 import LobbyHeader from '../components/LobbyHeader/LobbyHeader'
 import LobbyInfo from '../components/LobbyInfo/LobbyInfo'
+import { LobbyPasswordModal } from '../components/LobbyPasswordModal/LobbyPasswordModal'
 import PlayersList from '../components/PlayersList/PlayersList'
 import StartGameButton from '../components/StartGameButton/StartGameButton'
 import { useLobby } from '../hooks/useLobby'
@@ -70,6 +71,7 @@ const LobbyContent = memo(function LobbyContent({
 					title='Лобби'
 					lobbyId={lobbyId}
 					isConnected={lobby.isConnected}
+					showInviteLink
 				/>
 
 				<div className={styles.columns}>
@@ -102,7 +104,6 @@ const LobbyContent = memo(function LobbyContent({
 							onSendMessage={lobby.handleSendMessage}
 							onKeyPress={lobby.handleKeyPress}
 							onChatScroll={lobby.handleChatScroll}
-							// chatContainerRef временно убран, так как не используется в Chat
 						/>
 					</div>
 				</div>
@@ -115,7 +116,6 @@ const LobbyContent = memo(function LobbyContent({
 						minPlayersRequired={2}
 						isLobbyCreator={lobby.isLobbyCreator}
 						onStartGame={lobby.handleStartGame}
-						// lobbyId убран, так как не требуется в StartGameButton
 					/>
 				</div>
 
@@ -150,9 +150,18 @@ const LobbyContent = memo(function LobbyContent({
 					/>
 				)}
 			</div>
+
+			<LobbyPasswordModal
+				isOpen={lobby.isPasswordPromptOpen}
+				error={lobby.passwordPromptError}
+				isSubmitting={lobby.isSubmittingLobbyPassword}
+				onSubmit={lobby.handleSubmitLobbyPassword}
+				onCancel={lobby.handleCancelLobbyPassword}
+			/>
 		</>
 	)
 })
+
 LobbyContent.displayName = 'LobbyContent'
 
 export default function LobbyPageClient({ lobbyId }: LobbyPageClientProps) {

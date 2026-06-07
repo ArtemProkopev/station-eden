@@ -285,6 +285,16 @@ export default function HomePage() {
 		[router],
 	)
 
+	const handleJoinLobby = useCallback(
+		async (lobbyId: string, password?: string) => {
+			saveLobbyPassword(lobbyId, password)
+			setIsCreateLobbyOpen(false)
+			setCreateLobbyError('')
+			router.push(`/lobby/${lobbyId}`)
+		},
+		[router],
+	)
+
 	const handleCloseCreateLobby = useCallback(() => {
 		if (isCreatingLobby) return
 
@@ -387,6 +397,7 @@ export default function HomePage() {
 				submitError={createLobbyError}
 				onClose={handleCloseCreateLobby}
 				onCreate={handleCreateLobby}
+				onJoinLobby={handleJoinLobby}
 			/>
 		</>
 	)

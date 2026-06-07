@@ -10,7 +10,11 @@ import {
 	WebSocketGateway,
 	WebSocketServer,
 } from '@nestjs/websockets'
-import type { LobbyVisibility, PublicLobbyInfo } from '@station-eden/shared'
+import type {
+	ISODateString,
+	LobbyVisibility,
+	PublicLobbyInfo,
+} from '@station-eden/shared'
 import * as bcrypt from 'bcryptjs'
 import * as cookie from 'cookie'
 import { randomBytes } from 'crypto'
@@ -53,6 +57,7 @@ type LobbyState = {
 	connections: Map<string, Socket>
 	creatorId: string
 	visibility: LobbyVisibility
+	createdAt: ISODateString
 	passwordHash?: string
 	inviteCode?: string
 	gameStarted?: boolean
@@ -314,6 +319,7 @@ export class LobbyGateway
 		const passwordHash = needsPassword
 			? await bcrypt.hash(data.password!.trim(), 10)
 			: undefined
+		const createdAt = new Date().toISOString()
 
 		this.lobbies.set(lobbyId, {
 			settings: {
@@ -327,6 +333,7 @@ export class LobbyGateway
 			connections: new Map(),
 			creatorId: data.creatorId,
 			visibility,
+			createdAt,
 			passwordHash,
 			inviteCode: lobbyId,
 			gameStarted: false,
@@ -358,6 +365,7 @@ export class LobbyGateway
 				gameMode: lobby.settings.gameMode || 'standard',
 				visibility: lobby.visibility === 'password' ? 'password' : 'public',
 				hasPassword: !!lobby.passwordHash,
+				createdAt: lobby.createdAt,
 			}))
 	}
 
@@ -475,6 +483,7 @@ export class LobbyGateway
 					connections: new Map(),
 					creatorId: userId,
 					visibility: 'public',
+					createdAt: new Date().toISOString(),
 					gameStarted: false,
 				})
 
@@ -943,6 +952,7 @@ export class LobbyGateway
 			creatorId: lobby.creatorId,
 			connections: lobby.connections.size,
 			visibility: lobby.visibility,
+			createdAt: lobby.createdAt,
 			hasPassword: !!lobby.passwordHash,
 			inviteCode: lobby.inviteCode,
 			gameStarted: lobby.gameStarted || false,
@@ -958,6 +968,7 @@ export class LobbyGateway
 			creatorId: lobby.creatorId,
 			connections: lobby.connections.size,
 			visibility: lobby.visibility,
+			createdAt: lobby.createdAt,
 			hasPassword: !!lobby.passwordHash,
 			inviteCode: lobby.inviteCode,
 			gameStarted: lobby.gameStarted || false,

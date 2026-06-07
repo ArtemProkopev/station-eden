@@ -115,6 +115,7 @@ export interface PublicLobbyInfo {
 	gameMode: string
 	visibility: Exclude<LobbyVisibility, 'hidden_password'>
 	hasPassword: boolean
+	createdAt: ISODateString
 }
 
 export interface LobbySettings {
