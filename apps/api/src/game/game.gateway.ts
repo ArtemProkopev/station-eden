@@ -225,12 +225,40 @@ type GameState = {
 	voteTriggerCount: number
 	voteRequests: Set<string>
 	dealtRounds: Set<number>
+	introCompletedBy: Set<string>
+	introSkippedBy: Set<string>
 }
 
 const GAME_ID_RE = /^game-[a-zA-Z0-9_-]+$/
 const MSG_WINDOW_MS = 10_000
 const MSG_MAX_PER_WINDOW = 15
 const MSG_MAX_LEN = 300
+
+const INTRO_DURATION_SECONDS = 45
+
+function formatCapsuleSlotsCount(value: number) {
+	const safeValue = Math.max(1, Math.floor(value))
+	const mod10 = safeValue % 10
+	const mod100 = safeValue % 100
+
+	if (safeValue === 1) return 'одно место'
+	if (mod100 >= 11 && mod100 <= 14) return `${safeValue} мест`
+	if (mod10 >= 2 && mod10 <= 4) return `${safeValue} места`
+
+	return `${safeValue} мест`
+}
+
+function createIntroNarrationText(game: GameState) {
+	const capsuleSlots =
+		game.capsuleSlots || Math.max(1, Math.floor(game.players.size / 2))
+
+	return [
+		'Год 2247. Научно-исследовательская станция «Эдем» удерживается на орбите Хелиоса — планеты, которую считали шансом для человечества.',
+		'После атаки неизвестных сил внешний контур пробит. Связь оборвана, часть отсеков заблокирована, кислород уходит быстрее расчётов.',
+		`В аварийном ангаре осталась капсула «Надежда». В ней всего ${formatCapsuleSlotsCount(capsuleSlots)}. Второго запуска не будет.`,
+		'Экипаж должен решить, кто получит шанс на спасение. Но страх, ложь и саботаж уже стали частью этой станции.',
+	].join('\n')
+}
 
 const PROFESSIONS: Profession[] = [
 	{
@@ -743,14 +771,91 @@ export class GameGateway
 			return
 		}
 
-		this.broadcastToGame(game.id, 'NARRATION_ENDED', {
+		if (!game.introCompletedBy) {
+			game.introCompletedBy = new Set()
+		}
+
+		if (!game.introSkippedBy) {
+			game.introSkippedBy = new Set()
+		}
+
+		game.introSkippedBy.add(userId)
+
+		this.broadcastToGame(game.id, 'NARRATION_SKIP_PROGRESS', {
 			skippedBy: userId,
 			skippedByName: player.name,
+			skippedCount: game.introSkippedBy.size,
+			playersCount: game.players.size,
+		})
+
+		const readyPlayerIds = new Set<string>([
+			...Array.from(game.introCompletedBy),
+			...Array.from(game.introSkippedBy),
+		])
+
+		const allPlayersReady = readyPlayerIds.size >= game.players.size
+		const allPlayersSkipped = game.introSkippedBy.size >= game.players.size
+
+		if (!allPlayersReady) {
+			return
+		}
+
+		this.broadcastToGame(game.id, 'NARRATION_ENDED', {
+			skippedBy: allPlayersSkipped ? 'all' : 'system',
+			skippedByName: 'Система',
 		})
 
 		this.broadcastSystemMessage(
 			game,
-			`Игрок ${player.name} пропустил предысторию. Игра продолжается.`,
+			allPlayersSkipped
+				? 'Все игроки согласились пропустить предысторию. Игра продолжается.'
+				: 'Предыстория завершена. Игра продолжается.',
+		)
+
+		this.startPreparationPhase(game)
+	}
+
+	@SubscribeMessage('COMPLETE_NARRATION')
+	handleCompleteNarration(socket: Socket) {
+		const { userId, gameId } = socket.data
+		const game = this.games.get(gameId)
+
+		if (!game || game.phase !== 'introduction') return
+
+		const player = game.players.get(userId)
+
+		if (!player) {
+			socket.emit('ERROR', { message: 'Вы не являетесь игроком этой игры' })
+			return
+		}
+
+		if (!game.introCompletedBy) {
+			game.introCompletedBy = new Set()
+		}
+
+		if (!game.introSkippedBy) {
+			game.introSkippedBy = new Set()
+		}
+
+		game.introCompletedBy.add(userId)
+
+		const readyPlayerIds = new Set<string>([
+			...Array.from(game.introCompletedBy),
+			...Array.from(game.introSkippedBy),
+		])
+
+		if (readyPlayerIds.size < game.players.size) {
+			return
+		}
+
+		this.broadcastToGame(game.id, 'NARRATION_ENDED', {
+			skippedBy: 'system',
+			skippedByName: 'Система',
+		})
+
+		this.broadcastSystemMessage(
+			game,
+			'Предыстория завершена. Игра продолжается.',
 		)
 
 		this.startPreparationPhase(game)
@@ -1126,6 +1231,8 @@ export class GameGateway
 		game.voteRequests = new Set()
 		game.votingResults = new Map()
 		game.dealtRounds = new Set()
+		game.introCompletedBy = new Set()
+		game.introSkippedBy = new Set()
 
 		this.resetPlayersForGameStart(game)
 		this.dealBaseCardsToPlayers(game)
@@ -1135,16 +1242,12 @@ export class GameGateway
 
 		this.sendCardsToAllPlayers(game)
 
-		this.setPhase(game, 'introduction', 30)
+		this.setPhase(game, 'introduction', INTRO_DURATION_SECONDS)
 
 		this.broadcastToGame(game.id, 'GAME_NARRATION', {
-			title: '2247 год. Станция "Эдем"',
-			text: `Научно-исследовательская станция «Эдем», находящаяся на орбите таинственной планеты Хелиос, подвергается нападению неизвестных сил. Системы жизнеобеспечения повреждены. Единственная спасательная капсула «Надежда» может вместить только ${Math.floor(
-				game.players.size / 2,
-			)} человек. Экипаж из ${
-				game.players.size
-			} человек должен решить, кто выживет.`,
-			duration: 30,
+			title: 'СТАНЦИЯ «ЭДЕМ»',
+			text: createIntroNarrationText(game),
+			duration: INTRO_DURATION_SECONDS,
 			phaseEndTime: game.phaseEndTime,
 		})
 	}
@@ -1663,10 +1766,22 @@ export class GameGateway
 
 		switch (game.phase) {
 			case 'introduction':
+				this.server.to(game.id).emit('TIMER_UPDATE', {
+					phase: game.phase,
+					timeLeft: 0,
+					phaseEndTime: game.phaseEndTime,
+				})
+
 				this.broadcastToGame(game.id, 'NARRATION_ENDED', {
 					skippedBy: 'system',
 					skippedByName: 'Система',
 				})
+
+				this.broadcastSystemMessage(
+					game,
+					'Предыстория завершена. Игра продолжается.',
+				)
+
 				this.startPreparationPhase(game)
 				break
 
@@ -2161,6 +2276,10 @@ export class GameGateway
 			voteTriggerCount: game.voteTriggerCount || 0,
 			voteRequestPlayerIds: Array.from(game.voteRequests || []),
 			requiredVotes: this.getRequiredVoteRequests(aliveCount),
+			introSkipProgress: {
+				skippedCount: game.introSkippedBy?.size || 0,
+				playersCount: game.players.size,
+			},
 		}
 	}
 
@@ -2242,10 +2361,12 @@ export class GameGateway
 			capsuleSlots: Math.floor(players.length / 2),
 			occupiedSlots: 0,
 			crisisHistory: [],
-			phaseDuration: 30,
+			phaseDuration: INTRO_DURATION_SECONDS,
 			voteTriggerCount: 0,
 			voteRequests: new Set(),
 			dealtRounds: new Set(),
+			introCompletedBy: new Set(),
+			introSkippedBy: new Set(),
 		}
 
 		this.games.set(gameId, gameState)

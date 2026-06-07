@@ -4,19 +4,19 @@ import LobbyPageClient from './LobbyPageClient'
 
 // Валидация ID лобби
 function isValidLobbyId(id: string) {
-  return /^[a-z0-9]{3,20}$/i.test(id)
+	return /^[a-zA-Z0-9_-]{3,32}$/.test(id)
 }
 
 export default async function LobbyPage({
-  params,
+	params,
 }: {
-  params: Promise<{ lobbyId: string }>
+	params: Promise<{ lobbyId: string }>
 }) {
-  const { lobbyId } = await params
+	const { lobbyId } = await params
 
-  if (!isValidLobbyId(lobbyId)) {
-    redirect('/lobby')
-  }
+	if (!isValidLobbyId(lobbyId)) {
+		redirect('/lobby')
+	}
 
-  return <LobbyPageClient lobbyId={lobbyId} />
+	return <LobbyPageClient lobbyId={lobbyId} />
 }

@@ -1,4 +1,17 @@
+import {
+	formatCount,
+	formatPlayersCount,
+	formatPlayersGenitiveCount,
+	getPluralForm,
+} from '@/lib/ruPlural'
 import { CardType, GamePhase } from '@station-eden/shared'
+
+export {
+	formatCount,
+	formatPlayersCount,
+	formatPlayersGenitiveCount,
+	getPluralForm,
+}
 
 export const formatTime = (seconds: number): string => {
 	if (seconds === undefined || seconds === null) return '0:00'

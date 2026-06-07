@@ -1,0 +1,22 @@
+.textType {
+	display: block;
+	white-space: pre-wrap;
+}
+
+.cursor {
+	display: inline-block;
+	margin-left: 3px;
+	animation: cursorBlink 0.72s steps(2) infinite;
+}
+
+@keyframes cursorBlink {
+	0%,
+	45% {
+		opacity: 1;
+	}
+
+	46%,
+	100% {
+		opacity: 0;
+	}
+}

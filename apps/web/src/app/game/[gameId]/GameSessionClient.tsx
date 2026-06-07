@@ -6,12 +6,13 @@ import {
 	ExtendedGameState,
 	GameChatMessage,
 } from '@station-eden/shared'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import GameChat from './components/GameChat'
 import GameFooter from './components/GameFooter'
 import GameHeader from './components/GameHeader'
 import GamePhasePanel from './components/GamePhasePanel'
 import { useGameSession } from './components/hooks/useGameSession'
+import IntroCinematic from './components/IntroCinematic/IntroCinematic'
 import CardsTableModal from './components/modals/CardsTableModal'
 import CrisisModal from './components/modals/CrisisModal'
 import GameResultsModal from './components/modals/GameResultsModal'
@@ -19,7 +20,6 @@ import MyCardsModal from './components/modals/MyCardsModal'
 import RevealedPlayerModal from './components/modals/RevealedPlayerModal'
 import PlayersPanel from './components/PlayersPanel'
 import LoadingScreen from './components/screens/LoadingScreen'
-import NarrationScreen from './components/screens/NarrationScreen'
 import WaitingRoom from './components/screens/WaitingRoom'
 import styles from './page.module.css'
 
@@ -32,7 +32,6 @@ export default function GameSessionClient({ gameId }: Props) {
 		gameState,
 		myCards,
 		phaseTimeLeft,
-		narration,
 		activeCrisis,
 		showMyCards,
 		showCardsTable,
@@ -42,6 +41,8 @@ export default function GameSessionClient({ gameId }: Props) {
 		myAllRevealedCards,
 		cardsReceivedThisRound,
 		canSkipNarration,
+		introEndCounter,
+		introSkipProgress,
 		newCardsThisRound,
 
 		revealingCards,
@@ -66,6 +67,7 @@ export default function GameSessionClient({ gameId }: Props) {
 		handleKeyPress,
 		handleMessageChange,
 		handleStartGame,
+		handleCompleteNarration,
 		handleSkipNarration,
 		handleStartDiscussion,
 		handleRequestVote,
@@ -75,6 +77,32 @@ export default function GameSessionClient({ gameId }: Props) {
 		handleCloseCrisis,
 		handleLeaveGame,
 	} = useGameSession(gameId)
+
+	const players = useMemo((): ExtendedGamePlayer[] => {
+		return (gameState?.players || []) as ExtendedGamePlayer[]
+	}, [gameState?.players])
+
+	const [isIntroCinematicVisible, setIsIntroCinematicVisible] = useState(false)
+	const [introPlayersCount, setIntroPlayersCount] = useState(0)
+
+	useEffect(() => {
+		if (gameState?.phase !== 'introduction') return
+
+		setIntroPlayersCount(players.length)
+		setIsIntroCinematicVisible(true)
+	}, [gameState?.phase, players.length])
+
+	useEffect(() => {
+		if (gameState?.phase === 'introduction') return
+
+		setIsIntroCinematicVisible(false)
+	}, [gameState?.phase])
+
+	useEffect(() => {
+		if (introEndCounter <= 0) return
+
+		setIsIntroCinematicVisible(false)
+	}, [introEndCounter])
 
 	const myAllRevealedCardIds = useMemo((): string[] => {
 		if (!myAllRevealedCards) return []
@@ -113,6 +141,14 @@ export default function GameSessionClient({ gameId }: Props) {
 
 	const handleChatScroll = useCallback(() => {}, [])
 
+	const handleIntroCinematicComplete = useCallback(() => {
+		handleCompleteNarration()
+	}, [handleCompleteNarration])
+
+	const handleIntroCinematicSkip = useCallback(() => {
+		handleSkipNarration()
+	}, [handleSkipNarration])
+
 	if (!gameState) {
 		return (
 			<LoadingScreen
@@ -138,7 +174,6 @@ export default function GameSessionClient({ gameId }: Props) {
 		)
 	}
 
-	const players = (gameState.players || []) as ExtendedGamePlayer[]
 	const currentPlayer = userId
 		? players.find(player => player.id === userId)
 		: undefined
@@ -147,12 +182,14 @@ export default function GameSessionClient({ gameId }: Props) {
 
 	return (
 		<div className={styles.container}>
-			{narration && (
-				<NarrationScreen
-					narration={narration}
+			{isIntroCinematicVisible && (
+				<IntroCinematic
+					playersCount={introPlayersCount || players.length}
 					phaseTimeLeft={phaseTimeLeft}
-					canSkipNarration={canSkipNarration}
-					onSkip={handleSkipNarration}
+					canSkip={canSkipNarration}
+					skipProgress={introSkipProgress}
+					onSkip={handleIntroCinematicSkip}
+					onComplete={handleIntroCinematicComplete}
 				/>
 			)}
 
@@ -257,7 +294,9 @@ export default function GameSessionClient({ gameId }: Props) {
 					newMessage={newMessage}
 					onMessageChange={handleMessageChange}
 					onSendMessage={handleSendMessage}
-					onKeyPress={handleKeyPress as (e: React.KeyboardEvent<Element>) => void}
+					onKeyPress={
+						handleKeyPress as (e: React.KeyboardEvent<Element>) => void
+					}
 					onChatScroll={handleChatScroll}
 					disabled={!isConnected || gameState.phase === 'game_over'}
 					currentUserId={userId}

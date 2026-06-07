@@ -1,6 +1,7 @@
 // apps/web/src/app/lobby/components/StartGameButton/StartGameButton.tsx
 'use client'
 
+import { formatPlayersCount } from '@/lib/ruPlural'
 import styles from './StartGameButton.module.css'
 
 interface StartGameButtonProps {
@@ -29,8 +30,9 @@ export default function StartGameButton({
 	const getButtonText = () => {
 		if (!isConnected) return 'Нет подключения'
 		if (!isLobbyCreator) return 'Только создатель может начать'
-		if (totalPlayersCount < minPlayersRequired)
-			return `Минимум ${minPlayersRequired} игрока`
+		if (totalPlayersCount < minPlayersRequired) {
+			return `Минимум ${formatPlayersCount(minPlayersRequired)}`
+		}
 		if (readyPlayersCount !== totalPlayersCount) return 'Не все готовы'
 		return 'начать игру'
 	}

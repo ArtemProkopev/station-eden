@@ -12,7 +12,11 @@ import {
 	WsMessage,
 } from '@station-eden/shared'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getCardTypeDisplayName, getServerCardType } from '../utils/game.utils'
+import {
+	formatCount,
+	getCardTypeDisplayName,
+	getServerCardType,
+} from '../utils/game.utils'
 import { useCardReveal } from './useCardReveal'
 import { useGameChat } from './useGameChat'
 import { useGameTimer } from './useGameTimer'
@@ -35,6 +39,11 @@ type GameResults = {
 }
 
 type ServerCardPayload = Record<string, CardDetails | undefined>
+
+type IntroSkipProgress = {
+	skippedCount: number
+	playersCount: number
+}
 
 export function useGameSession(gameId: string) {
 	const { profile, loadUserData } = useProfile()
@@ -90,6 +99,13 @@ export function useGameSession(gameId: string) {
 	const [cardsReceivedThisRound, setCardsReceivedThisRound] =
 		useState<number>(0)
 	const [canSkipNarration, setCanSkipNarration] = useState<boolean>(false)
+	const [introEndCounter, setIntroEndCounter] = useState(0)
+	const [introSkipProgress, setIntroSkipProgress] = useState<IntroSkipProgress>(
+		{
+			skippedCount: 0,
+			playersCount: 0,
+		},
+	)
 	const [newCardsThisRound, setNewCardsThisRound] = useState<CardDetails[]>([])
 
 	const currentRoundRef = useRef<number>(0)
@@ -249,7 +265,7 @@ export function useGameSession(gameId: string) {
 		(data: unknown) => {
 			if (!data || typeof data !== 'object') return
 
-			const msg = data as WsMessage
+			const msg = data as WsMessage & Record<string, unknown>
 			const send = sendRef.current
 			const isConnected = isConnectedRef.current
 
@@ -269,6 +285,21 @@ export function useGameSession(gameId: string) {
 						restoreMyRevealState(game)
 
 						if (game.phase === 'introduction') {
+							setIntroEndCounter(0)
+
+							const skipProgress = (game as Record<string, unknown>)
+								.introSkipProgress as
+								| { skippedCount?: unknown; playersCount?: unknown }
+								| undefined
+
+							setIntroSkipProgress({
+								skippedCount: safeNumber(skipProgress?.skippedCount, 0),
+								playersCount: safeNumber(
+									skipProgress?.playersCount,
+									(game.players || []).length,
+								),
+							})
+
 							setTimeout(() => setCanSkipNarration(true), 3000)
 						} else {
 							clearNarration()
@@ -322,6 +353,25 @@ export function useGameSession(gameId: string) {
 					if (phase !== 'introduction') {
 						clearNarration()
 					} else {
+						setIntroEndCounter(0)
+
+						const sourceGame = incomingGameState
+						const skipProgress = sourceGame
+							? ((sourceGame as Record<string, unknown>).introSkipProgress as
+									| { skippedCount?: unknown; playersCount?: unknown }
+									| undefined)
+							: undefined
+
+						setIntroSkipProgress({
+							skippedCount: safeNumber(skipProgress?.skippedCount, 0),
+							playersCount: safeNumber(
+								skipProgress?.playersCount,
+								Array.isArray(sourceGame?.players)
+									? sourceGame.players.length
+									: 0,
+							),
+						})
+
 						setTimeout(() => setCanSkipNarration(true), 3000)
 					}
 
@@ -334,19 +384,19 @@ export function useGameSession(gameId: string) {
 				case 'NARRATION_ENDED': {
 					clearNarration()
 					stopTimer()
+					setIntroEndCounter(current => current + 1)
+					setIntroSkipProgress({
+						skippedCount: 0,
+						playersCount: 0,
+					})
+					break
+				}
 
-					const skippedByName = msg.skippedByName
-						? String(msg.skippedByName)
-						: ''
-
-					if (skippedByName && skippedByName !== 'Система') {
-						addToChat(
-							'Система',
-							`Игрок ${skippedByName} пропустил предысторию.`,
-							true,
-						)
-					}
-
+				case 'NARRATION_SKIP_PROGRESS': {
+					setIntroSkipProgress({
+						skippedCount: safeNumber(msg.skippedCount, 0),
+						playersCount: safeNumber(msg.playersCount, 0),
+					})
 					break
 				}
 
@@ -383,9 +433,15 @@ export function useGameSession(gameId: string) {
 					setNewCardsThisRound(prev => [...prev, ...cardsWithTypes])
 					setCardsReceivedThisRound(prev => prev + cardsWithTypes.length)
 
+					const cardsText = formatCount(cardsWithTypes.length, [
+						'новую карту',
+						'новые карты',
+						'новых карт',
+					])
+
 					addToChat(
 						'Система',
-						`Раунд ${roundNumber}: вы получили ${cardsWithTypes.length} новых карт!`,
+						`Раунд ${roundNumber}: вы получили ${cardsText}!`,
 						true,
 					)
 
@@ -460,11 +516,16 @@ export function useGameSession(gameId: string) {
 				}
 
 				case 'PLAYER_EJECTED': {
+					const votesCount = safeNumber(msg.votes, 0)
+					const votesText = formatCount(votesCount, [
+						'голосом',
+						'голосами',
+						'голосами',
+					])
+
 					addToChat(
 						'Система',
-						`Игрок ${String(msg.playerName ?? '')} выбыл с ${String(
-							msg.votes ?? '',
-						)} голосами!`,
+						`Игрок ${String(msg.playerName ?? '')} выбыл с ${votesText}!`,
 						true,
 					)
 
@@ -826,12 +887,18 @@ export function useGameSession(gameId: string) {
 		sendRef.current?.({ type: 'START_GAME_SESSION' })
 	}
 
-	const handleSkipNarration = () => {
-		if (!canSkipNarration || !isConnected) return
+	const handleCompleteNarration = () => {
+		if (!isConnected) return
 
-		sendRef.current?.({ type: 'SKIP_NARRATION' })
+		sendRef.current?.({ type: 'COMPLETE_NARRATION' })
 		clearNarration()
 		stopTimer()
+	}
+
+	const handleSkipNarration = () => {
+		if (!isConnected) return
+
+		sendRef.current?.({ type: 'SKIP_NARRATION' })
 	}
 
 	const handleStartDiscussion = () => {
@@ -898,13 +965,33 @@ export function useGameSession(gameId: string) {
 
 	const handleCloseCrisis = () => setActiveCrisis(null)
 
+	const getLobbyReturnUrl = useCallback(() => {
+		const lobbyId = String(
+			(gameState as { lobbyId?: unknown } | null)?.lobbyId ?? '',
+		).trim()
+
+		if (/^[a-zA-Z0-9_-]{3,32}$/.test(lobbyId)) {
+			return `/lobby/${encodeURIComponent(lobbyId)}`
+		}
+
+		const lobbyIdFromGameId = gameId.match(/^game-(.+)-\d+-[a-z0-9]+$/i)?.[1]
+
+		if (lobbyIdFromGameId && /^[a-zA-Z0-9_-]{3,32}$/.test(lobbyIdFromGameId)) {
+			return `/lobby/${encodeURIComponent(lobbyIdFromGameId)}`
+		}
+
+		return '/lobby'
+	}, [gameId, gameState])
+
 	const handleLeaveGame = () => {
 		if (!window.confirm('Вы уверены, что хотите покинуть игру?')) return
+
+		const returnUrl = getLobbyReturnUrl()
 
 		sendRef.current?.({ type: 'LEAVE_GAME', gameId })
 
 		setTimeout(() => {
-			window.location.href = '/lobby'
+			window.location.href = returnUrl
 		}, 1000)
 	}
 
@@ -923,6 +1010,8 @@ export function useGameSession(gameId: string) {
 		myAllRevealedCards,
 		cardsReceivedThisRound,
 		canSkipNarration,
+		introEndCounter,
+		introSkipProgress,
 		newCardsThisRound,
 		revealingCards,
 		revealedCards,
@@ -947,6 +1036,7 @@ export function useGameSession(gameId: string) {
 		handleKeyPress,
 		handleMessageChange,
 		handleStartGame,
+		handleCompleteNarration,
 		handleSkipNarration,
 		handleStartDiscussion,
 		handleRequestVote,
