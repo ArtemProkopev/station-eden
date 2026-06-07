@@ -71,10 +71,58 @@ export interface LockPayload {
 // ==============================================================================
 // LOBBY / GAME
 // ==============================================================================
+export const LobbyVisibilitySchema = z.enum([
+	'public',
+	'password',
+	'hidden_password',
+])
+
+export type LobbyVisibility = z.infer<typeof LobbyVisibilitySchema>
+
+export const CreateLobbySchema = z
+	.object({
+		visibility: LobbyVisibilitySchema.default('public'),
+		password: z.string().trim().max(72).optional(),
+	})
+	.superRefine((data, ctx) => {
+		const needsPassword =
+			data.visibility === 'password' || data.visibility === 'hidden_password'
+
+		if (!needsPassword) return
+
+		if (!data.password || data.password.trim().length < 4) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				path: ['password'],
+				message: 'Пароль должен содержать минимум 4 символа',
+			})
+		}
+	})
+
+export type CreateLobbyDto = z.infer<typeof CreateLobbySchema>
+
+export interface CreateLobbyResponse {
+	lobbyId: string
+	visibility: LobbyVisibility
+	hasPassword: boolean
+	inviteCode?: string
+}
+
+export interface PublicLobbyInfo {
+	lobbyId: string
+	playersCount: number
+	maxPlayers: number
+	gameMode: string
+	visibility: Exclude<LobbyVisibility, 'hidden_password'>
+	hasPassword: boolean
+}
+
 export interface LobbySettings {
 	maxPlayers: number
 	gameMode: string
 	isPrivate: boolean
+	visibility?: LobbyVisibility
+	hasPassword?: boolean
 	password?: string
 	difficulty?: 'easy' | 'medium' | 'hard'
 	turnTime?: number
@@ -141,6 +189,7 @@ export type WebSocketMessageType =
 	| 'CHAT_MESSAGE'
 	| 'SEND_MESSAGE'
 	| 'LOBBY_STATE'
+	| 'LOBBY_LOCKED'
 	| 'PLAYER_READY'
 	| 'TOGGLE_READY'
 	| 'UPDATE_LOBBY_SETTINGS'
@@ -258,106 +307,106 @@ export interface FriendsState {
 // GAME TYPES (добавлено из game.types.ts)
 // ==============================================================================
 export type CardType =
-  | 'profession'
-  | 'health'
-  | 'trait'
-  | 'secret'
-  | 'role'
-  | 'resource'
-  | 'gender'
-  | 'age'
-  | 'body'
+	| 'profession'
+	| 'health'
+	| 'trait'
+	| 'secret'
+	| 'role'
+	| 'resource'
+	| 'gender'
+	| 'age'
+	| 'body'
 
 export interface CardDetails {
-  id: string
-  name: string
-  description: string
-  type?: string
-  pros?: string[]
-  cons?: string[]
-  effects?: string[]
-  goal?: string
-  abilities?: string[]
-  bonuses?: string[]
-  range?: string
-  specialAbility?: string
-  winCondition?: string
+	id: string
+	name: string
+	description: string
+	type?: string
+	pros?: string[]
+	cons?: string[]
+	effects?: string[]
+	goal?: string
+	abilities?: string[]
+	bonuses?: string[]
+	range?: string
+	specialAbility?: string
+	winCondition?: string
 }
 
 export interface CrisisInfo {
-  id: string
-  name: string
-  description: string
-  type: string
-  penalty: string
-  isActive: boolean
-  priorityProfessions?: string[]
+	id: string
+	name: string
+	description: string
+	type: string
+	penalty: string
+	isActive: boolean
+	priorityProfessions?: string[]
 }
 
 export type GamePhase =
-  | 'introduction'
-  | 'preparation'
-  | 'discussion'
-  | 'voting'
-  | 'reveal'
-  | 'crisis'
-  | 'intermission'
-  | 'game_over'
+	| 'introduction'
+	| 'preparation'
+	| 'discussion'
+	| 'voting'
+	| 'reveal'
+	| 'crisis'
+	| 'intermission'
+	| 'game_over'
 
 export interface GameChatMessage {
-  id: string
-  playerId: string
-  playerName: string
-  text: string
-  type: 'player' | 'system'
-  timestamp: Date
+	id: string
+	playerId: string
+	playerName: string
+	text: string
+	type: 'player' | 'system'
+	timestamp: Date
 }
 
 export interface PlayerCardInfo {
-  playerId: string
-  playerName: string
-  revealedCards: Record<string, { name: string; type: string; cardId: string }>
+	playerId: string
+	playerName: string
+	revealedCards: Record<string, { name: string; type: string; cardId: string }>
 }
 
 export interface RevealedCardInfo {
-  name: string
-  type: string
-  id?: string
+	name: string
+	type: string
+	id?: string
 }
 
 export interface ExtendedGamePlayer extends GamePlayer {
-  isAlive: boolean
-  vote?: string
-  votesAgainst?: number
-  profession?: string
-  revealedCards?: number
-  revealedCardsInfo?: Record<string, RevealedCardInfo>
+	isAlive: boolean
+	vote?: string
+	votesAgainst?: number
+	profession?: string
+	revealedCards?: number
+	revealedCardsInfo?: Record<string, RevealedCardInfo>
 }
 
 export interface ExtendedGameState extends GameState {
-  phase?: GamePhase
-  phaseEndTime?: string
-  phaseDuration?: number
-  creatorId?: string
-  currentCrisis?: CrisisInfo | null
-  occupiedSlots?: number
-  capsuleSlots?: number
-  [key: string]: unknown
+	phase?: GamePhase
+	phaseEndTime?: string
+	phaseDuration?: number
+	creatorId?: string
+	currentCrisis?: CrisisInfo | null
+	occupiedSlots?: number
+	capsuleSlots?: number
+	[key: string]: unknown
 }
 
 export interface GameResults {
-  winners: string[]
-  reason?: string
-  scores?: unknown
+	winners: string[]
+	reason?: string
+	scores?: unknown
 }
 
 export type RevealedPlayer = {
-  name: string
-  cards: Record<string, Partial<CardDetails> | null>
-  playerId?: string
+	name: string
+	cards: Record<string, Partial<CardDetails> | null>
+	playerId?: string
 } | null
 
 export interface WsMessage {
-  type: string
-  [key: string]: unknown
+	type: string
+	[key: string]: unknown
 }

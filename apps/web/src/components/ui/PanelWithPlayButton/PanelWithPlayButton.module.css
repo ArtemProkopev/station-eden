@@ -1,260 +1,197 @@
-/* Главный контейнер с панелью и кнопкой */
 .mainButtonContainer {
-  position: relative;
-  perspective: 800px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 500px;
-  height: 400px;
-  margin-right: 160px;
-  transform: translateZ(0);
-  will-change: transform;
-  --panel-tilt-x: 18deg;
-  --panel-tilt-y: -26deg;
-  --panel-tilt-z: 13deg;
-  /* Добавляем для лучшего позиционирования */
-  align-self: flex-end;
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+
+	width: clamp(360px, 34vw, 520px);
+	height: clamp(290px, 26vw, 420px);
+
+	margin-right: clamp(40px, 8vw, 160px);
+	align-self: flex-end;
+
+	--button-width: clamp(235px, 22vw, 335px);
+	--button-height: clamp(78px, 7vw, 108px);
+	--button-bottom: 68.75%;
+	--button-rotate: 5.6deg;
+
+	transform: translateZ(0);
+	isolation: isolate;
 }
 
-/* Панель как фон */
 .panelBackground {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  object-fit: contain;
-  z-index: 1;
-  pointer-events: none;
-  content-visibility: auto;
-  width: 100%;
-  height: 100%;
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	z-index: 1;
+	pointer-events: none;
+	user-select: none;
+	-webkit-user-drag: none;
+	transform: translateZ(0);
 }
 
-/* Кнопка Play поверх экрана панели */
 .mainPlayButton {
-  position: absolute;
-  bottom: 275px;
-  left: 50%;
-  width: 360px;
-  height: 110px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  transform-style: preserve-3d;
-  transform: translateX(-50%) rotateZ(var(--panel-tilt-z))
-    rotateX(var(--panel-tilt-x)) rotateY(var(--panel-tilt-y)) scale(1);
-  transition:
-    transform 0.4s cubic-bezier(0.25, 1, 0.5, 1),
-    filter 0.3s ease;
-  overflow: hidden;
-  animation: float3DLeftSmall 4s ease-in-out infinite;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  backface-visibility: hidden;
+	position: absolute;
+	left: 50%;
+	bottom: var(--button-bottom);
+	z-index: 2;
+
+	width: var(--button-width);
+	height: var(--button-height);
+
+	display: flex;
+	align-items: center;
+	justify-content: center;
+
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	cursor: pointer;
+	outline: none;
+	overflow: visible;
+
+	transform: translate3d(-50%, 1px, 0) rotate(var(--button-rotate));
+	transform-origin: center;
+	backface-visibility: hidden;
+	-webkit-font-smoothing: antialiased;
+
+	transition: filter 180ms ease;
 }
 
 .mainPlayButton:hover {
-  transform: translateX(-50%) rotateZ(var(--panel-tilt-z))
-    rotateX(calc(var(--panel-tilt-x) - 3deg))
-    rotateY(calc(var(--panel-tilt-y) + 3deg)) scale(1.05);
-  filter: brightness(1.2) drop-shadow(0 0 20px rgba(40, 216, 255, 0.6));
-  animation-play-state: paused;
+	transform: translate3d(-50%, 1px, 0) rotate(var(--button-rotate));
+	filter: brightness(1.08);
 }
 
-/* Верхняя грань */
-.mainPlayButton .topEdge {
-  position: absolute;
-  top: -8px;
-  left: 0;
-  width: 100%;
-  height: 16px;
-  background: linear-gradient(
-    85deg,
-    rgba(20, 80, 180, 0.6) 0%,
-    rgba(40, 216, 255, 0.9) 100%
-  );
-  border-radius: 4px 4px 0 0;
-  transform: rotateX(90deg) translateZ(8px);
-  transform-origin: top center;
-  z-index: 0;
-  transition: all 0.4s ease;
-  backface-visibility: hidden;
+.mainPlayButton:active {
+	transform: translate3d(-50%, 1px, 0) rotate(var(--button-rotate)) scale(0.99);
 }
 
-/* Ховер через data-attribute */
-.mainPlayButton .topEdge[data-hovered='true'] {
-  height: 20px;
-  background: linear-gradient(
-    85deg,
-    rgba(40, 120, 220, 0.8) 0%,
-    rgba(80, 236, 255, 1) 100%
-  );
+.mainPlayButton:focus-visible {
+	outline: 1px solid rgba(99, 239, 255, 0.45);
+	outline-offset: 6px;
 }
 
 .playText {
-  font-family: 'RussoOne', sans-serif;
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: #83eefb;
-  text-shadow:
-    0 0 6px #83eefb,
-    0 0 12px #83eefb,
-    0 2px 4px rgba(0, 0, 0, 0.5);
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  position: relative;
-  z-index: 2;
-  transform: translateZ(25px) translateX(-15px) scaleX(0.85);
-  display: block;
-  transition: all 0.3s ease;
-  line-height: 1;
-  font-display: swap;
+	position: relative;
+	z-index: 2;
+	display: block;
+
+	font-family: 'RussoOne', sans-serif;
+	font-size: clamp(1.72rem, 2.9vw, 2.58rem);
+	font-weight: 700;
+	line-height: 1;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	white-space: nowrap;
+
+	color: rgba(145, 246, 255, 0.96);
+	text-shadow:
+		0 0 6px rgba(131, 238, 251, 0.95),
+		0 0 14px rgba(131, 238, 251, 0.72),
+		0 0 24px rgba(40, 216, 255, 0.34);
+
+	transform: translate(-6px, 0px) rotate(-4deg) skewX(-6deg) scaleX(0.94);
+	transform-origin: center;
+	transition:
+		color 180ms ease,
+		text-shadow 180ms ease,
+		filter 180ms ease;
 }
 
 .mainPlayButton:hover .playText {
-  color: #b9f4ff;
-  text-shadow:
-    0 0 8px #b9f4ff,
-    0 0 16px #b9f4ff,
-    0 0 24px #28d8ff;
+	color: #d8fbff;
+	text-shadow:
+		0 0 8px rgba(216, 251, 255, 1),
+		0 0 18px rgba(131, 238, 251, 0.9),
+		0 0 30px rgba(40, 216, 255, 0.55);
+	filter: brightness(1.08);
 }
 
-/* ===== ОПТИМИЗИРОВАННЫЕ АНИМАЦИИ ===== */
-@keyframes float3DLeftSmall {
-  0%,
-  100% {
-    transform: translateX(-50%) rotateZ(var(--panel-tilt-z))
-      rotateX(var(--panel-tilt-x)) rotateY(var(--panel-tilt-y));
-  }
-  50% {
-    transform: translateX(-50%) rotateZ(var(--panel-tilt-z))
-      rotateX(calc(var(--panel-tilt-x) - 2deg))
-      rotateY(calc(var(--panel-tilt-y) + 2deg));
-  }
-}
-
-/* Оптимизация для более узких экранов */
 @media (max-width: 1400px) {
-  .mainButtonContainer {
-    /* Вместо transform: scale() меняем фактические размеры */
-    width: 450px; /* 500 * 0.9 */
-    height: 360px; /* 400 * 0.9 */
-    margin-right: 120px;
-  }
+	.mainButtonContainer {
+		width: 460px;
+		height: 368px;
+		margin-right: 110px;
 
-  .mainPlayButton {
-    bottom: 247px; /* 275 * 0.9 */
-    width: 324px; /* 360 * 0.9 */
-    height: 99px; /* 110 * 0.9 */
-    animation: none;
-  }
-
-  .playText {
-    font-size: 2.25rem; /* 2.5 * 0.9 */
-  }
+		--button-width: 310px;
+		--button-height: 98px;
+		--button-bottom: 68.75%;
+		--button-rotate: 5.6deg;
+	}
 }
 
 @media (max-width: 1200px) {
-  .mainButtonContainer {
-    width: 425px;
-    height: 340px;
-    margin-right: 80px;
-  }
+	.mainButtonContainer {
+		width: 430px;
+		height: 344px;
+		margin-right: 72px;
 
-  .mainPlayButton {
-    bottom: 234px; /* 275 * 0.85 */
-    width: 306px; /* 360 * 0.85 */
-    height: 93.5px; /* 110 * 0.85 */
-  }
+		--button-width: 290px;
+		--button-height: 92px;
+		--button-bottom: 68.75%;
+		--button-rotate: 5.6deg;
+	}
 }
 
 @media (max-width: 1000px) {
-  .mainButtonContainer {
-    width: 400px;
-    height: 320px;
-    margin-right: 40px;
-  }
+	.mainButtonContainer {
+		width: 400px;
+		height: 320px;
+		margin-right: 32px;
 
-.mainPlayButton {
-    bottom: 220px; /* 275 * 0.8 */
-    width: 288px; /* 360 * 0.8 */
-    height: 88px; /* 110 * 0.8 */
-    transform: translateX(-50%) rotateZ(var(--panel-tilt-z)) scale(1);
-    animation: none;
-  }
-
-  .mainPlayButton:hover {
-    transform: translateX(-50%) rotateZ(var(--panel-tilt-z)) scale(1.05);
-  }
-
-  .playText {
-    font-size: 2rem; /* 2.5 * 0.8 */
-  }
+		--button-width: 270px;
+		--button-height: 86px;
+		--button-bottom: 68.75%;
+		--button-rotate: 5.6deg;
+	}
 }
 
 @media (max-width: 768px) {
-  .mainButtonContainer {
-    width: 375px;
-    height: 300px;
-    margin-right: 0;
-    margin-bottom: -20px;
-    align-items: flex-end;
-    max-width: 375px;
-  }
+	.mainButtonContainer {
+		width: min(375px, 92vw);
+		height: 300px;
+		margin-right: 0;
+		margin-bottom: -20px;
+		align-self: center;
 
-  /* Кнопка Play */
-  .mainPlayButton {
-    bottom: 206px; /* 275 * 0.75 */
-    width: 270px; /* 360 * 0.75 */
-    height: 82.5px; /* 110 * 0.75 */
-    transform: translateX(-50%) rotateZ(var(--panel-tilt-z)) scale(1);
-    animation: none;
-  }
+		--button-width: min(250px, 66vw);
+		--button-height: 80px;
+		--button-bottom: 68.6%;
+		--button-rotate: 5.4deg;
+	}
 
-  .mainPlayButton:hover {
-    transform: translateX(-50%) rotateZ(var(--panel-tilt-z)) scale(1.05);
-  }
-
-  .playText {
-    font-size: 1.875rem; /* 2.5 * 0.75 */
-  }
-
-  .mainPlayButton .topEdge {
-    display: none;
-  }
+	.playText {
+		font-size: 1.8rem;
+		transform: translateY(4px) rotate(-3.2deg) skewX(-6deg) scaleX(0.94);
+	}
 }
 
 @media (max-width: 480px) {
-  .mainButtonContainer {
-    width: 325px;
-    height: 260px;
-    margin-bottom: -30px;
-    max-width: 325px;
-  }
+	.mainButtonContainer {
+		width: min(325px, 94vw);
+		height: 260px;
+		margin-bottom: -28px;
 
-  .mainPlayButton {
-    bottom: 178px; /* 275 * 0.65 */
-    width: 234px; /* 360 * 0.65 */
-    height: 71.5px; /* 110 * 0.65 */
-  }
+		--button-width: min(220px, 66vw);
+		--button-height: 68px;
+		--button-bottom: 68.45%;
+		--button-rotate: 5.2deg;
+	}
 
-  .playText {
-    font-size: 1.625rem; /* 2.5 * 0.65 */
-  }
+	.playText {
+		font-size: 1.5rem;
+		transform: translateY(3px) rotate(-3deg) skewX(-6deg) scaleX(0.94);
+	}
 }
 
-/* Режим reduced-motion для доступности */
 @media (prefers-reduced-motion: reduce) {
-  .mainPlayButton {
-    animation: none;
-    transition: none;
-  }
-
-  .mainPlayButton:hover {
-    transform: translateX(-50%) rotateZ(var(--panel-tilt-z)) scale(1.05);
-  }
+	.mainPlayButton,
+	.playText {
+		transition: none;
+	}
 }

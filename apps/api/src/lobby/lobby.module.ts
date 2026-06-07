@@ -3,11 +3,12 @@ import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { JwtModule } from '@nestjs/jwt'
 import { GameModule } from '../game/game.module'
+import { LobbyController } from './lobby.controller'
 import { LobbyGateway } from './lobby.gateway'
 
 @Module({
 	imports: [
-		ConfigModule, // если ConfigModule глобальный, всё равно можно импортнуть здесь
+		ConfigModule,
 		JwtModule.registerAsync({
 			imports: [ConfigModule],
 			useFactory: (config: ConfigService) => ({
@@ -19,6 +20,7 @@ import { LobbyGateway } from './lobby.gateway'
 		}),
 		GameModule,
 	],
+	controllers: [LobbyController],
 	providers: [LobbyGateway],
 })
 export class LobbyModule {}

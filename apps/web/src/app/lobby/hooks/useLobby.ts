@@ -79,6 +79,7 @@ function toLobbyPlayer(v: unknown): Player | null {
 
 function normalizeSettings(v: unknown): LobbySettings {
 	if (!isRecord(v)) return DEFAULT_LOBBY_SETTINGS
+
 	return {
 		maxPlayers:
 			typeof v.maxPlayers === 'number' && v.maxPlayers > 0 ? v.maxPlayers : 4,
@@ -86,12 +87,29 @@ function normalizeSettings(v: unknown): LobbySettings {
 			? v.gameMode
 			: 'standard') as LobbySettings['gameMode'],
 		isPrivate: typeof v.isPrivate === 'boolean' ? v.isPrivate : false,
-		password: typeof v.password === 'string' ? v.password : '',
+		visibility:
+			v.visibility === 'public' ||
+			v.visibility === 'password' ||
+			v.visibility === 'hidden_password'
+				? v.visibility
+				: 'public',
+		hasPassword: typeof v.hasPassword === 'boolean' ? v.hasPassword : false,
+		password: '',
 	}
 }
 
 function makeId(prefix: string) {
 	return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+}
+
+function getStoredLobbyPassword(lobbyId: string): string | undefined {
+	if (typeof window === 'undefined') return undefined
+
+	const value = window.sessionStorage.getItem(
+		`station-eden:lobby-password:${lobbyId}`,
+	)
+
+	return value || undefined
 }
 
 export function useLobby(lobbyIdFromProps?: string) {
@@ -327,7 +345,11 @@ export function useLobby(lobbyIdFromProps?: string) {
 			isReady: false,
 		}
 
-		const ok = sendWS({ type: 'JOIN_LOBBY', player: currentUser })
+		const ok = sendWS({
+			type: 'JOIN_LOBBY',
+			player: currentUser,
+			password: getStoredLobbyPassword(lobbyIdRef.current),
+		})
 		if (ok) hasJoinedRef.current = true
 	}, [isConnected, currentUserId, profile.data, assets.avatar, sendWS])
 

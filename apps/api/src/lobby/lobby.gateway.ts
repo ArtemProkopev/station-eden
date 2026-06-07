@@ -1,5 +1,5 @@
 // apps/api/src/lobby/lobby.gateway.ts
-import { Logger } from '@nestjs/common'
+import { BadRequestException, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
 import {
@@ -10,6 +10,8 @@ import {
 	WebSocketGateway,
 	WebSocketServer,
 } from '@nestjs/websockets'
+import type { LobbyVisibility, PublicLobbyInfo } from '@station-eden/shared'
+import * as bcrypt from 'bcryptjs'
 import * as cookie from 'cookie'
 import { randomBytes } from 'crypto'
 import { Server, Socket } from 'socket.io'
@@ -29,6 +31,8 @@ type LobbySettings = {
 	gameMode: string
 	isPrivate: boolean
 	password: string
+	visibility: LobbyVisibility
+	hasPassword: boolean
 	difficulty?: string
 	turnTime?: string
 	fastGame?: boolean
@@ -48,6 +52,9 @@ type LobbyState = {
 	players: Map<string, Player>
 	connections: Map<string, Socket>
 	creatorId: string
+	visibility: LobbyVisibility
+	passwordHash?: string
+	inviteCode?: string
 	gameStarted?: boolean
 	gameId?: string
 }
@@ -57,6 +64,8 @@ const DEFAULT_LOBBY_SETTINGS: LobbySettings = {
 	gameMode: 'standard',
 	isPrivate: false,
 	password: '',
+	visibility: 'public',
+	hasPassword: false,
 }
 
 const LOBBY_ID_RE = /^[a-zA-Z0-9_-]{3,32}$/
@@ -114,6 +123,7 @@ export class LobbyGateway
 		const xf = (socket.handshake.headers['x-forwarded-for'] as string) || ''
 		const ip =
 			(xf.split(',')[0] || '').trim() || socket.handshake.address || 'unknown'
+
 		return ip
 	}
 
@@ -123,14 +133,19 @@ export class LobbyGateway
 			count: 0,
 			conns: 0,
 		}
+
 		const t = this.now()
+
 		if (t - b.windowStart > JOIN_WINDOW_MS) {
 			b.windowStart = t
 			b.count = 0
 		}
+
 		if (b.count >= JOIN_MAX_PER_IP) return false
+
 		b.count++
 		this.joinBucketsByIp.set(ip, b)
+
 		return true
 	}
 
@@ -140,14 +155,18 @@ export class LobbyGateway
 			count: 0,
 			conns: 0,
 		}
+
 		b.conns++
 		this.joinBucketsByIp.set(ip, b)
+
 		return b.conns
 	}
 
 	private decConn(ip: string) {
 		const b = this.joinBucketsByIp.get(ip)
+
 		if (!b) return
+
 		b.conns = Math.max(0, b.conns - 1)
 		this.joinBucketsByIp.set(ip, b)
 	}
@@ -157,14 +176,19 @@ export class LobbyGateway
 			windowStart: this.now(),
 			count: 0,
 		}
+
 		const t = this.now()
+
 		if (t - bucket.windowStart > MSG_WINDOW_MS) {
 			bucket.windowStart = t
 			bucket.count = 0
 		}
+
 		if (bucket.count >= MSG_MAX_PER_WINDOW) return false
+
 		bucket.count++
 		this.msgBuckets.set(userId, bucket)
+
 		return true
 	}
 
@@ -207,6 +231,136 @@ export class LobbyGateway
 		throw new Error('Не удалось сгенерировать уникальный ID игры')
 	}
 
+	private normalizeVisibility(value: unknown): LobbyVisibility {
+		if (
+			value === 'public' ||
+			value === 'password' ||
+			value === 'hidden_password'
+		) {
+			return value
+		}
+
+		return 'public'
+	}
+
+	private createRandomLobbyId() {
+		for (let attempt = 0; attempt < GAME_CODE_MAX_ATTEMPTS; attempt++) {
+			const id = Math.random().toString(36).slice(2, 10)
+
+			if (LOBBY_ID_RE.test(id) && !this.lobbies.has(id)) {
+				return id
+			}
+		}
+
+		throw new Error('Не удалось создать уникальный ID лобби')
+	}
+
+	private sanitizeSettings(lobby: LobbyState): LobbySettings {
+		const effectiveMax = Math.min(
+			lobby.settings.maxPlayers || 4,
+			HARD_MAX_PLAYERS,
+		)
+
+		return {
+			...lobby.settings,
+			maxPlayers: effectiveMax,
+			password: '',
+			hasPassword: !!lobby.passwordHash,
+			visibility: lobby.visibility,
+			isPrivate: lobby.visibility === 'hidden_password',
+		}
+	}
+
+	private emitLobbyState(lobbyId: string, lobby: LobbyState) {
+		this.server.to(lobbyId).emit('LOBBY_STATE', {
+			players: Array.from(lobby.players.values()),
+			settings: this.sanitizeSettings(lobby),
+			creatorId: lobby.creatorId,
+			gameStarted: lobby.gameStarted || false,
+		})
+	}
+
+	private bindSocketToLobby(
+		socket: Socket,
+		lobbyId: string,
+		lobby: LobbyState,
+	) {
+		socket.join(lobbyId)
+		lobby.connections.set(socket.data.userId, socket)
+	}
+
+	private async isPasswordValid(lobby: LobbyState, password?: string) {
+		if (!lobby.passwordHash) return true
+		if (!password || password.trim().length < 4) return false
+
+		return bcrypt.compare(password.trim(), lobby.passwordHash)
+	}
+
+	async createLobbyFromRequest(data: {
+		creatorId: string
+		creatorName: string
+		visibility: LobbyVisibility
+		password?: string
+	}) {
+		const visibility = this.normalizeVisibility(data.visibility)
+		const needsPassword =
+			visibility === 'password' || visibility === 'hidden_password'
+
+		if (needsPassword && (!data.password || data.password.trim().length < 4)) {
+			throw new BadRequestException('Пароль должен содержать минимум 4 символа')
+		}
+
+		const lobbyId = this.createRandomLobbyId()
+		const passwordHash = needsPassword
+			? await bcrypt.hash(data.password!.trim(), 10)
+			: undefined
+
+		this.lobbies.set(lobbyId, {
+			settings: {
+				...DEFAULT_LOBBY_SETTINGS,
+				visibility,
+				hasPassword: !!passwordHash,
+				isPrivate: visibility === 'hidden_password',
+				password: '',
+			},
+			players: new Map(),
+			connections: new Map(),
+			creatorId: data.creatorId,
+			visibility,
+			passwordHash,
+			inviteCode: lobbyId,
+			gameStarted: false,
+		})
+
+		this.logger.log(
+			`New ${visibility} lobby created: ${lobbyId} by ${data.creatorName}`,
+		)
+
+		return {
+			lobbyId,
+			visibility,
+			hasPassword: !!passwordHash,
+			inviteCode: lobbyId,
+		}
+	}
+
+	getOpenLobbies(): PublicLobbyInfo[] {
+		return Array.from(this.lobbies.entries())
+			.filter(([, lobby]) => {
+				if (lobby.gameStarted) return false
+
+				return lobby.visibility === 'public' || lobby.visibility === 'password'
+			})
+			.map(([lobbyId, lobby]) => ({
+				lobbyId,
+				playersCount: lobby.players.size,
+				maxPlayers: Math.min(lobby.settings.maxPlayers || 4, HARD_MAX_PLAYERS),
+				gameMode: lobby.settings.gameMode || 'standard',
+				visibility: lobby.visibility === 'password' ? 'password' : 'public',
+				hasPassword: !!lobby.passwordHash,
+			}))
+	}
+
 	afterInit() {
 		this.logger.log('LobbyGateway initialized')
 	}
@@ -214,13 +368,16 @@ export class LobbyGateway
 	async handleConnection(socket: Socket) {
 		try {
 			const ip = this.clientIp(socket)
+
 			if (!this.allowJoinFromIp(ip)) {
 				this.logger.warn(`Join rate-limit by IP ${ip}`)
 				socket.emit('ERROR', { message: 'Too many connections from IP' })
 				socket.disconnect(true)
 				return
 			}
+
 			const totalConns = this.incConn(ip)
+
 			if (totalConns > MAX_CONN_PER_IP_TOTAL) {
 				this.logger.warn(`Too many concurrent connections from IP ${ip}`)
 				socket.emit('ERROR', { message: 'Too many concurrent connections' })
@@ -262,6 +419,7 @@ export class LobbyGateway
 			}
 
 			let payload: any
+
 			try {
 				payload = await this.jwtService.verifyAsync(token, {
 					secret: jwtSecret,
@@ -294,6 +452,7 @@ export class LobbyGateway
 			}
 
 			const existingLobby = this.lobbies.get(lobbyId)
+
 			if (existingLobby?.gameStarted) {
 				this.logger.warn(
 					`Player ${username} tried to join lobby ${lobbyId} after game started`,
@@ -309,38 +468,48 @@ export class LobbyGateway
 			socket.data.username = username
 			socket.data.lobbyId = lobbyId
 
-			socket.join(lobbyId)
-
 			if (!this.lobbies.has(lobbyId)) {
 				this.lobbies.set(lobbyId, {
 					settings: { ...DEFAULT_LOBBY_SETTINGS },
 					players: new Map(),
 					connections: new Map(),
 					creatorId: userId,
+					visibility: 'public',
 					gameStarted: false,
 				})
-				this.logger.log(`New lobby created: ${lobbyId} by ${username}`)
+
+				this.logger.log(
+					`New legacy public lobby created: ${lobbyId} by ${username}`,
+				)
 			}
 
 			const lobby = this.lobbies.get(lobbyId)!
+
+			if (lobby.passwordHash) {
+				socket.emit('LOBBY_LOCKED', {
+					message: 'Для подключения к лобби нужен пароль',
+					hasPassword: true,
+				})
+				return
+			}
+
 			const effectiveMax = Math.min(
 				lobby.settings.maxPlayers || 4,
 				HARD_MAX_PLAYERS,
 			)
 
-			if (lobby.players.size >= effectiveMax) {
+			if (lobby.players.size >= effectiveMax && !lobby.players.has(userId)) {
 				this.logger.warn(`Lobby ${lobbyId} is full, rejecting ${username}`)
 				socket.emit('ERROR', { message: 'Lobby is full' })
-				socket.leave(lobbyId)
 				socket.disconnect(true)
 				return
 			}
 
-			lobby.connections.set(userId, socket)
+			this.bindSocketToLobby(socket, lobbyId, lobby)
 
 			socket.emit('LOBBY_STATE', {
 				players: Array.from(lobby.players.values()),
-				settings: { ...lobby.settings, maxPlayers: effectiveMax },
+				settings: this.sanitizeSettings(lobby),
 				creatorId: lobby.creatorId,
 				gameStarted: lobby.gameStarted || false,
 			})
@@ -358,20 +527,24 @@ export class LobbyGateway
 	handleDisconnect(socket: Socket) {
 		const { userId, lobbyId } = socket.data
 		const ip = this.clientIp(socket)
+
 		this.decConn(ip)
 
 		if (!userId || !lobbyId) return
 
 		const lobby = this.lobbies.get(lobbyId)
+
 		if (!lobby) return
 
 		lobby.connections.delete(userId)
 
 		if (lobby.players.has(userId)) {
 			const player = lobby.players.get(userId)!
+
 			lobby.players.delete(userId)
 
 			this.server.to(lobbyId).emit('PLAYER_LEFT', { playerId: userId })
+
 			this.logger.log(
 				`Player disconnected: ${player.name} from lobby ${lobbyId}`,
 			)
@@ -381,18 +554,25 @@ export class LobbyGateway
 				this.logger.log(`Lobby ${lobbyId} deleted (empty)`)
 			} else if (lobby.creatorId === userId) {
 				const remainingPlayers = Array.from(lobby.players.keys())
+
 				if (remainingPlayers.length > 0) {
 					lobby.creatorId = remainingPlayers[0]
+
 					this.logger.log(
 						`New lobby creator: ${lobby.creatorId} for lobby ${lobbyId}`,
 					)
+
+					this.emitLobbyState(lobbyId, lobby)
 				}
 			}
 		}
 	}
 
 	@SubscribeMessage('JOIN_LOBBY')
-	handleJoinLobby(socket: Socket, data: { player: Player }) {
+	async handleJoinLobby(
+		socket: Socket,
+		data: { player: Player; password?: string },
+	) {
 		const { userId, username, lobbyId } = socket.data
 		const lobby = this.lobbies.get(lobbyId)
 
@@ -408,14 +588,28 @@ export class LobbyGateway
 			return
 		}
 
+		const passwordOk = await this.isPasswordValid(lobby, data?.password)
+
+		if (!passwordOk) {
+			socket.emit('ERROR', {
+				message: lobby.passwordHash
+					? 'Неверный пароль лобби'
+					: 'Для подключения к лобби нужен пароль',
+			})
+			return
+		}
+
 		const effectiveMax = Math.min(
 			lobby.settings.maxPlayers || 4,
 			HARD_MAX_PLAYERS,
 		)
-		if (lobby.players.size >= effectiveMax) {
+
+		if (lobby.players.size >= effectiveMax && !lobby.players.has(userId)) {
 			socket.emit('ERROR', { message: 'Lobby is full' })
 			return
 		}
+
+		this.bindSocketToLobby(socket, lobbyId, lobby)
 
 		const p = data?.player || ({} as Player)
 		const sanitizedName =
@@ -441,18 +635,14 @@ export class LobbyGateway
 
 		lobby.players.set(userId, authenticatedPlayer)
 
-		this.server.to(lobbyId).emit('LOBBY_STATE', {
-			players: Array.from(lobby.players.values()),
-			settings: { ...lobby.settings, maxPlayers: effectiveMax },
-			creatorId: lobby.creatorId,
-			gameStarted: lobby.gameStarted || false,
-		})
+		this.emitLobbyState(lobbyId, lobby)
 	}
 
 	@SubscribeMessage('SEND_MESSAGE')
 	handleSendMessage(socket: Socket, data: { message: any }) {
 		const { lobbyId, username, userId } = socket.data
 		const lobby = this.lobbies.get(lobbyId)
+
 		if (!lobby) return
 
 		if (!lobby.players.has(userId)) {
@@ -469,6 +659,7 @@ export class LobbyGateway
 		const msg = data?.message ?? {}
 		const textRaw = typeof msg.text === 'string' ? msg.text : ''
 		const text = textRaw.trim().slice(0, MSG_MAX_LEN)
+
 		if (!text) return
 
 		const messageWithAuth = {
@@ -490,6 +681,7 @@ export class LobbyGateway
 	) {
 		const { userId, lobbyId } = socket.data
 		const lobby = this.lobbies.get(lobbyId)
+
 		if (!lobby) return
 
 		if (lobby.gameStarted) {
@@ -500,6 +692,7 @@ export class LobbyGateway
 		}
 
 		const playerId = data.playerId || userId
+
 		if (playerId !== userId) {
 			socket.emit('ERROR', {
 				message: 'Cannot change other player ready status',
@@ -508,19 +701,12 @@ export class LobbyGateway
 		}
 
 		const player = lobby.players.get(playerId)
+
 		if (!player) return
 
 		player.isReady = !!data.isReady
 
-		this.server.to(lobbyId).emit('LOBBY_STATE', {
-			players: Array.from(lobby.players.values()),
-			settings: {
-				...lobby.settings,
-				maxPlayers: Math.min(lobby.settings.maxPlayers, HARD_MAX_PLAYERS),
-			},
-			creatorId: lobby.creatorId,
-			gameStarted: lobby.gameStarted || false,
-		})
+		this.emitLobbyState(lobbyId, lobby)
 	}
 
 	@SubscribeMessage('UPDATE_LOBBY_SETTINGS')
@@ -530,6 +716,7 @@ export class LobbyGateway
 	) {
 		const { userId, lobbyId } = socket.data
 		const lobby = this.lobbies.get(lobbyId)
+
 		if (!lobby) return
 
 		if (lobby.gameStarted) {
@@ -546,7 +733,13 @@ export class LobbyGateway
 			return
 		}
 
-		const next = { ...data.settings }
+		const next: Partial<LobbySettings> = { ...data.settings }
+
+		delete next.password
+		delete next.hasPassword
+		delete next.visibility
+		delete next.isPrivate
+
 		if (typeof next.maxPlayers === 'number') {
 			next.maxPlayers = Math.max(2, Math.min(HARD_MAX_PLAYERS, next.maxPlayers))
 		}
@@ -559,12 +752,15 @@ export class LobbyGateway
 		)
 
 		this.server.to(lobbyId).emit('LOBBY_SETTINGS_UPDATED', {
-			settings: { ...lobby.settings, maxPlayers: effectiveMax },
+			settings: this.sanitizeSettings(lobby),
 		})
 
 		this.server.to(lobbyId).emit('LOBBY_STATE', {
 			players: Array.from(lobby.players.values()),
-			settings: { ...lobby.settings, maxPlayers: effectiveMax },
+			settings: {
+				...this.sanitizeSettings(lobby),
+				maxPlayers: effectiveMax,
+			},
 			creatorId: lobby.creatorId,
 			gameStarted: lobby.gameStarted || false,
 		})
@@ -574,15 +770,18 @@ export class LobbyGateway
 	handlePlayerLeft(socket: Socket, data: { playerId?: string }) {
 		const { userId, lobbyId } = socket.data
 		const lobby = this.lobbies.get(lobbyId)
+
 		if (!lobby) return
 
 		const playerId = data.playerId || userId
+
 		if (playerId !== userId && lobby.creatorId !== userId) {
 			socket.emit('ERROR', { message: 'Cannot remove other players' })
 			return
 		}
 
 		const player = lobby.players.get(playerId)
+
 		if (!player) return
 
 		const targetSocket = lobby.connections.get(playerId)
@@ -599,15 +798,7 @@ export class LobbyGateway
 			lobby.creatorId = Array.from(lobby.players.keys())[0]
 		}
 
-		this.server.to(lobbyId).emit('LOBBY_STATE', {
-			players: Array.from(lobby.players.values()),
-			settings: {
-				...lobby.settings,
-				maxPlayers: Math.min(lobby.settings.maxPlayers, HARD_MAX_PLAYERS),
-			},
-			creatorId: lobby.creatorId,
-			gameStarted: lobby.gameStarted || false,
-		})
+		this.emitLobbyState(lobbyId, lobby)
 
 		if (lobby.players.size === 0 && lobby.connections.size === 0) {
 			this.lobbies.delete(lobbyId)
@@ -626,6 +817,7 @@ export class LobbyGateway
 			}
 
 			const lobby = this.lobbies.get(targetLobbyId)
+
 			if (!lobby) {
 				socket.emit('ERROR', { message: 'Lobby not found' })
 				return
@@ -723,6 +915,7 @@ export class LobbyGateway
 
 			setTimeout(() => {
 				const currentLobby = this.lobbies.get(targetLobbyId)
+
 				if (currentLobby && currentLobby.connections.size === 0) {
 					this.lobbies.delete(targetLobbyId)
 					this.logger.log(`Lobby ${targetLobbyId} cleaned up after game start`)
@@ -741,12 +934,17 @@ export class LobbyGateway
 	// debug helpers
 	getLobbyState(lobbyId: string) {
 		const lobby = this.lobbies.get(lobbyId)
+
 		if (!lobby) return null
+
 		return {
 			players: Array.from(lobby.players.values()),
-			settings: lobby.settings,
+			settings: this.sanitizeSettings(lobby),
 			creatorId: lobby.creatorId,
 			connections: lobby.connections.size,
+			visibility: lobby.visibility,
+			hasPassword: !!lobby.passwordHash,
+			inviteCode: lobby.inviteCode,
 			gameStarted: lobby.gameStarted || false,
 			gameId: lobby.gameId,
 		}
@@ -756,9 +954,12 @@ export class LobbyGateway
 		return Array.from(this.lobbies.entries()).map(([lobbyId, lobby]) => ({
 			lobbyId,
 			players: Array.from(lobby.players.values()).map(player => player.name),
-			settings: lobby.settings,
+			settings: this.sanitizeSettings(lobby),
 			creatorId: lobby.creatorId,
 			connections: lobby.connections.size,
+			visibility: lobby.visibility,
+			hasPassword: !!lobby.passwordHash,
+			inviteCode: lobby.inviteCode,
 			gameStarted: lobby.gameStarted || false,
 			gameId: lobby.gameId,
 		}))

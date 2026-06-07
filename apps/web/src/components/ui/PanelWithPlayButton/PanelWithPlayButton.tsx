@@ -1,7 +1,6 @@
 'use client'
 
-import { memo, useCallback, useState } from 'react'
-
+import { memo, useCallback } from 'react'
 import styles from './PanelWithPlayButton.module.css'
 
 interface PanelWithPlayButtonProps {
@@ -16,15 +15,9 @@ function PanelWithPlayButton({
 	onPlayClick,
 	className = '',
 }: PanelWithPlayButtonProps) {
-	const [isHovered, setIsHovered] = useState(false)
-
 	const handlePlayClick = useCallback(() => {
 		onPlayClick?.()
 	}, [onPlayClick])
-
-	const handleMouseEnter = useCallback(() => setIsHovered(true), [])
-
-	const handleMouseLeave = useCallback(() => setIsHovered(false), [])
 
 	return (
 		<div className={`${styles.mainButtonContainer} ${className}`}>
@@ -43,12 +36,9 @@ function PanelWithPlayButton({
 			<button
 				className={`${styles.mainPlayButton} cursor-target`}
 				onClick={handlePlayClick}
-				onMouseEnter={handleMouseEnter}
-				onMouseLeave={handleMouseLeave}
 				type='button'
 				aria-label='Начать игру'
 			>
-				<span className={styles.topEdge} data-hovered={isHovered} />
 				<span className={styles.playText}>Играть</span>
 			</button>
 		</div>

@@ -1,10 +1,12 @@
 // apps/web/src/app/page.tsx
 'use client'
 
+import type { CreateLobbyDto } from '@station-eden/shared'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
+import { CreateLobbyModal } from '../components/CreateLobbyModal/CreateLobbyModal'
 import { api } from '../lib/api'
 import styles from './home.module.css'
 
@@ -101,6 +103,7 @@ async function fetchProfile(): Promise<UserProfile | null> {
 
 		const email =
 			typeof userUnknown.email === 'string' ? userUnknown.email : undefined
+
 		if (!id || !email) return null
 
 		const username =
@@ -117,6 +120,28 @@ async function fetchProfile(): Promise<UserProfile | null> {
 	}
 }
 
+function getCreateLobbyErrorMessage(error: unknown): string {
+	if (isRecord(error)) {
+		if (typeof error.userMessage === 'string') return error.userMessage
+		if (typeof error.serverMessage === 'string') return error.serverMessage
+		if (typeof error.message === 'string') return error.message
+	}
+
+	if (error instanceof Error) return error.message
+
+	return 'Не удалось создать лобби'
+}
+
+function saveLobbyPassword(lobbyId: string, password?: string) {
+	if (typeof window === 'undefined') return
+	if (!password) return
+
+	window.sessionStorage.setItem(
+		`station-eden:lobby-password:${lobbyId}`,
+		password,
+	)
+}
+
 function NewsSlider() {
 	const [currentIndex, setCurrentIndex] = useState(0)
 
@@ -124,6 +149,7 @@ function NewsSlider() {
 		const interval = setInterval(() => {
 			setCurrentIndex(prev => (prev + 1) % NEWS_DATA.length)
 		}, 7000)
+
 		return () => clearInterval(interval)
 	}, [])
 
@@ -140,6 +166,7 @@ function NewsSlider() {
 	return (
 		<div className={styles.newsSliderContainer}>
 			<button
+				type='button'
 				className={styles.sliderArrowLeft}
 				onClick={prevNews}
 				aria-label='Предыдущая новость'
@@ -152,6 +179,7 @@ function NewsSlider() {
 					<span className={styles.newsTitle}>{currentNews.title}</span>
 					<span className={styles.newsDate}>Дата: {currentNews.date}</span>
 				</div>
+
 				<div className={styles.newsContent}>
 					<p className={styles.newsInfo}>{currentNews.content}</p>
 					<p className={styles.newsHighlight}>{currentNews.highlight}</p>
@@ -159,6 +187,7 @@ function NewsSlider() {
 			</div>
 
 			<button
+				type='button'
 				className={styles.sliderArrowRight}
 				onClick={nextNews}
 				aria-label='Следующая новость'
@@ -172,6 +201,11 @@ function NewsSlider() {
 export default function HomePage() {
 	const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
 	const [isLoading, setIsLoading] = useState(true)
+
+	const [isCreateLobbyOpen, setIsCreateLobbyOpen] = useState(false)
+	const [isCreatingLobby, setIsCreatingLobby] = useState(false)
+	const [createLobbyError, setCreateLobbyError] = useState('')
+
 	const router = useRouter()
 
 	useEffect(() => {
@@ -179,7 +213,9 @@ export default function HomePage() {
 
 		const load = async () => {
 			const profile = await fetchProfile()
+
 			if (!alive) return
+
 			setUserProfile(profile)
 			setIsLoading(false)
 		}
@@ -188,6 +224,7 @@ export default function HomePage() {
 
 		const handleSessionChanged = () => {
 			if (!alive) return
+
 			setUserProfile(null)
 			setIsLoading(false)
 			load()
@@ -218,8 +255,42 @@ export default function HomePage() {
 	const isAuthenticated = !!userProfile
 
 	const handlePlayClick = useCallback(() => {
-		router.push(isAuthenticated ? '/lobby' : '/login')
+		if (!isAuthenticated) {
+			router.push('/login')
+			return
+		}
+
+		setCreateLobbyError('')
+		setIsCreateLobbyOpen(true)
 	}, [router, isAuthenticated])
+
+	const handleCreateLobby = useCallback(
+		async (payload: CreateLobbyDto) => {
+			setIsCreatingLobby(true)
+			setCreateLobbyError('')
+
+			try {
+				const lobby = await api.createLobby(payload)
+
+				saveLobbyPassword(lobby.lobbyId, payload.password)
+
+				setIsCreateLobbyOpen(false)
+				router.push(`/lobby/${lobby.lobbyId}`)
+			} catch (error) {
+				setCreateLobbyError(getCreateLobbyErrorMessage(error))
+			} finally {
+				setIsCreatingLobby(false)
+			}
+		},
+		[router],
+	)
+
+	const handleCloseCreateLobby = useCallback(() => {
+		if (isCreatingLobby) return
+
+		setIsCreateLobbyOpen(false)
+		setCreateLobbyError('')
+	}, [isCreatingLobby])
 
 	const handleRegister = () => router.push('/register')
 	const handleLogin = () => router.push('/login')
@@ -263,12 +334,15 @@ export default function HomePage() {
 					{!isAuthenticated && !isLoading && (
 						<nav className={styles.sideMenu}>
 							<button
+								type='button'
 								className={`${styles.menuItem} cursor-target`}
 								onClick={handleRegister}
 							>
 								ЗАРЕГИСТРИРОВАТЬСЯ
 							</button>
+
 							<button
+								type='button'
 								className={`${styles.menuItem} cursor-target`}
 								onClick={handleLogin}
 							>
@@ -282,6 +356,7 @@ export default function HomePage() {
 
 				<div className={styles.socialSection}>
 					<p className={styles.socialText}>Мы в социальных сетях:</p>
+
 					<div className={styles.socialIcons}>
 						{SOCIAL_ICONS.map(item => (
 							<a
@@ -305,6 +380,14 @@ export default function HomePage() {
 					</div>
 				</div>
 			</div>
+
+			<CreateLobbyModal
+				isOpen={isCreateLobbyOpen}
+				isSubmitting={isCreatingLobby}
+				submitError={createLobbyError}
+				onClose={handleCloseCreateLobby}
+				onCreate={handleCreateLobby}
+			/>
 		</>
 	)
 }

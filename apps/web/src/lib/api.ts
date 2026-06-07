@@ -1,4 +1,5 @@
 // apps/web/src/lib/api.ts
+import type { CreateLobbyDto, CreateLobbyResponse } from '@station-eden/shared'
 import { isForcedLogout } from './authUtils'
 import { getCsrfToken } from './csrf'
 import {
@@ -303,6 +304,9 @@ export const api = {
 	me: () => getJSON('/auth/me', 'default'),
 
 	session: () => getJSON('/auth/session', 'default'),
+
+	createLobby: (payload: CreateLobbyDto) =>
+		postJSON<CreateLobbyResponse>('/lobbies', payload, 'default'),
 
 	updateProfile: (patch: {
 		avatar?: string
