@@ -1,266 +1,14 @@
 /* apps/web/src/app/game/[gameId]/components/GameChat.module.css */
 
 .gameChat {
-	display: flex;
-	flex-direction: column;
-	height: calc(100vh - 180px);
-	min-height: 400px;
-	max-height: 600px;
-	width: 100%;
-	background: rgba(0, 0, 0, 0.6);
-	backdrop-filter: blur(8px);
-	border-radius: 12px;
-	border: 1px solid rgba(99, 239, 255, 0.3);
-	overflow: hidden;
-}
-
-/* Вкладки */
-.tabsHeader {
-	display: flex;
-	border-bottom: 1px solid rgba(99, 239, 255, 0.2);
-	background: rgba(0, 0, 0, 0.4);
-	flex-shrink: 0;
-}
-
-.tabButton {
-	flex: 1;
-	background: transparent;
-	border: none;
-	color: rgba(255, 255, 255, 0.5);
-	padding: 10px 16px;
-	font-family: 'RussoOne', sans-serif;
-	font-size: 12px;
-	cursor: pointer;
-	transition: all 0.2s ease;
-	border-bottom: 2px solid transparent;
-}
-
-.tabButtonActive {
-	color: #63efff;
-	border-bottom-color: #63efff;
-}
-
-.tabButtonHasVoice {
 	position: relative;
-}
-
-.tabButtonHasVoice::after {
-	content: '';
-	position: absolute;
-	top: 8px;
-	right: 20px;
-	width: 8px;
-	height: 8px;
-	background-color: #4caf50;
-	border-radius: 50%;
-	animation: pulse 1.5s infinite;
-}
-
-/* Область сообщений */
-.messagesArea {
-	flex: 1;
-	overflow-y: auto;
-	overflow-x: hidden;
-	padding: 12px;
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-	background: rgba(0, 0, 0, 0.2);
-	min-height: 0;
-}
-
-/* Сообщение */
-.message {
-	display: flex;
-	flex-direction: column;
-	padding: 8px 12px;
-	background: rgba(255, 255, 255, 0.03);
-	border-radius: 6px;
-	border-left: 2px solid rgba(99, 239, 255, 0.3);
-}
-
-.messageSystem {
-	background: rgba(99, 239, 255, 0.05);
-	border-left-color: #63efff;
-}
-
-.myMessage {
-	background: rgba(99, 239, 255, 0.08);
-	border-left-color: #63efff;
-}
-
-.messageHeader {
-	display: flex;
-	justify-content: space-between;
-	align-items: baseline;
-	margin-bottom: 4px;
-}
-
-.messageAuthor {
-	font-size: 11px;
-	color: #63efff;
-}
-
-.messageSystem .messageAuthor {
-	color: #f39c12;
-}
-
-.messageTime {
-	font-size: 9px;
-	color: rgba(255, 255, 255, 0.3);
-}
-
-.messageText {
-	font-size: 12px;
-	color: rgba(255, 255, 255, 0.85);
-	line-height: 1.4;
-	word-break: break-word;
-}
-
-/* Форма ввода */
-.inputArea {
-	display: flex;
-	padding: 10px 12px;
-	background: rgba(0, 0, 0, 0.4);
-	border-top: 1px solid rgba(99, 239, 255, 0.2);
-	gap: 8px;
-	flex-shrink: 0;
-}
-
-.input {
-	flex: 1;
-	padding: 8px 12px;
-	background: rgba(255, 255, 255, 0.05);
-	border: 1px solid rgba(99, 239, 255, 0.2);
-	border-radius: 4px;
-	color: white;
-	font-family: 'RussoOne', sans-serif;
-	font-size: 12px;
-	transition: all 0.2s ease;
-}
-
-.input:focus {
-	outline: none;
-	border-color: #63efff;
-	background: rgba(255, 255, 255, 0.08);
-}
-
-.input::placeholder {
-	color: rgba(255, 255, 255, 0.3);
-}
-
-.input:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
-
-.sendButton {
-	background: transparent;
-	border: 1px solid #63efff;
-	color: #63efff;
-	padding: 6px 16px;
-	border-radius: 4px;
-	cursor: pointer;
-	font-family: 'RussoOne', sans-serif;
-	font-size: 14px;
-	transition: all 0.2s ease;
-}
-
-.sendButton:hover:not(:disabled) {
-	background: rgba(99, 239, 255, 0.1);
-}
-
-.sendButton:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
-
-/* Пустое состояние */
-.emptyState {
-	text-align: center;
-	padding: 40px 20px;
-	color: rgba(255, 255, 255, 0.3);
-	font-size: 12px;
-}
-
-/* Голосовой чат */
-.voiceTab {
-	flex: 1;
-	overflow-y: auto;
-	padding: 12px;
-	background: rgba(0, 0, 0, 0.2);
-	min-height: 0;
-}
-
-.voiceLoading,
-.voiceError {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	height: 100%;
-	font-size: 12px;
-}
-
-.voiceLoading {
-	color: rgba(255, 255, 255, 0.5);
-}
-
-.voiceError {
-	color: #ff6b6b;
-}
-
-/* Скроллбар */
-.messagesArea::-webkit-scrollbar {
-	width: 4px;
-}
-
-.messagesArea::-webkit-scrollbar-track {
-	background: rgba(255, 255, 255, 0.05);
-	border-radius: 2px;
-}
-
-.messagesArea::-webkit-scrollbar-thumb {
-	background: rgba(99, 239, 255, 0.3);
-	border-radius: 2px;
-}
-
-.messagesArea::-webkit-scrollbar-thumb:hover {
-	background: rgba(99, 239, 255, 0.5);
-}
-
-.voiceTab::-webkit-scrollbar {
-	width: 4px;
-}
-
-.voiceTab::-webkit-scrollbar-track {
-	background: rgba(255, 255, 255, 0.05);
-	border-radius: 2px;
-}
-
-.voiceTab::-webkit-scrollbar-thumb {
-	background: rgba(99, 239, 255, 0.3);
-	border-radius: 2px;
-}
-
-/* Анимации */
-@keyframes pulse {
-	0%,
-	100% {
-		opacity: 0.4;
-	}
-	50% {
-		opacity: 1;
-	}
-}
-
-/* ===== Station Eden game chat redesign ===== */
-
-.gameChat {
-	position: relative;
+	z-index: 1;
 	isolation: isolate;
-	height: calc(100dvh - 170px);
-	min-height: 520px;
-	max-height: none;
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	height: 100%;
+	min-height: 0;
 	overflow: hidden;
 	border: 1px solid rgba(99, 239, 255, 0.34);
 	border-radius: 16px;
@@ -291,25 +39,33 @@
 }
 
 .tabsHeader {
+	display: flex;
+	flex: 0 0 auto;
 	border-bottom: 1px solid rgba(99, 239, 255, 0.2);
 	background: rgba(0, 0, 0, 0.22);
 }
 
 .tabButton {
 	position: relative;
+	flex: 1;
 	padding: 14px 16px;
-	color: rgba(237, 252, 255, 0.5);
-	letter-spacing: 0.35px;
+	border: none;
 	border-bottom: 1px solid transparent;
+	background: transparent;
+	color: rgba(237, 252, 255, 0.5);
+	cursor: pointer;
+	font-family: 'RussoOne', sans-serif;
+	font-size: 12px;
+	letter-spacing: 0.35px;
+	transition: all 0.2s ease;
 }
 
 .tabButton:hover {
-	color: rgba(237, 252, 255, 0.78);
 	background: rgba(99, 239, 255, 0.04);
+	color: rgba(237, 252, 255, 0.78);
 }
 
 .tabButtonActive {
-	color: #63efff;
 	border-bottom-color: #63efff;
 	background: linear-gradient(
 		180deg,
@@ -319,12 +75,31 @@
 	box-shadow:
 		inset 0 -1px 0 #63efff,
 		0 8px 22px rgba(99, 239, 255, 0.08);
+	color: #63efff;
 	text-shadow: 0 0 12px rgba(99, 239, 255, 0.3);
 }
 
+.tabButtonHasVoice::after {
+	content: '';
+	position: absolute;
+	top: 8px;
+	right: 20px;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background-color: #4caf50;
+	animation: pulse 1.5s infinite;
+}
+
 .messagesArea {
-	padding: 14px;
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
 	gap: 10px;
+	min-height: 0;
+	overflow-x: hidden;
+	overflow-y: auto;
+	padding: 14px;
 	background:
 		linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.08)),
 		radial-gradient(
@@ -335,6 +110,8 @@
 }
 
 .message {
+	display: flex;
+	flex-direction: column;
 	padding: 11px 13px;
 	border: 1px solid rgba(99, 239, 255, 0.12);
 	border-left: 2px solid rgba(99, 239, 255, 0.34);
@@ -363,6 +140,13 @@
 		rgba(0, 0, 0, 0.24);
 }
 
+.messageHeader {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	margin-bottom: 4px;
+}
+
 .messageAuthor {
 	color: #63efff;
 	font-size: 11px;
@@ -382,21 +166,24 @@
 	color: rgba(237, 252, 255, 0.86);
 	font-size: 12px;
 	line-height: 1.45;
+	word-break: break-word;
 }
 
 .inputArea {
-	padding: 12px;
+	display: flex;
+	flex: 0 0 auto;
 	gap: 10px;
+	padding: 12px;
 	border-top: 1px solid rgba(99, 239, 255, 0.18);
 	background: rgba(0, 0, 0, 0.32);
 }
 
 .input {
+	flex: 1;
 	height: 42px;
 	padding: 0 14px;
-	border-radius: 8px;
 	border: 1px solid rgba(99, 239, 255, 0.24);
-	color: rgba(237, 252, 255, 0.92);
+	border-radius: 8px;
 	background:
 		linear-gradient(
 			180deg,
@@ -404,9 +191,18 @@
 			rgba(255, 255, 255, 0.025)
 		),
 		rgba(0, 0, 0, 0.18);
+	color: rgba(237, 252, 255, 0.92);
+	font-family: 'RussoOne', sans-serif;
+	font-size: 12px;
+	transition: all 0.2s ease;
+}
+
+.input::placeholder {
+	color: rgba(255, 255, 255, 0.3);
 }
 
 .input:focus {
+	outline: none;
 	border-color: rgba(99, 239, 255, 0.78);
 	background:
 		linear-gradient(
@@ -420,15 +216,24 @@
 		0 0 20px rgba(99, 239, 255, 0.08);
 }
 
+.input:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
 .sendButton {
 	min-width: 48px;
 	height: 42px;
 	padding: 0 14px;
-	border-radius: 8px;
 	border: 1px solid rgba(99, 239, 255, 0.66);
-	color: #63efff;
+	border-radius: 8px;
 	background: rgba(99, 239, 255, 0.06);
 	box-shadow: inset 0 0 14px rgba(99, 239, 255, 0.05);
+	color: #63efff;
+	cursor: pointer;
+	font-family: 'RussoOne', sans-serif;
+	font-size: 14px;
+	transition: all 0.2s ease;
 }
 
 .sendButton:hover:not(:disabled) {
@@ -439,9 +244,97 @@
 		inset 0 0 14px rgba(99, 239, 255, 0.08);
 }
 
-@media (max-width: 1180px) {
+.sendButton:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.emptyState {
+	color: rgba(255, 255, 255, 0.3);
+	padding: 40px 20px;
+	font-size: 12px;
+	text-align: center;
+}
+
+.voiceTab {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-x: hidden;
+	overflow-y: auto;
+	padding: 12px;
+	background: rgba(0, 0, 0, 0.2);
+}
+
+.voiceLoading,
+.voiceError {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	font-size: 12px;
+}
+
+.voiceLoading {
+	color: rgba(255, 255, 255, 0.5);
+}
+
+.voiceError {
+	color: #ff6b6b;
+}
+
+.messagesArea::-webkit-scrollbar,
+.voiceTab::-webkit-scrollbar {
+	width: 4px;
+}
+
+.messagesArea::-webkit-scrollbar-track,
+.voiceTab::-webkit-scrollbar-track {
+	background: rgba(255, 255, 255, 0.05);
+	border-radius: 2px;
+}
+
+.messagesArea::-webkit-scrollbar-thumb,
+.voiceTab::-webkit-scrollbar-thumb {
+	background: rgba(99, 239, 255, 0.3);
+	border-radius: 2px;
+}
+
+.messagesArea::-webkit-scrollbar-thumb:hover,
+.voiceTab::-webkit-scrollbar-thumb:hover {
+	background: rgba(99, 239, 255, 0.5);
+}
+
+@keyframes pulse {
+	0%,
+	100% {
+		opacity: 0.4;
+	}
+
+	50% {
+		opacity: 1;
+	}
+}
+
+@media (max-width: 1200px) {
 	.gameChat {
-		height: auto;
+		height: 420px;
 		min-height: 420px;
+	}
+}
+
+@media (max-width: 768px) {
+	.gameChat {
+		height: 360px;
+		min-height: 360px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.tabButtonHasVoice::after {
+		animation: none;
+	}
+
+	.sendButton:hover:not(:disabled) {
+		transform: none;
 	}
 }

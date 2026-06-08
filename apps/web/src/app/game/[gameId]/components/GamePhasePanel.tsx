@@ -11,19 +11,15 @@ import {
 	RevealedPlayer,
 } from '@station-eden/shared'
 import { useCallback, useEffect, useState } from 'react'
-import styles from '../page.module.css'
 import CardsTable from './CardsTable'
+import styles from './GamePhasePanel.module.css'
 import CrisisActions from './phase-actions/CrisisActions'
 import DiscussionActions from './phase-actions/DiscussionActions'
 import GameOverActions from './phase-actions/GameOverActions'
 import PreparationActions from './phase-actions/PreparationActions'
 import RevealActions from './phase-actions/RevealActions'
 import VotingActions from './phase-actions/VotingActions'
-import {
-	formatTime,
-	getPhaseDescription,
-	getPhaseName,
-} from './utils/game.utils'
+import { getPhaseDescription, getPhaseName } from './utils/game.utils'
 
 interface GamePhasePanelProps {
 	gameState: ExtendedGameState
@@ -61,7 +57,6 @@ export default function GamePhasePanel({
 	isRevealing,
 	revealedPlayer,
 	onShowMyCards,
-	onStartDiscussion,
 	onRequestVote,
 	onVote,
 	onSolveCrisis,
@@ -245,17 +240,13 @@ export default function GamePhasePanel({
 					<p className={styles.phaseDescription}>{phaseDescription}</p>
 
 					{shouldShowTimer && (
-						<div className={styles.phaseTimer}>
+						<div className={styles.phaseTimer} aria-hidden='true'>
 							<div className={styles.timerBar}>
 								<div
 									className={styles.timerProgress}
 									style={{ width: `${timerProgress}%` }}
 								/>
 							</div>
-
-							<span className={styles.timerText}>
-								{formatTime(phaseTimeLeft)} / {formatTime(phaseDurationDisplay)}
-							</span>
 						</div>
 					)}
 				</div>

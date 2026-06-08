@@ -1,6 +1,6 @@
 // apps/web/src/app/game/[gameId]/components/GameHeader.tsx
 import { ExtendedGamePlayer, ExtendedGameState } from '@station-eden/shared'
-import styles from '../page.module.css'
+import styles from './GameHeader.module.css'
 import { formatTime } from './utils/game.utils'
 
 interface GameHeaderProps {

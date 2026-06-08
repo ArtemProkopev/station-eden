@@ -1,7 +1,7 @@
 // apps/web/src/app/game/[gameId]/components/PlayersPanel.tsx
 import { ExtendedGamePlayer, ExtendedGameState } from '@station-eden/shared'
 import Image from 'next/image'
-import styles from '../page.module.css'
+import styles from './PlayersPanel.module.css'
 
 interface PlayersPanelProps {
 	gameState: ExtendedGameState
@@ -81,10 +81,10 @@ function PlayerCard({
 }: PlayerCardProps) {
 	const isAlive = player.isAlive === true
 	const hasVoted = currentPlayer?.vote === player.id
-	
-	// Проверяем, раскрыта ли профессия
-	const isProfessionRevealed = player.revealedCardsInfo?.profession !== undefined
-	
+
+	const isProfessionRevealed =
+		player.revealedCardsInfo?.profession !== undefined
+
 	return (
 		<div
 			className={`${styles.playerCard} ${!isAlive ? styles.dead : ''} ${
@@ -111,61 +111,66 @@ function PlayerCard({
 						{userId && player.id === userId && ' (Вы)'}
 						{player.id === creatorId && ' (Создатель)'}
 					</h3>
+
 					<div className={styles.playerStatus}>
 						{isAlive ? (
 							<span className={styles.alive}>Жив</span>
 						) : (
 							<span className={styles.deadStatus}>Выбыл</span>
 						)}
+
 						{player.isInfected && (
 							<span className={styles.infected}>Заражён</span>
 						)}
+
 						{player.isSuspicious && (
 							<span className={styles.suspicious}>Подозрителен</span>
 						)}
-						{/* Показываем профессию только если карта раскрыта */}
+
 						{isProfessionRevealed && player.profession && (
 							<span className={styles.playerProfession}>
 								{player.profession}
 							</span>
 						)}
+
 						{!isProfessionRevealed && isAlive && (
-							<span className={styles.playerProfessionUnknown}>
-								Неизвестно
-							</span>
+							<span className={styles.playerProfessionUnknown}>Неизвестно</span>
 						)}
 					</div>
+
 					<div className={styles.playerStats}>
 						<span>Карт раскрыто: {player.revealedCards || 0}</span>
 					</div>
 				</div>
 
 				<div className={styles.playerBadges}>
-					{player.revealedCardsThisRound && player.revealedCardsThisRound.length > 0 && (
-						<span className={styles.revealedBadge} title="Раскрыл карту в этом раунде">
-							*
-						</span>
-					)}
+					{player.revealedCardsThisRound &&
+						player.revealedCardsThisRound.length > 0 && (
+							<span
+								className={styles.revealedBadge}
+								title='Раскрыл карту в этом раунде'
+							>
+								*
+							</span>
+						)}
 				</div>
 			</div>
 
-			{gamePhase === 'voting' &&
-				isAlive &&
-				userId &&
-				player.id !== userId && (
-					<div className={styles.voteSection}>
-						<button
-							className={styles.voteButton}
-							onClick={() => onVote(player.id)}
-							disabled={!currentPlayer?.isAlive || Boolean(currentPlayer?.vote)}
-						>
-							Голосовать против
-						</button>
-						<div className={styles.voteCount}>
-							Голосов: {player.votesAgainst || 0}
-						</div>
+			{gamePhase === 'voting' && isAlive && userId && player.id !== userId && (
+				<div className={styles.voteSection}>
+					<button
+						className={styles.voteButton}
+						onClick={() => onVote(player.id)}
+						disabled={!currentPlayer?.isAlive || Boolean(currentPlayer?.vote)}
+					>
+						Голосовать против
+					</button>
+
+					<div className={styles.voteCount}>
+						Голосов: {player.votesAgainst || 0}
 					</div>
-				)}
+				</div>
+			)}
 		</div>
 	)
 }
