@@ -29,6 +29,13 @@ const DEFAULT_LOBBY_SETTINGS: LobbySettings = {
 	visibility: 'public',
 	hasPassword: false,
 	password: '',
+	difficulty: 'normal',
+	turnTime: 180,
+	maxRounds: 10,
+	discussionTime: 180,
+	votingTime: 60,
+	hiddenRolesCount: 0,
+	enableCrises: true,
 }
 
 const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
@@ -93,12 +100,56 @@ function toLobbyPlayer(v: unknown): Player | null {
 function normalizeSettings(v: unknown): LobbySettings {
 	if (!isRecord(v)) return DEFAULT_LOBBY_SETTINGS
 
+	const maxPlayers =
+		typeof v.maxPlayers === 'number' && Number.isFinite(v.maxPlayers)
+			? Math.max(2, Math.min(6, Math.trunc(v.maxPlayers)))
+			: DEFAULT_LOBBY_SETTINGS.maxPlayers
+
+	const hiddenRolesCount =
+		typeof v.hiddenRolesCount === 'number' &&
+		Number.isFinite(v.hiddenRolesCount)
+			? Math.max(
+					0,
+					Math.min(Math.trunc(v.hiddenRolesCount), Math.max(0, maxPlayers - 1)),
+				)
+			: 0
+
+	const difficulty =
+		v.difficulty === 'easy' ||
+		v.difficulty === 'normal' ||
+		v.difficulty === 'hard'
+			? v.difficulty
+			: 'normal'
+
+	const turnTime =
+		typeof v.turnTime === 'number' && Number.isFinite(v.turnTime)
+			? Math.trunc(v.turnTime)
+			: 180
+
+	const maxRounds =
+		typeof v.maxRounds === 'number' && Number.isFinite(v.maxRounds)
+			? Math.max(3, Math.min(20, Math.trunc(v.maxRounds)))
+			: 10
+
+	const discussionTime =
+		typeof v.discussionTime === 'number' && Number.isFinite(v.discussionTime)
+			? Math.max(30, Math.min(600, Math.trunc(v.discussionTime)))
+			: 180
+
+	const votingTime =
+		typeof v.votingTime === 'number' && Number.isFinite(v.votingTime)
+			? Math.max(15, Math.min(300, Math.trunc(v.votingTime)))
+			: 60
+
 	return {
-		maxPlayers:
-			typeof v.maxPlayers === 'number' && v.maxPlayers > 0 ? v.maxPlayers : 4,
-		gameMode: (v.gameMode === 'standard' || v.gameMode === 'custom'
-			? v.gameMode
-			: 'standard') as LobbySettings['gameMode'],
+		maxPlayers,
+		gameMode:
+			v.gameMode === 'standard' ||
+			v.gameMode === 'extended' ||
+			v.gameMode === 'competitive' ||
+			v.gameMode === 'cooperative'
+				? v.gameMode
+				: 'standard',
 		isPrivate: typeof v.isPrivate === 'boolean' ? v.isPrivate : false,
 		visibility:
 			v.visibility === 'public' ||
@@ -108,6 +159,13 @@ function normalizeSettings(v: unknown): LobbySettings {
 				: 'public',
 		hasPassword: typeof v.hasPassword === 'boolean' ? v.hasPassword : false,
 		password: '',
+		difficulty,
+		turnTime,
+		maxRounds,
+		discussionTime,
+		votingTime,
+		hiddenRolesCount,
+		enableCrises: typeof v.enableCrises === 'boolean' ? v.enableCrises : true,
 	}
 }
 

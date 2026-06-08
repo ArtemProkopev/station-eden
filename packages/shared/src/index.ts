@@ -340,6 +340,7 @@ export interface CardDetails {
 	abilities?: string[]
 	bonuses?: string[]
 	range?: string
+	effect?: string
 	specialAbility?: string
 	winCondition?: string
 }
@@ -376,13 +377,11 @@ export interface GameChatMessage {
 export interface PlayerCardInfo {
 	playerId: string
 	playerName: string
-	revealedCards: Record<string, { name: string; type: string; cardId: string }>
+	revealedCards: Record<string, CardDetails>
 }
 
-export interface RevealedCardInfo {
-	name: string
+export interface RevealedCardInfo extends CardDetails {
 	type: string
-	id?: string
 }
 
 export interface ExtendedGamePlayer extends GamePlayer {
@@ -416,7 +415,7 @@ export interface ExtendedGameState extends GameState {
 		playersCount: number
 	}
 	currentSpeakerId?: string
-	currentRevealPlayerId?: string  
+	currentRevealPlayerId?: string
 	revealQueue?: string[]
 	[key: string]: unknown
 }

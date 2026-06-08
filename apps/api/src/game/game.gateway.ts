@@ -438,18 +438,54 @@ const HIDDEN_ROLES: HiddenRole[] = [
 	{
 		id: 'role_saboteur',
 		name: 'Саботажник',
-		description: 'Работает на конкурентов или имеет личные мотивы',
-		goal: 'Не дать капсуле улететь',
-		abilities: ['Может вызывать мелкие неисправности'],
-		winCondition: 'capsule_not_launched',
+		description:
+			'Член экипажа с тайной задачей сорвать эвакуацию. Ему выгодны кризисы, недоверие и нехватка мест в капсуле.',
+		goal: 'Сорвать безопасную эвакуацию и уменьшить количество мест в капсуле.',
+		abilities: [
+			'Один раз за раунд может устроить саботаж и уменьшить количество мест в капсуле на 1.',
+			'После саботажа случайный невиновный игрок получает статус подозрительного.',
+		],
+		winCondition:
+			'Побеждает, если эвакуация становится невозможной или капсуле не хватает мест для выживших.',
 	},
 	{
 		id: 'role_xenophag',
 		name: 'Агент ксенофагов',
-		description: 'Заражён инопланетной формой жизни',
-		goal: 'Доставить «образец» на Землю',
-		abilities: ['Может заражать других игроков'],
-		winCondition: 'at_least_one_infected',
+		description:
+			'Носитель инопланетной формы жизни. Выглядит как обычный член экипажа, но пытается доставить заражение дальше.',
+		goal: 'Заразить хотя бы одного выжившего и сохранить заражение до финала.',
+		abilities: [
+			'Может заразить выбранного живого игрока.',
+			'Заражённые игроки выглядят опаснее и усиливают подозрения в экипаже.',
+		],
+		winCondition:
+			'Побеждает, если к моменту проверки среди игроков есть хотя бы один заражённый.',
+	},
+	{
+		id: 'role_gray_cardinal',
+		name: 'Серый кардинал',
+		description:
+			'Манипулятор, которому выгодно, чтобы экипаж сам разрушал доверие и исключал друг друга.',
+		goal: 'Дожить до момента, когда из игры исключены минимум два игрока.',
+		abilities: [
+			'Получает выгоду от каждого успешного исключения.',
+			'Побеждает через хаос, если экипаж слишком часто голосует против своих.',
+		],
+		winCondition:
+			'Побеждает, если остаётся живым после исключения двух или более игроков.',
+	},
+	{
+		id: 'role_false_witness',
+		name: 'Ложный свидетель',
+		description:
+			'Игрок с фальшивыми уликами. Может направлять подозрения на других и ломать доверие внутри группы.',
+		goal: 'Подставить другого игрока и пережить хотя бы одно голосование после этого.',
+		abilities: [
+			'Может пометить выбранного игрока как подозрительного.',
+			'Подозрительный игрок выглядит опаснее в списке игроков.',
+		],
+		winCondition:
+			'Побеждает, если остаётся живым, когда в игре есть подозрительный невиновный игрок.',
 	},
 ]
 
@@ -987,8 +1023,8 @@ export class GameGateway
 		const currentRevealPlayerId = game.revealQueue[game.currentRevealQueueIndex]
 		if (currentRevealPlayerId !== userId) {
 			const currentPlayerName = game.players.get(currentRevealPlayerId)?.name
-			socket.emit('ERROR', { 
-				message: `Сейчас очередь ${currentPlayerName} раскрывать карту. Подождите своей очереди.` 
+			socket.emit('ERROR', {
+				message: `Сейчас очередь ${currentPlayerName} раскрывать карту. Подождите своей очереди.`,
 			})
 			return
 		}
@@ -1050,10 +1086,12 @@ export class GameGateway
 		} else {
 			game.currentRevealQueueIndex = 0
 		}
-		
+
 		this.broadcastToGame(game.id, 'REVEAL_QUEUE_CHANGED', {
 			currentPlayerId: game.revealQueue[game.currentRevealQueueIndex],
-			currentPlayerName: game.players.get(game.revealQueue[game.currentRevealQueueIndex])?.name,
+			currentPlayerName: game.players.get(
+				game.revealQueue[game.currentRevealQueueIndex],
+			)?.name,
 			queue: game.revealQueue,
 			currentIndex: game.currentRevealQueueIndex,
 		})
@@ -1164,38 +1202,61 @@ export class GameGateway
 
 		const player = game.players.get(userId)
 
-		if (!player || player.hasUsedAbility) {
+		if (!player || player.isAlive !== true) {
 			socket.emit('ERROR', { message: 'Нельзя использовать способность' })
 			return
 		}
 
-		switch (data?.ability) {
-			case 'captain_veto':
-				if (player.roleCard?.id === 'role_captain') {
-					this.handleCaptainVeto(game, userId)
-					player.hasUsedAbility = true
-				}
-				break
+		if (player.hasUsedAbility) {
+			socket.emit('ERROR', {
+				message: 'Способность уже использована в этом раунде',
+			})
+			return
+		}
 
+		let abilityUsed = false
+
+		switch (data?.ability) {
 			case 'sabotage':
-				if (player.hiddenRole?.id === 'role_saboteur') {
-					this.handleSabotage(game, userId)
-					player.hasUsedAbility = true
+				if (player.hiddenRole?.id !== 'role_saboteur') {
+					socket.emit('ERROR', { message: 'У вас нет способности саботажа' })
+					return
 				}
+
+				this.handleSabotage(game, userId)
+				abilityUsed = true
 				break
 
 			case 'infect':
-				if (player.hiddenRole?.id === 'role_xenophag') {
-					this.handleInfect(game, userId, data?.targetPlayerId)
-					player.hasUsedAbility = true
+				if (player.hiddenRole?.id !== 'role_xenophag') {
+					socket.emit('ERROR', { message: 'У вас нет способности заражения' })
+					return
 				}
+
+				this.handleInfect(game, userId, data?.targetPlayerId)
+				abilityUsed = true
+				break
+
+			case 'frame':
+				if (player.hiddenRole?.id !== 'role_false_witness') {
+					socket.emit('ERROR', {
+						message: 'У вас нет способности подставить игрока',
+					})
+					return
+				}
+
+				this.handleFramePlayer(game, userId, data?.targetPlayerId)
+				abilityUsed = true
 				break
 
 			case 'nonbinary_ability':
-				if (player.gender?.id === 'gender_nonbinary') {
-					this.handleNonbinaryAbility(game, userId)
-					player.hasUsedAbility = true
+				if (player.gender?.id !== 'gender_nonbinary') {
+					socket.emit('ERROR', { message: 'У вас нет этой способности' })
+					return
 				}
+
+				this.handleNonbinaryAbility(game, userId)
+				abilityUsed = true
 				break
 
 			default:
@@ -1203,7 +1264,10 @@ export class GameGateway
 				return
 		}
 
-		this.broadcastGameState(gameId)
+		if (abilityUsed) {
+			player.hasUsedAbility = true
+			this.broadcastGameState(gameId)
+		}
 	}
 
 	@SubscribeMessage('SOLVE_CRISIS')
@@ -1377,6 +1441,8 @@ export class GameGateway
 			player.isInfected = false
 			player.isSuspicious = false
 			player.vote = undefined
+			player.isCaptain = false
+			player.isSeniorOfficer = false
 
 			player.profession = undefined
 			player.healthStatus = undefined
@@ -1402,40 +1468,30 @@ export class GameGateway
 		const professionsPool = [...PROFESSIONS]
 		const hiddenRolesPool = [...HIDDEN_ROLES]
 
-		players.forEach((player, index) => {
+		players.forEach(player => {
 			player.profession = this.takeRandomFromPoolWithFallback(
 				professionsPool,
 				PROFESSIONS,
 			)
 
-			if (
-				index < game.settings.hiddenRolesCount &&
-				hiddenRolesPool.length > 0
-			) {
-				player.hiddenRole = this.takeRandomFromPoolWithFallback(
-					hiddenRolesPool,
-					HIDDEN_ROLES,
-				)
-			}
-
-			if (index === 0) {
-				player.roleCard = {
-					id: 'role_captain',
-					name: 'Капитан станции',
-					description: 'Имеет право вето на одно голосование за игру',
-					specialAbility: 'veto',
-				}
-				player.isCaptain = true
-			} else if (index === 1) {
-				player.roleCard = {
-					id: 'role_officer',
-					name: 'Старший офицер',
-					description: 'Замещает капитана, дополнительный голос при ничьей',
-					specialAbility: 'extra_vote',
-				}
-				player.isSeniorOfficer = true
-			}
+			player.roleCard = undefined
+			player.isCaptain = false
+			player.isSeniorOfficer = false
 		})
+
+		const hiddenRolesEnabled = (game.settings.hiddenRolesCount || 0) > 0
+
+		if (!hiddenRolesEnabled || players.length < 2) {
+			return
+		}
+
+		const hiddenRoleCandidates = [...players].sort(() => Math.random() - 0.5)
+		const hiddenRolePlayer = hiddenRoleCandidates[0]
+
+		hiddenRolePlayer.hiddenRole = this.takeRandomFromPoolWithFallback(
+			hiddenRolesPool,
+			HIDDEN_ROLES,
+		)
 	}
 
 	private dealRoundCardsToPlayers(game: GameState) {
@@ -1551,14 +1607,18 @@ export class GameGateway
 
 		this.broadcastToGame(game.id, 'SPEAKER_CHANGED', {
 			speakerId: game.currentSpeakerId,
-			speakerName: game.currentSpeakerId ? game.players.get(game.currentSpeakerId)?.name : null,
+			speakerName: game.currentSpeakerId
+				? game.players.get(game.currentSpeakerId)?.name
+				: null,
 			timeLeft: game.speakingTimePerPlayer,
 		})
 
 		// Отправляем информацию о том, кто сейчас может раскрыть карту
 		this.broadcastToGame(game.id, 'REVEAL_QUEUE_CHANGED', {
 			currentPlayerId: game.revealQueue[game.currentRevealQueueIndex],
-			currentPlayerName: game.players.get(game.revealQueue[game.currentRevealQueueIndex])?.name,
+			currentPlayerName: game.players.get(
+				game.revealQueue[game.currentRevealQueueIndex],
+			)?.name,
 			queue: game.revealQueue,
 			currentIndex: game.currentRevealQueueIndex,
 		})
@@ -1597,13 +1657,17 @@ export class GameGateway
 
 		this.broadcastToGame(game.id, 'SPEAKER_CHANGED', {
 			speakerId: game.currentSpeakerId,
-			speakerName: game.currentSpeakerId ? game.players.get(game.currentSpeakerId)?.name : null,
+			speakerName: game.currentSpeakerId
+				? game.players.get(game.currentSpeakerId)?.name
+				: null,
 			timeLeft: game.speakingTimePerPlayer,
 		})
 
 		this.broadcastToGame(game.id, 'REVEAL_QUEUE_CHANGED', {
 			currentPlayerId: game.revealQueue[game.currentRevealQueueIndex],
-			currentPlayerName: game.players.get(game.revealQueue[game.currentRevealQueueIndex])?.name,
+			currentPlayerName: game.players.get(
+				game.revealQueue[game.currentRevealQueueIndex],
+			)?.name,
 			queue: game.revealQueue,
 			currentIndex: game.currentRevealQueueIndex,
 		})
@@ -1674,12 +1738,12 @@ export class GameGateway
 
 		ejectedPlayer.isAlive = false
 		game.ejectedPlayers.push(ejectedPlayerId)
+		this.revealAllPlayerCards(ejectedPlayer)
 
 		this.getAlivePlayers(game).forEach(player => {
 			player.score += 10
 		})
 
-		// Получаем все карты выбывшего игрока для отображения
 		const ejectedPlayerCards = this.getAllPlayerCards(ejectedPlayer)
 
 		this.broadcastToGame(game.id, 'PLAYER_EJECTED', {
@@ -2020,27 +2084,41 @@ export class GameGateway
 
 	private checkHiddenRoleWins(game: GameState): string[] {
 		const winners: string[] = []
+		const alivePlayers = this.getAlivePlayers(game)
+		const infectedPlayers = Array.from(game.players.values()).filter(
+			player => player.isInfected === true,
+		)
+		const suspiciousNonHiddenPlayers = alivePlayers.filter(
+			player => player.isSuspicious === true && !player.hiddenRole,
+		)
 
 		Array.from(game.players.values()).forEach(player => {
 			if (!player.hiddenRole || player.isAlive !== true) return
 
 			switch (player.hiddenRole.id) {
 				case 'role_saboteur':
-					if (game.capsuleSlots <= 0) {
+					if (game.capsuleSlots <= 1) {
 						winners.push(player.id)
 					}
 					break
 
-				case 'role_xenophag': {
-					const infectedPlayers = Array.from(game.players.values()).filter(
-						p => p.isInfected === true,
-					)
-
+				case 'role_xenophag':
 					if (infectedPlayers.length > 0) {
 						winners.push(player.id)
 					}
 					break
-				}
+
+				case 'role_gray_cardinal':
+					if ((game.ejectedPlayers || []).length >= 2) {
+						winners.push(player.id)
+					}
+					break
+
+				case 'role_false_witness':
+					if (suspiciousNonHiddenPlayers.length > 0) {
+						winners.push(player.id)
+					}
+					break
 
 				default:
 					break
@@ -2185,10 +2263,6 @@ export class GameGateway
 				return player.secret ? this.toPublicCard('secret', player.secret) : null
 
 			case 'role':
-				if (player.roleCard) {
-					return this.toPublicCard('role', player.roleCard)
-				}
-
 				if (player.hiddenRole) {
 					return this.toPublicCard('role', player.hiddenRole)
 				}
@@ -2216,10 +2290,8 @@ export class GameGateway
 		}
 	}
 
-	private getAllPlayerCards(player: GamePlayer) {
-		const cards: Record<string, PublicCard | null> = {}
-
-		const cardTypes: CardKey[] = [
+	private getRevealableCardTypes(): CardKey[] {
+		return [
 			'profession',
 			'gender',
 			'age',
@@ -2228,11 +2300,27 @@ export class GameGateway
 			'trait',
 			'secret',
 			'resource',
-			// 'role' - убираем role из списка карт, так как это служебная роль
+			'role',
 		]
+	}
 
-		cardTypes.forEach(type => {
+	private revealAllPlayerCards(player: GamePlayer) {
+		this.getRevealableCardTypes().forEach(cardType => {
+			if (
+				this.getPlayerCardDetails(player, cardType) &&
+				!player.revealedCards.includes(cardType)
+			) {
+				player.revealedCards.push(cardType)
+			}
+		})
+	}
+
+	private getAllPlayerCards(player: GamePlayer) {
+		const cards: Record<string, PublicCard | null> = {}
+
+		this.getRevealableCardTypes().forEach(type => {
 			const card = this.getPlayerCardDetails(player, type)
+
 			if (card) {
 				cards[type] = card
 			}
@@ -2247,18 +2335,28 @@ export class GameGateway
 			if (card.title) return String(card.title)
 			if (card.displayName) return String(card.displayName)
 		}
-		
+
 		switch (type) {
-			case 'profession': return 'Профессия'
-			case 'health': return 'Состояние здоровья'
-			case 'trait': return 'Характеристика'
-			case 'secret': return 'Секрет'
-			case 'role': return 'Роль'
-			case 'resource': return 'Ресурс'
-			case 'gender': return 'Пол'
-			case 'age': return 'Возраст'
-			case 'body': return 'Телосложение'
-			default: return String(type)
+			case 'profession':
+				return 'Профессия'
+			case 'health':
+				return 'Состояние здоровья'
+			case 'trait':
+				return 'Характеристика'
+			case 'secret':
+				return 'Секрет'
+			case 'role':
+				return 'Роль'
+			case 'resource':
+				return 'Ресурс'
+			case 'gender':
+				return 'Пол'
+			case 'age':
+				return 'Возраст'
+			case 'body':
+				return 'Телосложение'
+			default:
+				return String(type)
 		}
 	}
 
@@ -2335,11 +2433,56 @@ export class GameGateway
 	private handleSabotage(game: GameState, userId: string) {
 		game.capsuleSlots = Math.max(1, game.capsuleSlots - 1)
 
+		const possibleTargets = this.getAlivePlayers(game).filter(
+			player => player.id !== userId && !player.hiddenRole,
+		)
+
+		const suspiciousTarget =
+			possibleTargets.length > 0
+				? possibleTargets[Math.floor(Math.random() * possibleTargets.length)]
+				: undefined
+
+		if (suspiciousTarget) {
+			suspiciousTarget.isSuspicious = true
+		}
+
 		this.broadcastToGame(game.id, 'SABOTAGE_OCCURRED', {
 			playerId: userId,
 			playerName: game.players.get(userId)?.name,
-			message:
-				'Произошла неисправность! Количество мест в капсуле уменьшено на 1.',
+			suspiciousPlayerId: suspiciousTarget?.id,
+			suspiciousPlayerName: suspiciousTarget?.name,
+			message: suspiciousTarget
+				? `На станции произошёл саботаж! Количество мест в капсуле уменьшено на 1. Улики указывают на игрока ${suspiciousTarget.name}.`
+				: 'На станции произошёл саботаж! Количество мест в капсуле уменьшено на 1.',
+		})
+	}
+
+	private handleFramePlayer(
+		game: GameState,
+		userId: string,
+		targetPlayerId?: string,
+	) {
+		if (!targetPlayerId) return
+
+		const sourcePlayer = game.players.get(userId)
+		const targetPlayer = game.players.get(targetPlayerId)
+
+		if (!sourcePlayer || !targetPlayer || targetPlayer.isAlive !== true) {
+			return
+		}
+
+		if (targetPlayer.id === sourcePlayer.id) {
+			return
+		}
+
+		targetPlayer.isSuspicious = true
+
+		this.broadcastToGame(game.id, 'FALSE_EVIDENCE_PLANTED', {
+			playerId: targetPlayer.id,
+			playerName: targetPlayer.name,
+			sourcePlayerId: sourcePlayer.id,
+			sourcePlayerName: sourcePlayer.name,
+			message: `В системе появились подозрительные улики против игрока ${targetPlayer.name}.`,
 		})
 	}
 
@@ -2411,25 +2554,13 @@ export class GameGateway
 
 	private serializeGameState(game: GameState) {
 		const players = Array.from(game.players.values()).map(player => {
-			const revealedCardsInfo: Record<
-				string,
-				{ name: string; type: string; id: string }
-			> = {}
+			const revealedCardsInfo: Record<string, PublicCard> = {}
 
 			player.revealedCards.forEach(cardType => {
-				// Пропускаем roleCard (это служебная роль, не карта)
-				if (cardType === 'role' && player.roleCard) {
-					return
-				}
-				
 				const card = this.getPlayerCardDetails(player, cardType)
 				if (!card) return
 
-				revealedCardsInfo[cardType] = {
-					name: card.name,
-					type: card.type,
-					id: card.id,
-				}
+				revealedCardsInfo[cardType] = card
 			})
 
 			return {
@@ -2449,7 +2580,7 @@ export class GameGateway
 				isSuspicious: player.isSuspicious || false,
 				isCaptain: player.isCaptain || false,
 				isSeniorOfficer: player.isSeniorOfficer || false,
-				revealedCards: player.revealedCards?.length || 0,
+				revealedCards: Object.keys(revealedCardsInfo).length,
 				revealedCardsInfo,
 				revealedCardsThisRound: player.revealedCardsThisRound || [],
 				hasUsedAbility: player.hasUsedAbility || false,
@@ -2517,8 +2648,8 @@ export class GameGateway
 				hasUsedAbility: false,
 				isInfected: false,
 				isSuspicious: false,
-				isCaptain: index === 0,
-				isSeniorOfficer: index === 1,
+				isCaptain: false,
+				isSeniorOfficer: false,
 			}
 
 			gamePlayers.set(player.id, gamePlayer)
@@ -2548,8 +2679,8 @@ export class GameGateway
 				discussionTime: settings?.discussionTime || 180,
 				votingTime: settings?.votingTime || 60,
 				hiddenRolesCount: Math.min(
-					settings?.hiddenRolesCount || 1,
-					players.length,
+					settings?.hiddenRolesCount ?? 0,
+					Math.max(0, players.length - 1),
 				),
 				enableCrises: settings?.enableCrises !== false,
 				difficulty,

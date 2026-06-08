@@ -47,6 +47,39 @@ type GameResults = {
 
 type ServerCardPayload = Record<string, CardDetails | undefined>
 
+type RevealedCardPayload = Partial<CardDetails> & { cardId?: string }
+
+type NormalizedRevealedCard = CardDetails & { type: string }
+
+const optionalStringArray = (value: unknown): string[] | undefined => {
+	return Array.isArray(value) ? value.map(String) : undefined
+}
+
+const normalizeRevealedCard = (
+	cardType: string,
+	card: RevealedCardPayload,
+	fallbackName = cardType,
+): NormalizedRevealedCard => {
+	return {
+		id: String(card.id ?? card.cardId ?? cardType),
+		name: String(card.name ?? fallbackName),
+		description: String(card.description ?? ''),
+		type: String(card.type || cardType),
+		pros: optionalStringArray(card.pros),
+		cons: optionalStringArray(card.cons),
+		effects: optionalStringArray(card.effects),
+		abilities: optionalStringArray(card.abilities),
+		bonuses: optionalStringArray(card.bonuses),
+		goal: typeof card.goal === 'string' ? card.goal : undefined,
+		range: typeof card.range === 'string' ? card.range : undefined,
+		effect: typeof card.effect === 'string' ? card.effect : undefined,
+		specialAbility:
+			typeof card.specialAbility === 'string' ? card.specialAbility : undefined,
+		winCondition:
+			typeof card.winCondition === 'string' ? card.winCondition : undefined,
+	}
+}
+
 type IntroSkipProgress = {
 	skippedCount: number
 	playersCount: number
@@ -156,26 +189,16 @@ export function useGameSession(gameId: string) {
 
 		const playersInfo: PlayerCardInfo[] = (game.players || []).map(player => {
 			const extPlayer = player as ExtendedGamePlayer & {
-				revealedCardsInfo?: Record<
-					string,
-					{ name: string; type: string; id?: string }
-				>
+				revealedCardsInfo?: Record<string, RevealedCardPayload>
 			}
 
-			const revealedCardsMap: Record<
-				string,
-				{ name: string; type: string; cardId: string }
-			> = {}
+			const revealedCardsMap: Record<string, CardDetails> = {}
 
 			Object.entries(extPlayer.revealedCardsInfo || {}).forEach(
 				([cardType, card]) => {
 					if (!card || typeof card !== 'object') return
 
-					revealedCardsMap[cardType] = {
-						name: String(card.name),
-						type: String(card.type || cardType),
-						cardId: String(card.id ?? cardType),
-					}
+					revealedCardsMap[cardType] = normalizeRevealedCard(cardType, card)
 				},
 			)
 
@@ -537,7 +560,7 @@ export function useGameSession(gameId: string) {
 					)
 
 					const cards = msg.cards as
-						| Record<string, Partial<CardDetails> | null>
+						| Record<string, RevealedCardPayload | null>
 						| undefined
 
 					if (cards) {
@@ -548,45 +571,49 @@ export function useGameSession(gameId: string) {
 						})
 					}
 
-					// Обновляем таблицу карт для выбывшего игрока - показываем все его карты
 					const ejectedCards = cards
-					const ejectedPlayerId = msg.playerId ? String(msg.playerId) : undefined
+					const ejectedPlayerId = msg.playerId
+						? String(msg.playerId)
+						: undefined
 
 					if (ejectedCards && ejectedPlayerId) {
 						setAllPlayersCards(prev => {
-							const existingPlayer = prev.find(p => p.playerId === ejectedPlayerId)
-							
-							const newRevealedCards = Object.entries(ejectedCards).reduce((acc, [cardType, card]) => {
-								if (card && card.name) {
-									acc[cardType] = {
-										name: card.name,
-										type: card.type || cardType,
-										cardId: card.id || cardType
+							const existingPlayer = prev.find(
+								p => p.playerId === ejectedPlayerId,
+							)
+
+							const newRevealedCards = Object.entries(ejectedCards).reduce(
+								(acc, [cardType, card]) => {
+									if (card && card.name) {
+										acc[cardType] = normalizeRevealedCard(cardType, card)
 									}
-								}
-								return acc
-							}, {} as Record<string, { name: string; type: string; cardId: string }>)
+
+									return acc
+								},
+								{} as Record<string, CardDetails>,
+							)
 
 							if (existingPlayer) {
-								return prev.map(p => 
-									p.playerId === ejectedPlayerId 
-										? { 
-												...p, 
+								return prev.map(p =>
+									p.playerId === ejectedPlayerId
+										? {
+												...p,
 												revealedCards: {
 													...p.revealedCards,
-													...newRevealedCards
-												}
+													...newRevealedCards,
+												},
 											}
-										: p
+										: p,
 								)
-							} else {
-								const newPlayer: PlayerCardInfo = {
-									playerId: ejectedPlayerId,
-									playerName: String(msg.playerName ?? ''),
-									revealedCards: newRevealedCards
-								}
-								return [...prev, newPlayer]
 							}
+
+							const newPlayer: PlayerCardInfo = {
+								playerId: ejectedPlayerId,
+								playerName: String(msg.playerName ?? ''),
+								revealedCards: newRevealedCards,
+							}
+
+							return [...prev, newPlayer]
 						})
 					}
 
@@ -616,12 +643,23 @@ export function useGameSession(gameId: string) {
 					const cardId = String(msg.cardId ?? '')
 					const playerName = String(msg.playerName ?? '')
 					const playerIdMsg = String(msg.playerId ?? '')
-					const cardDetails = msg.cardDetails as
-						| { name: string; type: string; id?: string }
-						| undefined
+					const cardDetails = msg.cardDetails as RevealedCardPayload | undefined
 
 					const cardName =
 						cardDetails?.name || getCardDisplayName(cardType, cardId)
+
+					const fullCard: NormalizedRevealedCard = cardDetails
+						? normalizeRevealedCard(
+								cardType,
+								{ ...cardDetails, id: cardDetails.id ?? cardId },
+								cardName,
+							)
+						: {
+								id: cardId || cardType,
+								name: cardName,
+								description: '',
+								type: cardType,
+							}
 
 					addToChat(
 						'Система',
@@ -636,20 +674,16 @@ export function useGameSession(gameId: string) {
 							player => {
 								if (player.id !== playerIdMsg) return player
 
-								const updatedPlayer = { ...player } as ExtendedGamePlayer & {
-									revealedCardsInfo?: Record<
-										string,
-										{ name: string; type: string; id?: string }
-									>
+								const updatedPlayer = { ...player } as Omit<
+									ExtendedGamePlayer,
+									'revealedCardsInfo'
+								> & {
+									revealedCardsInfo?: Record<string, NormalizedRevealedCard>
 								}
 
 								updatedPlayer.revealedCardsInfo = {
 									...(updatedPlayer.revealedCardsInfo || {}),
-									[cardType]: {
-										name: cardName,
-										type: cardType,
-										id: cardId,
-									},
+									[cardType]: fullCard,
 								}
 
 								updatedPlayer.revealedCards =
@@ -805,11 +839,15 @@ export function useGameSession(gameId: string) {
 						if (!prev) return prev
 						return {
 							...prev,
-							currentSpeakerId: msg.speakerId ? String(msg.speakerId) : undefined,
+							currentSpeakerId: msg.speakerId
+								? String(msg.speakerId)
+								: undefined,
 						}
 					})
-					
-					const speakerName = msg.speakerName ? String(msg.speakerName) : 'никто'
+
+					const speakerName = msg.speakerName
+						? String(msg.speakerName)
+						: 'никто'
 					addToChat('Система', `Сейчас говорит: ${speakerName}.`, true)
 					break
 				}
@@ -820,13 +858,23 @@ export function useGameSession(gameId: string) {
 						if (!prev) return prev
 						return {
 							...prev,
-							currentRevealPlayerId: msg.currentPlayerId ? String(msg.currentPlayerId) : undefined,
-							revealQueue: Array.isArray(msg.queue) ? msg.queue as string[] : [],
+							currentRevealPlayerId: msg.currentPlayerId
+								? String(msg.currentPlayerId)
+								: undefined,
+							revealQueue: Array.isArray(msg.queue)
+								? (msg.queue as string[])
+								: [],
 						}
 					})
-					
-					const currentPlayerName = msg.currentPlayerName ? String(msg.currentPlayerName) : 'никто'
-					addToChat('Система', `Сейчас раскрывает карту: ${currentPlayerName}.`, true)
+
+					const currentPlayerName = msg.currentPlayerName
+						? String(msg.currentPlayerName)
+						: 'никто'
+					addToChat(
+						'Система',
+						`Сейчас раскрывает карту: ${currentPlayerName}.`,
+						true,
+					)
 					break
 				}
 

@@ -10,6 +10,12 @@ interface LobbySettingsModalProps {
 	onSaveSettings: (settings: LobbySettings) => void
 }
 
+type SettingsTab = 'basic' | 'advanced' | 'roles'
+
+function clampNumber(value: number, min: number, max: number) {
+	return Math.max(min, Math.min(max, Math.trunc(value)))
+}
+
 export function LobbySettingsModal({
 	isOpen,
 	onClose,
@@ -17,16 +23,28 @@ export function LobbySettingsModal({
 	onSaveSettings,
 }: LobbySettingsModalProps) {
 	const [settings, setSettings] = useState<LobbySettings>(currentSettings)
-	const [activeTab, setActiveTab] = useState<'basic' | 'advanced'>('basic')
+	const [activeTab, setActiveTab] = useState<SettingsTab>('basic')
 
 	useEffect(() => {
 		if (isOpen) setSettings(currentSettings)
 	}, [isOpen, currentSettings])
 
+	const hiddenRolesCount = settings.hiddenRolesCount ? 1 : 0
+
 	const handleSave = () => {
+		const normalizedMaxPlayers = clampNumber(settings.maxPlayers || 4, 2, 6)
+		const normalizedHiddenRolesCount = settings.hiddenRolesCount ? 1 : 0
+
 		onSaveSettings({
 			...settings,
+			maxPlayers: normalizedMaxPlayers,
 			difficulty: settings.difficulty || 'normal',
+			turnTime: settings.turnTime ?? 180,
+			maxRounds: clampNumber(settings.maxRounds ?? 10, 3, 20),
+			discussionTime: clampNumber(settings.discussionTime ?? 180, 30, 600),
+			votingTime: clampNumber(settings.votingTime ?? 60, 15, 300),
+			hiddenRolesCount: normalizedHiddenRolesCount,
+			enableCrises: settings.enableCrises !== false,
 		})
 
 		onClose()
@@ -49,7 +67,7 @@ export function LobbySettingsModal({
 	}
 
 	const getTurnTimeLabel = (turnTime?: number) => {
-		if (turnTime == null) return null
+		if (turnTime == null) return '3 минуты'
 
 		switch (turnTime) {
 			case 60:
@@ -75,6 +93,13 @@ export function LobbySettingsModal({
 		return '🔓 Публичное лобби'
 	}
 
+	const getHiddenRolesLabel = () => {
+		if (hiddenRolesCount <= 0) return 'Выключены'
+		if (hiddenRolesCount === 1) return '1 скрытая роль'
+
+		return `${hiddenRolesCount} скрытые роли`
+	}
+
 	const isAccessRestricted =
 		settings.visibility === 'hidden_password' ||
 		settings.visibility === 'password' ||
@@ -87,6 +112,7 @@ export function LobbySettingsModal({
 			<div className={styles.modalContent} onClick={e => e.stopPropagation()}>
 				<div className={styles.modalHeader}>
 					<h2 className={styles.modalTitle}>Настройки лобби</h2>
+
 					<button
 						className={styles.closeButton}
 						onClick={onClose}
@@ -116,6 +142,16 @@ export function LobbySettingsModal({
 					>
 						Дополнительно
 					</button>
+
+					<button
+						type='button'
+						className={`${styles.tab} ${
+							activeTab === 'roles' ? styles.activeTab : ''
+						}`}
+						onClick={() => setActiveTab('roles')}
+					>
+						Скрытые роли
+					</button>
 				</div>
 
 				<div className={styles.tabContent}>
@@ -126,12 +162,18 @@ export function LobbySettingsModal({
 
 								<select
 									value={String(settings.maxPlayers)}
-									onChange={e =>
+									onChange={e => {
+										const nextMaxPlayers = Number(e.target.value)
+
 										setSettings(prev => ({
 											...prev,
-											maxPlayers: Number(e.target.value),
+											maxPlayers: nextMaxPlayers,
+											hiddenRolesCount: Math.min(
+												prev.hiddenRolesCount ?? 0,
+												Math.max(0, nextMaxPlayers - 1),
+											),
 										}))
-									}
+									}}
 									className={styles.select}
 								>
 									<option value='2'>2 игрока</option>
@@ -191,26 +233,111 @@ export function LobbySettingsModal({
 								<label className={styles.settingLabel}>Время на ход</label>
 
 								<select
-									value={
-										settings.turnTime == null
-											? 'unlimited'
-											: String(settings.turnTime)
-									}
-									onChange={e => {
-										const v = e.target.value
-
+									value={String(settings.turnTime ?? 180)}
+									onChange={e =>
 										setSettings(prev => ({
 											...prev,
-											turnTime: v === 'unlimited' ? undefined : Number(v),
+											turnTime: Number(e.target.value),
 										}))
-									}}
+									}
 									className={styles.select}
 								>
-									<option value='unlimited'>Неограниченно</option>
 									<option value='60'>1 минута</option>
 									<option value='180'>3 минуты</option>
 									<option value='300'>5 минут</option>
 								</select>
+							</div>
+
+							<div className={styles.settingItem}>
+								<label className={styles.settingLabel}>Раундов до финала</label>
+
+								<select
+									value={String(settings.maxRounds ?? 10)}
+									onChange={e =>
+										setSettings(prev => ({
+											...prev,
+											maxRounds: Number(e.target.value),
+										}))
+									}
+									className={styles.select}
+								>
+									<option value='3'>3 раунда</option>
+									<option value='5'>5 раундов</option>
+									<option value='10'>10 раундов</option>
+									<option value='15'>15 раундов</option>
+									<option value='20'>20 раундов</option>
+								</select>
+							</div>
+
+							<label className={styles.checkboxLabel}>
+								<input
+									type='checkbox'
+									className={styles.checkbox}
+									checked={settings.enableCrises !== false}
+									onChange={e =>
+										setSettings(prev => ({
+											...prev,
+											enableCrises: e.target.checked,
+										}))
+									}
+								/>
+								<span>Кризисы станции включены</span>
+							</label>
+						</div>
+					)}
+
+					{activeTab === 'roles' && (
+						<div className={styles.settingGroup}>
+							<div className={styles.settingItem}>
+								<label className={styles.settingLabel}>Скрытые роли</label>
+
+								<select
+									value={String(hiddenRolesCount > 0 ? 1 : 0)}
+									onChange={e =>
+										setSettings(prev => ({
+											...prev,
+											hiddenRolesCount: Number(e.target.value),
+										}))
+									}
+									className={styles.select}
+								>
+									<option value='0'>Выключены</option>
+									<option value='1'>Включены — 1 случайная роль</option>
+								</select>
+
+								<p className={styles.settingHint}>
+									Скрытые роли добавляют личные цели, саботаж, заражение и
+									подозрения. Если режим включён, одну случайную скрытую роль
+									получает один случайный участник лобби
+								</p>
+							</div>
+
+							<div className={styles.rolesInfo}>
+								<div className={styles.roleInfoCard}>
+									<strong>Саботажник</strong>
+									<span>
+										Пытается сорвать эвакуацию и уменьшить число мест.
+									</span>
+								</div>
+
+								<div className={styles.roleInfoCard}>
+									<strong>Агент ксенофагов</strong>
+									<span>
+										Распространяет заражение и хочет доставить его дальше.
+									</span>
+								</div>
+
+								<div className={styles.roleInfoCard}>
+									<strong>Серый кардинал</strong>
+									<span>
+										Побеждает через хаос, исключения и чужие подозрения.
+									</span>
+								</div>
+
+								<div className={styles.roleInfoCard}>
+									<strong>Ложный свидетель</strong>
+									<span>Подставляет других и запутывает обсуждение.</span>
+								</div>
 							</div>
 						</div>
 					)}
@@ -248,12 +375,28 @@ export function LobbySettingsModal({
 							</span>
 						</div>
 
-						{settings.turnTime != null && (
-							<div className={styles.previewItem}>
-								<span>Время на ход:</span>
-								<span>{getTurnTimeLabel(settings.turnTime)}</span>
-							</div>
-						)}
+						<div className={styles.previewItem}>
+							<span>Время на ход:</span>
+							<span>{getTurnTimeLabel(settings.turnTime)}</span>
+						</div>
+
+						<div className={styles.previewItem}>
+							<span>Кризисы:</span>
+							<span>
+								{settings.enableCrises === false ? 'Выключены' : 'Включены'}
+							</span>
+						</div>
+
+						<div className={styles.previewItem}>
+							<span>Скрытые роли:</span>
+							<span
+								className={
+									hiddenRolesCount > 0 ? styles.private : styles.public
+								}
+							>
+								{getHiddenRolesLabel()}
+							</span>
+						</div>
 					</div>
 				</div>
 

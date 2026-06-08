@@ -26,18 +26,7 @@ const ALL_CARD_TYPES = [
 
 interface SelectedCard {
 	playerName: string
-	card: {
-		name: string
-		type: string
-		description?: string
-		pros?: string[]
-		cons?: string[]
-		effects?: string[]
-		goal?: string
-		abilities?: string[]
-		bonuses?: string[]
-		specialAbility?: string
-	}
+	card: CardDetails
 }
 
 export default function CardsTable({
@@ -46,7 +35,7 @@ export default function CardsTable({
 }: CardsTableProps) {
 	const [selectedCard, setSelectedCard] = useState<SelectedCard | null>(null)
 
-	const handleCardClick = (playerName: string, card: SelectedCard['card']) => {
+	const handleCardClick = (playerName: string, card: CardDetails) => {
 		setSelectedCard({ playerName, card })
 	}
 
@@ -105,18 +94,25 @@ export default function CardsTable({
 										return (
 											<td key={cardType} className={styles.cardCell}>
 												{revealedCard ? (
-													<div 
+													<div
 														className={styles.revealedCardCell}
-														onClick={() => handleCardClick(player.playerName, revealedCard)}
-														onKeyDown={(e) => e.key === 'Enter' && handleCardClick(player.playerName, revealedCard)}
-														role="button"
+														onClick={() =>
+															handleCardClick(player.playerName, revealedCard)
+														}
+														onKeyDown={e =>
+															e.key === 'Enter' &&
+															handleCardClick(player.playerName, revealedCard)
+														}
+														role='button'
 														tabIndex={0}
 														style={{ cursor: 'pointer' }}
-														title="Нажмите для просмотра деталей"
+														title='Нажмите для просмотра деталей'
 													>
 														<strong>{revealedCard.name}</strong>
 														<span className={styles.cardTypeHint}>
-															{getCardTypeDisplayName(revealedCard.type)}
+															{getCardTypeDisplayName(
+																revealedCard.type || cardType,
+															)}
 														</span>
 													</div>
 												) : (
@@ -142,24 +138,37 @@ export default function CardsTable({
 					</div>
 					<div className={styles.legendItem}>
 						<span className={styles.legendSymbol}>i</span>
-						<span className={styles.legendText}>Нажмите на карту для деталей</span>
+						<span className={styles.legendText}>
+							Нажмите на карту для деталей
+						</span>
 					</div>
 				</div>
 			</div>
 
-			{/* Модальное окно с деталями карты */}
 			{selectedCard && (
-				<div className={styles.modalOverlay} onClick={() => setSelectedCard(null)}>
-					<div className={styles.modalContent} onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+				<div
+					className={styles.modalOverlay}
+					onClick={() => setSelectedCard(null)}
+				>
+					<div
+						className={styles.modalContent}
+						onClick={e => e.stopPropagation()}
+						style={{ maxWidth: '500px' }}
+					>
 						<div className={styles.modalHeader}>
 							<h2>Карта игрока {selectedCard.playerName}</h2>
-							<button className={styles.closeButton} onClick={() => setSelectedCard(null)}>
+							<button
+								className={styles.closeButton}
+								onClick={() => setSelectedCard(null)}
+							>
 								✕
 							</button>
 						</div>
-						
+
 						<div className={styles.cardItem}>
-							<h3>{getCardTypeDisplayName(selectedCard.card.type)}</h3>
+							<h3>
+								{getCardTypeDisplayName(selectedCard.card.type || 'unknown')}
+							</h3>
 							<h4>{selectedCard.card.name}</h4>
 							<p>{selectedCard.card.description || 'Описание отсутствует'}</p>
 
@@ -167,7 +176,7 @@ export default function CardsTable({
 								<div className={styles.cardPros}>
 									<strong>Преимущества:</strong>
 									<ul>
-										{selectedCard.card.pros.map((pro: string, i: number) => (
+										{selectedCard.card.pros.map((pro, i) => (
 											<li key={i}>{pro}</li>
 										))}
 									</ul>
@@ -178,21 +187,65 @@ export default function CardsTable({
 								<div className={styles.cardCons}>
 									<strong>Недостатки:</strong>
 									<ul>
-										{selectedCard.card.cons.map((con: string, i: number) => (
+										{selectedCard.card.cons.map((con, i) => (
 											<li key={i}>{con}</li>
 										))}
 									</ul>
 								</div>
 							)}
 
-							{selectedCard.card.effects && selectedCard.card.effects.length > 0 && (
+							{selectedCard.card.effects &&
+								selectedCard.card.effects.length > 0 && (
+									<div className={styles.cardEffects}>
+										<strong>Эффекты:</strong>
+										<ul>
+											{selectedCard.card.effects.map((effect, i) => (
+												<li key={i}>{effect}</li>
+											))}
+										</ul>
+									</div>
+								)}
+
+							{selectedCard.card.abilities &&
+								selectedCard.card.abilities.length > 0 && (
+									<div className={styles.cardEffects}>
+										<strong>Способности:</strong>
+										<ul>
+											{selectedCard.card.abilities.map((ability, i) => (
+												<li key={i}>{ability}</li>
+											))}
+										</ul>
+									</div>
+								)}
+
+							{selectedCard.card.bonuses &&
+								selectedCard.card.bonuses.length > 0 && (
+									<div className={styles.cardPros}>
+										<strong>Бонусы:</strong>
+										<ul>
+											{selectedCard.card.bonuses.map((bonus, i) => (
+												<li key={i}>{bonus}</li>
+											))}
+										</ul>
+									</div>
+								)}
+
+							{selectedCard.card.effect && (
 								<div className={styles.cardEffects}>
-									<strong>Эффекты:</strong>
-									<ul>
-										{selectedCard.card.effects.map((effect: string, i: number) => (
-											<li key={i}>{effect}</li>
-										))}
-									</ul>
+									<strong>Эффект:</strong> {selectedCard.card.effect}
+								</div>
+							)}
+
+							{selectedCard.card.range && (
+								<div className={styles.cardGoal}>
+									<strong>Диапазон:</strong> {selectedCard.card.range}
+								</div>
+							)}
+
+							{selectedCard.card.winCondition && (
+								<div className={styles.cardGoal}>
+									<strong>Условие победы:</strong>{' '}
+									{selectedCard.card.winCondition}
 								</div>
 							)}
 
@@ -204,7 +257,8 @@ export default function CardsTable({
 
 							{selectedCard.card.specialAbility && (
 								<div className={styles.cardSpecialAbility}>
-									<strong>Особая способность:</strong> {selectedCard.card.specialAbility}
+									<strong>Особая способность:</strong>{' '}
+									{selectedCard.card.specialAbility}
 								</div>
 							)}
 						</div>

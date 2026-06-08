@@ -78,7 +78,7 @@ const DEFAULT_LOBBY_SETTINGS: LobbySettings = {
 	maxRounds: 10,
 	discussionTime: 180,
 	votingTime: 60,
-	hiddenRolesCount: 1,
+	hiddenRolesCount: 0,
 	enableCrises: true,
 }
 
@@ -441,7 +441,7 @@ export class LobbyGateway
 		const hiddenRolesCount = normalizeIntegerInRange(
 			rawSettings.hiddenRolesCount,
 			0,
-			Math.max(0, effectiveMaxPlayers - 1),
+			1,
 		)
 
 		if (hiddenRolesCount !== undefined) {
@@ -1072,8 +1072,8 @@ export class LobbyGateway
 				discussionTime: lobby.settings.discussionTime ?? 180,
 				votingTime: lobby.settings.votingTime ?? 60,
 				hiddenRolesCount: Math.min(
-					lobby.settings.hiddenRolesCount ?? 1,
-					playersForGame.length,
+					lobby.settings.hiddenRolesCount ?? 0,
+					Math.max(0, playersForGame.length - 1),
 				),
 				enableCrises: lobby.settings.enableCrises !== false,
 				difficulty:
