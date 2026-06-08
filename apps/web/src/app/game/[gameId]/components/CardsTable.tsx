@@ -2,8 +2,8 @@
 'use client'
 
 import { CardDetails, PlayerCardInfo } from '@station-eden/shared'
-import { useState } from 'react'
-import styles from '../page.module.css'
+import { useMemo, useState } from 'react'
+import styles from './CardsTable.module.css'
 import { getCardTypeDisplayName } from './utils/game.utils'
 
 interface CardsTableProps {
@@ -26,6 +26,7 @@ const ALL_CARD_TYPES = [
 
 interface SelectedCard {
 	playerName: string
+	cardType: string
 	card: CardDetails
 }
 
@@ -35,16 +36,30 @@ export default function CardsTable({
 }: CardsTableProps) {
 	const [selectedCard, setSelectedCard] = useState<SelectedCard | null>(null)
 
-	const handleCardClick = (playerName: string, card: CardDetails) => {
-		setSelectedCard({ playerName, card })
+	const revealedTotal = useMemo(() => {
+		return allPlayersCards.reduce((total, player) => {
+			return (
+				total + Object.values(player.revealedCards || {}).filter(Boolean).length
+			)
+		}, 0)
+	}, [allPlayersCards])
+
+	const totalSlots = allPlayersCards.length * ALL_CARD_TYPES.length
+
+	const handleCardClick = (
+		playerName: string,
+		cardType: string,
+		card: CardDetails,
+	) => {
+		setSelectedCard({ playerName, cardType, card })
 	}
 
 	if (allPlayersCards.length === 0) {
 		return (
 			<div className={styles.cardsTableContainer}>
 				<div className={styles.cardsTableHeader}>
-					<h3>Общая таблица карт</h3>
-					<p className={styles.tableHint}>Ожидание игроков</p>
+					<h3>Раскрытые карты</h3>
+					<p>Ожидание раскрытия данных экипажа</p>
 				</div>
 			</div>
 		)
@@ -54,10 +69,14 @@ export default function CardsTable({
 		<>
 			<div className={styles.cardsTableContainer}>
 				<div className={styles.cardsTableHeader}>
-					<h3>Общая таблица карт</h3>
-					<p className={styles.tableHint}>
-						Нажмите на раскрытую карту для просмотра деталей
-					</p>
+					<h3>Раскрытые карты</h3>
+
+					<div className={styles.tableStats}>
+						<span>Открыто</span>
+						<strong>
+							{revealedTotal}/{totalSlots}
+						</strong>
+					</div>
 				</div>
 
 				<div className={styles.cardsTable}>
@@ -65,6 +84,7 @@ export default function CardsTable({
 						<thead>
 							<tr>
 								<th className={styles.playerColumn}>Игрок</th>
+
 								{ALL_CARD_TYPES.map(cardType => (
 									<th key={cardType} className={styles.cardTypeColumn}>
 										{getCardTypeDisplayName(cardType)}
@@ -74,197 +94,172 @@ export default function CardsTable({
 						</thead>
 
 						<tbody>
-							{allPlayersCards.map(player => (
-								<tr
-									key={player.playerId}
-									className={
-										player.playerId === userId ? styles.currentPlayerRow : ''
-									}
-								>
-									<td className={styles.playerCell}>
-										<span className={styles.playerNameCell}>
-											{player.playerName}
-											{player.playerId === userId && ' - Вы'}
-										</span>
-									</td>
+							{allPlayersCards.map((player, index) => {
+								const revealedCount = Object.values(
+									player.revealedCards || {},
+								).filter(Boolean).length
 
-									{ALL_CARD_TYPES.map(cardType => {
-										const revealedCard = player.revealedCards[cardType]
+								return (
+									<tr
+										key={player.playerId}
+										className={
+											player.playerId === userId ? styles.currentPlayerRow : ''
+										}
+									>
+										<td className={styles.playerCell}>
+											<div className={styles.playerCellInner}>
+												<span className={styles.playerIndex}>
+													{String(index + 1).padStart(2, '0')}
+												</span>
 
-										return (
-											<td key={cardType} className={styles.cardCell}>
-												{revealedCard ? (
-													<div
-														className={styles.revealedCardCell}
-														onClick={() =>
-															handleCardClick(player.playerName, revealedCard)
-														}
-														onKeyDown={e =>
-															e.key === 'Enter' &&
-															handleCardClick(player.playerName, revealedCard)
-														}
-														role='button'
-														tabIndex={0}
-														style={{ cursor: 'pointer' }}
-														title='Нажмите для просмотра деталей'
-													>
-														<strong>{revealedCard.name}</strong>
-														<span className={styles.cardTypeHint}>
-															{getCardTypeDisplayName(
-																revealedCard.type || cardType,
-															)}
-														</span>
+												<div className={styles.playerCellText}>
+													<span className={styles.playerNameCell}>
+														{player.playerName}
+													</span>
+
+													<div className={styles.playerCellMeta}>
+														{player.playerId === userId && (
+															<span className={styles.youBadge}>Вы</span>
+														)}
+
+														<span>{revealedCount} открыто</span>
 													</div>
-												) : (
-													<span className={styles.hiddenCardCell}>—</span>
-												)}
-											</td>
-										)
-									})}
-								</tr>
-							))}
+												</div>
+											</div>
+										</td>
+
+										{ALL_CARD_TYPES.map(cardType => {
+											const revealedCard = player.revealedCards?.[cardType]
+
+											return (
+												<td key={cardType} className={styles.cardCell}>
+													{revealedCard ? (
+														<button
+															type='button'
+															className={styles.revealedCardCell}
+															onClick={() =>
+																handleCardClick(
+																	player.playerName,
+																	cardType,
+																	revealedCard,
+																)
+															}
+															title='Открыть подробности карты'
+														>
+															<strong>{cleanText(revealedCard.name)}</strong>
+															<span>
+																{getCardTypeDisplayName(
+																	revealedCard.type || cardType,
+																)}
+															</span>
+														</button>
+													) : (
+														<span className={styles.hiddenCardCell}>
+															<span />
+														</span>
+													)}
+												</td>
+											)
+										})}
+									</tr>
+								)
+							})}
 						</tbody>
 					</table>
 				</div>
 
 				<div className={styles.cardsTableLegend}>
 					<div className={styles.legendItem}>
-						<span className={styles.legendSymbol}>—</span>
-						<span className={styles.legendText}>Не раскрыта</span>
+						<span className={styles.legendClosed} />
+						<span>Не раскрыта</span>
 					</div>
+
 					<div className={styles.legendItem}>
-						<div className={styles.legendPlayerIndicator}></div>
-						<span className={styles.legendText}>Вы</span>
+						<span className={styles.legendOpened} />
+						<span>Раскрыта</span>
 					</div>
+
 					<div className={styles.legendItem}>
-						<span className={styles.legendSymbol}>i</span>
-						<span className={styles.legendText}>
-							Нажмите на карту для деталей
-						</span>
+						<span className={styles.legendCurrent} />
+						<span>Ваш игрок</span>
 					</div>
 				</div>
 			</div>
 
 			{selectedCard && (
-				<div
-					className={styles.modalOverlay}
-					onClick={() => setSelectedCard(null)}
-				>
-					<div
-						className={styles.modalContent}
-						onClick={e => e.stopPropagation()}
-						style={{ maxWidth: '500px' }}
-					>
-						<div className={styles.modalHeader}>
-							<h2>Карта игрока {selectedCard.playerName}</h2>
-							<button
-								className={styles.closeButton}
-								onClick={() => setSelectedCard(null)}
-							>
-								✕
-							</button>
-						</div>
-
-						<div className={styles.cardItem}>
-							<h3>
-								{getCardTypeDisplayName(selectedCard.card.type || 'unknown')}
-							</h3>
-							<h4>{selectedCard.card.name}</h4>
-							<p>{selectedCard.card.description || 'Описание отсутствует'}</p>
-
-							{selectedCard.card.pros && selectedCard.card.pros.length > 0 && (
-								<div className={styles.cardPros}>
-									<strong>Преимущества:</strong>
-									<ul>
-										{selectedCard.card.pros.map((pro, i) => (
-											<li key={i}>{pro}</li>
-										))}
-									</ul>
-								</div>
-							)}
-
-							{selectedCard.card.cons && selectedCard.card.cons.length > 0 && (
-								<div className={styles.cardCons}>
-									<strong>Недостатки:</strong>
-									<ul>
-										{selectedCard.card.cons.map((con, i) => (
-											<li key={i}>{con}</li>
-										))}
-									</ul>
-								</div>
-							)}
-
-							{selectedCard.card.effects &&
-								selectedCard.card.effects.length > 0 && (
-									<div className={styles.cardEffects}>
-										<strong>Эффекты:</strong>
-										<ul>
-											{selectedCard.card.effects.map((effect, i) => (
-												<li key={i}>{effect}</li>
-											))}
-										</ul>
-									</div>
-								)}
-
-							{selectedCard.card.abilities &&
-								selectedCard.card.abilities.length > 0 && (
-									<div className={styles.cardEffects}>
-										<strong>Способности:</strong>
-										<ul>
-											{selectedCard.card.abilities.map((ability, i) => (
-												<li key={i}>{ability}</li>
-											))}
-										</ul>
-									</div>
-								)}
-
-							{selectedCard.card.bonuses &&
-								selectedCard.card.bonuses.length > 0 && (
-									<div className={styles.cardPros}>
-										<strong>Бонусы:</strong>
-										<ul>
-											{selectedCard.card.bonuses.map((bonus, i) => (
-												<li key={i}>{bonus}</li>
-											))}
-										</ul>
-									</div>
-								)}
-
-							{selectedCard.card.effect && (
-								<div className={styles.cardEffects}>
-									<strong>Эффект:</strong> {selectedCard.card.effect}
-								</div>
-							)}
-
-							{selectedCard.card.range && (
-								<div className={styles.cardGoal}>
-									<strong>Диапазон:</strong> {selectedCard.card.range}
-								</div>
-							)}
-
-							{selectedCard.card.winCondition && (
-								<div className={styles.cardGoal}>
-									<strong>Условие победы:</strong>{' '}
-									{selectedCard.card.winCondition}
-								</div>
-							)}
-
-							{selectedCard.card.goal && (
-								<div className={styles.cardGoal}>
-									<strong>Цель:</strong> {selectedCard.card.goal}
-								</div>
-							)}
-
-							{selectedCard.card.specialAbility && (
-								<div className={styles.cardSpecialAbility}>
-									<strong>Особая способность:</strong>{' '}
-									{selectedCard.card.specialAbility}
-								</div>
-							)}
-						</div>
-					</div>
-				</div>
+				<CardDetailsModal
+					selectedCard={selectedCard}
+					onClose={() => setSelectedCard(null)}
+				/>
 			)}
 		</>
 	)
+}
+
+function CardDetailsModal({
+	selectedCard,
+	onClose,
+}: {
+	selectedCard: SelectedCard
+	onClose: () => void
+}) {
+	return (
+		<div className={styles.modalOverlay} onClick={onClose}>
+			<section
+				className={styles.modalContent}
+				role='dialog'
+				aria-modal='true'
+				onClick={event => event.stopPropagation()}
+			>
+				<div className={styles.modalHeader}>
+					<div>
+						<span className={styles.modalEyebrow}>
+							{getCardTypeDisplayName(
+								selectedCard.card.type || selectedCard.cardType,
+							)}
+						</span>
+
+						<h2>{cleanText(selectedCard.card.name)}</h2>
+
+						<p>Игрок: {selectedCard.playerName}</p>
+					</div>
+
+					<button
+						type='button'
+						className={styles.closeButton}
+						onClick={onClose}
+						aria-label='Закрыть карту'
+					>
+						✕
+					</button>
+				</div>
+
+				<div className={styles.cardDetails}>
+					{selectedCard.card.description && (
+						<p className={styles.cardDescription}>
+							{cleanText(selectedCard.card.description)}
+						</p>
+					)}
+
+					{selectedCard.card.effects &&
+						selectedCard.card.effects.length > 0 && (
+							<div className={styles.cardEffects}>
+								<h3>Эффекты</h3>
+								<ul>
+									{selectedCard.card.effects.map(effect => (
+										<li key={effect}>{cleanText(effect)}</li>
+									))}
+								</ul>
+							</div>
+						)}
+				</div>
+			</section>
+		</div>
+	)
+}
+
+function cleanText(value?: string): string {
+	if (!value) return ''
+
+	return value.trim().replace(/[.!?。！？]+$/g, '')
 }

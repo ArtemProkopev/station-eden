@@ -1,67 +1,68 @@
 // apps/web/src/app/game/[gameId]/components/phase-actions/VotingActions.tsx
 import { ExtendedGamePlayer } from '@station-eden/shared'
-import { formatTime } from '../utils/game.utils'
-import styles from '../../page.module.css'
+import styles from './PhaseActions.module.css'
 
 interface VotingActionsProps {
-  phaseTimeLeft: number
-  alivePlayers: ExtendedGamePlayer[]
-  userId?: string
-  currentPlayer?: ExtendedGamePlayer
-  onVote: (targetPlayerId: string) => void
+	alivePlayers: ExtendedGamePlayer[]
+	userId?: string
+	currentPlayer?: ExtendedGamePlayer
+	onVote: (targetPlayerId: string) => void
 }
 
-export default function VotingActions({ 
-  phaseTimeLeft, 
-  alivePlayers, 
-  userId, 
-  currentPlayer, 
-  onVote 
+export default function VotingActions({
+	alivePlayers,
+	userId,
+	currentPlayer,
+	onVote,
 }: VotingActionsProps) {
-  return (
-    <div className={styles.phaseActions}>
-      <div className={styles.votingHeader}>
-        <h3>Голосуйте за исключение игрока</h3>
-        <p>Время на голосование: {formatTime(phaseTimeLeft)}</p>
-      </div>
-      <div className={styles.votingGrid}>
-        {alivePlayers
-          .filter(p => p.id !== userId)
-          .map(player => (
-            <VoteOption
-              key={player.id}
-              player={player}
-              currentPlayer={currentPlayer}
-              onVote={onVote}
-            />
-          ))}
-      </div>
-    </div>
-  )
+	const availablePlayers = alivePlayers.filter(player => player.id !== userId)
+
+	return (
+		<div className={styles.phaseActions}>
+			<div className={styles.votingHeader}>
+				<h3>Голосование за исключение</h3>
+			</div>
+
+			<div className={styles.votingGrid}>
+				{availablePlayers.map(player => (
+					<VoteOption
+						key={player.id}
+						player={player}
+						currentPlayer={currentPlayer}
+						onVote={onVote}
+					/>
+				))}
+			</div>
+		</div>
+	)
 }
 
 interface VoteOptionProps {
-  player: ExtendedGamePlayer
-  currentPlayer?: ExtendedGamePlayer
-  onVote: (targetPlayerId: string) => void
+	player: ExtendedGamePlayer
+	currentPlayer?: ExtendedGamePlayer
+	onVote: (targetPlayerId: string) => void
 }
 
 function VoteOption({ player, currentPlayer, onVote }: VoteOptionProps) {
-  const isSelected = currentPlayer?.vote === player.id
+	const isSelected = currentPlayer?.vote === player.id
+	const isDisabled = !currentPlayer?.isAlive || Boolean(currentPlayer?.vote)
 
-  return (
-    <button
-      className={`${styles.voteOption} ${isSelected ? styles.selected : ''}`}
-      onClick={() => onVote(player.id)}
-      disabled={!currentPlayer?.isAlive || Boolean(currentPlayer?.vote)}
-    >
-      <div className={styles.votePlayerInfo}>
-        <span className={styles.votePlayerName}>{player.name}</span>
-        {/* Убираем профессию из голосования */}
-      </div>
-      <div className={styles.voteCount}>
-        Голосов: {player.votesAgainst || 0}
-      </div>
-    </button>
-  )
+	return (
+		<button
+			type='button'
+			className={`${styles.voteOption} ${isSelected ? styles.selected : ''}`}
+			onClick={() => onVote(player.id)}
+			disabled={isDisabled}
+		>
+			<span className={styles.votePlayerInfo}>
+				<strong className={styles.votePlayerName}>{player.name}</strong>
+				<small>{isSelected ? 'Цель выбрана' : 'Выбрать цель'}</small>
+			</span>
+
+			<span className={styles.voteCount}>
+				<span>Голосов</span>
+				<strong>{player.votesAgainst || 0}</strong>
+			</span>
+		</button>
+	)
 }

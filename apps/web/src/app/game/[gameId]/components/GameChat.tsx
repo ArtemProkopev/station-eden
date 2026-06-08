@@ -3,7 +3,7 @@
 
 import { GameChatMessage } from '@station-eden/shared'
 import type React from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import styles from './GameChat.module.css'
 
 interface GameChatProps {
@@ -33,9 +33,13 @@ export default function GameChat({
 	const [activeTab, setActiveTab] = useState<'text' | 'voice'>('text')
 	const [hasVoiceActivity, setHasVoiceActivity] = useState(false)
 
+	const chatMessages = useMemo(() => {
+		return messages.filter(message => message.type !== 'system')
+	}, [messages])
+
 	useEffect(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-	}, [messages])
+	}, [chatMessages])
 
 	const formatTime = (timestamp: Date | string) => {
 		const date = new Date(timestamp)
@@ -80,28 +84,30 @@ export default function GameChat({
 			{activeTab === 'text' && (
 				<>
 					<div className={styles.messagesArea} onScroll={onChatScroll}>
-						{messages.length === 0 ? (
+						{chatMessages.length === 0 ? (
 							<div className={styles.emptyState}>
 								<p>Сообщений пока нет</p>
 							</div>
 						) : (
-							messages.map(msg => (
+							chatMessages.map(msg => (
 								<div
 									key={msg.id}
 									className={`${styles.message} ${
-										msg.type === 'system' ? styles.messageSystem : ''
-									} ${msg.playerId === currentUserId ? styles.myMessage : ''}`}
+										msg.playerId === currentUserId ? styles.myMessage : ''
+									}`}
 								>
 									<div className={styles.messageHeader}>
 										<span className={styles.messageAuthor}>
-											{msg.type === 'system' ? 'Система' : msg.playerName}
+											{msg.playerName}
 										</span>
 										<span className={styles.messageTime}>
 											{formatTime(msg.timestamp)}
 										</span>
 									</div>
 
-									<div className={styles.messageText}>{msg.text}</div>
+									<div className={styles.messageText}>
+										{cleanText(msg.text)}
+									</div>
 								</div>
 							))
 						)}
@@ -115,9 +121,7 @@ export default function GameChat({
 							value={newMessage}
 							onChange={e => onMessageChange(e.target.value.slice(0, 300))}
 							onKeyPress={onKeyPress}
-							placeholder={
-								disabled ? 'Чат недоступен...' : 'Введите сообщение...'
-							}
+							placeholder={disabled ? 'Чат недоступен' : 'Введите сообщение'}
 							className={styles.input}
 							maxLength={300}
 							disabled={disabled}
@@ -182,10 +186,12 @@ function VoicePanelLoader({
 	}
 
 	if (!VoicePanelComponent) {
-		return (
-			<div className={styles.voiceLoading}>Загрузка голосового чата...</div>
-		)
+		return <div className={styles.voiceLoading}>Загрузка голосового чата</div>
 	}
 
 	return <VoicePanelComponent lobbyId={roomId} onStatsChange={onStatsChange} />
+}
+
+function cleanText(value: string): string {
+	return value.trim().replace(/[.。]+$/g, '')
 }

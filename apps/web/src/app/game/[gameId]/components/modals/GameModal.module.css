@@ -1,0 +1,539 @@
+/* apps/web/src/app/game/[gameId]/components/modals/GameModal.module.css */
+
+.modalOverlay {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 24px;
+	background:
+		radial-gradient(
+			circle at 50% 100%,
+			rgba(99, 239, 255, 0.08),
+			transparent 42%
+		),
+		rgba(0, 0, 0, 0.44);
+	backdrop-filter: blur(5px);
+}
+
+.modalContent {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	width: min(900px, calc(100vw - 48px));
+	max-height: min(760px, calc(100dvh - 72px));
+	overflow: hidden;
+	border: 1px solid rgba(99, 239, 255, 0.28);
+	border-radius: 18px;
+	background:
+		linear-gradient(180deg, rgba(3, 10, 28, 0.96), rgba(1, 5, 16, 0.96)),
+		radial-gradient(circle at 50% 0%, rgba(99, 239, 255, 0.1), transparent 42%);
+	box-shadow:
+		0 24px 80px rgba(0, 0, 0, 0.58),
+		0 0 38px rgba(99, 239, 255, 0.12),
+		inset 0 0 0 1px rgba(255, 255, 255, 0.035);
+	backdrop-filter: blur(14px);
+}
+
+.modalContent::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background:
+		linear-gradient(
+			120deg,
+			transparent 0%,
+			rgba(99, 239, 255, 0.045) 36%,
+			transparent 58%
+		),
+		linear-gradient(rgba(99, 239, 255, 0.035) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(99, 239, 255, 0.03) 1px, transparent 1px);
+	background-size:
+		100% 100%,
+		42px 42px,
+		42px 42px;
+	opacity: 0.34;
+}
+
+.modalHeader,
+.modalBody,
+.modalActions {
+	position: relative;
+	z-index: 1;
+}
+
+.modalHeader {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 18px;
+	flex: 0 0 auto;
+	padding: 18px 20px 14px;
+	border-bottom: 1px solid rgba(99, 239, 255, 0.13);
+	background:
+		linear-gradient(90deg, rgba(99, 239, 255, 0.055), transparent 44%),
+		rgba(0, 0, 0, 0.2);
+}
+
+.modalEyebrow {
+	display: block;
+	margin-bottom: 5px;
+	color: rgba(99, 239, 255, 0.72);
+	font-size: 10px;
+	letter-spacing: 1.1px;
+	text-transform: uppercase;
+}
+
+.modalHeader h2 {
+	margin: 0;
+	color: #63efff;
+	font-size: 22px;
+	font-weight: normal;
+	line-height: 1.25;
+	letter-spacing: 0.7px;
+	text-shadow:
+		0 0 14px rgba(99, 239, 255, 0.36),
+		0 0 34px rgba(124, 92, 255, 0.14);
+}
+
+.modalHeader p {
+	margin: 7px 0 0;
+	color: rgba(255, 255, 255, 0.46);
+	font-size: 11px;
+	line-height: 1.45;
+}
+
+.closeButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 34px;
+	height: 34px;
+	flex: 0 0 auto;
+	border: 1px solid rgba(255, 107, 107, 0.36);
+	border-radius: 8px;
+	background: rgba(255, 107, 107, 0.08);
+	color: #ff6b6b;
+	cursor: pointer;
+	font-family: 'RussoOne', sans-serif;
+	font-size: 15px;
+	line-height: 1;
+	transition:
+		transform 0.18s ease,
+		background 0.18s ease,
+		border-color 0.18s ease,
+		box-shadow 0.18s ease;
+}
+
+.closeButton:hover:not(:disabled) {
+	transform: translateY(-1px);
+	border-color: #ff6b6b;
+	background: rgba(255, 107, 107, 0.14);
+	box-shadow: 0 0 14px rgba(255, 107, 107, 0.16);
+}
+
+.closeButton:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.modalBody {
+	min-height: 0;
+	overflow: auto;
+	padding: 18px;
+}
+
+.description {
+	margin: 0;
+	color: rgba(237, 252, 255, 0.68);
+	font-size: 12px;
+	line-height: 1.6;
+}
+
+.infoGrid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 10px;
+	margin-top: 14px;
+}
+
+.infoBlock {
+	padding: 11px 12px;
+	border: 1px solid rgba(99, 239, 255, 0.12);
+	border-radius: 10px;
+	background: rgba(99, 239, 255, 0.035);
+}
+
+.infoBlockDanger {
+	border-color: rgba(255, 107, 107, 0.15);
+	background: rgba(255, 107, 107, 0.035);
+}
+
+.infoBlock strong {
+	display: block;
+	margin-bottom: 7px;
+	color: rgba(99, 239, 255, 0.76);
+	font-size: 10px;
+	font-weight: normal;
+	letter-spacing: 0.7px;
+	text-transform: uppercase;
+}
+
+.infoBlockDanger strong {
+	color: rgba(255, 107, 107, 0.78);
+}
+
+.infoBlock p {
+	margin: 0;
+	color: rgba(237, 252, 255, 0.62);
+	font-size: 11px;
+	line-height: 1.5;
+}
+
+.infoBlock ul {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.infoBlock li {
+	position: relative;
+	padding-left: 12px;
+	color: rgba(237, 252, 255, 0.58);
+	font-size: 11px;
+	line-height: 1.45;
+}
+
+.infoBlock li::before {
+	content: '';
+	position: absolute;
+	left: 0;
+	top: 0.65em;
+	width: 5px;
+	height: 1px;
+	background: rgba(99, 239, 255, 0.56);
+}
+
+.infoBlockDanger li::before {
+	background: rgba(255, 107, 107, 0.58);
+}
+
+.statusPanel {
+	margin-top: 14px;
+	padding: 12px;
+	border: 1px solid rgba(243, 156, 18, 0.18);
+	border-radius: 12px;
+	background: rgba(243, 156, 18, 0.055);
+}
+
+.statusPanel p {
+	margin: 0;
+	color: rgba(237, 252, 255, 0.62);
+	font-size: 11px;
+	line-height: 1.5;
+}
+
+.statusPanel p + p {
+	margin-top: 7px;
+}
+
+.modalActions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
+	padding: 0 18px 18px;
+}
+
+.primaryButton,
+.secondaryButton,
+.dangerButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 38px;
+	padding: 0 16px;
+	border-radius: 9px;
+	cursor: pointer;
+	font-family: 'RussoOne', sans-serif;
+	font-size: 12px;
+	transition:
+		transform 0.18s ease,
+		background 0.18s ease,
+		border-color 0.18s ease,
+		box-shadow 0.18s ease,
+		opacity 0.18s ease;
+}
+
+.primaryButton {
+	border: 1px solid rgba(99, 239, 255, 0.42);
+	background:
+		linear-gradient(180deg, rgba(99, 239, 255, 0.1), rgba(99, 239, 255, 0.035)),
+		rgba(0, 0, 0, 0.22);
+	color: #63efff;
+}
+
+.secondaryButton {
+	border: 1px solid rgba(237, 252, 255, 0.16);
+	background: rgba(255, 255, 255, 0.035);
+	color: rgba(237, 252, 255, 0.72);
+}
+
+.dangerButton {
+	border: 1px solid rgba(255, 107, 107, 0.38);
+	background: rgba(255, 107, 107, 0.08);
+	color: #ff6b6b;
+}
+
+.primaryButton:hover:not(:disabled),
+.secondaryButton:hover:not(:disabled),
+.dangerButton:hover:not(:disabled) {
+	transform: translateY(-1px);
+}
+
+.primaryButton:hover:not(:disabled) {
+	border-color: #63efff;
+	box-shadow: 0 0 16px rgba(99, 239, 255, 0.13);
+}
+
+.secondaryButton:hover:not(:disabled) {
+	border-color: rgba(237, 252, 255, 0.32);
+}
+
+.dangerButton:hover:not(:disabled) {
+	border-color: #ff6b6b;
+	box-shadow: 0 0 14px rgba(255, 107, 107, 0.16);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.dangerButton:disabled {
+	opacity: 0.46;
+	cursor: not-allowed;
+}
+
+.cardsGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 12px;
+}
+
+.revealCard {
+	position: relative;
+	min-height: 220px;
+	padding: 14px;
+	overflow: hidden;
+	border: 1px solid rgba(99, 239, 255, 0.16);
+	border-radius: 14px;
+	background:
+		linear-gradient(
+			145deg,
+			rgba(99, 239, 255, 0.075),
+			rgba(99, 239, 255, 0.02)
+		),
+		rgba(0, 0, 0, 0.26);
+	box-shadow:
+		0 12px 28px rgba(0, 0, 0, 0.2),
+		inset 0 0 22px rgba(99, 239, 255, 0.03);
+}
+
+.revealCardHidden {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-color: rgba(237, 252, 255, 0.08);
+	background: rgba(255, 255, 255, 0.025);
+}
+
+.revealCardType {
+	display: inline-flex;
+	align-items: center;
+	min-height: 21px;
+	margin-bottom: 10px;
+	padding: 3px 8px;
+	border: 1px solid rgba(99, 239, 255, 0.2);
+	border-radius: 999px;
+	background: rgba(99, 239, 255, 0.06);
+	color: rgba(99, 239, 255, 0.84);
+	font-size: 9px;
+	line-height: 1;
+	letter-spacing: 0.55px;
+	text-transform: uppercase;
+}
+
+.revealCard h3 {
+	margin: 0 0 8px;
+	color: #63efff;
+	font-size: 16px;
+	font-weight: normal;
+	line-height: 1.25;
+	text-shadow: 0 0 12px rgba(99, 239, 255, 0.22);
+}
+
+.revealCard p {
+	margin: 0;
+	color: rgba(237, 252, 255, 0.62);
+	font-size: 11px;
+	line-height: 1.5;
+}
+
+.hiddenText {
+	color: rgba(237, 252, 255, 0.36);
+	font-size: 12px;
+	text-transform: uppercase;
+}
+
+.resultReason {
+	margin: 0 0 14px;
+	color: rgba(99, 239, 255, 0.8);
+	font-size: 13px;
+	line-height: 1.45;
+}
+
+.scoresList,
+.winnersList {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+.sectionTitle {
+	margin: 18px 0 0;
+	color: rgba(99, 239, 255, 0.78);
+	font-size: 12px;
+	font-weight: normal;
+	letter-spacing: 0.8px;
+	text-transform: uppercase;
+}
+
+.scoreRow,
+.winnerItem {
+	display: grid;
+	grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto auto;
+	gap: 10px;
+	align-items: center;
+	padding: 10px 12px;
+	border: 1px solid rgba(99, 239, 255, 0.13);
+	border-radius: 10px;
+	background: rgba(99, 239, 255, 0.035);
+	color: rgba(237, 252, 255, 0.7);
+	font-size: 11px;
+}
+
+.winnerItem {
+	display: flex;
+	justify-content: space-between;
+}
+
+.playerName,
+.winnerName {
+	color: #63efff;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.playerRole {
+	color: rgba(237, 252, 255, 0.48);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.playerScore {
+	color: rgba(237, 252, 255, 0.72);
+	font-variant-numeric: tabular-nums;
+}
+
+.survivedBadge {
+	display: inline-flex;
+	align-items: center;
+	min-height: 20px;
+	padding: 2px 7px;
+	border: 1px solid rgba(76, 175, 80, 0.25);
+	border-radius: 999px;
+	background: rgba(76, 175, 80, 0.09);
+	color: #5ff071;
+	font-size: 9px;
+	text-transform: uppercase;
+}
+
+.modalBody::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+.modalBody::-webkit-scrollbar-track {
+	background: rgba(255, 255, 255, 0.045);
+	border-radius: 999px;
+}
+
+.modalBody::-webkit-scrollbar-thumb {
+	background: rgba(99, 239, 255, 0.28);
+	border-radius: 999px;
+}
+
+.modalBody::-webkit-scrollbar-thumb:hover {
+	background: rgba(99, 239, 255, 0.46);
+}
+
+@media (max-width: 768px) {
+	.modalOverlay {
+		padding: 12px;
+	}
+
+	.modalContent {
+		width: calc(100vw - 24px);
+		max-height: calc(100dvh - 24px);
+	}
+
+	.modalHeader {
+		padding: 15px 14px 12px;
+	}
+
+	.modalBody {
+		padding: 14px;
+	}
+
+	.infoGrid,
+	.cardsGrid {
+		grid-template-columns: 1fr;
+	}
+
+	.modalActions {
+		flex-direction: column;
+		padding: 0 14px 14px;
+	}
+
+	.scoreRow {
+		grid-template-columns: 1fr;
+	}
+
+	.primaryButton,
+	.secondaryButton,
+	.dangerButton {
+		width: 100%;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.closeButton,
+	.primaryButton,
+	.secondaryButton,
+	.dangerButton {
+		transition: none !important;
+	}
+
+	.closeButton:hover:not(:disabled),
+	.primaryButton:hover:not(:disabled),
+	.secondaryButton:hover:not(:disabled),
+	.dangerButton:hover:not(:disabled) {
+		transform: none;
+	}
+}

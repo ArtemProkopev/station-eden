@@ -6,11 +6,12 @@ import {
 	CrisisInfo,
 	ExtendedGamePlayer,
 	ExtendedGameState,
+	GameChatMessage,
 	GamePhase,
 	PlayerCardInfo,
 	RevealedPlayer,
 } from '@station-eden/shared'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import CardsTable from './CardsTable'
 import styles from './GamePhasePanel.module.css'
 import CrisisActions from './phase-actions/CrisisActions'
@@ -43,6 +44,31 @@ interface GamePhasePanelProps {
 	myAllRevealedCards: string[]
 	allPlayersCards: PlayerCardInfo[]
 	myCards: Record<string, CardDetails>
+	newCardsCount?: number
+	systemMessages?: GameChatMessage[]
+}
+
+type LocalTimerSnapshot = {
+	key: string
+	endMs: number
+	durationMs: number
+}
+
+const COMPACT_SYSTEM_MESSAGES_COUNT = 2
+
+const PROFESSION_NAMES: Record<string, string> = {
+	prof_engineer: 'Инженер',
+	prof_astrobiologist: 'Астробиолог',
+	prof_pilot: 'Пилот',
+	prof_surgeon: 'Хирург',
+	prof_linguist: 'Лингвист',
+	prof_security: 'Офицер безопасности',
+	prof_communications: 'Специалист связи',
+	prof_geologist: 'Геолог',
+	prof_psychologist: 'Психолог',
+	prof_medic: 'Медик',
+	prof_doctor: 'Врач',
+	prof_biologist: 'Биолог',
 }
 
 export default function GamePhasePanel({
@@ -57,14 +83,22 @@ export default function GamePhasePanel({
 	isRevealing,
 	revealedPlayer,
 	onShowMyCards,
+	onStartDiscussion,
 	onRequestVote,
 	onVote,
 	onSolveCrisis,
 	onSetActiveCrisis,
 	allPlayersCards,
 	myCards,
+	newCardsCount = 0,
+	systemMessages = [],
 }: GamePhasePanelProps) {
-	const [isScannerOpen, setIsScannerOpen] = useState(false)
+	const [isCardsOverviewOpen, setIsCardsOverviewOpen] = useState(false)
+	const [isSystemFeedExpanded, setIsSystemFeedExpanded] = useState(false)
+
+	const timerProgressRef = useRef<HTMLDivElement | null>(null)
+	const phaseTimeLeftRef = useRef(phaseTimeLeft)
+	const localTimerRef = useRef<LocalTimerSnapshot | null>(null)
 
 	const phase = gameState.phase as GamePhase
 	const isCreator = userId === gameState.creatorId
@@ -73,7 +107,6 @@ export default function GamePhasePanel({
 	const phaseDescription = getPhaseDescription(phase)
 	const phaseClassName = getPhaseClassName(phase)
 	const terminalStatus = getTerminalStatus(phase)
-	const scannerStatus = getScannerStatus(allPlayersCards)
 
 	const allPlayersRevealed = alivePlayers.every(
 		player => (player.revealedCards ?? 0) > 0,
@@ -104,28 +137,128 @@ export default function GamePhasePanel({
 			phase === 'intermission') &&
 		phaseTimeLeft > 0
 
-	const timerProgress =
-		phaseDurationDisplay > 0
-			? Math.min(100, Math.max(0, (phaseTimeLeft / phaseDurationDisplay) * 100))
-			: 0
+	const timerIdentity = `${String(gameState.phase)}-${String(
+		gameState.round ?? 0,
+	)}-${String(gameState.phaseEndTime ?? 'local')}`
 
-	const handleOpenScanner = useCallback(() => {
-		setIsScannerOpen(true)
+	const shouldShowSystemFeedMore =
+		systemMessages.length > COMPACT_SYSTEM_MESSAGES_COUNT
+
+	const visibleSystemMessages = useMemo(() => {
+		if (isSystemFeedExpanded) {
+			return systemMessages
+		}
+
+		return systemMessages.slice(-COMPACT_SYSTEM_MESSAGES_COUNT)
+	}, [isSystemFeedExpanded, systemMessages])
+
+	useEffect(() => {
+		phaseTimeLeftRef.current = phaseTimeLeft
+	}, [phaseTimeLeft])
+
+	useEffect(() => {
+		setIsSystemFeedExpanded(false)
+	}, [gameState.phase, gameState.round])
+
+	useEffect(() => {
+		const progressElement = timerProgressRef.current
+
+		if (!progressElement) return
+
+		if (!shouldShowTimer) {
+			localTimerRef.current = null
+			progressElement.style.transform = 'scaleX(0)'
+			return
+		}
+
+		const parsedPhaseEndMs = gameState.phaseEndTime
+			? new Date(String(gameState.phaseEndTime)).getTime()
+			: NaN
+
+		const hasValidServerEnd = Number.isFinite(parsedPhaseEndMs)
+		const fallbackSeconds = Math.max(phaseTimeLeftRef.current, 1)
+
+		let endMs: number
+		let durationMs: number
+
+		if (hasValidServerEnd) {
+			localTimerRef.current = null
+			endMs = parsedPhaseEndMs
+			durationMs = Math.max(
+				phaseDurationDisplay * 1000,
+				fallbackSeconds * 1000,
+				1,
+			)
+		} else {
+			const previousSnapshot = localTimerRef.current
+
+			if (previousSnapshot?.key === timerIdentity) {
+				endMs = previousSnapshot.endMs
+				durationMs = previousSnapshot.durationMs
+			} else {
+				durationMs = Math.max(
+					phaseDurationDisplay * 1000,
+					fallbackSeconds * 1000,
+					1,
+				)
+				endMs = Date.now() + fallbackSeconds * 1000
+
+				localTimerRef.current = {
+					key: timerIdentity,
+					endMs,
+					durationMs,
+				}
+			}
+		}
+
+		let frameId = 0
+
+		const updateProgress = () => {
+			const nextProgress = Math.min(
+				1,
+				Math.max(0, (endMs - Date.now()) / durationMs),
+			)
+
+			progressElement.style.transform = `scaleX(${nextProgress})`
+
+			if (nextProgress > 0) {
+				frameId = window.requestAnimationFrame(updateProgress)
+			}
+		}
+
+		updateProgress()
+
+		return () => {
+			window.cancelAnimationFrame(frameId)
+		}
+	}, [
+		shouldShowTimer,
+		timerIdentity,
+		gameState.phaseEndTime,
+		phaseDurationDisplay,
+	])
+
+	const handleOpenCardsOverview = useCallback(() => {
+		setIsCardsOverviewOpen(true)
 	}, [])
 
-	const handleCloseScanner = useCallback(() => {
-		setIsScannerOpen(false)
+	const handleCloseCardsOverview = useCallback(() => {
+		setIsCardsOverviewOpen(false)
+	}, [])
+
+	const handleToggleSystemFeed = useCallback(() => {
+		setIsSystemFeedExpanded(current => !current)
 	}, [])
 
 	useEffect(() => {
-		if (!isScannerOpen) return
+		if (!isCardsOverviewOpen) return
 
 		const previousOverflow = document.body.style.overflow
 		document.body.style.overflow = 'hidden'
 
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (event.key === 'Escape') {
-				setIsScannerOpen(false)
+				setIsCardsOverviewOpen(false)
 			}
 		}
 
@@ -135,7 +268,7 @@ export default function GamePhasePanel({
 			document.body.style.overflow = previousOverflow
 			window.removeEventListener('keydown', handleKeyDown)
 		}
-	}, [isScannerOpen])
+	}, [isCardsOverviewOpen])
 
 	const renderPhaseActions = () => {
 		switch (phase) {
@@ -143,7 +276,11 @@ export default function GamePhasePanel({
 				return (
 					<PreparationActions
 						onShowMyCards={onShowMyCards}
-						onShowCardsTable={handleOpenScanner}
+						onShowCardsTable={handleOpenCardsOverview}
+						onStartDiscussion={onStartDiscussion}
+						isCreator={isCreator}
+						allPlayersRevealed={allPlayersRevealed}
+						newCardsCount={newCardsCount}
 					/>
 				)
 
@@ -151,23 +288,22 @@ export default function GamePhasePanel({
 				return (
 					<DiscussionActions
 						onShowMyCards={onShowMyCards}
-						onShowCardsTable={handleOpenScanner}
+						onShowCardsTable={handleOpenCardsOverview}
 						onRequestVote={onRequestVote}
 						isCreator={isCreator}
 						allPlayersRevealed={allPlayersRevealed}
 						isConnected={true}
-						phaseTimeLeft={phaseTimeLeft}
 						voteTriggerCount={voteTriggerCount}
 						requiredVotes={requiredVotes}
 						hasRequestedVote={hasRequestedVote}
 						alivePlayers={alivePlayers}
+						newCardsCount={newCardsCount}
 					/>
 				)
 
 			case 'voting':
 				return (
 					<VotingActions
-						phaseTimeLeft={phaseTimeLeft}
 						alivePlayers={alivePlayers}
 						userId={userId}
 						currentPlayer={currentPlayer}
@@ -220,10 +356,6 @@ export default function GamePhasePanel({
 						<span className={styles.commandTerminalEyebrow}>
 							Командный терминал
 						</span>
-
-						<span className={styles.commandTerminalCode}>
-							STATION-EDEN / SESSION-LINK
-						</span>
 					</div>
 
 					<div className={styles.commandTerminalStatus}>
@@ -242,10 +374,7 @@ export default function GamePhasePanel({
 					{shouldShowTimer && (
 						<div className={styles.phaseTimer} aria-hidden='true'>
 							<div className={styles.timerBar}>
-								<div
-									className={styles.timerProgress}
-									style={{ width: `${timerProgress}%` }}
-								/>
+								<div ref={timerProgressRef} className={styles.timerProgress} />
 							</div>
 						</div>
 					)}
@@ -259,70 +388,79 @@ export default function GamePhasePanel({
 									Доступные действия
 								</span>
 
-								<h3>Панель управления фазой</h3>
+								<h3>Управление фазой</h3>
 							</div>
-
-							<span className={styles.primaryActionsHint}>
-								{isCreator
-									? 'Права создателя активны'
-									: 'Ожидание решений экипажа'}
-							</span>
 						</div>
 
 						<div className={styles.gameActions}>{renderPhaseActions()}</div>
 
-						<div className={styles.scannerLauncher}>
-							<div className={styles.scannerLauncherInfo}>
-								<span className={styles.scannerLauncherEyebrow}>
-									Сканер экипажа
-								</span>
-
-								<span className={styles.scannerLauncherStatus}>
-									{scannerStatus}
-								</span>
-							</div>
-
-							<button
-								type='button'
-								className={styles.scannerLauncherButton}
-								onClick={handleOpenScanner}
+						{systemMessages.length > 0 && (
+							<div
+								className={styles.systemFeed}
+								data-expanded={isSystemFeedExpanded}
 							>
-								Открыть матрицу карт
-							</button>
-						</div>
+								<div className={styles.systemFeedHeader}>
+									<div className={styles.systemFeedTitle}>
+										<span>Системные сообщения</span>
+									</div>
+
+									{shouldShowSystemFeedMore && (
+										<button
+											type='button'
+											className={styles.systemFeedMore}
+											onClick={handleToggleSystemFeed}
+											aria-expanded={isSystemFeedExpanded}
+										>
+											{isSystemFeedExpanded ? 'Свернуть' : 'Подробнее'}
+										</button>
+									)}
+								</div>
+
+								<div
+									className={styles.systemFeedList}
+									data-expanded={isSystemFeedExpanded}
+								>
+									{visibleSystemMessages.map(message => (
+										<div key={message.id} className={styles.systemFeedItem}>
+											<span className={styles.systemFeedTime}>
+												{formatMessageTime(message.timestamp)}
+											</span>
+
+											<p className={styles.systemFeedText}>
+												{cleanText(message.text)}
+											</p>
+										</div>
+									))}
+								</div>
+							</div>
+						)}
 					</div>
 				</div>
 			</section>
 
 			<div
 				className={styles.scannerDrawerBackdrop}
-				data-open={isScannerOpen}
-				onClick={handleCloseScanner}
+				data-open={isCardsOverviewOpen}
+				onClick={handleCloseCardsOverview}
 				aria-hidden='true'
 			/>
 
 			<section
 				className={styles.scannerDrawer}
-				data-open={isScannerOpen}
+				data-open={isCardsOverviewOpen}
 				role='dialog'
-				aria-modal={isScannerOpen}
-				aria-hidden={!isScannerOpen}
-				aria-label='Сканер экипажа'
+				aria-modal={isCardsOverviewOpen}
+				aria-hidden={!isCardsOverviewOpen}
+				aria-label='Карты экипажа'
 			>
 				<div className={styles.scannerDrawerHeader}>
-					<div>
-						<span className={styles.scannerDrawerEyebrow}>Сканер экипажа</span>
-
-						<h2>Матрица раскрытых карт</h2>
-
-						<p>{scannerStatus}</p>
-					</div>
+					<h2>Карты экипажа</h2>
 
 					<button
 						type='button'
 						className={styles.scannerDrawerClose}
-						onClick={handleCloseScanner}
-						aria-label='Закрыть сканер экипажа'
+						onClick={handleCloseCardsOverview}
+						aria-label='Закрыть карты экипажа'
 					>
 						✕
 					</button>
@@ -396,10 +534,22 @@ function getTerminalStatus(phase: GamePhase): string {
 	}
 }
 
-function getScannerStatus(allPlayersCards: PlayerCardInfo[]): string {
-	if (!allPlayersCards.length) {
-		return 'Ожидание раскрытия данных'
+function formatMessageTime(timestamp: Date | string | number): string {
+	const date = timestamp instanceof Date ? timestamp : new Date(timestamp)
+
+	if (Number.isNaN(date.getTime())) {
+		return '--:--'
 	}
 
-	return 'Данные синхронизированы'
+	return date.toLocaleTimeString('ru-RU', {
+		hour: '2-digit',
+		minute: '2-digit',
+	})
+}
+
+function cleanText(value: string): string {
+	return value
+		.trim()
+		.replace(/\bprof_[a-z_]+\b/g, match => PROFESSION_NAMES[match] || match)
+		.replace(/[.。]+$/g, '')
 }

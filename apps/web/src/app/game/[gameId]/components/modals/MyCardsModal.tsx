@@ -5,8 +5,8 @@ import {
 	ExtendedGamePlayer,
 	ExtendedGameState,
 } from '@station-eden/shared'
-import styles from '../../page.module.css'
 import { getCardTypeName } from '../utils/game.utils'
+import styles from './MyCardsModal.module.css'
 
 interface MyCardsModalProps {
 	myCards: Record<string, CardDetails>
@@ -20,9 +20,8 @@ interface MyCardsModalProps {
 	onRevealCard: (cardType: CardType) => void
 }
 
-// Type guard для проверки типа myAllRevealedCards
 function isRevealedCardsObject(
-	cards: Record<string, { name: string; type: string }> | string[]
+	cards: Record<string, { name: string; type: string }> | string[],
 ): cards is Record<string, { name: string; type: string }> {
 	return cards && typeof cards === 'object' && !Array.isArray(cards)
 }
@@ -45,32 +44,54 @@ export default function MyCardsModal({
 	const players = (gameState?.players ?? []) as ExtendedGamePlayer[]
 	const currentPlayer = userId ? players.find(p => p.id === userId) : undefined
 
-	// Нормализация myAllRevealedCards для проверки
 	const isCardRevealed = (cardType: string): boolean => {
 		if (isRevealedCardsObject(myAllRevealedCards)) {
 			return !!myAllRevealedCards[cardType]
 		}
+
 		return myAllRevealedCards.includes(cardType)
 	}
 
 	return (
 		<div className={styles.modalOverlay}>
-			<div className={styles.modalContent}>
+			<section className={styles.modalContent} role='dialog' aria-modal='true'>
 				<div className={styles.modalHeader}>
-					<h2>Ваши карты</h2>
-					<button className={styles.closeButton} onClick={onClose}>✕</button>
+					<div>
+						<span className={styles.modalEyebrow}>Личные данные</span>
+						<h2>Мои карты</h2>
+					</div>
+
+					<button
+						type='button'
+						className={styles.closeButton}
+						onClick={onClose}
+						aria-label='Закрыть карты'
+					>
+						✕
+					</button>
 				</div>
 
 				<div className={styles.cardsStats}>
-					<p>Всего карт: {Object.keys(myCards).length}</p>
-					<p>В этом раунде получено: {cardsReceivedThisRound}</p>
-					<p>Раскрыто в этом раунде: {myRevealedCardsThisRound.length}/1</p>
+					<div>
+						<span>Всего карт</span>
+						<strong>{Object.keys(myCards).length}</strong>
+					</div>
+
+					<div>
+						<span>Получено в раунде</span>
+						<strong>{cardsReceivedThisRound}</strong>
+					</div>
+
+					<div>
+						<span>Раскрыто в раунде</span>
+						<strong>{myRevealedCardsThisRound.length}/1</strong>
+					</div>
 				</div>
 
 				<div className={styles.cardsList}>
 					{Object.entries(myCards).map(([type, card]) => {
 						const isRevealed = isCardRevealed(type)
-						const canReveal = 
+						const canReveal =
 							gameState?.phase === 'discussion' &&
 							!!userId &&
 							!!currentPlayer?.isAlive &&
@@ -90,7 +111,7 @@ export default function MyCardsModal({
 						)
 					})}
 				</div>
-			</div>
+			</section>
 		</div>
 	)
 }
@@ -111,44 +132,55 @@ function CardItem({
 	onReveal: (cardType: CardType) => void
 }) {
 	return (
-		<div className={`${styles.cardItem} ${isNew ? styles.newCard : ''}`}>
-			<h3>{getCardTypeName(type)}</h3>
-			{isNew && <span className={styles.newBadge}>Новая</span>}
+		<article className={`${styles.cardItem} ${isNew ? styles.newCard : ''}`}>
+			<div className={styles.cardTopline}>
+				<span className={styles.cardType}>{getCardTypeName(type)}</span>
+				{isNew && <span className={styles.newBadge}>Новая</span>}
+				{isRevealed && <span className={styles.revealedBadge}>Раскрыта</span>}
+			</div>
 
-			<h4>{card.name}</h4>
-			<p>{card.description}</p>
+			<h3>{cleanText(card.name)}</h3>
 
-			{card.pros && card.pros.length > 0 && (
-				<div className={styles.cardPros}>
-					<strong>Преимущества:</strong>
-					<ul>
-						{card.pros.map((pro: string, i: number) => (
-							<li key={i}>{pro}</li>
-						))}
-					</ul>
-				</div>
+			{card.description && (
+				<p className={styles.cardDescription}>{cleanText(card.description)}</p>
 			)}
 
-			{card.cons && card.cons.length > 0 && (
-				<div className={styles.cardCons}>
-					<strong>Недостатки:</strong>
-					<ul>
-						{card.cons.map((con: string, i: number) => (
-							<li key={i}>{con}</li>
-						))}
-					</ul>
-				</div>
-			)}
+			<div className={styles.cardDetailsGrid}>
+				{card.pros && card.pros.length > 0 && (
+					<div className={styles.cardDetailsBlock}>
+						<strong>Плюсы</strong>
+						<ul>
+							{card.pros.map((pro: string, i: number) => (
+								<li key={i}>{cleanText(pro)}</li>
+							))}
+						</ul>
+					</div>
+				)}
 
-			<button 
+				{card.cons && card.cons.length > 0 && (
+					<div className={`${styles.cardDetailsBlock} ${styles.cardCons}`}>
+						<strong>Риски</strong>
+						<ul>
+							{card.cons.map((con: string, i: number) => (
+								<li key={i}>{cleanText(con)}</li>
+							))}
+						</ul>
+					</div>
+				)}
+			</div>
+
+			<button
+				type='button'
 				className={styles.revealButton}
-				onClick={() => onReveal(type)} 
+				onClick={() => onReveal(type)}
 				disabled={!canReveal}
 			>
-				{isRevealed
-					? 'Уже раскрыта'
-					: 'Раскрыть карту'}
+				{isRevealed ? 'Уже раскрыта' : 'Раскрыть карту'}
 			</button>
-		</div>
+		</article>
 	)
+}
+
+function cleanText(value: string): string {
+	return value.trim().replace(/[.!?。！？]+$/g, '')
 }

@@ -80,10 +80,28 @@ export default function GameSessionClient({ gameId }: Props) {
 	} = useGameSession(gameId)
 
 	const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false)
+	const [seenNewCardsCount, setSeenNewCardsCount] = useState(0)
 
 	const players = useMemo((): ExtendedGamePlayer[] => {
 		return (gameState?.players || []) as ExtendedGamePlayer[]
 	}, [gameState?.players])
+
+	const userChatMessages = useMemo((): GameChatMessage[] => {
+		return (chatMessages as GameChatMessage[]).filter(
+			message => message.type !== 'system',
+		)
+	}, [chatMessages])
+
+	const systemMessages = useMemo((): GameChatMessage[] => {
+		return (chatMessages as GameChatMessage[])
+			.filter(message => message.type === 'system')
+			.slice(-12)
+	}, [chatMessages])
+
+	const newCardsCount = Math.max(
+		0,
+		newCardsThisRound.length - seenNewCardsCount,
+	)
 
 	const [isIntroCinematicVisible, setIsIntroCinematicVisible] = useState(false)
 	const [introPlayersCount, setIntroPlayersCount] = useState(0)
@@ -106,6 +124,12 @@ export default function GameSessionClient({ gameId }: Props) {
 
 		setIsIntroCinematicVisible(false)
 	}, [introEndCounter])
+
+	useEffect(() => {
+		if (newCardsThisRound.length === 0) {
+			setSeenNewCardsCount(0)
+		}
+	}, [newCardsThisRound.length])
 
 	const myAllRevealedCardIds = useMemo((): string[] => {
 		if (!myAllRevealedCards) return []
@@ -153,6 +177,11 @@ export default function GameSessionClient({ gameId }: Props) {
 	const handleIntroCinematicSkip = useCallback(() => {
 		handleSkipNarration()
 	}, [handleSkipNarration])
+
+	const handleOpenMyCards = useCallback(() => {
+		setShowMyCards(true)
+		setSeenNewCardsCount(newCardsThisRound.length)
+	}, [newCardsThisRound.length, setShowMyCards])
 
 	const handleOpenLeaveConfirm = useCallback(() => {
 		setIsLeaveConfirmOpen(true)
@@ -285,7 +314,7 @@ export default function GameSessionClient({ gameId }: Props) {
 					gamePhase={gameState.phase as string}
 					currentPlayer={currentPlayer}
 					onVote={handleVote}
-					onShowMyCards={() => setShowMyCards(true)}
+					onShowMyCards={handleOpenMyCards}
 					onShowCardsTable={() => setShowCardsTable(true)}
 				/>
 
@@ -302,7 +331,7 @@ export default function GameSessionClient({ gameId }: Props) {
 					currentRevealIndex={currentRevealIndex}
 					isRevealing={isRevealing}
 					revealedPlayer={revealedPlayer}
-					onShowMyCards={() => setShowMyCards(true)}
+					onShowMyCards={handleOpenMyCards}
 					onShowCardsTable={() => setShowCardsTable(true)}
 					onStartDiscussion={handleStartDiscussion}
 					onRequestVote={handleRequestVote}
@@ -311,11 +340,13 @@ export default function GameSessionClient({ gameId }: Props) {
 					onSetActiveCrisis={setActiveCrisis}
 					allPlayersCards={allPlayersCards}
 					myCards={myCards}
+					newCardsCount={newCardsCount}
+					systemMessages={systemMessages}
 				/>
 
 				<GameChat
 					gameId={gameId}
-					messages={chatMessages as GameChatMessage[]}
+					messages={userChatMessages}
 					newMessage={newMessage}
 					onMessageChange={handleMessageChange}
 					onSendMessage={handleSendMessage}

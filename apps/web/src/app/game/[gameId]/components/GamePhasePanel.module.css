@@ -106,7 +106,7 @@
 	justify-content: space-between;
 	gap: 18px;
 	flex: 0 0 auto;
-	padding: 13px 20px 10px;
+	padding: 11px 18px 9px;
 	border-bottom: 1px solid rgba(99, 239, 255, 0.12);
 	background:
 		linear-gradient(90deg, rgba(99, 239, 255, 0.045), transparent 34%),
@@ -129,10 +129,7 @@
 }
 
 .commandTerminalCode {
-	color: rgba(255, 255, 255, 0.32);
-	font-size: 10px;
-	letter-spacing: 0.9px;
-	text-transform: uppercase;
+	display: none;
 }
 
 .commandTerminalStatus {
@@ -159,7 +156,7 @@
 
 .phaseInfo {
 	flex: 0 0 auto;
-	padding: 22px 28px 16px;
+	padding: 18px 28px 13px;
 	text-align: center;
 	border-bottom: 1px solid rgba(99, 239, 255, 0.1);
 }
@@ -169,7 +166,7 @@
 	align-items: center;
 	justify-content: center;
 	min-height: 22px;
-	margin-bottom: 11px;
+	margin-bottom: 10px;
 	padding: 4px 11px;
 	border: 1px solid rgba(99, 239, 255, 0.2);
 	border-radius: 999px;
@@ -181,9 +178,9 @@
 }
 
 .phaseInfo h2 {
-	margin: 0 0 10px;
+	margin: 0 0 9px;
 	color: #63efff;
-	font-size: clamp(34px, 4.8vw, 58px);
+	font-size: clamp(34px, 4.6vw, 56px);
 	font-weight: normal;
 	line-height: 1;
 	letter-spacing: 5px;
@@ -198,13 +195,13 @@
 	margin: 0 auto;
 	color: rgba(255, 255, 255, 0.64);
 	font-size: 13px;
-	line-height: 1.55;
+	line-height: 1.5;
 	letter-spacing: 0.25px;
 }
 
 .phaseTimer {
 	width: min(660px, 100%);
-	margin: 16px auto 0;
+	margin: 14px auto 0;
 }
 
 .timerBar {
@@ -241,18 +238,38 @@
 
 .timerProgress {
 	position: relative;
+	width: 100%;
 	height: 100%;
+	overflow: hidden;
 	border-radius: inherit;
+	transform: scaleX(1);
+	transform-origin: left center;
 	background: linear-gradient(
 		90deg,
-		rgba(99, 239, 255, 0.95),
-		rgba(99, 239, 255, 0.74),
+		rgba(99, 239, 255, 0.96),
+		rgba(99, 239, 255, 0.76),
 		rgba(124, 92, 255, 0.64)
 	);
 	box-shadow:
 		0 0 18px rgba(99, 239, 255, 0.42),
 		0 0 34px rgba(124, 92, 255, 0.16);
-	transition: width 0.5s linear;
+	will-change: transform;
+}
+
+.timerProgress::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: repeating-linear-gradient(
+		110deg,
+		rgba(255, 255, 255, 0.22) 0,
+		rgba(255, 255, 255, 0.22) 7px,
+		transparent 7px,
+		transparent 17px
+	);
+	background-size: 38px 100%;
+	opacity: 0.32;
+	animation: timerFlow 0.75s linear infinite;
 }
 
 .terminalBody {
@@ -262,7 +279,7 @@
 	gap: 0;
 	min-height: 0;
 	overflow: hidden;
-	padding: 14px 22px 20px;
+	padding: 12px 22px 18px;
 }
 
 .primaryActionsPanel {
@@ -304,7 +321,7 @@
 	justify-content: space-between;
 	gap: 16px;
 	flex: 0 0 auto;
-	padding: 13px 16px;
+	padding: 12px 16px;
 	border-bottom: 1px solid rgba(99, 239, 255, 0.1);
 }
 
@@ -324,19 +341,7 @@
 }
 
 .primaryActionsHint {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	max-width: 220px;
-	min-height: 24px;
-	padding: 4px 10px;
-	border: 1px solid rgba(99, 239, 255, 0.12);
-	border-radius: 999px;
-	background: rgba(0, 0, 0, 0.2);
-	color: rgba(255, 255, 255, 0.44);
-	font-size: 10px;
-	line-height: 1.35;
-	text-align: center;
+	display: none;
 }
 
 .gameActions {
@@ -344,15 +349,15 @@
 	z-index: 1;
 	display: flex;
 	flex: 1 1 auto;
-	align-items: center;
+	align-items: flex-start;
 	justify-content: center;
 	min-height: 0;
 	overflow: hidden;
-	padding: 18px;
+	padding: 18px 18px 10px;
 	border: none;
 	border-radius: 0;
 	background: radial-gradient(
-		circle at 50% 50%,
+		circle at 50% 32%,
 		rgba(99, 239, 255, 0.06),
 		transparent 58%
 	);
@@ -370,77 +375,154 @@
 	text-align: center;
 }
 
-.scannerLauncher {
+.systemFeed {
+	position: relative;
+	z-index: 1;
+	flex: 0 0 auto;
+	margin: 0 18px 16px;
+	padding: 0;
+	overflow: hidden;
+	border: 1px solid rgba(99, 239, 255, 0.16);
+	border-radius: 12px;
+	background:
+		linear-gradient(180deg, rgba(99, 239, 255, 0.03), rgba(0, 0, 0, 0.18)),
+		rgba(0, 0, 0, 0.22);
+	box-shadow:
+		inset 0 0 18px rgba(99, 239, 255, 0.016),
+		0 10px 24px rgba(0, 0, 0, 0.12);
+}
+
+.systemFeed::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background:
+		linear-gradient(90deg, rgba(99, 239, 255, 0.05), transparent 28%),
+		linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.02), transparent);
+	opacity: 0.5;
+}
+
+.systemFeedHeader {
 	position: relative;
 	z-index: 1;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 16px;
-	flex: 0 0 auto;
-	padding: 13px 16px;
-	border-top: 1px solid rgba(99, 239, 255, 0.1);
-	background:
-		linear-gradient(90deg, rgba(99, 239, 255, 0.035), transparent 42%),
-		rgba(0, 0, 0, 0.18);
+	gap: 12px;
+	padding: 10px 14px;
+	border-bottom: 1px solid rgba(99, 239, 255, 0.1);
+	background: rgba(0, 0, 0, 0.14);
 }
 
-.scannerLauncherInfo {
+.systemFeedTitle {
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
+	gap: 2px;
 	min-width: 0;
 }
 
-.scannerLauncherEyebrow {
-	color: rgba(99, 239, 255, 0.72);
-	font-size: 10px;
-	letter-spacing: 1px;
-	text-transform: uppercase;
-}
-
-.scannerLauncherStatus {
-	color: rgba(255, 255, 255, 0.46);
+.systemFeedTitle span {
+	color: #63efff;
 	font-size: 11px;
-	line-height: 1.35;
+	letter-spacing: 0.8px;
+	text-transform: uppercase;
+	text-shadow: 0 0 10px rgba(99, 239, 255, 0.16);
 }
 
-.scannerLauncherButton {
+.systemFeedTitle small {
+	display: none;
+}
+
+.systemFeedMore {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	min-height: 34px;
-	padding: 0 16px;
-	border: 1px solid rgba(99, 239, 255, 0.46);
-	border-radius: 8px;
-	background:
-		linear-gradient(180deg, rgba(99, 239, 255, 0.1), rgba(99, 239, 255, 0.035)),
-		rgba(0, 0, 0, 0.22);
-	color: #63efff;
+	height: 24px;
+	padding: 0 10px;
+	border: 1px solid rgba(99, 239, 255, 0.2);
+	border-radius: 999px;
+	background: rgba(99, 239, 255, 0.05);
+	color: rgba(99, 239, 255, 0.82);
 	cursor: pointer;
 	font-family: 'RussoOne', sans-serif;
-	font-size: 12px;
-	letter-spacing: 0.2px;
+	font-size: 9px;
+	letter-spacing: 0.45px;
+	text-transform: uppercase;
 	transition:
-		transform 0.18s ease,
-		background 0.18s ease,
 		border-color 0.18s ease,
+		background 0.18s ease,
+		color 0.18s ease,
 		box-shadow 0.18s ease;
 }
 
-.scannerLauncherButton:hover {
-	transform: translateY(-1px);
-	border-color: #63efff;
-	background:
-		linear-gradient(
-			180deg,
-			rgba(99, 239, 255, 0.16),
-			rgba(99, 239, 255, 0.055)
-		),
-		rgba(0, 0, 0, 0.26);
-	box-shadow:
-		0 0 16px rgba(99, 239, 255, 0.12),
-		inset 0 0 18px rgba(99, 239, 255, 0.045);
+.systemFeedMore:hover {
+	border-color: rgba(99, 239, 255, 0.44);
+	background: rgba(99, 239, 255, 0.08);
+	box-shadow: 0 0 12px rgba(99, 239, 255, 0.1);
+}
+
+.systemFeedList {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	padding: 6px 0;
+	overflow: hidden;
+}
+
+.systemFeedList[data-expanded='true'] {
+	max-height: min(190px, 28dvh);
+	overflow-y: auto;
+	scrollbar-width: thin;
+	scrollbar-color: rgba(99, 239, 255, 0.34) rgba(255, 255, 255, 0.04);
+}
+
+.systemFeedList::-webkit-scrollbar {
+	width: 5px;
+}
+
+.systemFeedList::-webkit-scrollbar-track {
+	background: rgba(255, 255, 255, 0.045);
+	border-radius: 999px;
+}
+
+.systemFeedList::-webkit-scrollbar-thumb {
+	background: rgba(99, 239, 255, 0.28);
+	border-radius: 999px;
+}
+
+.systemFeedList::-webkit-scrollbar-thumb:hover {
+	background: rgba(99, 239, 255, 0.46);
+}
+
+.systemFeedItem {
+	display: grid;
+	grid-template-columns: 52px minmax(0, 1fr);
+	gap: 10px;
+	align-items: start;
+	padding: 6px 14px;
+	border-top: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.systemFeedItem:first-child {
+	border-top: none;
+}
+
+.systemFeedTime {
+	color: rgba(99, 239, 255, 0.62);
+	font-size: 10px;
+	font-variant-numeric: tabular-nums;
+	line-height: 1.45;
+}
+
+.systemFeedText {
+	margin: 0;
+	color: rgba(237, 252, 255, 0.72);
+	font-size: 11px;
+	line-height: 1.45;
+	letter-spacing: 0.15px;
 }
 
 .scannerDrawerBackdrop {
@@ -450,72 +532,62 @@
 	background:
 		radial-gradient(
 			circle at 50% 100%,
-			rgba(99, 239, 255, 0.08),
+			rgba(99, 239, 255, 0.1),
 			transparent 42%
 		),
-		rgba(0, 0, 0, 0.26);
+		rgba(0, 0, 0, 0.34);
 	opacity: 0;
 	pointer-events: none;
 	backdrop-filter: blur(0);
 	transition:
-		opacity 350ms cubic-bezier(0.22, 1, 0.36, 1),
-		backdrop-filter 350ms cubic-bezier(0.22, 1, 0.36, 1);
+		opacity 420ms ease,
+		backdrop-filter 420ms ease;
 	overscroll-behavior: contain;
 }
 
 .scannerDrawerBackdrop[data-open='true'] {
 	opacity: 1;
 	pointer-events: auto;
-	backdrop-filter: blur(2px);
+	backdrop-filter: blur(3px);
 }
 
 .scannerDrawer {
-	--panel-open-dur: 400ms;
-	--panel-close-dur: 350ms;
-	--panel-translate-y: calc(520px * 0.5);
-	--panel-blur: 2px;
-	--panel-ease: cubic-bezier(0.22, 1, 0.36, 1);
-
 	position: fixed;
 	left: 50%;
-	bottom: 18px;
+	bottom: 14px;
 	z-index: 9000;
 	display: flex;
 	flex-direction: column;
-	width: min(1180px, calc(100vw - 32px));
-	max-height: min(560px, calc(100dvh - 120px));
+	width: min(1320px, calc(100vw - 28px));
+	max-height: min(720px, calc(100dvh - 108px));
 	overflow: hidden;
-	border: 1px solid rgba(99, 239, 255, 0.28);
+	border: 1px solid rgba(99, 239, 255, 0.3);
 	border-radius: 18px;
 	background:
-		linear-gradient(180deg, rgba(3, 10, 28, 0.96), rgba(1, 5, 16, 0.96)),
-		radial-gradient(circle at 50% 0%, rgba(99, 239, 255, 0.1), transparent 42%);
+		linear-gradient(180deg, rgba(3, 10, 28, 0.97), rgba(1, 5, 16, 0.97)),
+		radial-gradient(circle at 50% 0%, rgba(99, 239, 255, 0.11), transparent 42%);
 	box-shadow:
-		0 24px 80px rgba(0, 0, 0, 0.58),
-		0 0 38px rgba(99, 239, 255, 0.12),
+		0 30px 90px rgba(0, 0, 0, 0.62),
+		0 0 44px rgba(99, 239, 255, 0.14),
 		inset 0 0 0 1px rgba(255, 255, 255, 0.035);
-	backdrop-filter: blur(14px);
-	transform: translate(-50%, var(--panel-translate-y));
+	backdrop-filter: blur(16px);
+	transform: translate3d(-50%, 30px, 0) scale(0.982);
 	opacity: 0;
-	filter: blur(var(--panel-blur));
+	filter: blur(4px);
 	pointer-events: none;
 	transition:
-		transform var(--panel-close-dur) var(--panel-ease),
-		opacity var(--panel-close-dur) var(--panel-ease),
-		filter var(--panel-close-dur) var(--panel-ease);
+		transform 520ms cubic-bezier(0.16, 1, 0.3, 1),
+		opacity 420ms ease,
+		filter 420ms ease;
 	will-change: transform, opacity, filter;
 	overscroll-behavior: contain;
 }
 
 .scannerDrawer[data-open='true'] {
-	transform: translate(-50%, 0);
+	transform: translate3d(-50%, 0, 0) scale(1);
 	opacity: 1;
 	filter: blur(0);
 	pointer-events: auto;
-	transition:
-		transform var(--panel-open-dur) var(--panel-ease),
-		opacity var(--panel-open-dur) var(--panel-ease),
-		filter var(--panel-open-dur) var(--panel-ease);
 }
 
 .scannerDrawer::before {
@@ -544,40 +616,25 @@
 	position: relative;
 	z-index: 1;
 	display: flex;
-	align-items: flex-start;
+	align-items: center;
 	justify-content: space-between;
 	gap: 18px;
-	padding: 18px 20px 14px;
+	padding: 14px 18px 12px;
 	border-bottom: 1px solid rgba(99, 239, 255, 0.13);
 	background:
 		linear-gradient(90deg, rgba(99, 239, 255, 0.055), transparent 44%),
 		rgba(0, 0, 0, 0.2);
 }
 
-.scannerDrawerEyebrow {
-	display: block;
-	margin-bottom: 5px;
-	color: rgba(99, 239, 255, 0.72);
-	font-size: 10px;
-	letter-spacing: 1.1px;
-	text-transform: uppercase;
-}
-
 .scannerDrawerHeader h2 {
 	margin: 0;
 	color: #63efff;
-	font-size: 20px;
+	font-size: 18px;
 	font-weight: normal;
 	letter-spacing: 0.7px;
 	text-shadow:
 		0 0 14px rgba(99, 239, 255, 0.36),
 		0 0 34px rgba(124, 92, 255, 0.14);
-}
-
-.scannerDrawerHeader p {
-	margin: 7px 0 0;
-	color: rgba(255, 255, 255, 0.46);
-	font-size: 11px;
 }
 
 .scannerDrawerClose {
@@ -612,28 +669,11 @@
 .scannerDrawerBody {
 	position: relative;
 	z-index: 1;
-	max-height: min(440px, calc(100dvh - 240px));
-	overflow: auto;
-	padding: 16px 18px 18px;
-}
-
-.scannerDrawerBody::-webkit-scrollbar {
-	width: 6px;
-	height: 6px;
-}
-
-.scannerDrawerBody::-webkit-scrollbar-track {
-	background: rgba(255, 255, 255, 0.045);
-	border-radius: 999px;
-}
-
-.scannerDrawerBody::-webkit-scrollbar-thumb {
-	background: rgba(99, 239, 255, 0.28);
-	border-radius: 999px;
-}
-
-.scannerDrawerBody::-webkit-scrollbar-thumb:hover {
-	background: rgba(99, 239, 255, 0.46);
+	flex: 1 1 auto;
+	min-height: 0;
+	max-height: calc(100dvh - 174px);
+	overflow: hidden;
+	padding: 12px 14px 14px;
 }
 
 .phaseDiscussion,
@@ -736,6 +776,16 @@
 	border-color: rgba(76, 175, 80, 0.28);
 }
 
+@keyframes timerFlow {
+	from {
+		background-position: 0 0;
+	}
+
+	to {
+		background-position: 38px 0;
+	}
+}
+
 @keyframes terminalStatusPulse {
 	0%,
 	100% {
@@ -770,8 +820,8 @@
 
 @media (min-width: 1201px) and (max-height: 850px) {
 	.phaseInfo {
-		padding-top: 18px;
-		padding-bottom: 13px;
+		padding-top: 15px;
+		padding-bottom: 11px;
 	}
 
 	.phaseInfo h2 {
@@ -789,30 +839,25 @@
 	}
 
 	.terminalBody {
-		padding-top: 12px;
-		padding-bottom: 16px;
+		padding-top: 10px;
+		padding-bottom: 14px;
 	}
 
 	.gameActions {
 		padding-top: 15px;
-		padding-bottom: 15px;
-	}
-
-	.scannerLauncher {
-		padding-top: 12px;
-		padding-bottom: 12px;
+		padding-bottom: 8px;
 	}
 }
 
 @media (min-width: 1201px) and (max-height: 760px) {
 	.commandTerminalTopbar {
-		padding-top: 10px;
-		padding-bottom: 8px;
+		padding-top: 9px;
+		padding-bottom: 7px;
 	}
 
 	.phaseInfo {
-		padding-top: 15px;
-		padding-bottom: 11px;
+		padding-top: 13px;
+		padding-bottom: 9px;
 	}
 
 	.phaseInfo h2 {
@@ -829,20 +874,32 @@
 	}
 
 	.terminalBody {
-		padding: 11px 18px 13px;
+		padding: 9px 18px 11px;
 	}
 
 	.gameActions {
-		padding: 13px;
+		padding: 13px 13px 8px;
 	}
 
 	.primaryActionsHeader {
-		padding-top: 12px;
-		padding-bottom: 12px;
+		padding-top: 10px;
+		padding-bottom: 10px;
 	}
 
-	.scannerLauncher {
-		padding: 10px 14px;
+	.systemFeed {
+		margin-right: 14px;
+		margin-bottom: 12px;
+		margin-left: 14px;
+	}
+
+	.systemFeedHeader {
+		padding-top: 8px;
+		padding-bottom: 8px;
+	}
+
+	.systemFeedItem {
+		padding-top: 5px;
+		padding-bottom: 5px;
 	}
 }
 
@@ -870,7 +927,7 @@
 
 	.gameActions {
 		min-height: 112px;
-		padding: 18px 14px;
+		padding: 18px 14px 12px;
 	}
 
 	.primaryActionsHeader,
@@ -879,18 +936,18 @@
 		align-items: stretch;
 	}
 
-	.primaryActionsHint {
-		justify-content: flex-start;
-		max-width: none;
+	.systemFeed {
+		margin: 0 14px 14px;
 	}
 
-	.scannerLauncher {
-		flex-direction: column;
-		align-items: stretch;
+	.systemFeedHeader {
+		align-items: flex-start;
 	}
 
-	.scannerLauncherButton {
-		width: 100%;
+	.systemFeedItem {
+		grid-template-columns: 44px minmax(0, 1fr);
+		padding-right: 12px;
+		padding-left: 12px;
 	}
 
 	.scannerDrawer {
@@ -909,15 +966,15 @@
 	}
 
 	.scannerDrawerBody {
-		max-height: calc(100dvh - 180px);
-		padding: 12px;
+		max-height: calc(100dvh - 150px);
+		padding: 10px;
 	}
 }
 
 @media (prefers-reduced-motion: reduce) {
 	.commandTerminalStatusDot,
 	.phaseCrisis,
-	.timerProgress,
+	.timerProgress::before,
 	.scannerDrawer,
 	.scannerDrawer[data-open='true'],
 	.scannerDrawerBackdrop,
@@ -926,7 +983,6 @@
 		transition: none !important;
 	}
 
-	.scannerLauncherButton:hover,
 	.scannerDrawerClose:hover {
 		transform: none;
 	}

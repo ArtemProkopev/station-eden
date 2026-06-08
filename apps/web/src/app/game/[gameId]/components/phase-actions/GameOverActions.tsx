@@ -1,16 +1,23 @@
 // apps/web/src/app/game/[gameId]/components/phase-actions/GameOverActions.tsx
-import styles from '../../page.module.css'
+import styles from './PhaseActions.module.css'
 
 interface GameOverActionsProps {
-  onLeaveGame: () => void
+	onLeaveGame: () => void
 }
 
 export default function GameOverActions({ onLeaveGame }: GameOverActionsProps) {
-  return (
-    <div className={styles.phaseActions}>
-      <button className={styles.leaveButton} onClick={onLeaveGame}>
-        Выйти из игры
-      </button>
-    </div>
-  )
+	return (
+		<div className={styles.phaseActions}>
+			<button
+				type='button'
+				className={`${styles.actionTile} ${styles.actionTileDanger} ${styles.leaveActionTile}`}
+				onClick={onLeaveGame}
+			>
+				<span className={styles.actionTileContent}>
+					<strong>Выйти из игры</strong>
+					<small>Покинуть завершённую сессию</small>
+				</span>
+			</button>
+		</div>
+	)
 }

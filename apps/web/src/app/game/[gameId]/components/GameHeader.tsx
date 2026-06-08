@@ -11,46 +11,46 @@ interface GameHeaderProps {
 	onLeaveGame: () => void
 }
 
+const CARD_TYPES_COUNT = 9
+
 export default function GameHeader({
 	gameState,
 	phaseTimeLeft,
 	myRevealedCardsThisRound,
-	userId,
 	onLeaveGame,
 }: GameHeaderProps) {
 	const players = (gameState.players || []) as ExtendedGamePlayer[]
-
-	const currentPlayer = userId
-		? players.find(player => player.id === userId)
-		: undefined
-
 	const alivePlayers = players.filter(player => player.isAlive === true)
 
-	const isProfessionRevealed =
-		currentPlayer?.revealedCardsInfo?.profession !== undefined
-
-	const professionDisplay =
-		isProfessionRevealed && currentPlayer?.profession
-			? currentPlayer.profession
-			: 'Неизвестно'
-
 	const capsuleSlots = Number(
-		gameState.capsuleSlots || Math.max(1, Math.floor(players.length / 2)),
+		(gameState as { capsuleSlots?: number }).capsuleSlots ||
+			Math.max(1, Math.floor(players.length / 2)),
 	)
 
-	const occupiedSlots = Number(gameState.occupiedSlots || 0)
-	const roleDisplay = gameState.creatorId === userId ? 'Создатель' : 'Экипаж'
+	const occupiedSlots = Number(
+		(gameState as { occupiedSlots?: number }).occupiedSlots || 0,
+	)
+
+	const openedCards = players.reduce((total, player) => {
+		return total + Number(player.revealedCards || 0)
+	}, 0)
+
+	const totalCards = Math.max(1, players.length * CARD_TYPES_COUNT)
+
+	const openedCardsDisplay =
+		openedCards > 0 ? openedCards : myRevealedCardsThisRound.length
+
+	const roundNumber =
+		typeof (gameState as { round?: number }).round === 'number'
+			? (gameState as { round?: number }).round
+			: 1
 
 	return (
 		<header className={styles.header}>
 			<div className={styles.gameBrand}>
-				<div className={styles.gameBrandMark} aria-hidden='true'>
-					<StationMarkIcon />
-				</div>
-
 				<div className={styles.gameTitle}>
 					<h1>Станция Эдем</h1>
-					<span className={styles.gameHeaderSession}>Игровая сессия</span>
+					<span className={styles.gameHeaderSession}>Раунд {roundNumber}</span>
 				</div>
 			</div>
 
@@ -63,40 +63,29 @@ export default function GameHeader({
 
 			<div className={styles.gameHeaderRight}>
 				<div className={styles.gameStats}>
+					<div className={`${styles.statItem} ${styles.statItemSurvivors}`}>
+						<SurvivorsIcon />
+						<div>
+							<span className={styles.statLabel}>Выжившие</span>
+							<strong className={styles.statValue}>
+								{alivePlayers.length}/{players.length}
+							</strong>
+						</div>
+					</div>
+
 					<div className={styles.statItem}>
-						<span className={styles.statLabel}>Капсула</span>
-						<span className={styles.statValue}>
+						<span className={styles.statLabel}>Капсулы</span>
+						<strong className={styles.statValue}>
 							{occupiedSlots}/{capsuleSlots}
-						</span>
+						</strong>
 					</div>
 
 					<div className={styles.statItem}>
-						<span className={styles.statLabel}>Выжило</span>
-						<span className={styles.statValue}>
-							{alivePlayers.length}/{players.length}
-						</span>
+						<span className={styles.statLabel}>Открыто карт</span>
+						<strong className={styles.statValue}>
+							{openedCardsDisplay}/{totalCards}
+						</strong>
 					</div>
-
-					{currentPlayer && (
-						<>
-							<div className={styles.statItem}>
-								<span className={styles.statLabel}>Раскрыто</span>
-								<span className={styles.statValue}>
-									{myRevealedCardsThisRound.length}/1
-								</span>
-							</div>
-
-							<div className={`${styles.statItem} ${styles.statItemWide}`}>
-								<span className={styles.statLabel}>Профессия</span>
-								<span className={styles.statValue}>{professionDisplay}</span>
-							</div>
-
-							<div className={`${styles.statItem} ${styles.statItemWide}`}>
-								<span className={styles.statLabel}>Роль</span>
-								<span className={styles.statValue}>{roleDisplay}</span>
-							</div>
-						</>
-					)}
 				</div>
 
 				<button
@@ -113,50 +102,46 @@ export default function GameHeader({
 	)
 }
 
-function StationMarkIcon() {
+function SurvivorsIcon() {
 	return (
 		<svg
-			width='44'
-			height='44'
-			viewBox='0 0 44 44'
+			className={styles.statIcon}
+			xmlnsXlink='http://www.w3.org/1999/xlink'
+			width='24'
+			height='24'
+			viewBox='0 0 24 24'
 			fill='none'
 			xmlns='http://www.w3.org/2000/svg'
 			aria-hidden='true'
 			focusable='false'
 		>
-			<circle
-				cx='22'
-				cy='22'
-				r='16.5'
-				stroke='currentColor'
-				strokeOpacity='0.55'
-			/>
-			<circle
-				cx='22'
-				cy='22'
-				r='9.5'
-				stroke='currentColor'
-				strokeOpacity='0.34'
-			/>
-			<path
-				d='M22 4V11M22 33V40M4 22H11M33 22H40'
-				stroke='currentColor'
-				strokeWidth='1.4'
-				strokeLinecap='round'
-				strokeOpacity='0.72'
-			/>
-			<path
-				d='M17.5 16.5L22 13.5L26.5 16.5V24.2L22 30.5L17.5 24.2V16.5Z'
-				stroke='currentColor'
-				strokeWidth='1.5'
-				strokeLinejoin='round'
-			/>
-			<path
-				d='M22 13.5V30.5'
-				stroke='currentColor'
-				strokeWidth='1'
-				strokeOpacity='0.42'
-			/>
+			<g clipPath='url(#survivorsIconClip)'>
+				<path
+					d='M18.0014 19.8751H19.6369C21.2184 19.8751 22.5005 18.6307 22.5005 17.0957C22.5005 14.5374 20.3636 12.4634 17.7277 12.4634H15.8187C15.7386 12.4634 15.6591 12.4653 15.5801 12.4691C17.1962 13.9473 18.2051 16.0442 18.2051 18.3696C18.2051 18.8904 18.1342 19.3951 18.0014 19.8751Z'
+					fill='#576390'
+				/>
+				<path
+					d='M14.2695 9.51536C14.8816 10.1869 15.7762 10.6103 16.7727 10.6103C18.6178 10.6103 20.1135 9.15852 20.1135 7.36765C20.1135 5.57678 18.6178 4.125 16.7727 4.125C16.1269 4.125 15.524 4.30279 15.013 4.61068C15.1491 5.12159 15.2214 5.65737 15.2214 6.20955C15.2214 7.42004 14.8736 8.55167 14.2695 9.51536Z'
+					fill='#576390'
+				/>
+				<path
+					fillRule='evenodd'
+					clipRule='evenodd'
+					d='M8.65908 10.2629C10.9655 10.2629 12.8352 8.44814 12.8352 6.20956C12.8352 3.97098 10.9655 2.15625 8.65908 2.15625C6.35267 2.15625 4.48296 3.97098 4.48296 6.20956C4.48296 8.44814 6.35267 10.2629 8.65908 10.2629ZM7.4659 12.579C4.17103 12.579 1.5 15.1715 1.5 18.3694C1.5 20.2883 3.10261 21.8438 5.07954 21.8438H12.2386C14.2156 21.8438 15.8182 20.2883 15.8182 18.3694C15.8182 15.1715 13.1472 12.579 9.85226 12.579H7.4659Z'
+					fill='#576390'
+				/>
+			</g>
+
+			<defs>
+				<clipPath id='survivorsIconClip'>
+					<rect
+						width='21'
+						height='21'
+						fill='white'
+						transform='translate(1.5 1.5)'
+					/>
+				</clipPath>
+			</defs>
 		</svg>
 	)
 }

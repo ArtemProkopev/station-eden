@@ -1,7 +1,7 @@
 // apps/web/src/app/game/[gameId]/components/modals/RevealedPlayerModal.tsx
 import { RevealedPlayer } from '@station-eden/shared'
-import styles from '../../page.module.css'
 import { getCardTypeDisplayName } from '../utils/game.utils'
+import styles from './GameModal.module.css'
 
 interface RevealedPlayerModalProps {
 	revealedPlayer: RevealedPlayer
@@ -22,87 +22,104 @@ export default function RevealedPlayerModal({
 }: RevealedPlayerModalProps) {
 	return (
 		<div className={styles.modalOverlay}>
-			<div className={styles.modalContent}>
+			<section className={styles.modalContent} role='dialog' aria-modal='true'>
 				<div className={styles.modalHeader}>
-					<h2>Карты выбывшего игрока: {revealedPlayer?.name}</h2>
+					<div>
+						<span className={styles.modalEyebrow}>Раскрытие данных</span>
+
+						<h2>{revealedPlayer?.name || 'Игрок'}</h2>
+
+						<p>
+							{isRevealing
+								? `Открывается карта ${currentRevealIndex + 1} из ${revealingCards.length}`
+								: 'Все карты раскрыты'}
+						</p>
+					</div>
+
 					<button
+						type='button'
 						className={styles.closeButton}
 						onClick={onClose}
 						disabled={isRevealing}
+						aria-label='Закрыть раскрытие карт'
 					>
 						✕
 					</button>
 				</div>
 
-				<div className={styles.revealProgress}>
-					{isRevealing ? (
-						<div className={styles.revealingStatus}>
-							<div className={styles.revealSpinner}></div>
-							<p>
-								Раскрытие карты {currentRevealIndex + 1} из{' '}
-								{revealingCards.length}...
-							</p>
-						</div>
-					) : (
-						<div className={styles.revealComplete}>
-							<p>Все карты раскрыты</p>
+				<div className={styles.modalBody}>
+					{revealedPlayer?.cards && (
+						<div className={styles.cardsGrid}>
+							{Object.entries(revealedPlayer.cards).map(([type, card]) => {
+								if (!card) return null
+
+								const isRevealed = Boolean(revealedCards[type])
+								const cardName = cleanText(card.name) || 'Неизвестная карта'
+								const cardDescription = cleanText(card.description)
+
+								return (
+									<article
+										key={type}
+										className={`${styles.revealCard} ${
+											isRevealed ? '' : styles.revealCardHidden
+										}`}
+									>
+										{isRevealed ? (
+											<>
+												<span className={styles.revealCardType}>
+													{getCardTypeDisplayName(type)}
+												</span>
+
+												<h3>{cardName}</h3>
+
+												{cardDescription && <p>{cardDescription}</p>}
+
+												<div className={styles.infoGrid}>
+													<InfoList title='Плюсы' items={card.pros} />
+
+													<InfoList title='Риски' items={card.cons} danger />
+												</div>
+											</>
+										) : (
+											<span className={styles.hiddenText}>Скрыто</span>
+										)}
+									</article>
+								)
+							})}
 						</div>
 					)}
 				</div>
-
-				{revealedPlayer?.cards && (
-					<div className={styles.cardsGrid}>
-						{Object.entries(revealedPlayer.cards).map(([type, card]) =>
-							card ? (
-								<div
-									key={type}
-									className={`${styles.cardItem} ${styles.revealCard} ${
-										revealedCards[type] ? styles.revealed : styles.hidden
-									}`}
-								>
-									<div className={styles.cardHeader}>
-										<h3>{getCardTypeDisplayName(type)}</h3>
-										{!revealedCards[type] && (
-											<div className={styles.cardBack}>
-												<span className={styles.cardBackText}>Скрыто</span>
-											</div>
-										)}
-									</div>
-
-									{revealedCards[type] && (
-										<div className={styles.cardContent}>
-											<h4>{card.name}</h4>
-											<p>{card.description}</p>
-
-											{card.pros && card.pros.length > 0 && (
-												<div className={styles.cardPros}>
-													<strong>Плюсы:</strong>
-													<ul>
-														{card.pros.map((pro, i) => (
-															<li key={i}>{pro}</li>
-														))}
-													</ul>
-												</div>
-											)}
-
-											{card.cons && card.cons.length > 0 && (
-												<div className={styles.cardCons}>
-													<strong>Минусы:</strong>
-													<ul>
-														{card.cons.map((con, i) => (
-															<li key={i}>{con}</li>
-														))}
-													</ul>
-												</div>
-											)}
-										</div>
-									)}
-								</div>
-							) : null,
-						)}
-					</div>
-				)}
-			</div>
+			</section>
 		</div>
 	)
+}
+
+function InfoList({
+	title,
+	items,
+	danger = false,
+}: {
+	title: string
+	items?: string[]
+	danger?: boolean
+}) {
+	if (!items || items.length === 0) return null
+
+	return (
+		<div
+			className={`${styles.infoBlock} ${danger ? styles.infoBlockDanger : ''}`}
+		>
+			<strong>{title}</strong>
+
+			<ul>
+				{items.map((item, index) => (
+					<li key={index}>{cleanText(item)}</li>
+				))}
+			</ul>
+		</div>
+	)
+}
+
+function cleanText(value?: string | null): string {
+	return (value ?? '').trim().replace(/[.!?。！？]+$/g, '')
 }
