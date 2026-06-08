@@ -6,7 +6,9 @@ import {
 	ExtendedGameState,
 	GameChatMessage,
 } from '@station-eden/shared'
+import type React from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import GameAtmosphere from './components/GameAtmosphere'
 import GameChat from './components/GameChat'
 import GameFooter from './components/GameFooter'
 import GameHeader from './components/GameHeader'
@@ -15,6 +17,7 @@ import { useGameSession } from './components/hooks/useGameSession'
 import IntroCinematic from './components/IntroCinematic/IntroCinematic'
 import CrisisModal from './components/modals/CrisisModal'
 import GameResultsModal from './components/modals/GameResultsModal'
+import LeaveGameConfirmModal from './components/modals/LeaveGameConfirmModal'
 import MyCardsModal from './components/modals/MyCardsModal'
 import RevealedPlayerModal from './components/modals/RevealedPlayerModal'
 import PlayersPanel from './components/PlayersPanel'
@@ -33,7 +36,6 @@ export default function GameSessionClient({ gameId }: Props) {
 		phaseTimeLeft,
 		activeCrisis,
 		showMyCards,
-		showCardsTable,
 		gameResults,
 		allPlayersCards,
 		myRevealedCardsThisRound,
@@ -76,6 +78,8 @@ export default function GameSessionClient({ gameId }: Props) {
 		handleCloseCrisis,
 		handleLeaveGame,
 	} = useGameSession(gameId)
+
+	const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false)
 
 	const players = useMemo((): ExtendedGamePlayer[] => {
 		return (gameState?.players || []) as ExtendedGamePlayer[]
@@ -125,10 +129,12 @@ export default function GameSessionClient({ gameId }: Props) {
 			return myAllRevealedCards.reduce(
 				(acc, card) => {
 					const key = (card as any).id ?? (card as any).name
+
 					acc[key] = {
 						name: (card as any).name,
 						type: (card as any).type,
 					}
+
 					return acc
 				},
 				{} as Record<string, { name: string; type: string }>,
@@ -148,6 +154,26 @@ export default function GameSessionClient({ gameId }: Props) {
 		handleSkipNarration()
 	}, [handleSkipNarration])
 
+	const handleOpenLeaveConfirm = useCallback(() => {
+		setIsLeaveConfirmOpen(true)
+	}, [])
+
+	const handleCloseLeaveConfirm = useCallback(() => {
+		setIsLeaveConfirmOpen(false)
+	}, [])
+
+	const handleConfirmLeaveGame = useCallback(() => {
+		setIsLeaveConfirmOpen(false)
+		handleLeaveGame()
+	}, [handleLeaveGame])
+
+	const leaveConfirmToast = isLeaveConfirmOpen ? (
+		<LeaveGameConfirmModal
+			onConfirm={handleConfirmLeaveGame}
+			onCancel={handleCloseLeaveConfirm}
+		/>
+	) : null
+
 	if (!gameState) {
 		return (
 			<LoadingScreen
@@ -162,25 +188,34 @@ export default function GameSessionClient({ gameId }: Props) {
 
 	if (gameState.status === 'waiting') {
 		return (
-			<WaitingRoom
-				gameState={gameState}
-				gameId={gameId}
-				userId={userId}
-				isConnected={isConnected}
-				onStartGame={handleStartGame}
-				onLeaveGame={handleLeaveGame}
-			/>
+			<>
+				<WaitingRoom
+					gameState={gameState}
+					gameId={gameId}
+					userId={userId}
+					isConnected={isConnected}
+					onStartGame={handleStartGame}
+					onLeaveGame={handleOpenLeaveConfirm}
+				/>
+
+				{leaveConfirmToast}
+			</>
 		)
 	}
 
 	const currentPlayer = userId
 		? players.find(player => player.id === userId)
 		: undefined
+
 	const alivePlayers = players.filter(player => player.isAlive === true)
 	const phaseDurationDisplay = getPhaseDuration(gameState, phaseTimeLeft)
 
 	return (
 		<div className={styles.container}>
+			<GameAtmosphere />
+
+			{leaveConfirmToast}
+
 			{isIntroCinematicVisible && (
 				<IntroCinematic
 					playersCount={introPlayersCount || players.length}
@@ -205,19 +240,6 @@ export default function GameSessionClient({ gameId }: Props) {
 					onRevealCard={handleRevealCard}
 				/>
 			)}
-
-			{/* CardsTable теперь отображается внутри GamePhasePanel, 
-			    поэтому отдельное модальное окно не нужно. 
-			    Убираем CardsTableModal, так как он не используется */}
-			
-			{/* {showCardsTable && (
-				<CardsTableModal
-					allPlayersCards={allPlayersCards}
-					myCards={myCards}
-					userId={userId}
-					onClose={() => setShowCardsTable(false)}
-				/>
-			)} */}
 
 			{revealedPlayer && (
 				<RevealedPlayerModal
@@ -253,7 +275,7 @@ export default function GameSessionClient({ gameId }: Props) {
 				phaseTimeLeft={phaseTimeLeft}
 				myRevealedCardsThisRound={myRevealedCardsThisRound}
 				userId={userId}
-				onLeaveGame={handleLeaveGame}
+				onLeaveGame={handleOpenLeaveConfirm}
 			/>
 
 			<main className={styles.mainContent}>

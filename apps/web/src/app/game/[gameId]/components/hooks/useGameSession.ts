@@ -1107,8 +1107,6 @@ export function useGameSession(gameId: string) {
 	}, [gameState])
 
 	const handleLeaveGame = () => {
-		if (!window.confirm('Вы уверены, что хотите покинуть игру?')) return
-
 		const returnUrl = getLobbyReturnUrl()
 
 		sendRef.current?.({ type: 'LEAVE_GAME', gameId })

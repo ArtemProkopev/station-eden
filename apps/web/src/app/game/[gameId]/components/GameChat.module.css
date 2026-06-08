@@ -1,252 +1,447 @@
 /* apps/web/src/app/game/[gameId]/components/GameChat.module.css */
 
 .gameChat {
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 180px);
-  min-height: 400px;
-  max-height: 600px;
-  width: 100%;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
-  border-radius: 12px;
-  border: 1px solid rgba(99, 239, 255, 0.3);
-  overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	height: calc(100vh - 180px);
+	min-height: 400px;
+	max-height: 600px;
+	width: 100%;
+	background: rgba(0, 0, 0, 0.6);
+	backdrop-filter: blur(8px);
+	border-radius: 12px;
+	border: 1px solid rgba(99, 239, 255, 0.3);
+	overflow: hidden;
 }
 
 /* Вкладки */
 .tabsHeader {
-  display: flex;
-  border-bottom: 1px solid rgba(99, 239, 255, 0.2);
-  background: rgba(0, 0, 0, 0.4);
-  flex-shrink: 0;
+	display: flex;
+	border-bottom: 1px solid rgba(99, 239, 255, 0.2);
+	background: rgba(0, 0, 0, 0.4);
+	flex-shrink: 0;
 }
 
 .tabButton {
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.5);
-  padding: 10px 16px;
-  font-family: 'RussoOne', sans-serif;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border-bottom: 2px solid transparent;
+	flex: 1;
+	background: transparent;
+	border: none;
+	color: rgba(255, 255, 255, 0.5);
+	padding: 10px 16px;
+	font-family: 'RussoOne', sans-serif;
+	font-size: 12px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	border-bottom: 2px solid transparent;
 }
 
 .tabButtonActive {
-  color: #63efff;
-  border-bottom-color: #63efff;
+	color: #63efff;
+	border-bottom-color: #63efff;
 }
 
 .tabButtonHasVoice {
-  position: relative;
+	position: relative;
 }
 
 .tabButtonHasVoice::after {
-  content: '';
-  position: absolute;
-  top: 8px;
-  right: 20px;
-  width: 8px;
-  height: 8px;
-  background-color: #4caf50;
-  border-radius: 50%;
-  animation: pulse 1.5s infinite;
+	content: '';
+	position: absolute;
+	top: 8px;
+	right: 20px;
+	width: 8px;
+	height: 8px;
+	background-color: #4caf50;
+	border-radius: 50%;
+	animation: pulse 1.5s infinite;
 }
 
 /* Область сообщений */
 .messagesArea {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: rgba(0, 0, 0, 0.2);
-  min-height: 0;
+	flex: 1;
+	overflow-y: auto;
+	overflow-x: hidden;
+	padding: 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	background: rgba(0, 0, 0, 0.2);
+	min-height: 0;
 }
 
 /* Сообщение */
 .message {
-  display: flex;
-  flex-direction: column;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 6px;
-  border-left: 2px solid rgba(99, 239, 255, 0.3);
+	display: flex;
+	flex-direction: column;
+	padding: 8px 12px;
+	background: rgba(255, 255, 255, 0.03);
+	border-radius: 6px;
+	border-left: 2px solid rgba(99, 239, 255, 0.3);
 }
 
 .messageSystem {
-  background: rgba(99, 239, 255, 0.05);
-  border-left-color: #63efff;
+	background: rgba(99, 239, 255, 0.05);
+	border-left-color: #63efff;
 }
 
 .myMessage {
-  background: rgba(99, 239, 255, 0.08);
-  border-left-color: #63efff;
+	background: rgba(99, 239, 255, 0.08);
+	border-left-color: #63efff;
 }
 
 .messageHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 4px;
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	margin-bottom: 4px;
 }
 
 .messageAuthor {
-  font-size: 11px;
-  color: #63efff;
+	font-size: 11px;
+	color: #63efff;
 }
 
 .messageSystem .messageAuthor {
-  color: #f39c12;
+	color: #f39c12;
 }
 
 .messageTime {
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.3);
+	font-size: 9px;
+	color: rgba(255, 255, 255, 0.3);
 }
 
 .messageText {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.85);
-  line-height: 1.4;
-  word-break: break-word;
+	font-size: 12px;
+	color: rgba(255, 255, 255, 0.85);
+	line-height: 1.4;
+	word-break: break-word;
 }
 
 /* Форма ввода */
 .inputArea {
-  display: flex;
-  padding: 10px 12px;
-  background: rgba(0, 0, 0, 0.4);
-  border-top: 1px solid rgba(99, 239, 255, 0.2);
-  gap: 8px;
-  flex-shrink: 0;
+	display: flex;
+	padding: 10px 12px;
+	background: rgba(0, 0, 0, 0.4);
+	border-top: 1px solid rgba(99, 239, 255, 0.2);
+	gap: 8px;
+	flex-shrink: 0;
 }
 
 .input {
-  flex: 1;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(99, 239, 255, 0.2);
-  border-radius: 4px;
-  color: white;
-  font-family: 'RussoOne', sans-serif;
-  font-size: 12px;
-  transition: all 0.2s ease;
+	flex: 1;
+	padding: 8px 12px;
+	background: rgba(255, 255, 255, 0.05);
+	border: 1px solid rgba(99, 239, 255, 0.2);
+	border-radius: 4px;
+	color: white;
+	font-family: 'RussoOne', sans-serif;
+	font-size: 12px;
+	transition: all 0.2s ease;
 }
 
 .input:focus {
-  outline: none;
-  border-color: #63efff;
-  background: rgba(255, 255, 255, 0.08);
+	outline: none;
+	border-color: #63efff;
+	background: rgba(255, 255, 255, 0.08);
 }
 
 .input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+	color: rgba(255, 255, 255, 0.3);
 }
 
 .input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+	opacity: 0.5;
+	cursor: not-allowed;
 }
 
 .sendButton {
-  background: transparent;
-  border: 1px solid #63efff;
-  color: #63efff;
-  padding: 6px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-family: 'RussoOne', sans-serif;
-  font-size: 14px;
-  transition: all 0.2s ease;
+	background: transparent;
+	border: 1px solid #63efff;
+	color: #63efff;
+	padding: 6px 16px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-family: 'RussoOne', sans-serif;
+	font-size: 14px;
+	transition: all 0.2s ease;
 }
 
 .sendButton:hover:not(:disabled) {
-  background: rgba(99, 239, 255, 0.1);
+	background: rgba(99, 239, 255, 0.1);
 }
 
 .sendButton:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+	opacity: 0.5;
+	cursor: not-allowed;
 }
 
 /* Пустое состояние */
 .emptyState {
-  text-align: center;
-  padding: 40px 20px;
-  color: rgba(255, 255, 255, 0.3);
-  font-size: 12px;
+	text-align: center;
+	padding: 40px 20px;
+	color: rgba(255, 255, 255, 0.3);
+	font-size: 12px;
 }
 
 /* Голосовой чат */
 .voiceTab {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px;
-  background: rgba(0, 0, 0, 0.2);
-  min-height: 0;
+	flex: 1;
+	overflow-y: auto;
+	padding: 12px;
+	background: rgba(0, 0, 0, 0.2);
+	min-height: 0;
 }
 
-.voiceLoading, .voiceError {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  font-size: 12px;
+.voiceLoading,
+.voiceError {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	font-size: 12px;
 }
 
 .voiceLoading {
-  color: rgba(255, 255, 255, 0.5);
+	color: rgba(255, 255, 255, 0.5);
 }
 
 .voiceError {
-  color: #ff6b6b;
+	color: #ff6b6b;
 }
 
 /* Скроллбар */
 .messagesArea::-webkit-scrollbar {
-  width: 4px;
+	width: 4px;
 }
 
 .messagesArea::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 2px;
+	background: rgba(255, 255, 255, 0.05);
+	border-radius: 2px;
 }
 
 .messagesArea::-webkit-scrollbar-thumb {
-  background: rgba(99, 239, 255, 0.3);
-  border-radius: 2px;
+	background: rgba(99, 239, 255, 0.3);
+	border-radius: 2px;
 }
 
 .messagesArea::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 239, 255, 0.5);
+	background: rgba(99, 239, 255, 0.5);
 }
 
 .voiceTab::-webkit-scrollbar {
-  width: 4px;
+	width: 4px;
 }
 
 .voiceTab::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 2px;
+	background: rgba(255, 255, 255, 0.05);
+	border-radius: 2px;
 }
 
 .voiceTab::-webkit-scrollbar-thumb {
-  background: rgba(99, 239, 255, 0.3);
-  border-radius: 2px;
+	background: rgba(99, 239, 255, 0.3);
+	border-radius: 2px;
 }
 
 /* Анимации */
 @keyframes pulse {
-  0%, 100% {
-    opacity: 0.4;
-  }
-  50% {
-    opacity: 1;
-  }
+	0%,
+	100% {
+		opacity: 0.4;
+	}
+	50% {
+		opacity: 1;
+	}
+}
+
+/* ===== Station Eden game chat redesign ===== */
+
+.gameChat {
+	position: relative;
+	isolation: isolate;
+	height: calc(100dvh - 170px);
+	min-height: 520px;
+	max-height: none;
+	overflow: hidden;
+	border: 1px solid rgba(99, 239, 255, 0.34);
+	border-radius: 16px;
+	background:
+		linear-gradient(145deg, rgba(3, 18, 35, 0.8), rgba(1, 7, 17, 0.74)),
+		radial-gradient(circle at 50% 0%, rgba(99, 239, 255, 0.12), transparent 58%);
+	backdrop-filter: blur(18px) saturate(132%);
+	box-shadow:
+		0 18px 44px rgba(0, 0, 0, 0.38),
+		0 0 34px rgba(99, 239, 255, 0.1),
+		inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.gameChat::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+	background:
+		linear-gradient(90deg, transparent, rgba(99, 239, 255, 0.28), transparent)
+			top / 100% 1px no-repeat,
+		radial-gradient(
+			circle at 50% 100%,
+			rgba(99, 239, 255, 0.08),
+			transparent 52%
+		);
+}
+
+.tabsHeader {
+	border-bottom: 1px solid rgba(99, 239, 255, 0.2);
+	background: rgba(0, 0, 0, 0.22);
+}
+
+.tabButton {
+	position: relative;
+	padding: 14px 16px;
+	color: rgba(237, 252, 255, 0.5);
+	letter-spacing: 0.35px;
+	border-bottom: 1px solid transparent;
+}
+
+.tabButton:hover {
+	color: rgba(237, 252, 255, 0.78);
+	background: rgba(99, 239, 255, 0.04);
+}
+
+.tabButtonActive {
+	color: #63efff;
+	border-bottom-color: #63efff;
+	background: linear-gradient(
+		180deg,
+		rgba(99, 239, 255, 0.09),
+		rgba(99, 239, 255, 0.02)
+	);
+	box-shadow:
+		inset 0 -1px 0 #63efff,
+		0 8px 22px rgba(99, 239, 255, 0.08);
+	text-shadow: 0 0 12px rgba(99, 239, 255, 0.3);
+}
+
+.messagesArea {
+	padding: 14px;
+	gap: 10px;
+	background:
+		linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.08)),
+		radial-gradient(
+			circle at 50% 0%,
+			rgba(99, 239, 255, 0.035),
+			transparent 48%
+		);
+}
+
+.message {
+	padding: 11px 13px;
+	border: 1px solid rgba(99, 239, 255, 0.12);
+	border-left: 2px solid rgba(99, 239, 255, 0.34);
+	border-radius: 9px;
+	background:
+		linear-gradient(
+			135deg,
+			rgba(255, 255, 255, 0.045),
+			rgba(99, 239, 255, 0.025)
+		),
+		rgba(0, 0, 0, 0.22);
+	box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+.messageSystem {
+	border-left-color: #f2a23a;
+	background:
+		linear-gradient(135deg, rgba(242, 162, 58, 0.08), rgba(99, 239, 255, 0.03)),
+		rgba(0, 0, 0, 0.24);
+}
+
+.myMessage {
+	border-left-color: #63efff;
+	background:
+		linear-gradient(135deg, rgba(99, 239, 255, 0.1), rgba(99, 239, 255, 0.025)),
+		rgba(0, 0, 0, 0.24);
+}
+
+.messageAuthor {
+	color: #63efff;
+	font-size: 11px;
+	letter-spacing: 0.25px;
+}
+
+.messageSystem .messageAuthor {
+	color: #f2a23a;
+}
+
+.messageTime {
+	color: rgba(237, 252, 255, 0.34);
+	font-size: 9px;
+}
+
+.messageText {
+	color: rgba(237, 252, 255, 0.86);
+	font-size: 12px;
+	line-height: 1.45;
+}
+
+.inputArea {
+	padding: 12px;
+	gap: 10px;
+	border-top: 1px solid rgba(99, 239, 255, 0.18);
+	background: rgba(0, 0, 0, 0.32);
+}
+
+.input {
+	height: 42px;
+	padding: 0 14px;
+	border-radius: 8px;
+	border: 1px solid rgba(99, 239, 255, 0.24);
+	color: rgba(237, 252, 255, 0.92);
+	background:
+		linear-gradient(
+			180deg,
+			rgba(255, 255, 255, 0.055),
+			rgba(255, 255, 255, 0.025)
+		),
+		rgba(0, 0, 0, 0.18);
+}
+
+.input:focus {
+	border-color: rgba(99, 239, 255, 0.78);
+	background:
+		linear-gradient(
+			180deg,
+			rgba(99, 239, 255, 0.08),
+			rgba(255, 255, 255, 0.03)
+		),
+		rgba(0, 0, 0, 0.22);
+	box-shadow:
+		0 0 0 3px rgba(99, 239, 255, 0.08),
+		0 0 20px rgba(99, 239, 255, 0.08);
+}
+
+.sendButton {
+	min-width: 48px;
+	height: 42px;
+	padding: 0 14px;
+	border-radius: 8px;
+	border: 1px solid rgba(99, 239, 255, 0.66);
+	color: #63efff;
+	background: rgba(99, 239, 255, 0.06);
+	box-shadow: inset 0 0 14px rgba(99, 239, 255, 0.05);
+}
+
+.sendButton:hover:not(:disabled) {
+	transform: translateY(-1px);
+	background: rgba(99, 239, 255, 0.12);
+	box-shadow:
+		0 0 18px rgba(99, 239, 255, 0.16),
+		inset 0 0 14px rgba(99, 239, 255, 0.08);
+}
+
+@media (max-width: 1180px) {
+	.gameChat {
+		height: auto;
+		min-height: 420px;
+	}
 }

@@ -1,0 +1,138 @@
+/* apps/web/src/app/game/[gameId]/components/GameAtmosphere.module.css */
+
+.gameAtmosphere {
+	position: fixed;
+	inset: 0;
+	z-index: 0;
+	overflow: hidden;
+	pointer-events: none;
+	background: #01040d;
+	contain: paint;
+	isolation: isolate;
+	transform: translateZ(0);
+}
+
+.gameAtmosphereImage {
+	position: absolute;
+	inset: 0;
+	background-image: url('https://cdn.assets.stationeden.ru/web/game-optimized.webp');
+	background-size: cover;
+	background-position: center;
+	opacity: 0.66;
+	filter: saturate(1.1) brightness(0.68) contrast(1.08);
+	transform: scale(1.02) translateZ(0);
+}
+
+.gameAtmosphereGalaxy {
+	position: absolute;
+	inset: 0;
+	opacity: 0.34;
+	mix-blend-mode: screen;
+	transform: translateZ(0);
+}
+
+.gameAtmosphereCore {
+	position: absolute;
+	left: 50%;
+	top: 42%;
+	width: min(760px, 58vw);
+	aspect-ratio: 1;
+	border-radius: 999px;
+	transform: translate(-50%, -50%) scale(0.98) translateZ(0);
+	background: radial-gradient(
+		circle,
+		rgba(99, 239, 255, 0.3) 0%,
+		rgba(99, 239, 255, 0.14) 18%,
+		rgba(124, 92, 255, 0.075) 42%,
+		transparent 68%
+	);
+	filter: blur(2px);
+	opacity: 0.68;
+	animation: gameCorePulse 8.4s ease-in-out infinite;
+	will-change: transform, opacity;
+}
+
+.gameAtmosphereCore::before {
+	content: '';
+	position: absolute;
+	inset: 18%;
+	border-radius: inherit;
+	border: 1px solid rgba(99, 239, 255, 0.16);
+	box-shadow:
+		0 0 28px rgba(99, 239, 255, 0.15),
+		inset 0 0 26px rgba(99, 239, 255, 0.07);
+}
+
+.gameAtmosphereCore::after {
+	content: '';
+	position: absolute;
+	inset: 32%;
+	border-radius: inherit;
+	background: radial-gradient(
+		circle,
+		rgba(99, 239, 255, 0.36) 0%,
+		rgba(99, 239, 255, 0.14) 34%,
+		transparent 70%
+	);
+	box-shadow:
+		0 0 34px rgba(99, 239, 255, 0.22),
+		0 0 86px rgba(124, 92, 255, 0.12);
+}
+
+.gameAtmosphereGrid {
+	position: absolute;
+	inset: 0;
+	opacity: 0.14;
+	background-image:
+		linear-gradient(rgba(99, 239, 255, 0.11) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(99, 239, 255, 0.09) 1px, transparent 1px),
+		linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+	background-size:
+		96px 96px,
+		96px 96px,
+		100% 4px;
+	-webkit-mask-image: radial-gradient(
+		circle at 50% 42%,
+		black 0%,
+		transparent 72%
+	);
+	mask-image: radial-gradient(circle at 50% 42%, black 0%, transparent 72%);
+}
+
+.gameAtmosphereVignette {
+	position: absolute;
+	inset: 0;
+	background:
+		radial-gradient(
+			circle at 50% 40%,
+			transparent 0%,
+			rgba(1, 4, 13, 0.38) 58%,
+			rgba(1, 4, 13, 0.94) 100%
+		),
+		linear-gradient(
+			180deg,
+			rgba(1, 4, 13, 0.74),
+			transparent 26%,
+			transparent 68%,
+			rgba(1, 4, 13, 0.88)
+		);
+}
+
+@keyframes gameCorePulse {
+	0%,
+	100% {
+		opacity: 0.56;
+		transform: translate(-50%, -50%) scale(0.96) translateZ(0);
+	}
+
+	50% {
+		opacity: 0.76;
+		transform: translate(-50%, -50%) scale(1.035) translateZ(0);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.gameAtmosphereCore {
+		animation: none;
+	}
+}
