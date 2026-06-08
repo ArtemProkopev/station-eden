@@ -36,6 +36,7 @@ const DEFAULT_LOBBY_SETTINGS: LobbySettings = {
 	votingTime: 60,
 	hiddenRolesCount: 0,
 	enableCrises: true,
+	searchingPlayers: false,
 }
 
 const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
@@ -108,10 +109,7 @@ function normalizeSettings(v: unknown): LobbySettings {
 	const hiddenRolesCount =
 		typeof v.hiddenRolesCount === 'number' &&
 		Number.isFinite(v.hiddenRolesCount)
-			? Math.max(
-					0,
-					Math.min(Math.trunc(v.hiddenRolesCount), Math.max(0, maxPlayers - 1)),
-				)
+			? Math.max(0, Math.min(Math.trunc(v.hiddenRolesCount), 1))
 			: 0
 
 	const difficulty =
@@ -141,6 +139,20 @@ function normalizeSettings(v: unknown): LobbySettings {
 			? Math.max(15, Math.min(300, Math.trunc(v.votingTime)))
 			: 60
 
+	const visibility =
+		v.visibility === 'public' ||
+		v.visibility === 'password' ||
+		v.visibility === 'hidden_password'
+			? v.visibility
+			: 'public'
+
+	const searchingPlayers =
+		visibility === 'hidden_password'
+			? false
+			: typeof v.searchingPlayers === 'boolean'
+				? v.searchingPlayers
+				: false
+
 	return {
 		maxPlayers,
 		gameMode:
@@ -150,13 +162,8 @@ function normalizeSettings(v: unknown): LobbySettings {
 			v.gameMode === 'cooperative'
 				? v.gameMode
 				: 'standard',
-		isPrivate: typeof v.isPrivate === 'boolean' ? v.isPrivate : false,
-		visibility:
-			v.visibility === 'public' ||
-			v.visibility === 'password' ||
-			v.visibility === 'hidden_password'
-				? v.visibility
-				: 'public',
+		isPrivate: visibility === 'hidden_password',
+		visibility,
 		hasPassword: typeof v.hasPassword === 'boolean' ? v.hasPassword : false,
 		password: '',
 		difficulty,
@@ -166,6 +173,7 @@ function normalizeSettings(v: unknown): LobbySettings {
 		votingTime,
 		hiddenRolesCount,
 		enableCrises: typeof v.enableCrises === 'boolean' ? v.enableCrises : true,
+		searchingPlayers,
 	}
 }
 
@@ -190,6 +198,12 @@ function saveStoredLobbyPassword(lobbyId: string, password: string) {
 		`station-eden:lobby-password:${lobbyId}`,
 		password,
 	)
+}
+
+function removeStoredLobbyPassword(lobbyId: string) {
+	if (typeof window === 'undefined') return
+
+	window.sessionStorage.removeItem(`station-eden:lobby-password:${lobbyId}`)
 }
 
 function isLobbyPasswordError(message: string) {
@@ -515,7 +529,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 			const normalizedPassword = password.trim()
 
 			if (normalizedPassword.length < 4) {
-				setPasswordPromptError('Пароль должен содержать минимум 4 символа.')
+				setPasswordPromptError('Пароль должен содержать минимум 4 символа')
 				return
 			}
 
@@ -528,7 +542,7 @@ export function useLobby(lobbyIdFromProps?: string) {
 			if (!ok) {
 				setIsSubmittingLobbyPassword(false)
 				setPasswordPromptError(
-					'Не удалось отправить пароль. Проверьте соединение.',
+					'Не удалось отправить пароль. Проверьте соединение',
 				)
 			}
 		},
@@ -539,7 +553,8 @@ export function useLobby(lobbyIdFromProps?: string) {
 		setIsPasswordPromptOpen(false)
 		setPasswordPromptError('')
 		setIsSubmittingLobbyPassword(false)
-		router.push('/')
+		removeStoredLobbyPassword(lobbyIdRef.current)
+		router.push('/?openLobbies=1')
 	}, [router])
 
 	const handlePlayerMenuClick = useCallback((player: Player) => {
@@ -569,12 +584,32 @@ export function useLobby(lobbyIdFromProps?: string) {
 	const handleSaveLobbySettings = useCallback(
 		(settings: LobbySettings) => {
 			const normalized = normalizeSettings(settings)
+			const rawPassword = (settings.password || '').trim()
+			const needsPassword =
+				normalized.visibility === 'password' ||
+				normalized.visibility === 'hidden_password'
+			const outgoingSettings: LobbySettings = {
+				...normalized,
+				password: needsPassword ? rawPassword : '',
+				hasPassword: needsPassword
+					? !!settings.hasPassword || rawPassword.length >= 4
+					: false,
+				searchingPlayers:
+					normalized.visibility === 'hidden_password'
+						? false
+						: !!normalized.searchingPlayers,
+			}
 
-			setLobbySettings(normalized)
+			const localSettings: LobbySettings = {
+				...outgoingSettings,
+				password: '',
+			}
+
+			setLobbySettings(localSettings)
 
 			sendWS({
 				type: 'UPDATE_LOBBY_SETTINGS',
-				settings: normalized,
+				settings: outgoingSettings,
 				__userId: currentUserId,
 			})
 		},

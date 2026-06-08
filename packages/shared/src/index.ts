@@ -115,6 +115,11 @@ export interface PublicLobbyInfo {
 	gameMode: string
 	visibility: Exclude<LobbyVisibility, 'hidden_password'>
 	hasPassword: boolean
+	searchingPlayers?: boolean
+	difficulty?: 'easy' | 'normal' | 'hard'
+	turnTime?: number
+	hiddenRolesCount?: number
+	enableCrises?: boolean
 	createdAt: ISODateString
 }
 export interface LobbySettings {
@@ -129,6 +134,7 @@ export interface LobbySettings {
 	fastGame?: boolean
 	tournamentMode?: boolean
 	limitedResources?: boolean
+	searchingPlayers?: boolean
 
 	maxRounds?: number
 	discussionTime?: number

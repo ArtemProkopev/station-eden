@@ -36,6 +36,8 @@ interface UserProfile {
 	avatar?: string
 }
 
+type InitialLobbyTab = 'create' | 'open'
+
 function isRecord(v: unknown): v is Record<string, unknown> {
 	return !!v && typeof v === 'object' && !Array.isArray(v)
 }
@@ -205,8 +207,11 @@ export default function HomePage() {
 	const [isCreateLobbyOpen, setIsCreateLobbyOpen] = useState(false)
 	const [isCreatingLobby, setIsCreatingLobby] = useState(false)
 	const [createLobbyError, setCreateLobbyError] = useState('')
+	const [initialLobbyTab, setInitialLobbyTab] =
+		useState<InitialLobbyTab>('create')
 
 	const router = useRouter()
+	const isAuthenticated = !!userProfile
 
 	useEffect(() => {
 		let alive = true
@@ -252,7 +257,25 @@ export default function HomePage() {
 		}
 	}, [])
 
-	const isAuthenticated = !!userProfile
+	useEffect(() => {
+		if (isLoading) return
+		if (typeof window === 'undefined') return
+
+		const params = new URLSearchParams(window.location.search)
+
+		if (params.get('openLobbies') !== '1') return
+
+		if (!isAuthenticated) {
+			router.replace('/')
+			return
+		}
+
+		setInitialLobbyTab('open')
+		setCreateLobbyError('')
+		setIsCreateLobbyOpen(true)
+
+		window.history.replaceState(null, '', window.location.pathname)
+	}, [isLoading, isAuthenticated, router])
 
 	const handlePlayClick = useCallback(() => {
 		if (!isAuthenticated) {
@@ -260,6 +283,7 @@ export default function HomePage() {
 			return
 		}
 
+		setInitialLobbyTab('create')
 		setCreateLobbyError('')
 		setIsCreateLobbyOpen(true)
 	}, [router, isAuthenticated])
@@ -300,6 +324,7 @@ export default function HomePage() {
 
 		setIsCreateLobbyOpen(false)
 		setCreateLobbyError('')
+		setInitialLobbyTab('create')
 	}, [isCreatingLobby])
 
 	const handleRegister = () => router.push('/register')
@@ -393,6 +418,7 @@ export default function HomePage() {
 
 			<CreateLobbyModal
 				isOpen={isCreateLobbyOpen}
+				initialTab={initialLobbyTab}
 				isSubmitting={isCreatingLobby}
 				submitError={createLobbyError}
 				onClose={handleCloseCreateLobby}

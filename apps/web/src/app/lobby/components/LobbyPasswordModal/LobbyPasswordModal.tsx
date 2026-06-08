@@ -1,5 +1,6 @@
 'use client'
 
+import { EyeIcon, EyeOffIcon } from '@/components/ui/Icons'
 import { useEffect, useState, type FormEvent } from 'react'
 import styles from './LobbyPasswordModal.module.css'
 
@@ -21,6 +22,7 @@ export function LobbyPasswordModal({
 	const [password, setPassword] = useState('')
 	const [showPassword, setShowPassword] = useState(false)
 	const [validationError, setValidationError] = useState('')
+	const [wasSubmitted, setWasSubmitted] = useState(false)
 
 	useEffect(() => {
 		if (!isOpen) return
@@ -28,6 +30,7 @@ export function LobbyPasswordModal({
 		setPassword('')
 		setShowPassword(false)
 		setValidationError('')
+		setWasSubmitted(false)
 
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (event.key === 'Escape' && !isSubmitting) {
@@ -44,15 +47,16 @@ export function LobbyPasswordModal({
 
 	if (!isOpen) return null
 
-	const message = validationError || error
+	const message = wasSubmitted ? validationError || error : ''
 
 	const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault()
 
 		const normalizedPassword = password.trim()
+		setWasSubmitted(true)
 
 		if (normalizedPassword.length < 4) {
-			setValidationError('Пароль должен содержать минимум 4 символа.')
+			setValidationError('Пароль должен содержать минимум 4 символа')
 			return
 		}
 
@@ -69,20 +73,16 @@ export function LobbyPasswordModal({
 				aria-labelledby='lobby-password-title'
 			>
 				<div className={styles.header}>
-					<div>
-						<p className={styles.eyebrow}>STATION EDEN</p>
-						<h2 id='lobby-password-title' className={styles.title}>
-							Лобби защищено
-						</h2>
-					</div>
+					<p className={styles.eyebrow}>STATION EDEN</p>
+					<h2 id='lobby-password-title' className={styles.title}>
+						Вход в лобби
+					</h2>
+					<p className={styles.subtitle}>
+						Для подключения введите пароль комнаты
+					</p>
 				</div>
 
 				<form className={styles.form} onSubmit={handleSubmit}>
-					<p className={styles.description}>
-						Для подключения к этому лобби нужен пароль. Введите его, чтобы
-						присоединиться к игровой сессии.
-					</p>
-
 					<label className={styles.field}>
 						<span className={styles.fieldLabel}>Пароль лобби</span>
 
@@ -91,7 +91,11 @@ export function LobbyPasswordModal({
 								className={styles.passwordInput}
 								type={showPassword ? 'text' : 'password'}
 								value={password}
-								onChange={event => setPassword(event.target.value)}
+								onChange={event => {
+									setPassword(event.target.value)
+									setValidationError('')
+									setWasSubmitted(false)
+								}}
 								placeholder='Минимум 4 символа'
 								minLength={4}
 								autoComplete='current-password'
@@ -104,8 +108,10 @@ export function LobbyPasswordModal({
 								className={styles.passwordToggle}
 								onClick={() => setShowPassword(prev => !prev)}
 								disabled={isSubmitting}
+								aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+								title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
 							>
-								{showPassword ? 'Скрыть' : 'Показать'}
+								{showPassword ? <EyeOffIcon /> : <EyeIcon />}
 							</button>
 						</div>
 					</label>
@@ -127,7 +133,7 @@ export function LobbyPasswordModal({
 							className={styles.submitButton}
 							disabled={isSubmitting}
 						>
-							{isSubmitting ? 'Проверка...' : 'Войти в лобби'}
+							{isSubmitting ? 'Проверка' : 'Войти в лобби'}
 						</button>
 					</div>
 				</form>

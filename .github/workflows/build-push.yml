@@ -12,6 +12,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
+
     permissions:
       contents: read
       packages: write
@@ -51,6 +53,8 @@ jobs:
             BUILDKIT_INLINE_CACHE=1
           cache-from: |
             type=registry,ref=ghcr.io/${{ steps.owner.outputs.lc }}/station-eden-api:latest
+          cache-to: |
+            type=inline
           tags: |
             ghcr.io/${{ steps.owner.outputs.lc }}/station-eden-api:latest
 
@@ -65,17 +69,17 @@ jobs:
 
           echo "Creating tag ${DST} -> ${SRC}"
 
-          for i in 1 2 3 4 5; do
+          for i in 1 2 3 4 5 6; do
             if docker buildx imagetools create -t "${DST}" "${SRC}"; then
-              echo "OK"
+              echo "API SHA tag created"
               exit 0
             fi
 
-            echo "Retry $i failed, sleeping..."
-            sleep $((i * 2))
+            echo "API SHA tag failed. Retry ${i}/6..."
+            sleep $((i * 5))
           done
 
-          echo "Failed to create tag after retries"
+          echo "Failed to create API SHA tag after retries"
           exit 1
 
       # ===== WEB image =====
@@ -94,6 +98,8 @@ jobs:
             BUILDKIT_INLINE_CACHE=1
           cache-from: |
             type=registry,ref=ghcr.io/${{ steps.owner.outputs.lc }}/station-eden-web:latest
+          cache-to: |
+            type=inline
           tags: |
             ghcr.io/${{ steps.owner.outputs.lc }}/station-eden-web:latest
 
@@ -108,161 +114,269 @@ jobs:
 
           echo "Creating tag ${DST} -> ${SRC}"
 
-          for i in 1 2 3 4 5; do
+          for i in 1 2 3 4 5 6; do
             if docker buildx imagetools create -t "${DST}" "${SRC}"; then
-              echo "OK"
+              echo "WEB SHA tag created"
               exit 0
             fi
 
-            echo "Retry $i failed, sleeping..."
-            sleep $((i * 2))
+            echo "WEB SHA tag failed. Retry ${i}/6..."
+            sleep $((i * 5))
           done
 
-          echo "Failed to create tag after retries"
+          echo "Failed to create WEB SHA tag after retries"
           exit 1
 
       # ===== Deploy to server via SSH =====
       - name: Deploy to server
         if: ${{ github.ref == 'refs/heads/main' }}
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          script_stop: true
-          script: |
-            set -euo pipefail
-            set -x
+        shell: bash
+        env:
+          SSHPASS: ${{ secrets.SERVER_PASSWORD }}
+        run: |
+          set -euo pipefail
 
-            APP_DIR="$HOME/station-eden"
-            MIN_FREE_MB=1024
-            CRITICAL_FREE_MB=512
+          echo "==> Install sshpass"
+          for i in 1 2 3; do
+            if sudo apt-get update && sudo apt-get install -y sshpass; then
+              echo "sshpass installed"
+              break
+            fi
 
-            free_space_mb() {
-              df -Pm / | awk 'NR==2 {print $4}'
-            }
+            echo "sshpass install failed. Retry ${i}/3..."
+            sleep $((i * 5))
 
-            print_disk_info() {
-              echo "==> Disk usage"
-              df -h /
+            if [ "$i" = "3" ]; then
+              echo "Failed to install sshpass"
+              exit 1
+            fi
+          done
 
-              echo "==> Docker usage"
-              docker system df || true
-            }
+          echo "==> Connect to server"
+          sshpass -e ssh \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o ConnectTimeout=20 \
+            -o ConnectionAttempts=3 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=3 \
+            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" 'bash -s' << 'REMOTE_SCRIPT'
+              set -euo pipefail
+              set -x
 
-            cleanup_safe() {
-              echo "==> Safe cleanup"
-              echo "==> Removing stopped containers, old unused images, old build cache, unused networks and old logs"
+              APP_DIR="$HOME/station-eden"
+              MIN_FREE_MB=1024
+              CRITICAL_FREE_MB=512
 
-              docker container prune -f || true
-              docker image prune -af --filter "until=24h" || true
-              docker builder prune -af --filter "until=24h" || true
-              docker network prune -f || true
+              free_space_mb() {
+                df -Pm / | awk 'NR==2 {print $4}'
+              }
 
-              sudo apt-get clean || true
-              sudo journalctl --vacuum-time=3d || true
+              print_disk_info() {
+                echo "==> Disk usage"
+                df -h /
 
-              sudo find /tmp -mindepth 1 -mtime +1 -delete 2>/dev/null || true
-              sudo find /var/tmp -mindepth 1 -mtime +1 -delete 2>/dev/null || true
-            }
+                echo "==> Docker usage"
+                docker system df || true
+              }
 
-            cleanup_aggressive() {
-              echo "==> Aggressive cleanup"
-              echo "==> Removing all unused Docker containers, images, build cache and networks"
-              echo "==> Docker volumes are NOT removed"
+              cleanup_safe() {
+                echo "==> Safe cleanup"
+                echo "==> Removing stopped containers, old unused images, old build cache, unused networks and old logs"
 
-              docker container prune -f || true
-              docker image prune -af || true
-              docker builder prune -af || true
-              docker network prune -f || true
+                docker container prune -f || true
+                docker image prune -af --filter "until=24h" || true
+                docker builder prune -af --filter "until=24h" || true
+                docker network prune -f || true
 
-              sudo apt-get clean || true
-              sudo journalctl --vacuum-time=2d || true
+                sudo apt-get clean || true
+                sudo journalctl --vacuum-time=3d || true
 
-              sudo find /tmp -mindepth 1 -mtime +1 -delete 2>/dev/null || true
-              sudo find /var/tmp -mindepth 1 -mtime +1 -delete 2>/dev/null || true
-            }
+                sudo find /tmp -mindepth 1 -mtime +1 -delete 2>/dev/null || true
+                sudo find /var/tmp -mindepth 1 -mtime +1 -delete 2>/dev/null || true
+              }
 
-            ensure_min_free_space() {
-              FREE_MB="$(free_space_mb)"
-              FREE_MB="${FREE_MB:-0}"
+              cleanup_aggressive() {
+                echo "==> Aggressive cleanup"
+                echo "==> Removing all unused Docker containers, images, build cache and networks"
+                echo "==> Docker volumes are NOT removed"
 
-              echo "==> Free space: ${FREE_MB} MB"
+                docker container prune -f || true
+                docker image prune -af || true
+                docker builder prune -af || true
+                docker network prune -f || true
 
-              if [ "$FREE_MB" -lt "$MIN_FREE_MB" ]; then
-                echo "==> Free space is below ${MIN_FREE_MB} MB. Running aggressive cleanup..."
-                cleanup_aggressive
-                print_disk_info
+                sudo apt-get clean || true
+                sudo journalctl --vacuum-time=2d || true
 
+                sudo find /tmp -mindepth 1 -mtime +1 -delete 2>/dev/null || true
+                sudo find /var/tmp -mindepth 1 -mtime +1 -delete 2>/dev/null || true
+              }
+
+              ensure_min_free_space() {
                 FREE_MB="$(free_space_mb)"
                 FREE_MB="${FREE_MB:-0}"
 
-                if [ "$FREE_MB" -lt "$CRITICAL_FREE_MB" ]; then
-                  echo "Not enough free disk space after cleanup: ${FREE_MB} MB"
-                  echo "The server disk is too small or contains large non-Docker files."
-                  echo "Increase disk size or remove large files manually."
+                echo "==> Free space: ${FREE_MB} MB"
+
+                if [ "$FREE_MB" -lt "$MIN_FREE_MB" ]; then
+                  echo "==> Free space is below ${MIN_FREE_MB} MB. Running aggressive cleanup..."
+                  cleanup_aggressive
+                  print_disk_info
+
+                  FREE_MB="$(free_space_mb)"
+                  FREE_MB="${FREE_MB:-0}"
+
+                  if [ "$FREE_MB" -lt "$CRITICAL_FREE_MB" ]; then
+                    echo "Not enough free disk space after cleanup: ${FREE_MB} MB"
+                    echo "The server disk is too small or contains large non-Docker files."
+                    echo "Increase disk size or remove large files manually."
+                    exit 1
+                  fi
+                fi
+              }
+
+              login_ghcr() {
+                echo "==> Login to GHCR on server"
+
+                set +x
+                LOGIN_OK=0
+
+                for i in 1 2 3 4 5 6; do
+                  if printf '%s' "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u "${{ secrets.GHCR_USER }}" --password-stdin; then
+                    LOGIN_OK=1
+                    break
+                  fi
+
+                  echo "GHCR login failed. Retry ${i}/6..."
+                  sleep $((i * 10))
+                done
+
+                set -x
+
+                if [ "$LOGIN_OK" -ne 1 ]; then
+                  echo "GHCR login failed after retries"
+                  return 1
+                fi
+
+                echo "GHCR login OK"
+                return 0
+              }
+
+              update_repository() {
+                if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+                  echo "==> Update repository"
+
+                  FETCH_OK=0
+
+                  for i in 1 2 3; do
+                    if git fetch origin main --prune; then
+                      FETCH_OK=1
+                      break
+                    fi
+
+                    echo "git fetch failed. Retry ${i}/3..."
+                    sleep $((i * 5))
+                  done
+
+                  if [ "$FETCH_OK" -ne 1 ]; then
+                    echo "git fetch failed after retries"
+                    exit 1
+                  fi
+
+                  git checkout -B main origin/main
+                  git reset --hard origin/main
+                else
+                  echo "Not a git repo. Skipping pull."
+                fi
+              }
+
+              detect_compose() {
+                if [ -f .env ]; then
+                  ENV_FILE_ARGS="--env-file .env"
+                else
+                  ENV_FILE_ARGS=""
+                fi
+
+                if docker compose version >/dev/null 2>&1; then
+                  COMP="docker compose ${ENV_FILE_ARGS} -f docker-compose.yml"
+                elif docker-compose version >/dev/null 2>&1; then
+                  COMP="docker-compose ${ENV_FILE_ARGS} -f docker-compose.yml"
+                else
+                  echo "Neither 'docker compose' nor 'docker-compose' found."
                   exit 1
                 fi
-              fi
-            }
 
-            mkdir -p "$APP_DIR"
-            cd "$APP_DIR"
+                echo "==> Compose command: ${COMP}"
+              }
 
-            echo "==> Initial disk state"
-            print_disk_info
+              compose_pull_with_retry() {
+                LABEL="$1"
+                ATTEMPTS="${2:-3}"
 
-            echo "==> Pre-deploy cleanup"
-            cleanup_safe
-            print_disk_info
+                for i in $(seq 1 "$ATTEMPTS"); do
+                  echo "==> Pull images (${LABEL}), attempt ${i}/${ATTEMPTS}"
 
-            if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-              echo "==> Update repository"
-              git fetch --all --prune
-              git checkout main || true
-              git reset --hard origin/main
-            else
-              echo "Not a git repo. Skipping pull."
-            fi
+                  if $COMP pull; then
+                    echo "Pull images OK (${LABEL})"
+                    return 0
+                  fi
 
-            echo "==> Login to GHCR on server"
-            set +x
-            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
-            set -x
+                  echo "Pull images failed (${LABEL}), attempt ${i}/${ATTEMPTS}"
 
-            echo "==> Load .env file"
-            set +x
-            set -a
-            [ -f .env ] && source .env
-            set +a
-            set -x
+                  cleanup_safe || true
+                  print_disk_info || true
+                  ensure_min_free_space || true
+                  login_ghcr || true
 
-            export GHCR_OWNER="${{ steps.owner.outputs.lc }}"
-            export GHCR_REG="ghcr.io"
-            export IMAGE_TAG="${{ github.sha }}"
-            [ -n "$IMAGE_TAG" ] || IMAGE_TAG="latest"
+                  sleep $((i * 10))
+                done
 
-            if docker-compose version >/dev/null 2>&1; then
-              COMP="docker-compose --env-file .env -f docker-compose.yml"
-            elif docker compose version >/dev/null 2>&1; then
-              COMP="docker compose --env-file .env -f docker-compose.yml"
-            else
-              echo "Neither 'docker-compose' nor 'docker compose' found."
-              exit 1
-            fi
+                return 1
+              }
 
-            echo "==> Check free space before pulling images"
-            ensure_min_free_space
+              mkdir -p "$APP_DIR"
+              cd "$APP_DIR"
 
-            echo "==> Pull images"
-            if ! $COMP pull; then
-              echo "First pull failed. Running aggressive cleanup and retrying..."
-              cleanup_aggressive
+              echo "==> Check Docker daemon"
+              docker info >/dev/null
+
+              echo "==> Initial disk state"
               print_disk_info
+
+              echo "==> Pre-deploy cleanup"
+              cleanup_safe
+              print_disk_info
+
+              update_repository
+
+              login_ghcr
+
+              echo "==> Load .env file"
+              set +x
+              set -a
+              [ -f .env ] && source .env
+              set +a
+              set -x
+
+              export GHCR_OWNER="${{ steps.owner.outputs.lc }}"
+              export GHCR_REG="ghcr.io"
+              export IMAGE_TAG="${{ github.sha }}"
+
+              if [ -z "${IMAGE_TAG:-}" ]; then
+                IMAGE_TAG="latest"
+                export IMAGE_TAG
+              fi
+
+              detect_compose
+
+              echo "==> Check free space before pulling images"
               ensure_min_free_space
 
-              if ! $COMP pull; then
-                echo "Second pull failed. Trying maintenance fallback with compose down..."
+              echo "==> Pull commit SHA images"
+              if ! compose_pull_with_retry "commit SHA ${IMAGE_TAG}" 3; then
+                echo "Commit SHA pull failed after retries."
+                echo "Trying maintenance fallback with compose down..."
                 echo "==> This may cause a short downtime, but helps free old images on small disks."
 
                 $COMP down --remove-orphans || true
@@ -270,26 +384,31 @@ jobs:
                 cleanup_aggressive
                 print_disk_info
                 ensure_min_free_space
+                login_ghcr
 
-                if ! $COMP pull; then
-                  echo "Commit SHA pull failed. Fallback to latest..."
+                if ! compose_pull_with_retry "commit SHA ${IMAGE_TAG} after cleanup" 2; then
+                  echo "Commit SHA pull still failed. Fallback to latest..."
                   export IMAGE_TAG="latest"
-                  $COMP pull
+
+                  if ! compose_pull_with_retry "latest" 3; then
+                    echo "Latest pull failed after retries"
+                    exit 1
+                  fi
                 fi
               fi
-            fi
 
-            echo "==> Up containers"
-            $COMP up -d --force-recreate --remove-orphans
+              echo "==> Up containers"
+              $COMP up -d --force-recreate --remove-orphans
 
-            echo "==> Final cleanup after successful deploy"
-            docker container prune -f || true
-            docker image prune -af --filter "until=24h" || true
-            docker builder prune -af --filter "until=24h" || true
-            docker network prune -f || true
+              echo "==> Final cleanup after successful deploy"
+              docker container prune -f || true
+              docker image prune -af --filter "until=24h" || true
+              docker builder prune -af --filter "until=24h" || true
+              docker network prune -f || true
 
-            echo "==> Final disk state"
-            print_disk_info
+              echo "==> Final disk state"
+              print_disk_info
 
-            echo "==> Status"
-            docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+              echo "==> Status"
+              docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+          REMOTE_SCRIPT

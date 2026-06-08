@@ -1,6 +1,6 @@
 // apps/web/src/app/lobby/components/PlayersList/PlayersList.tsx
 import { LobbyPlayer as Player } from '@station-eden/shared'
-import { memo, useRef, useEffect } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import styles from './PlayersList.module.css'
 
 interface PlayersListProps {
@@ -13,6 +13,23 @@ interface PlayersListProps {
 	currentUserReadyState: boolean
 }
 
+function MoreDotsIcon() {
+	return (
+		<svg
+			width='24'
+			height='24'
+			viewBox='0 0 24 24'
+			fill='none'
+			xmlns='http://www.w3.org/2000/svg'
+			aria-hidden='true'
+		>
+			<circle cx='5' cy='12' r='2.15' fill='currentColor' />
+			<circle cx='12' cy='12' r='2.15' fill='currentColor' />
+			<circle cx='19' cy='12' r='2.15' fill='currentColor' />
+		</svg>
+	)
+}
+
 export default memo(function PlayersList({
 	players,
 	maxPlayers,
@@ -23,14 +40,12 @@ export default memo(function PlayersList({
 	currentUserReadyState,
 }: PlayersListProps) {
 	const playersListRef = useRef<HTMLDivElement>(null)
-	
-	// Обработчик прокрутки колесиком мыши
+
 	useEffect(() => {
 		const container = playersListRef.current
 		if (!container) return
 
 		const wheelHandler = (e: WheelEvent) => {
-			// Проверяем, нужна ли прокрутка (есть ли контент для прокрутки)
 			if (container.scrollHeight > container.clientHeight) {
 				container.scrollTop += e.deltaY
 				e.preventDefault()
@@ -38,7 +53,7 @@ export default memo(function PlayersList({
 		}
 
 		container.addEventListener('wheel', wheelHandler, { passive: false })
-		
+
 		return () => {
 			container.removeEventListener('wheel', wheelHandler)
 		}
@@ -51,10 +66,7 @@ export default memo(function PlayersList({
 			</h2>
 
 			<div className={styles.playersListContainer}>
-				<div 
-					className={styles.playersList}
-					ref={playersListRef}
-				>
+				<div className={styles.playersList} ref={playersListRef}>
 					{players.map(player => (
 						<div
 							key={player.id}
@@ -74,6 +86,7 @@ export default memo(function PlayersList({
 											: {}
 									}
 								/>
+
 								<div className={styles.playerDetails}>
 									<p className={styles.playerName}>
 										{player.name}
@@ -84,7 +97,6 @@ export default memo(function PlayersList({
 									</p>
 								</div>
 
-								{/* Индикатор голоса / mute: только кружок + полоски */}
 								<div className={styles.voiceStatus}>
 									<span className={styles.voiceDot} />
 									<div className={styles.voiceBars} aria-hidden='true'>
@@ -93,17 +105,16 @@ export default memo(function PlayersList({
 										<span />
 									</div>
 								</div>
-
-								{/* {player.isReady && (
-									<span className={styles.readyBadge}>Готов</span>
-								)} */}
 							</div>
+
 							<button
 								className={styles.dots}
 								onClick={() => onPlayerMenuClick(player)}
 								title='Управление игроком'
+								aria-label='Управление игроком'
+								type='button'
 							>
-								•••
+								<MoreDotsIcon />
 							</button>
 						</div>
 					))}
@@ -129,6 +140,7 @@ export default memo(function PlayersList({
 							? `Достигнут лимит игроков (${maxPlayers})`
 							: 'Добавить игрока'
 					}
+					type='button'
 				>
 					добавить игрока
 					{players.length >= maxPlayers && ' (лимит)'}
@@ -141,6 +153,7 @@ export default memo(function PlayersList({
 					title={
 						!currentUserId ? 'Профиль не загружен' : 'Переключить готовность'
 					}
+					type='button'
 				>
 					{currentUserReadyState ? 'не готов' : 'готов'}
 				</button>

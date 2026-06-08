@@ -44,8 +44,8 @@ type LobbySettings = {
 	fastGame?: boolean
 	tournamentMode?: boolean
 	limitedResources?: boolean
+	searchingPlayers?: boolean
 
-	// игровые настройки для прокидывания в GameGateway
 	maxRounds?: number
 	discussionTime?: number
 	votingTime?: number
@@ -80,6 +80,7 @@ const DEFAULT_LOBBY_SETTINGS: LobbySettings = {
 	votingTime: 60,
 	hiddenRolesCount: 0,
 	enableCrises: true,
+	searchingPlayers: false,
 }
 
 const LOBBY_ID_RE = /^[a-zA-Z0-9_-]{3,32}$/
@@ -357,6 +358,10 @@ export class LobbyGateway
 			hasPassword: !!lobby.passwordHash,
 			visibility: lobby.visibility,
 			isPrivate: lobby.visibility === 'hidden_password',
+			searchingPlayers:
+				lobby.visibility === 'hidden_password'
+					? false
+					: !!lobby.settings.searchingPlayers,
 		}
 	}
 
@@ -379,13 +384,6 @@ export class LobbyGateway
 		if (maxPlayers !== undefined) {
 			next.maxPlayers = maxPlayers
 		}
-
-		const effectiveMaxPlayers =
-			next.maxPlayers ??
-			Math.min(
-				lobby.settings.maxPlayers || DEFAULT_LOBBY_SETTINGS.maxPlayers,
-				HARD_MAX_PLAYERS,
-			)
 
 		const gameMode = normalizeGameMode(rawSettings.gameMode)
 
@@ -454,6 +452,12 @@ export class LobbyGateway
 			next.enableCrises = enableCrises
 		}
 
+		const searchingPlayers = normalizeBoolean(rawSettings.searchingPlayers)
+
+		if (searchingPlayers !== undefined) {
+			next.searchingPlayers = searchingPlayers
+		}
+
 		const fastGame = normalizeBoolean(rawSettings.fastGame)
 
 		if (fastGame !== undefined) {
@@ -470,6 +474,10 @@ export class LobbyGateway
 
 		if (limitedResources !== undefined) {
 			next.limitedResources = limitedResources
+		}
+
+		if (next.visibility === 'hidden_password') {
+			next.searchingPlayers = false
 		}
 
 		return next
@@ -557,15 +565,35 @@ export class LobbyGateway
 
 				return lobby.visibility === 'public' || lobby.visibility === 'password'
 			})
-			.map(([lobbyId, lobby]) => ({
-				lobbyId,
-				playersCount: lobby.players.size,
-				maxPlayers: Math.min(lobby.settings.maxPlayers || 4, HARD_MAX_PLAYERS),
-				gameMode: lobby.settings.gameMode || 'standard',
-				visibility: lobby.visibility === 'password' ? 'password' : 'public',
-				hasPassword: !!lobby.passwordHash,
-				createdAt: lobby.createdAt,
-			}))
+			.map(([lobbyId, lobby]): PublicLobbyInfo => {
+				const visibility: Exclude<LobbyVisibility, 'hidden_password'> =
+					lobby.visibility === 'password' ? 'password' : 'public'
+
+				return {
+					lobbyId,
+					playersCount: lobby.players.size,
+					maxPlayers: Math.min(
+						lobby.settings.maxPlayers || 4,
+						HARD_MAX_PLAYERS,
+					),
+					gameMode: lobby.settings.gameMode || 'standard',
+					visibility,
+					hasPassword: !!lobby.passwordHash,
+					searchingPlayers: !!lobby.settings.searchingPlayers,
+					difficulty: lobby.settings.difficulty || 'normal',
+					turnTime: lobby.settings.turnTime ?? 180,
+					hiddenRolesCount: lobby.settings.hiddenRolesCount ?? 0,
+					enableCrises: lobby.settings.enableCrises !== false,
+					createdAt: lobby.createdAt,
+				}
+			})
+			.sort((a, b) => {
+				if (!!a.searchingPlayers !== !!b.searchingPlayers) {
+					return a.searchingPlayers ? -1 : 1
+				}
+
+				return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+			})
 	}
 
 	afterInit() {
@@ -918,7 +946,7 @@ export class LobbyGateway
 	}
 
 	@SubscribeMessage('UPDATE_LOBBY_SETTINGS')
-	handleUpdateLobbySettings(
+	async handleUpdateLobbySettings(
 		socket: Socket,
 		data: { settings: Partial<LobbySettings> },
 	) {
@@ -941,7 +969,53 @@ export class LobbyGateway
 			return
 		}
 
-		const next = this.normalizeLobbySettingsPatch(data?.settings, lobby)
+		const rawSettings = isRecord(data?.settings) ? data.settings : {}
+		const next = this.normalizeLobbySettingsPatch(rawSettings, lobby)
+
+		const nextVisibility = this.normalizeVisibility(rawSettings.visibility)
+		const wantsPassword =
+			nextVisibility === 'password' || nextVisibility === 'hidden_password'
+		const rawPassword =
+			typeof rawSettings.password === 'string'
+				? rawSettings.password.trim()
+				: ''
+
+		if (nextVisibility !== lobby.visibility) {
+			if (wantsPassword && !lobby.passwordHash && rawPassword.length < 4) {
+				socket.emit('ERROR', {
+					message: 'Пароль должен содержать минимум 4 символа',
+				})
+				return
+			}
+
+			lobby.visibility = nextVisibility
+			next.visibility = nextVisibility
+			next.isPrivate = nextVisibility === 'hidden_password'
+			next.hasPassword = wantsPassword
+
+			if (nextVisibility === 'public') {
+				lobby.passwordHash = undefined
+				next.password = ''
+				next.hasPassword = false
+				next.searchingPlayers = !!next.searchingPlayers
+			}
+
+			if (nextVisibility === 'hidden_password') {
+				next.searchingPlayers = false
+			}
+		}
+
+		if (wantsPassword && rawPassword.length >= 4) {
+			lobby.passwordHash = await bcrypt.hash(rawPassword, 10)
+			next.hasPassword = true
+			next.password = ''
+		}
+
+		if (!wantsPassword) {
+			lobby.passwordHash = undefined
+			next.hasPassword = false
+			next.password = ''
+		}
 
 		Object.assign(lobby.settings, next)
 
@@ -1071,10 +1145,7 @@ export class LobbyGateway
 				maxRounds: lobby.settings.maxRounds ?? 10,
 				discussionTime: lobby.settings.discussionTime ?? 180,
 				votingTime: lobby.settings.votingTime ?? 60,
-				hiddenRolesCount: Math.min(
-					lobby.settings.hiddenRolesCount ?? 0,
-					Math.max(0, playersForGame.length - 1),
-				),
+				hiddenRolesCount: lobby.settings.hiddenRolesCount ? 1 : 0,
 				enableCrises: lobby.settings.enableCrises !== false,
 				difficulty:
 					(lobby.settings.difficulty as 'easy' | 'normal' | 'hard') || 'normal',

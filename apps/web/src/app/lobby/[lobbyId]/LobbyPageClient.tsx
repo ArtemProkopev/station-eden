@@ -26,7 +26,7 @@ const MemoizedChat = memo(Chat)
 const LoadingState = () => (
 	<div className={styles.loadingContainer}>
 		<div className={styles.loadingSpinner}></div>
-		<p>Загрузка лобби...</p>
+		<p>Загрузка лобби</p>
 	</div>
 )
 
@@ -62,6 +62,11 @@ const LobbyContent = memo(function LobbyContent({
 		[lobby.profile],
 	)
 
+	const hostPlayer = useMemo(() => lobby.players[0], [lobby.players])
+
+	const hostName = hostPlayer?.name || lobby.profile.data?.username || 'Игрок'
+	const hostAvatar = hostPlayer?.avatar || lobby.assets.avatar
+
 	return (
 		<>
 			<MemoizedTopHUD profile={topHudProfile} avatar={lobby.assets.avatar} />
@@ -91,6 +96,8 @@ const LobbyContent = memo(function LobbyContent({
 						<MemoizedLobbyInfo
 							lobbySettings={lobby.lobbySettings}
 							playersCount={lobby.players.length}
+							hostName={hostName}
+							hostAvatar={hostAvatar}
 							onOpenSettings={lobby.handleOpenLobbySettings}
 						/>
 					</div>
@@ -146,6 +153,7 @@ const LobbyContent = memo(function LobbyContent({
 						isOpen={lobby.showLobbySettingsModal}
 						onClose={() => lobby.setShowLobbySettingsModal(false)}
 						currentSettings={lobby.lobbySettings}
+						playersCount={lobby.players.length}
 						onSaveSettings={lobby.handleSaveLobbySettings}
 					/>
 				)}
