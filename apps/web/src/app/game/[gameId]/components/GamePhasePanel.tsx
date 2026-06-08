@@ -2,6 +2,7 @@
 'use client'
 
 import {
+	AbilityInfo,
 	CardDetails,
 	CrisisInfo,
 	ExtendedGamePlayer,
@@ -12,6 +13,7 @@ import {
 	RevealedPlayer,
 } from '@station-eden/shared'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import AbilitiesPanel from './AbilitiesPanel'
 import CardsTable from './CardsTable'
 import styles from './GamePhasePanel.module.css'
 import CrisisActions from './phase-actions/CrisisActions'
@@ -46,6 +48,12 @@ interface GamePhasePanelProps {
 	myCards: Record<string, CardDetails>
 	newCardsCount?: number
 	systemMessages?: GameChatMessage[]
+	// Новые пропсы для способностей
+	playerAbilities?: AbilityInfo[]
+	onUseAbility?: (abilityId: string, targetId?: string, extraData?: string) => void
+	playersList?: Array<{ id: string; name: string; isAlive: boolean }>
+	availableProfessions?: Array<{ id: string; name: string }>
+	availableResources?: Array<{ id: string; name: string }>
 }
 
 type LocalTimerSnapshot = {
@@ -92,6 +100,12 @@ export default function GamePhasePanel({
 	myCards,
 	newCardsCount = 0,
 	systemMessages = [],
+	// Новые пропсы для способностей
+	playerAbilities = [],
+	onUseAbility,
+	playersList = [],
+	availableProfessions = [],
+	availableResources = [],
 }: GamePhasePanelProps) {
 	const [isCardsOverviewOpen, setIsCardsOverviewOpen] = useState(false)
 	const [isSystemFeedExpanded, setIsSystemFeedExpanded] = useState(false)
@@ -151,6 +165,9 @@ export default function GamePhasePanel({
 
 		return systemMessages.slice(-COMPACT_SYSTEM_MESSAGES_COUNT)
 	}, [isSystemFeedExpanded, systemMessages])
+
+	// Определяем, доступны ли способности (только в фазах discussion и voting)
+	const abilitiesDisabled = phase !== 'discussion' && phase !== 'voting'
 
 	useEffect(() => {
 		phaseTimeLeftRef.current = phaseTimeLeft
@@ -344,6 +361,9 @@ export default function GamePhasePanel({
 		}
 	}
 
+	// Фильтруем доступные способности (только те, что available === true)
+	const availableAbilities = playerAbilities.filter(ability => ability.available && !ability.used)
+
 	return (
 		<>
 			<section
@@ -393,6 +413,26 @@ export default function GamePhasePanel({
 						</div>
 
 						<div className={styles.gameActions}>{renderPhaseActions()}</div>
+
+						{/* Панель способностей */}
+						{availableAbilities.length > 0 && onUseAbility && (
+							<div className={styles.abilitiesSection}>
+								<div className={styles.abilitiesSectionHeader}>
+									<span className={styles.abilitiesEyebrow}>
+										Активация способностей
+									</span>
+									<h3>Особые возможности</h3>
+								</div>
+								<AbilitiesPanel
+									abilities={playerAbilities}
+									onUseAbility={onUseAbility}
+									players={playersList}
+									professions={availableProfessions}
+									resources={availableResources}
+									disabled={abilitiesDisabled}
+								/>
+							</div>
+						)}
 
 						{systemMessages.length > 0 && (
 							<div

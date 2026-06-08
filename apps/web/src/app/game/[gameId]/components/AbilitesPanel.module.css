@@ -1,0 +1,186 @@
+/* Добавьте в page.module.css */
+
+.abilitiesPanel {
+  margin: 16px 0;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  border: 1px solid rgba(99, 239, 255, 0.2);
+}
+
+.abilitiesPanel h3 {
+  color: #63efff;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.abilitiesList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.abilityButton {
+  background: rgba(99, 239, 255, 0.1);
+  border: 1px solid #63efff;
+  color: #63efff;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.abilityButton:hover:not(:disabled) {
+  background: rgba(99, 239, 255, 0.2);
+  transform: scale(1.02);
+}
+
+.abilityDisabled {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.3);
+  cursor: not-allowed;
+}
+
+.abilityUsed {
+  background: rgba(76, 175, 80, 0.1);
+  border-color: #4caf50;
+  color: #4caf50;
+  cursor: default;
+  opacity: 0.7;
+}
+
+.abilitySelected {
+  background: rgba(76, 175, 80, 0.2);
+  border-color: #4caf50;
+  color: #4caf50;
+  transform: scale(1.02);
+}
+
+.abilityName {
+  font-size: 12px;
+}
+
+.abilityUsedBadge {
+  margin-left: 8px;
+  font-size: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.noAbilities {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+  text-align: center;
+  padding: 16px;
+}
+
+.abilityModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+}
+
+.abilityModalContent {
+  background: #0a0a1a;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  border: 1px solid #63efff;
+}
+
+.abilityModalContent h3 {
+  color: #63efff;
+  margin-bottom: 12px;
+}
+
+.abilityModalContent p {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.targetSelector {
+  margin: 16px 0;
+}
+
+.targetSelector h4 {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.targetList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.targetButton {
+  background: rgba(99, 239, 255, 0.1);
+  border: 1px solid rgba(99, 239, 255, 0.3);
+  color: #63efff;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.targetButton:hover {
+  background: rgba(99, 239, 255, 0.2);
+}
+
+.targetSelected {
+  background: rgba(76, 175, 80, 0.2);
+  border-color: #4caf50;
+  color: #4caf50;
+}
+
+.modalActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.confirmButton {
+  flex: 1;
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid #4caf50;
+  color: #4caf50;
+  padding: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'RussoOne', sans-serif;
+}
+
+.confirmButton:hover {
+  background: rgba(76, 175, 80, 0.2);
+}
+
+.cancelButton {
+  flex: 1;
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid #ff6b6b;
+  color: #ff6b6b;
+  padding: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'RussoOne', sans-serif;
+}
+
+.cancelButton:hover {
+  background: rgba(255, 107, 107, 0.2);
+}

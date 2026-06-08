@@ -151,6 +151,32 @@ type GamePlayer = {
 
 	vote?: string
 	votesAgainst: number
+
+	// Для инопланетного шпиона
+	alienSpyDisguise?: string
+	alienSpyTrustedBy?: string[]
+	usedAlienSpyDisguise?: boolean
+
+	// Для безумного учёного
+	researchProgress?: number
+	usedMadScientistCrisis?: boolean
+
+	// Для крипто-трейдера
+	traderDebts?: Map<string, number>
+	usedTraderExchange?: boolean
+
+	// Для отслеживания состояний
+	isPanicking?: boolean
+	isStimulated?: boolean
+	stimulantRoundsLeft?: number
+
+	// Для других способностей
+	usedGeneticModification?: boolean
+	usedBloggerStream?: boolean
+	usedExBossConnection?: boolean
+	usedEcologistRecycling?: boolean
+	usedXenopsychologistDetect?: boolean
+	usedPsychiatristStabilize?: boolean
 }
 
 type GamePhase =
@@ -228,13 +254,11 @@ type GameState = {
 	introCompletedBy: Set<string>
 	introSkippedBy: Set<string>
 
-	// Система очереди говорящих
 	currentSpeakerId?: string
 	speakingQueue: string[]
 	speakingTimePerPlayer: number
 	speakerStartTime?: number
 
-	// Система очереди раскрытия карт
 	revealQueue: string[]
 	currentRevealQueueIndex: number
 }
@@ -245,7 +269,7 @@ const MSG_MAX_PER_WINDOW = 15
 const MSG_MAX_LEN = 300
 
 const INTRO_DURATION_SECONDS = 45
-const SPEAKING_TIME_PER_PLAYER = 90 // 1.5 минуты на игрока
+const SPEAKING_TIME_PER_PLAYER = 90
 
 function formatCapsuleSlotsCount(value: number) {
 	const safeValue = Math.max(1, Math.floor(value))
@@ -270,6 +294,10 @@ function createIntroNarrationText(game: GameState) {
 		'Экипаж должен решить, кто получит шанс на спасение. Но страх, ложь и саботаж уже стали частью этой станции.',
 	].join('\n')
 }
+
+// ============================================================================
+// КОЛОДЫ КАРТ
+// ============================================================================
 
 const PROFESSIONS: Profession[] = [
 	{
@@ -320,6 +348,86 @@ const PROFESSIONS: Profession[] = [
 		cons: ['Может действовать слишком жёстко'],
 		priority: ['external', 'technological'],
 	},
+	{
+		id: 'prof_astrogeologist',
+		name: 'Астрогеолог',
+		description: 'Говорит с камнями. Камни отвечают редко, но метко.',
+		pros: ['Может определить состав астероидов и предсказать метеоритный дождь'],
+		cons: ['Вечно в скафандре, пропускает важные обсуждения'],
+		priority: ['external'],
+	},
+	{
+		id: 'prof_xenopsychologist',
+		name: 'Ксенопсихолог',
+		description: 'Знает, что у инопланетян на уме. Иногда это пугает.',
+		pros: ['Может определить, кто из игроков скрывает контакт с чужими'],
+		cons: ['Сама подозревается в симпатиях к ксенофагам'],
+		priority: ['biological', 'external'],
+	},
+	{
+		id: 'prof_genetic_engineer',
+		name: 'Генный инженер',
+		description: 'Может переписать ДНК на ходу. Этично? Не очень.',
+		pros: ['Может изменить одну свою характеристику за игру'],
+		cons: ['Риск мутации (случайное негативное последствие)'],
+		priority: ['biological'],
+	},
+	{
+		id: 'prof_ecologist',
+		name: 'Эколог замкнутого цикла',
+		description: 'Ничто не пропадает даром. Даже трупы.',
+		pros: ['Может переработать любой ресурс в кислород'],
+		cons: ['Вызывает отвращение у некоторых членов экипажа'],
+		priority: ['biological'],
+	},
+	{
+		id: 'prof_ai_activist',
+		name: 'Активист за права ИИ',
+		description: 'У машин тоже есть душа. И право на место в капсуле.',
+		pros: ['Получает союзника, если в игре есть ИИ-персонаж'],
+		cons: ['Защищает любых андроидов, даже если они опасны'],
+		priority: [],
+	},
+	{
+		id: 'prof_blogger',
+		name: 'Космический блогер',
+		description: 'Подписчики важнее кислорода!',
+		pros: ['Может один раз "записать стрим"'],
+		cons: ['Весь экипаж знает, что он бесполезен'],
+		priority: [],
+	},
+	{
+		id: 'prof_food_critic',
+		name: 'Штатный критик еды',
+		description: 'Синтетическая паста? Один звёздочка, не рекомендую.',
+		pros: ['Может определить, не отравлена ли еда'],
+		cons: ['Вечно недоволен'],
+		priority: ['biological'],
+	},
+	{
+		id: 'prof_cleaner_android',
+		name: 'Уборщик-андроид',
+		description: 'Могу пропылесосить станцию до блеска. Или труп.',
+		pros: ['Знает все тайные углы и закоулки'],
+		cons: ['Никто не воспринимает всерьёз'],
+		priority: [],
+	},
+	{
+		id: 'prof_crypto_trader',
+		name: 'Крипто-трейдер',
+		description: 'Курс кислорода упал! Вкладывайтесь в мемкойны!',
+		pros: ['Может обменять любой ресурс на другой'],
+		cons: ['Весь экипаж считает его мошенником'],
+		priority: [],
+	},
+	{
+		id: 'prof_ex_boss',
+		name: 'Бывший начальник (ныне никто)',
+		description: 'Привык командовать, но не привык подчиняться.',
+		pros: ['Вспоминает старые связи'],
+		cons: ['Не выполняет чужих приказов'],
+		priority: [],
+	},
 ]
 
 const HEALTH_STATUSES: HealthStatus[] = [
@@ -349,6 +457,69 @@ const HEALTH_STATUSES: HealthStatus[] = [
 		name: 'Отличное здоровье',
 		description: 'Редкий случай, когда медкарта почти пустая',
 		effects: ['Лучше переносит штрафы и кризисы'],
+	},
+	{
+		id: 'health_adapted_to_weightlessness',
+		name: 'Адаптированный к невесомости',
+		description: 'В космосе как рыба в воде.',
+		effects: ['Не страдает от гравитационных аномалий'],
+		hidden: false,
+	},
+	{
+		id: 'health_brittle_bones',
+		name: 'Хрупкие кости',
+		description: 'Удар — и гипс обеспечен.',
+		effects: ['Легко травмируется в кризисах', 'Получает приоритет в медицинской помощи'],
+		hidden: false,
+	},
+	{
+		id: 'health_imposter_syndrome',
+		name: 'Синдром самозванца',
+		description: 'Постоянно чувствует, что не заслуживает места в капсуле.',
+		effects: ['-2 к убеждению, когда речь идёт о его собственном спасении', '+2 к убеждению, когда защищает других'],
+		hidden: false,
+	},
+	{
+		id: 'health_stimulant_dependent',
+		name: 'Зависимость от стимуляторов',
+		description: 'Без таблетки — никуда.',
+		effects: ['Под стимуляторами +2 ко всем действиям'],
+		hidden: false,
+	},
+	{
+		id: 'health_dropping_syndrome',
+		name: 'Синдром "всё падает из рук"',
+		description: 'Даже в невесомости умудряется что-то уронить.',
+		effects: ['Постоянно теряет важные вещи'],
+		hidden: false,
+	},
+	{
+		id: 'health_space_snoring',
+		name: 'Храп в условиях невесомости',
+		description: 'От него трясётся вся станция.',
+		effects: ['Всегда знают, где он находится'],
+		hidden: false,
+	},
+	{
+		id: 'health_synthetic_allergy',
+		name: 'Гастрономическая аллергия на синтетику',
+		description: 'От пасты — сыпь, от чипов — анафилаксия.',
+		effects: ['Не может есть стандартную еду, нужны особые пайки'],
+		hidden: false,
+	},
+	{
+		id: 'health_no_regeneration',
+		name: 'Генетическая несовместимость с регенерацией',
+		description: 'Лечение? Нет, не слышал.',
+		effects: ['Любые медицинские процедуры не работают на нём', 'Не может быть заражён биологическими угрозами'],
+		hidden: false,
+	},
+	{
+		id: 'health_parkinson',
+		name: 'Болезнь Паркинсона',
+		description: 'Руки трясутся, но мозг работает.',
+		effects: ['Не может выполнять точные действия (чинить, стрелять)'],
+		hidden: false,
 	},
 ]
 
@@ -381,6 +552,69 @@ const PSYCHOLOGICAL_TRAITS: PsychologicalTrait[] = [
 		effects: ['Сложно прочитать мотивы', 'Вызывает подозрения'],
 		triggers: ['discussion', 'voting'],
 	},
+	{
+		id: 'trait_phlegmatic',
+		name: 'Флегматик',
+		description: 'Спокоен, как удав.',
+		effects: ['Не поддаётся панике в кризисах'],
+		triggers: ['crisis'],
+	},
+	{
+		id: 'trait_humorist',
+		name: 'Юморист',
+		description: 'И в огне пляшет и шутит.',
+		effects: ['Повышает мораль команды'],
+		triggers: ['discussion'],
+	},
+	{
+		id: 'trait_autistic',
+		name: 'Аутист',
+		description: 'Гений в одном, беспомощен в другом.',
+		effects: ['-1 к дипломатии'],
+		triggers: ['discussion', 'voting'],
+	},
+	{
+		id: 'trait_fatalist',
+		name: 'Фаталист',
+		description: 'Что будет, того не миновать.',
+		effects: ['Не борется до конца (сдаётся при первой серьёзной угрозе)'],
+		triggers: ['crisis', 'voting'],
+	},
+	{
+		id: 'trait_alien_fan',
+		name: 'Фанат инопланетных сериалов',
+		description: 'Верит, что ксенофаги на самом деле добрые.',
+		effects: ['Защищает любых инопланетян, даже явно враждебных'],
+		triggers: ['discussion', 'crisis'],
+	},
+	{
+		id: 'trait_silence_fear',
+		name: 'Боязнь тишины',
+		description: 'В космосе слишком тихо. Это подозрительно.',
+		effects: ['Постоянно что-то бормочет, мешая другим'],
+		triggers: ['crisis', 'discussion'],
+	},
+	{
+		id: 'trait_pathological_liar',
+		name: 'Патологическая лживость',
+		description: 'Правда — это просто недосказанная ложь.',
+		effects: ['Даже когда говорит правду, никто не верит'],
+		triggers: ['discussion', 'voting'],
+	},
+	{
+		id: 'trait_megalomania',
+		name: 'Мания величия',
+		description: 'Я — солнце этой системы. Все вращаются вокруг меня.',
+		effects: ['Требует, чтобы его спасли в первую очередь. Игнорирует чужие аргументы'],
+		triggers: ['discussion', 'voting'],
+	},
+	{
+		id: 'trait_sociopathy',
+		name: 'Социопатия',
+		description: 'Эмпатия? Не, не слышал.',
+		effects: ['Может использовать чужие слабости против них'],
+		triggers: ['discussion', 'voting', 'crisis'],
+	},
 ]
 
 const SECRETS: Secret[] = [
@@ -408,6 +642,46 @@ const SECRETS: Secret[] = [
 		abilities: ['Может запутать проверку личности'],
 		isHiddenRole: false,
 	},
+	{
+		id: 'secret_alien_spy',
+		name: 'Инопланетный шпион (не враждебный)',
+		description: 'Прилетел с миром, но никто не верит',
+		goal: 'Убедить хотя бы одного игрока помочь мне скрыться',
+		abilities: ['Меняю внешность (могу притворяться другой профессией)'],
+		isHiddenRole: true,
+	},
+	{
+		id: 'secret_journalist',
+		name: 'Журналист-расследователь',
+		description: 'Ищет правду любой ценой',
+		goal: 'Раскрыть настоящую причину катастрофы до конца игры',
+		abilities: ['Могу задавать "неудобные" вопросы, на которые другие обязаны отвечать правду (один раз)'],
+		isHiddenRole: false,
+	},
+	{
+		id: 'secret_cult_leader',
+		name: 'Религиозный лидер секты "Тишина"',
+		description: 'Тишина — это спасение',
+		goal: 'Убедить не менее трёх игроков добровольно остаться на станции',
+		abilities: ['Могу провести "обряд", который даёт бонусы добровольцам'],
+		isHiddenRole: false,
+	},
+	{
+		id: 'secret_creator',
+		name: 'Учёный, создавший AI',
+		description: 'Моё творение вышло из-под контроля',
+		goal: 'Остановить своё творение (или помочь ему, если передумал)',
+		abilities: ['Знаю слабые места AI'],
+		isHiddenRole: false,
+	},
+	{
+		id: 'secret_station_destroyer',
+		name: 'Тот, кто уничтожил предыдущую станцию',
+		description: 'История повторяется?',
+		goal: 'Скрыть это любой ценой. Если раскроют — проиграл',
+		abilities: ['Знает все уязвимости станции'],
+		isHiddenRole: true,
+	},
 ]
 
 const RESOURCES: Resource[] = [
@@ -432,60 +706,132 @@ const RESOURCES: Resource[] = [
 		effect: 'Даёт дополнительную информацию при обсуждении',
 		occupiesSpace: true,
 	},
+	{
+		id: 'resource_magnetic_gloves',
+		name: 'Магнитные перчатки',
+		description: 'Позволяют передвигаться по внешней обшивке станции',
+		effect: 'Может выйти в открытый космос',
+		occupiesSpace: true,
+	},
+	{
+		id: 'resource_universal_keycard',
+		name: 'Универсальный ключ-карта',
+		description: 'Открывает любую дверь на станции',
+		effect: 'Доступ в любые отсеки',
+		occupiesSpace: false,
+	},
+	{
+		id: 'resource_mini_reactor',
+		name: 'Мини-реактор',
+		description: 'Может заменить основной источник питания',
+		effect: 'Обеспечивает энергией всю станцию',
+		occupiesSpace: true,
+	},
+	{
+		id: 'resource_oxygen_generator',
+		name: 'Генератор кислорода',
+		description: 'Обеспечивает дыхание для 2 человек',
+		effect: 'Создаёт кислород',
+		occupiesSpace: true,
+	},
+	{
+		id: 'resource_black_box',
+		name: 'Чёрный ящик',
+		description: 'Содержит записи последних минут станции',
+		effect: 'Раскрывает секретную информацию',
+		occupiesSpace: false,
+	},
+	{
+		id: 'resource_alien_sample',
+		name: 'Образец неизвестной формы жизни в банке',
+		description: 'Может быть оружием или ключом к спасению',
+		effect: 'Неизвестный эффект',
+		occupiesSpace: false,
+	},
+	{
+		id: 'resource_canned_food',
+		name: 'Запас консервов на год',
+		description: 'Обеспечивает едой всю команду',
+		effect: 'Решает проблему голода',
+		occupiesSpace: true,
+	},
+	{
+		id: 'resource_water_filter',
+		name: 'Водный фильтр',
+		description: 'Очищает любую воду',
+		effect: 'Обеспечивает чистой водой',
+		occupiesSpace: true,
+	},
+	{
+		id: 'resource_nano_medkit',
+		name: 'Аптечка с наноботами',
+		description: 'Лечит любые раны (один раз)',
+		effect: 'Полное исцеление одного игрока',
+		occupiesSpace: false,
+	},
+	{
+		id: 'resource_moonshine',
+		name: 'Контрабандный алкоголь (самогон)',
+		description: 'Пьём, пока не взлетим!',
+		effect: 'Разве могут быть минусы?',
+		occupiesSpace: false,
+	},
+	{
+		id: 'resource_speaker',
+		name: 'Музыкальная колонка (без наушников)',
+		description: 'Музыка сближает. Или бесит.',
+		effect: 'Повышает мораль',
+		occupiesSpace: true,
+	},
+	{
+		id: 'resource_mutant_cockroach',
+		name: 'Ручной таракан-мутант',
+		description: 'Маленький, пушистый, противный.',
+		effect: 'Все его боятся. Может отправить таракана в труднодоступные места (разведка)',
+		occupiesSpace: false,
+	},
 ]
 
 const HIDDEN_ROLES: HiddenRole[] = [
 	{
 		id: 'role_saboteur',
 		name: 'Саботажник',
-		description:
-			'Член экипажа с тайной задачей сорвать эвакуацию. Ему выгодны кризисы, недоверие и нехватка мест в капсуле.',
-		goal: 'Сорвать безопасную эвакуацию и уменьшить количество мест в капсуле.',
-		abilities: [
-			'Один раз за раунд может устроить саботаж и уменьшить количество мест в капсуле на 1.',
-			'После саботажа случайный невиновный игрок получает статус подозрительного.',
-		],
-		winCondition:
-			'Побеждает, если эвакуация становится невозможной или капсуле не хватает мест для выживших.',
+		description: 'Член экипажа с тайной задачей сорвать эвакуацию',
+		goal: 'Сорвать безопасную эвакуацию и уменьшить количество мест в капсуле',
+		abilities: ['Может устроить саботаж и уменьшить количество мест в капсуле'],
+		winCondition: 'Эвакуация становится невозможной или капсуле не хватает мест',
 	},
 	{
 		id: 'role_xenophag',
 		name: 'Агент ксенофагов',
-		description:
-			'Носитель инопланетной формы жизни. Выглядит как обычный член экипажа, но пытается доставить заражение дальше.',
-		goal: 'Заразить хотя бы одного выжившего и сохранить заражение до финала.',
-		abilities: [
-			'Может заразить выбранного живого игрока.',
-			'Заражённые игроки выглядят опаснее и усиливают подозрения в экипаже.',
-		],
-		winCondition:
-			'Побеждает, если к моменту проверки среди игроков есть хотя бы один заражённый.',
+		description: 'Носитель инопланетной формы жизни',
+		goal: 'Заразить хотя бы одного выжившего',
+		abilities: ['Может заразить выбранного живого игрока'],
+		winCondition: 'Среди игроков есть хотя бы один заражённый',
 	},
 	{
 		id: 'role_gray_cardinal',
 		name: 'Серый кардинал',
-		description:
-			'Манипулятор, которому выгодно, чтобы экипаж сам разрушал доверие и исключал друг друга.',
-		goal: 'Дожить до момента, когда из игры исключены минимум два игрока.',
-		abilities: [
-			'Получает выгоду от каждого успешного исключения.',
-			'Побеждает через хаос, если экипаж слишком часто голосует против своих.',
-		],
-		winCondition:
-			'Побеждает, если остаётся живым после исключения двух или более игроков.',
+		description: 'Манипулятор, которому выгоден хаос',
+		goal: 'Дожить до исключения двух игроков',
+		abilities: ['Получает выгоду от каждого успешного исключения'],
+		winCondition: 'Остаётся живым после исключения двух игроков',
 	},
 	{
 		id: 'role_false_witness',
 		name: 'Ложный свидетель',
-		description:
-			'Игрок с фальшивыми уликами. Может направлять подозрения на других и ломать доверие внутри группы.',
-		goal: 'Подставить другого игрока и пережить хотя бы одно голосование после этого.',
-		abilities: [
-			'Может пометить выбранного игрока как подозрительного.',
-			'Подозрительный игрок выглядит опаснее в списке игроков.',
-		],
-		winCondition:
-			'Побеждает, если остаётся живым, когда в игре есть подозрительный невиновный игрок.',
+		description: 'Игрок с фальшивыми уликами',
+		goal: 'Подставить другого игрока',
+		abilities: ['Может пометить выбранного игрока как подозрительного'],
+		winCondition: 'Остаётся живым, когда есть подозрительный невиновный',
+	},
+	{
+		id: 'role_mad_scientist',
+		name: 'Безумный учёный',
+		description: 'Проводит опасные эксперименты',
+		goal: 'Завершить исследование любой ценой',
+		abilities: ['Может создать кризис намеренно'],
+		winCondition: 'research_complete',
 	},
 ]
 
@@ -507,9 +853,20 @@ const GENDERS: Gender[] = [
 			'Может один раз за игру сменить восприятие себя другими, отменив один голос против себя',
 		],
 	},
+	{
+		id: 'gender_android',
+		name: 'Андроид',
+		bonuses: ['Не нуждается в кислороде', 'Не подвержен болезням'],
+	},
 ]
 
 const AGES: Age[] = [
+	{
+		id: 'age_child',
+		name: 'Ребёнок',
+		range: '10-17',
+		effects: ['Вызывает доверие', 'Менее опытен'],
+	},
 	{
 		id: 'age_young',
 		name: 'Молодой',
@@ -527,6 +884,12 @@ const AGES: Age[] = [
 		name: 'Пожилой',
 		range: '51-70',
 		effects: ['+2 к опыту', '-1 к выносливости'],
+	},
+	{
+		id: 'age_immortal',
+		name: 'Бессмертный',
+		range: '???',
+		effects: ['Странное поведение', 'Не стареет'],
 	},
 ]
 
@@ -546,7 +909,51 @@ const BODY_TYPES: BodyType[] = [
 		name: 'Среднее',
 		effects: ['Без выраженных бонусов и штрафов'],
 	},
+	{
+		id: 'body_agile',
+		name: 'Поджарое',
+		effects: ['+2 к скрытности', '+1 к скорости', '-1 к силе'],
+	},
+	{
+		id: 'body_small',
+		name: 'Низкорослое',
+		effects: ['+1 к скрытности', 'Может прятаться в труднодоступных местах'],
+	},
+	{
+		id: 'body_bioluminescent',
+		name: 'Биолюминесцентное',
+		effects: ['Не нуждается в фонарике'],
+	},
+	{
+		id: 'body_fragile',
+		name: 'Хрупкое',
+		effects: ['+1 к скрытности', '-2 к выносливости', 'Легче получает травмы'],
+	},
+	{
+		id: 'body_asymmetric',
+		name: 'Асимметричное',
+		effects: ['-1 к точным действиям', 'Одна рука длиннее другой'],
+	},
+	{
+		id: 'body_tiny',
+		name: 'Миниатюрное (15 см)',
+		effects: ['Может спрятаться где угодно', 'Не может использовать тяжёлые предметы'],
+	},
+	{
+		id: 'body_slime',
+		name: 'Слизнеподобное тело',
+		effects: ['Может разделяться на части', 'Боится соли'],
+	},
+	{
+		id: 'body_overweight',
+		name: 'Крупное',
+		effects: ['+2 к выносливости', '-1 к скрытности', '-1 к скорости'],
+	},
 ]
+
+// ============================================================================
+// WEBSOCKET GATEWAY
+// ============================================================================
 
 @WebSocketGateway({
 	path: '/game',
@@ -1019,7 +1426,6 @@ export class GameGateway
 			return
 		}
 
-		// Проверяем, что игрок может раскрыть карту по очереди
 		const currentRevealPlayerId = game.revealQueue[game.currentRevealQueueIndex]
 		if (currentRevealPlayerId !== userId) {
 			const currentPlayerName = game.players.get(currentRevealPlayerId)?.name
@@ -1080,7 +1486,6 @@ export class GameGateway
 
 		this.broadcastGameState(gameId)
 
-		// После раскрытия карты переходим к следующему игроку в очереди раскрытия
 		if (game.currentRevealQueueIndex < game.revealQueue.length - 1) {
 			game.currentRevealQueueIndex++
 		} else {
@@ -1170,6 +1575,17 @@ export class GameGateway
 			return
 		}
 
+		// Проверка долгов для крипто-трейдера
+		if (player.profession?.id === 'prof_crypto_trader' && player.traderDebts) {
+			const debtToTarget = player.traderDebts.get(targetPlayerId)
+			if (debtToTarget && debtToTarget > 0) {
+				socket.emit('ERROR', {
+					message: `Вы не можете голосовать против ${targetPlayer.name}, так как он ваш должник (${debtToTarget} условных единиц)!`
+				})
+				return
+			}
+		}
+
 		player.vote = targetPlayerId
 		targetPlayer.votesAgainst = (targetPlayer.votesAgainst || 0) + 1
 
@@ -1193,7 +1609,7 @@ export class GameGateway
 	@SubscribeMessage('USE_ABILITY')
 	handleUseAbility(
 		socket: Socket,
-		data: { ability?: string; targetPlayerId?: string },
+		data: { ability?: string; targetPlayerId?: string; cardType?: string; resourceId?: string; professionId?: string },
 	) {
 		const { userId, gameId } = socket.data
 		const game = this.games.get(gameId)
@@ -1207,7 +1623,7 @@ export class GameGateway
 			return
 		}
 
-		if (player.hasUsedAbility) {
+		if (player.hasUsedAbility && data?.ability !== 'alien_spy_request_help') {
 			socket.emit('ERROR', {
 				message: 'Способность уже использована в этом раунде',
 			})
@@ -1222,7 +1638,6 @@ export class GameGateway
 					socket.emit('ERROR', { message: 'У вас нет способности саботажа' })
 					return
 				}
-
 				this.handleSabotage(game, userId)
 				abilityUsed = true
 				break
@@ -1232,19 +1647,15 @@ export class GameGateway
 					socket.emit('ERROR', { message: 'У вас нет способности заражения' })
 					return
 				}
-
 				this.handleInfect(game, userId, data?.targetPlayerId)
 				abilityUsed = true
 				break
 
 			case 'frame':
 				if (player.hiddenRole?.id !== 'role_false_witness') {
-					socket.emit('ERROR', {
-						message: 'У вас нет способности подставить игрока',
-					})
+					socket.emit('ERROR', { message: 'У вас нет способности подставить игрока' })
 					return
 				}
-
 				this.handleFramePlayer(game, userId, data?.targetPlayerId)
 				abilityUsed = true
 				break
@@ -1254,9 +1665,92 @@ export class GameGateway
 					socket.emit('ERROR', { message: 'У вас нет этой способности' })
 					return
 				}
-
 				this.handleNonbinaryAbility(game, userId)
 				abilityUsed = true
+				break
+
+			case 'alien_spy_disguise':
+				if (player.secret?.id !== 'secret_alien_spy') {
+					socket.emit('ERROR', { message: 'У вас нет этой способности' })
+					return
+				}
+				abilityUsed = this.handleAlienSpyDisguise(game, userId, data?.professionId)
+				break
+
+			case 'alien_spy_request_help':
+				if (player.secret?.id !== 'secret_alien_spy') {
+					socket.emit('ERROR', { message: 'У вас нет этой способности' })
+					return
+				}
+				abilityUsed = this.handleAlienSpyRequestHelp(game, userId, data?.targetPlayerId || '')
+				break
+
+			case 'nano_medkit_use':
+				abilityUsed = this.handleNanoMedkitUse(game, userId, data?.targetPlayerId)
+				break
+
+			case 'mad_scientist_crisis':
+				if (player.hiddenRole?.id !== 'role_mad_scientist') {
+					socket.emit('ERROR', { message: 'У вас нет этой способности' })
+					return
+				}
+				abilityUsed = this.handleMadScientistCreateCrisis(game, userId)
+				break
+
+			case 'crypto_trader_exchange':
+				if (player.profession?.id !== 'prof_crypto_trader') {
+					socket.emit('ERROR', { message: 'У вас нет этой способности' })
+					return
+				}
+				abilityUsed = this.handleCryptoTraderExchange(game, userId, data?.targetPlayerId || '', data?.resourceId)
+				break
+
+			case 'genetic_modification':
+				if (player.profession?.id !== 'prof_genetic_engineer') {
+					socket.emit('ERROR', { message: 'У вас нет этой способности' })
+					return
+				}
+				abilityUsed = this.handleGeneticModification(game, userId)
+				break
+
+			case 'blogger_stream':
+				if (player.profession?.id !== 'prof_blogger') {
+					socket.emit('ERROR', { message: 'У вас нет этой способности' })
+					return
+				}
+				abilityUsed = this.handleBloggerStream(game, userId)
+				break
+
+			case 'ex_boss_connection':
+				if (player.profession?.id !== 'prof_ex_boss') {
+					socket.emit('ERROR', { message: 'У вас нет этой способности' })
+					return
+				}
+				abilityUsed = this.handleExBossConnection(game, userId)
+				break
+
+			case 'ecologist_recycling':
+				if (player.profession?.id !== 'prof_ecologist') {
+					socket.emit('ERROR', { message: 'У вас нет этой способности' })
+					return
+				}
+				abilityUsed = this.handleEcologistRecycling(game, userId)
+				break
+
+			case 'xenopsychologist_detect':
+				if (player.profession?.id !== 'prof_xenopsychologist') {
+					socket.emit('ERROR', { message: 'У вас нет этой способности' })
+					return
+				}
+				abilityUsed = this.handleXenopsychologistDetect(game, userId)
+				break
+
+			case 'psychiatrist_stabilize':
+				if (player.profession?.id !== 'prof_psychiatrist') {
+					socket.emit('ERROR', { message: 'У вас нет этой способности' })
+					return
+				}
+				abilityUsed = this.handlePsychiatristStabilize(game, userId, data?.targetPlayerId || '')
 				break
 
 			default:
@@ -1264,9 +1758,11 @@ export class GameGateway
 				return
 		}
 
-		if (abilityUsed) {
+		if (abilityUsed && data?.ability !== 'alien_spy_request_help') {
 			player.hasUsedAbility = true
 			this.broadcastGameState(gameId)
+		} else if (!abilityUsed) {
+			socket.emit('ERROR', { message: 'Не удалось использовать способность' })
 		}
 	}
 
@@ -1299,6 +1795,25 @@ export class GameGateway
 			game.currentCrisis.isActive = false
 			game.currentCrisis.solvedBy = userId
 			player.score += 20
+
+			// Обработка кризиса для безумного учёного
+			const scientist = Array.from(game.players.values()).find(
+				p => p.hiddenRole?.id === 'role_mad_scientist' && p.isAlive === true
+			)
+			if (scientist) {
+				if (scientist.id === userId) {
+					scientist.researchProgress = (scientist.researchProgress || 0) + 50
+					this.broadcastSystemMessage(game, `${scientist.name} использовал кризис для своего исследования! Прогресс: ${scientist.researchProgress}%`)
+				} else {
+					scientist.researchProgress = (scientist.researchProgress || 0) + 10
+					this.broadcastSystemMessage(game, `Исследование ${scientist.name} продвинулось благодаря кризису. Прогресс: ${scientist.researchProgress}%`)
+				}
+				
+				if (scientist.researchProgress && scientist.researchProgress >= 100) {
+					this.endGame(game, [scientist.id], 'research_complete')
+					return
+				}
+			}
 
 			this.broadcastToGame(gameId, 'CRISIS_SOLVED', {
 				playerId: userId,
@@ -1382,6 +1897,10 @@ export class GameGateway
 		socket.emit('HEARTBEAT_ACK', { timestamp: Date.now() })
 	}
 
+	// ============================================================================
+	// ОСНОВНАЯ ИГРОВАЯ ЛОГИКА
+	// ============================================================================
+
 	private async startGameSession(game: GameState) {
 		this.logger.log(`Запуск игровой сессии для ${game.id}`)
 
@@ -1443,6 +1962,22 @@ export class GameGateway
 			player.vote = undefined
 			player.isCaptain = false
 			player.isSeniorOfficer = false
+			player.isPanicking = false
+			player.isStimulated = false
+			player.stimulantRoundsLeft = 0
+			player.usedGeneticModification = false
+			player.usedBloggerStream = false
+			player.usedExBossConnection = false
+			player.usedEcologistRecycling = false
+			player.usedXenopsychologistDetect = false
+			player.usedPsychiatristStabilize = false
+			player.usedTraderExchange = false
+			player.usedAlienSpyDisguise = false
+			player.alienSpyTrustedBy = []
+			player.alienSpyDisguise = undefined
+			player.researchProgress = 0
+			player.usedMadScientistCrisis = false
+			player.traderDebts = new Map()
 
 			player.profession = undefined
 			player.healthStatus = undefined
@@ -1467,31 +2002,39 @@ export class GameGateway
 		const players = Array.from(game.players.values())
 		const professionsPool = [...PROFESSIONS]
 		const hiddenRolesPool = [...HIDDEN_ROLES]
+		const secretsPool = [...SECRETS]
 
+		// Раздаём профессии
 		players.forEach(player => {
 			player.profession = this.takeRandomFromPoolWithFallback(
 				professionsPool,
 				PROFESSIONS,
 			)
-
-			player.roleCard = undefined
-			player.isCaptain = false
-			player.isSeniorOfficer = false
 		})
 
+		// Раздаём скрытые роли (только если включены)
 		const hiddenRolesEnabled = (game.settings.hiddenRolesCount || 0) > 0
 
-		if (!hiddenRolesEnabled || players.length < 2) {
-			return
+		if (hiddenRolesEnabled && players.length >= 2) {
+			const hiddenRoleCandidates = [...players].sort(() => Math.random() - 0.5)
+			const hiddenRolePlayer = hiddenRoleCandidates[0]
+			hiddenRolePlayer.hiddenRole = this.takeRandomFromPoolWithFallback(
+				hiddenRolesPool,
+				HIDDEN_ROLES,
+			)
 		}
 
-		const hiddenRoleCandidates = [...players].sort(() => Math.random() - 0.5)
-		const hiddenRolePlayer = hiddenRoleCandidates[0]
-
-		hiddenRolePlayer.hiddenRole = this.takeRandomFromPoolWithFallback(
-			hiddenRolesPool,
-			HIDDEN_ROLES,
-		)
+		// Раздаём секреты (могут быть у нескольких игроков)
+		const secretsCount = Math.min(players.length, 3)
+		const shuffledPlayers = [...players].sort(() => Math.random() - 0.5)
+		for (let i = 0; i < secretsCount && i < shuffledPlayers.length; i++) {
+			if (!shuffledPlayers[i].secret && secretsPool.length > 0) {
+				shuffledPlayers[i].secret = this.takeRandomFromPoolWithFallback(
+					secretsPool,
+					SECRETS,
+				)
+			}
+		}
 	}
 
 	private dealRoundCardsToPlayers(game: GameState) {
@@ -1502,14 +2045,12 @@ export class GameGateway
 
 			for (let i = 0; i < cardsCount; i++) {
 				const card = this.giveRandomCard(player)
-
 				if (card) {
 					cards.push(card)
 				}
 			}
 
 			const socket = game.connections.get(player.id)
-
 			if (socket && cards.length > 0) {
 				socket.emit('NEW_CARDS', {
 					round: game.round,
@@ -1538,32 +2079,24 @@ export class GameGateway
 			case 'gender':
 				player.gender = this.getRandomFromArray(GENDERS)
 				return this.toPublicCard('gender', player.gender)
-
 			case 'age':
 				player.age = this.getRandomFromArray(AGES)
 				return this.toPublicCard('age', player.age)
-
 			case 'body':
 				player.bodyType = this.getRandomFromArray(BODY_TYPES)
 				return this.toPublicCard('body', player.bodyType)
-
 			case 'health':
 				player.healthStatus = this.getRandomFromArray(HEALTH_STATUSES)
 				return this.toPublicCard('health', player.healthStatus)
-
 			case 'trait':
-				player.psychologicalTrait =
-					this.getRandomFromArray(PSYCHOLOGICAL_TRAITS)
+				player.psychologicalTrait = this.getRandomFromArray(PSYCHOLOGICAL_TRAITS)
 				return this.toPublicCard('trait', player.psychologicalTrait)
-
 			case 'secret':
 				player.secret = this.getRandomFromArray(SECRETS)
 				return this.toPublicCard('secret', player.secret)
-
 			case 'resource':
 				player.resource = this.getRandomFromArray(RESOURCES)
 				return this.toPublicCard('resource', player.resource)
-
 			default:
 				return null
 		}
@@ -1588,13 +2121,11 @@ export class GameGateway
 		game.voteRequests = new Set()
 		game.speakingTimePerPlayer = SPEAKING_TIME_PER_PLAYER
 
-		// Создаем очередь из живых игроков
 		const alivePlayers = this.getAlivePlayers(game)
 		game.speakingQueue = alivePlayers.map(p => p.id)
 		game.currentSpeakerId = game.speakingQueue[0] || undefined
 		game.speakerStartTime = Date.now()
 
-		// Создаем такую же очередь для раскрытия карт
 		game.revealQueue = [...game.speakingQueue]
 		game.currentRevealQueueIndex = 0
 
@@ -1607,25 +2138,20 @@ export class GameGateway
 
 		this.broadcastToGame(game.id, 'SPEAKER_CHANGED', {
 			speakerId: game.currentSpeakerId,
-			speakerName: game.currentSpeakerId
-				? game.players.get(game.currentSpeakerId)?.name
-				: null,
+			speakerName: game.currentSpeakerId ? game.players.get(game.currentSpeakerId)?.name : null,
 			timeLeft: game.speakingTimePerPlayer,
 		})
 
-		// Отправляем информацию о том, кто сейчас может раскрыть карту
 		this.broadcastToGame(game.id, 'REVEAL_QUEUE_CHANGED', {
 			currentPlayerId: game.revealQueue[game.currentRevealQueueIndex],
-			currentPlayerName: game.players.get(
-				game.revealQueue[game.currentRevealQueueIndex],
-			)?.name,
+			currentPlayerName: game.players.get(game.revealQueue[game.currentRevealQueueIndex])?.name,
 			queue: game.revealQueue,
 			currentIndex: game.currentRevealQueueIndex,
 		})
 
 		this.broadcastSystemMessage(
 			game,
-			`Начинается обсуждение. Первым говорит ${game.currentSpeakerId ? game.players.get(game.currentSpeakerId)?.name : 'никто'}. У вас ${game.speakingTimePerPlayer} секунд. Сейчас раскрывает карту ${game.players.get(game.revealQueue[game.currentRevealQueueIndex])?.name}.`,
+			`Начинается обсуждение. Первым говорит ${game.currentSpeakerId ? game.players.get(game.currentSpeakerId)?.name : 'никто'}. Сейчас раскрывает карту ${game.players.get(game.revealQueue[game.currentRevealQueueIndex])?.name}.`,
 		)
 	}
 
@@ -1648,7 +2174,6 @@ export class GameGateway
 		game.currentSpeakerId = game.speakingQueue[nextIndex] || undefined
 		game.speakerStartTime = Date.now()
 
-		// Также переключаем очередь раскрытия карт на следующего игрока
 		if (game.currentRevealQueueIndex < game.revealQueue.length - 1) {
 			game.currentRevealQueueIndex++
 		} else {
@@ -1657,17 +2182,13 @@ export class GameGateway
 
 		this.broadcastToGame(game.id, 'SPEAKER_CHANGED', {
 			speakerId: game.currentSpeakerId,
-			speakerName: game.currentSpeakerId
-				? game.players.get(game.currentSpeakerId)?.name
-				: null,
+			speakerName: game.currentSpeakerId ? game.players.get(game.currentSpeakerId)?.name : null,
 			timeLeft: game.speakingTimePerPlayer,
 		})
 
 		this.broadcastToGame(game.id, 'REVEAL_QUEUE_CHANGED', {
 			currentPlayerId: game.revealQueue[game.currentRevealQueueIndex],
-			currentPlayerName: game.players.get(
-				game.revealQueue[game.currentRevealQueueIndex],
-			)?.name,
+			currentPlayerName: game.players.get(game.revealQueue[game.currentRevealQueueIndex])?.name,
 			queue: game.revealQueue,
 			currentIndex: game.currentRevealQueueIndex,
 		})
@@ -1701,7 +2222,6 @@ export class GameGateway
 
 		this.getAlivePlayers(game).forEach(player => {
 			if (!player.vote) return
-
 			const currentVotes = game.votingResults!.get(player.vote) || 0
 			game.votingResults!.set(player.vote, currentVotes + 1)
 		})
@@ -1724,13 +2244,11 @@ export class GameGateway
 			this.broadcastToGame(game.id, 'VOTE_TIED', {
 				message: 'Голосование завершилось ничьей',
 			})
-
 			this.checkForCrisis(game)
 			return
 		}
 
 		const ejectedPlayer = game.players.get(ejectedPlayerId)
-
 		if (!ejectedPlayer) {
 			this.checkForCrisis(game)
 			return
@@ -1762,15 +2280,12 @@ export class GameGateway
 			playerName: ejectedPlayer.name,
 			cards: this.getAllPlayerCards(ejectedPlayer),
 		})
-
 		this.setPhase(game, 'reveal', 30)
 	}
 
 	private checkGameEnd(game: GameState) {
 		const alivePlayers = this.getAlivePlayers(game)
-		const capsuleCapacity =
-			game.capsuleSlots || Math.floor(game.players.size / 2)
-
+		const capsuleCapacity = game.capsuleSlots || Math.floor(game.players.size / 2)
 		const hiddenRoleWinners = this.checkHiddenRoleWins(game)
 
 		if (hiddenRoleWinners.length > 0) {
@@ -1798,19 +2313,10 @@ export class GameGateway
 		if (game.status !== 'active') return
 
 		let crisisChance = 0.3
-
 		switch (game.settings.difficulty) {
-			case 'easy':
-				crisisChance = 0.2
-				break
-
-			case 'hard':
-				crisisChance = 0.4
-				break
-
-			default:
-				crisisChance = 0.3
-				break
+			case 'easy': crisisChance = 0.2; break
+			case 'hard': crisisChance = 0.4; break
+			default: crisisChance = 0.3
 		}
 
 		if (Math.random() < crisisChance && game.settings.enableCrises) {
@@ -1822,9 +2328,7 @@ export class GameGateway
 
 	private triggerCrisis(game: GameState) {
 		const crisisTypes = ['technological', 'biological', 'external']
-		const randomType = crisisTypes[
-			Math.floor(Math.random() * crisisTypes.length)
-		] as Crisis['type']
+		const randomType = crisisTypes[Math.floor(Math.random() * crisisTypes.length)] as Crisis['type']
 
 		let crisis: Crisis
 
@@ -1840,27 +2344,23 @@ export class GameGateway
 					isActive: true,
 				}
 				break
-
 			case 'biological':
 				crisis = {
 					id: 'crisis_pathogen',
 					type: 'biological',
 					name: 'Вспышка неизвестного патогена',
-					description:
-						'Системы обнаружили вспышку неизвестного патогена в системе вентиляции',
+					description: 'Системы обнаружили вспышку неизвестного патогена',
 					priorityProfessions: ['prof_astrobiologist', 'prof_surgeon'],
 					penalty: 'Случайный игрок получает заражение',
 					isActive: true,
 				}
 				break
-
 			default:
 				crisis = {
 					id: 'crisis_signal',
 					type: 'external',
 					name: 'Неопознанный сигнал',
-					description:
-						'Станция получает неопознанный сигнал с неизвестным источником',
+					description: 'Станция получает неопознанный сигнал',
 					priorityProfessions: ['prof_linguist', 'prof_pilot'],
 					penalty: 'Помощь или новая угроза',
 					isActive: true,
@@ -1871,10 +2371,22 @@ export class GameGateway
 		game.currentCrisis = crisis
 		game.crisisHistory.push(crisis)
 
-		this.broadcastToGame(game.id, 'CRISIS_TRIGGERED', {
-			crisis,
+		// Эффекты паники
+		Array.from(game.players.values()).forEach(player => {
+			if (player.psychologicalTrait?.id === 'trait_panicker') {
+				player.isPanicking = true
+				this.broadcastSystemMessage(game, `${player.name} впадает в панику из-за кризиса!`)
+			}
+			if (player.psychologicalTrait?.id === 'trait_fatalist') {
+				this.broadcastSystemMessage(game, `${player.name} говорит: "Что будет, того не миновать"`)
+			}
+			if (player.psychologicalTrait?.id === 'trait_sabotage_prone' && Math.random() < 0.25) {
+				crisis.penalty = `Усугублено! ${crisis.penalty}`
+				this.broadcastSystemMessage(game, `${player.name} случайно усугубил кризис!`)
+			}
 		})
 
+		this.broadcastToGame(game.id, 'CRISIS_TRIGGERED', { crisis })
 		this.setPhase(game, 'crisis', 60)
 	}
 
@@ -1885,28 +2397,24 @@ export class GameGateway
 			case 'crisis_leak':
 				game.capsuleSlots = Math.max(1, game.capsuleSlots - 1)
 				this.broadcastToGame(game.id, 'CRISIS_PENALTY', {
-					message:
-						'Утечка не устранена! Количество мест в капсуле уменьшено на 1.',
+					message: 'Утечка не устранена! Количество мест в капсуле уменьшено на 1.',
 				})
 				break
-
 			case 'crisis_pathogen': {
 				const alivePlayers = this.getAlivePlayers(game)
-
 				if (alivePlayers.length > 0) {
-					const randomPlayer =
-						alivePlayers[Math.floor(Math.random() * alivePlayers.length)]
-
-					randomPlayer.isInfected = true
-
-					this.broadcastToGame(game.id, 'CRISIS_PENALTY', {
-						message: `Игрок ${randomPlayer.name} заразился неизвестным патогеном!`,
-						infectedPlayerId: randomPlayer.id,
-					})
+					const infectablePlayers = alivePlayers.filter(p => p.healthStatus?.id !== 'health_no_regeneration')
+					if (infectablePlayers.length > 0) {
+						const randomPlayer = infectablePlayers[Math.floor(Math.random() * infectablePlayers.length)]
+						randomPlayer.isInfected = true
+						this.broadcastToGame(game.id, 'CRISIS_PENALTY', {
+							message: `Игрок ${randomPlayer.name} заразился!`,
+							infectedPlayerId: randomPlayer.id,
+						})
+					}
 				}
 				break
 			}
-
 			default:
 				this.broadcastToGame(game.id, 'CRISIS_PENALTY', {
 					message: 'Кризис не был решён вовремя.',
@@ -1936,12 +2444,21 @@ export class GameGateway
 			player.revealedCardsThisRound = []
 			player.vote = undefined
 			player.votesAgainst = 0
+
+			if (player.isStimulated && player.stimulantRoundsLeft) {
+				player.stimulantRoundsLeft--
+				if (player.stimulantRoundsLeft === 0) {
+					player.isStimulated = false
+					player.score = Math.max(0, player.score - 1)
+					this.broadcastSystemMessage(game, `${player.name} чувствует откат после стимуляторов.`)
+				}
+			}
+			if (!game.currentCrisis) {
+				player.isPanicking = false
+			}
 		})
 
-		this.broadcastToGame(game.id, 'ROUND_STARTED', {
-			roundNumber: game.round,
-		})
-
+		this.broadcastToGame(game.id, 'ROUND_STARTED', { roundNumber: game.round })
 		this.setPhase(game, 'intermission', 10)
 	}
 
@@ -1954,13 +2471,8 @@ export class GameGateway
 		this.clearTimer(game)
 
 		Array.from(game.players.values()).forEach(player => {
-			if (winnerIds.includes(player.id)) {
-				player.score += 50
-			}
-
-			if (player.isAlive === true) {
-				player.score += 20
-			}
+			if (winnerIds.includes(player.id)) player.score += 50
+			if (player.isAlive === true) player.score += 20
 		})
 
 		this.broadcastToGame(game.id, 'GAME_FINISHED', {
@@ -1978,13 +2490,326 @@ export class GameGateway
 		this.broadcastGameState(game.id)
 	}
 
+	// ============================================================================
+	// СПОСОБНОСТИ КАРТ
+	// ============================================================================
+
+	private handleAlienSpyDisguise(game: GameState, userId: string, targetProfessionId?: string): boolean {
+		const player = game.players.get(userId)
+		if (!player || player.usedAlienSpyDisguise) return false
+
+		const availableProfessions = PROFESSIONS.filter(p => p.id !== player.profession?.id)
+		let newProfession: Profession | undefined
+
+		if (targetProfessionId) {
+			newProfession = PROFESSIONS.find(p => p.id === targetProfessionId)
+		} else if (availableProfessions.length > 0) {
+			newProfession = availableProfessions[Math.floor(Math.random() * availableProfessions.length)]
+		}
+
+		if (newProfession) {
+			player.alienSpyDisguise = player.profession?.id
+			player.profession = newProfession
+			player.usedAlienSpyDisguise = true
+			this.broadcastSystemMessage(game, `${player.name} изменил внешность и теперь выглядит как ${newProfession.name}!`)
+			this.sendPlayerCards(game, player)
+			return true
+		}
+		return false
+	}
+
+	private handleAlienSpyRequestHelp(game: GameState, userId: string, targetUserId: string): boolean {
+		const player = game.players.get(userId)
+		const target = game.players.get(targetUserId)
+
+		if (!player || !target || !player.isAlive || !target.isAlive) return false
+		if (player.secret?.id !== 'secret_alien_spy') return false
+
+		if (!player.alienSpyTrustedBy) player.alienSpyTrustedBy = []
+
+		if (!player.alienSpyTrustedBy.includes(targetUserId)) {
+			player.alienSpyTrustedBy.push(targetUserId)
+			this.broadcastSystemMessage(game, `${target.name} согласился помочь ${player.name} скрыться!`)
+
+			if (player.alienSpyTrustedBy.length >= 1) {
+				this.broadcastSystemMessage(game, `${player.name} (Инопланетный шпион) достиг цели!`)
+				player.score += 30
+			}
+			return true
+		}
+		return false
+	}
+
+	private handleNanoMedkitUse(game: GameState, userId: string, targetUserId?: string): boolean {
+		const player = game.players.get(userId)
+		if (!player || !player.isAlive) return false
+		if (player.resource?.id !== 'resource_nano_medkit') return false
+
+		const targetId = targetUserId || userId
+		const target = game.players.get(targetId)
+		if (!target || !target.isAlive) return false
+
+		if (target.healthStatus?.id === 'health_no_regeneration') {
+			this.broadcastSystemMessage(game, `Аптечка не работает на ${target.name} из-за генетической несовместимости!`)
+			return false
+		}
+
+		let wasHealed = false
+		if (target.isInfected) { target.isInfected = false; wasHealed = true }
+		if (target.isSuspicious) { target.isSuspicious = false; wasHealed = true }
+		if (target.isPanicking) { target.isPanicking = false; wasHealed = true }
+
+		player.resource = undefined
+
+		if (wasHealed) {
+			this.broadcastSystemMessage(game, `${player.name} использовал аптечку на ${target.name}! Все негативные эффекты сняты.`)
+			target.score += 10
+		} else {
+			this.broadcastSystemMessage(game, `${player.name} использовал аптечку на ${target.name}, но у того не было негативных эффектов.`)
+		}
+		return true
+	}
+
+	private handleMadScientistCreateCrisis(game: GameState, userId: string): boolean {
+		const player = game.players.get(userId)
+		if (!player || player.usedMadScientistCrisis) return false
+		if (player.hiddenRole?.id !== 'role_mad_scientist') return false
+
+		const crisis: Crisis = {
+			id: 'crisis_mad_scientist',
+			type: 'technological',
+			name: 'Эксперимент вышел из-под контроля!',
+			description: `Безумный учёный ${player.name} проводил опасный эксперимент!`,
+			priorityProfessions: ['prof_engineer', 'prof_security'],
+			penalty: 'Штраф к месту в капсуле',
+			isActive: true,
+		}
+
+		game.currentCrisis = crisis
+		game.crisisHistory.push(crisis)
+		player.usedMadScientistCrisis = true
+
+		this.broadcastToGame(game.id, 'CRISIS_TRIGGERED', { crisis })
+		this.broadcastSystemMessage(game, `${player.name} (Безумный учёный) запустил опасный эксперимент!`)
+		this.setPhase(game, 'crisis', 60)
+		return true
+	}
+
+	private handleCryptoTraderExchange(game: GameState, userId: string, targetUserId: string, offeredResourceId?: string): boolean {
+		const trader = game.players.get(userId)
+		const target = game.players.get(targetUserId)
+
+		if (!trader || !target || !trader.isAlive || !target.isAlive) return false
+		if (trader.profession?.id !== 'prof_crypto_trader') return false
+		if (trader.usedTraderExchange) return false
+
+		if (!trader.resource) return false
+
+		const offeredResource = trader.resource
+
+		if (target.resource) {
+			const targetResource = target.resource
+			trader.resource = targetResource
+			target.resource = offeredResource
+			this.broadcastSystemMessage(game, `${trader.name} обменял ${offeredResource.name} на ${targetResource.name} с ${target.name}!`)
+		} else {
+			if (!trader.traderDebts) trader.traderDebts = new Map()
+			const currentDebt = trader.traderDebts.get(targetUserId) || 0
+			trader.traderDebts.set(targetUserId, currentDebt + 10)
+
+			trader.resource = undefined
+			target.resource = offeredResource
+
+			this.broadcastSystemMessage(game, `${trader.name} продал ${offeredResource.name} ${target.name} в кредит!`)
+		}
+
+		trader.usedTraderExchange = true
+		return true
+	}
+
+	private handleGeneticModification(game: GameState, userId: string): boolean {
+		const player = game.players.get(userId)
+		if (!player || player.usedGeneticModification) return false
+
+		const hasMutation = Math.random() < 0.25
+
+		if (hasMutation) {
+			player.isInfected = true
+			this.broadcastSystemMessage(game, `${player.name} получил неожиданный побочный эффект от генной модификации!`)
+		} else {
+			player.score += 10
+			this.broadcastSystemMessage(game, `${player.name} успешно изменил свои гены и получил бонус!`)
+		}
+
+		player.usedGeneticModification = true
+		return true
+	}
+
+	private handleBloggerStream(game: GameState, userId: string): boolean {
+		const player = game.players.get(userId)
+		if (!player || player.usedBloggerStream) return false
+
+		const hints = [
+			'Зрители заметили, что кто-то слишком нервничает',
+			'Чат подсказывает обратить внимание на одного из игроков',
+			'Донат от подписчика: проверьте системы жизнеобеспечения',
+			'Зрители передают, что кто-то может врать',
+		]
+
+		const randomHint = hints[Math.floor(Math.random() * hints.length)]
+		this.broadcastSystemMessage(game, `${player.name} начал стрим! ${randomHint}`)
+		player.score += 5
+		player.usedBloggerStream = true
+		return true
+	}
+
+	private handleExBossConnection(game: GameState, userId: string): boolean {
+		const player = game.players.get(userId)
+		if (!player || player.usedExBossConnection) return false
+
+		const alivePlayers = this.getAlivePlayers(game).filter(p => p.id !== userId)
+		if (alivePlayers.length > 0) {
+			const target = alivePlayers[Math.floor(Math.random() * alivePlayers.length)]
+			const socket = game.connections.get(userId)
+			if (socket) {
+				this.sendSystemMessageToSocket(socket,
+					target.hiddenRole
+						? `Старые связи сообщают: ${target.name} имеет скрытую роль "${target.hiddenRole.name}"`
+						: `Старые связи сообщают: ${target.name} обычный член экипажа`
+				)
+			}
+		}
+
+		player.score += 15
+		player.usedExBossConnection = true
+		return true
+	}
+
+	private handleEcologistRecycling(game: GameState, userId: string): boolean {
+		const player = game.players.get(userId)
+		if (!player || player.usedEcologistRecycling) return false
+
+		if (player.resource) {
+			player.resource = undefined
+			game.capsuleSlots = Math.min(game.players.size, game.capsuleSlots + 1)
+			this.broadcastSystemMessage(game, `${player.name} переработал ресурс в кислород! Мест в капсуле стало больше.`)
+			player.usedEcologistRecycling = true
+			return true
+		}
+		return false
+	}
+
+	private handleXenopsychologistDetect(game: GameState, userId: string): boolean {
+		const player = game.players.get(userId)
+		if (!player || player.usedXenopsychologistDetect) return false
+
+		const infectedPlayers = Array.from(game.players.values()).filter(p => p.isInfected === true)
+
+		if (infectedPlayers.length > 0) {
+			const infected = infectedPlayers[0]
+			this.broadcastSystemMessage(game, `${player.name} подозревает ${infected.name} в контакте с чужими!`)
+		} else {
+			this.broadcastSystemMessage(game, `${player.name} пытается выявить контакт с чужими, но пока безуспешно.`)
+		}
+
+		player.usedXenopsychologistDetect = true
+		return true
+	}
+
+	private handlePsychiatristStabilize(game: GameState, userId: string, targetUserId: string): boolean {
+		const player = game.players.get(userId)
+		const target = game.players.get(targetUserId)
+
+		if (!player || !target || !player.isAlive || !target.isAlive) return false
+		if (player.usedPsychiatristStabilize) return false
+
+		if (target.isPanicking) {
+			target.isPanicking = false
+			this.broadcastSystemMessage(game, `${player.name} стабилизировал состояние ${target.name}!`)
+			player.usedPsychiatristStabilize = true
+			return true
+		}
+		return false
+	}
+
+	private handleSabotage(game: GameState, userId: string) {
+		game.capsuleSlots = Math.max(1, game.capsuleSlots - 1)
+
+		const possibleTargets = this.getAlivePlayers(game).filter(
+			player => player.id !== userId && !player.hiddenRole,
+		)
+
+		const suspiciousTarget = possibleTargets.length > 0
+			? possibleTargets[Math.floor(Math.random() * possibleTargets.length)]
+			: undefined
+
+		if (suspiciousTarget) {
+			suspiciousTarget.isSuspicious = true
+			this.broadcastToGame(game.id, 'SABOTAGE_OCCURRED', {
+				playerId: userId,
+				playerName: game.players.get(userId)?.name,
+				suspiciousPlayerId: suspiciousTarget.id,
+				suspiciousPlayerName: suspiciousTarget.name,
+				message: `Саботаж! Мест в капсуле меньше. Улики указывают на ${suspiciousTarget.name}.`,
+			})
+		} else {
+			this.broadcastToGame(game.id, 'SABOTAGE_OCCURRED', {
+				playerId: userId,
+				playerName: game.players.get(userId)?.name,
+				message: 'Саботаж! Мест в капсуле стало меньше.',
+			})
+		}
+	}
+
+	private handleFramePlayer(game: GameState, userId: string, targetPlayerId?: string) {
+		if (!targetPlayerId) return
+
+		const targetPlayer = game.players.get(targetPlayerId)
+		if (targetPlayer && targetPlayer.isAlive === true) {
+			targetPlayer.isSuspicious = true
+			this.broadcastToGame(game.id, 'FALSE_EVIDENCE_PLANTED', {
+				playerId: targetPlayer.id,
+				playerName: targetPlayer.name,
+				message: `Появились улики против игрока ${targetPlayer.name}.`,
+			})
+		}
+	}
+
+	private handleInfect(game: GameState, userId: string, targetPlayerId?: string) {
+		if (!targetPlayerId) return
+
+		const targetPlayer = game.players.get(targetPlayerId)
+		if (targetPlayer && targetPlayer.isAlive === true) {
+			targetPlayer.isInfected = true
+			this.broadcastToGame(game.id, 'PLAYER_INFECTED', {
+				infectedBy: userId,
+				infectedByName: game.players.get(userId)?.name,
+				playerId: targetPlayerId,
+				playerName: targetPlayer.name,
+			})
+		}
+	}
+
+	private handleNonbinaryAbility(game: GameState, userId: string) {
+		const player = game.players.get(userId)
+		if (!player) return
+
+		player.votesAgainst = Math.max(0, player.votesAgainst - 1)
+		this.broadcastToGame(game.id, 'NONBINARY_ABILITY_USED', {
+			playerId: userId,
+			playerName: player.name,
+			message: `${player.name} использовал способность, отменив голос против себя`,
+		})
+	}
+
+	// ============================================================================
+	// ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
+	// ============================================================================
+
 	private startPhaseTimer(game: GameState) {
 		this.clearTimer(game)
-
 		if (!game.phaseEndTime) {
-			game.phaseEndTime = new Date(
-				Date.now() + game.phaseDuration * 1000,
-			).toISOString()
+			game.phaseEndTime = new Date(Date.now() + game.phaseDuration * 1000).toISOString()
 		}
 
 		game.timerInterval = setInterval(() => {
@@ -2011,66 +2836,36 @@ export class GameGateway
 
 		switch (game.phase) {
 			case 'introduction':
-				this.server.to(game.id).emit('TIMER_UPDATE', {
-					phase: game.phase,
-					timeLeft: 0,
-					phaseEndTime: game.phaseEndTime,
-				})
-
-				this.broadcastToGame(game.id, 'NARRATION_ENDED', {
-					skippedBy: 'system',
-					skippedByName: 'Система',
-				})
-
-				this.broadcastSystemMessage(
-					game,
-					'Предыстория завершена. Игра продолжается.',
-				)
-
+				this.broadcastToGame(game.id, 'NARRATION_ENDED', { skippedBy: 'system', skippedByName: 'Система' })
+				this.broadcastSystemMessage(game, 'Предыстория завершена. Игра продолжается.')
 				this.startPreparationPhase(game)
 				break
-
 			case 'preparation':
 				this.startDiscussionPhase(game)
 				break
-
 			case 'discussion':
-				// Если время истекло, переключаем на следующего говорящего
 				this.rotateSpeaker(game)
 				break
-
 			case 'voting':
 				this.processVotingResults(game)
 				break
-
 			case 'reveal':
 				this.checkGameEnd(game)
 				break
-
 			case 'crisis':
-				if (game.currentCrisis?.isActive) {
-					this.applyCrisisPenalty(game)
-				}
+				if (game.currentCrisis?.isActive) this.applyCrisisPenalty(game)
 				break
-
 			case 'intermission':
 				if (game.round <= (game.maxRounds || game.settings.maxRounds || 10)) {
 					this.startPreparationPhase(game)
 				} else {
 					const survivors = this.getAlivePlayers(game)
 					let winners = survivors.map(player => player.id)
-
 					if (winners.length > game.capsuleSlots) {
-						winners = winners
-							.sort(() => Math.random() - 0.5)
-							.slice(0, game.capsuleSlots)
+						winners = winners.sort(() => Math.random() - 0.5).slice(0, game.capsuleSlots)
 					}
-
 					this.endGame(game, winners, 'round_limit')
 				}
-				break
-
-			default:
 				break
 		}
 	}
@@ -2084,64 +2879,43 @@ export class GameGateway
 
 	private checkHiddenRoleWins(game: GameState): string[] {
 		const winners: string[] = []
-		const alivePlayers = this.getAlivePlayers(game)
-		const infectedPlayers = Array.from(game.players.values()).filter(
-			player => player.isInfected === true,
-		)
-		const suspiciousNonHiddenPlayers = alivePlayers.filter(
-			player => player.isSuspicious === true && !player.hiddenRole,
-		)
+		const infectedPlayers = Array.from(game.players.values()).filter(p => p.isInfected === true)
+		const suspiciousNonHiddenPlayers = this.getAlivePlayers(game).filter(p => p.isSuspicious === true && !p.hiddenRole)
 
 		Array.from(game.players.values()).forEach(player => {
 			if (!player.hiddenRole || player.isAlive !== true) return
 
 			switch (player.hiddenRole.id) {
 				case 'role_saboteur':
-					if (game.capsuleSlots <= 1) {
-						winners.push(player.id)
-					}
+					if (game.capsuleSlots <= 1) winners.push(player.id)
 					break
-
 				case 'role_xenophag':
-					if (infectedPlayers.length > 0) {
-						winners.push(player.id)
-					}
+					if (infectedPlayers.length > 0) winners.push(player.id)
 					break
-
 				case 'role_gray_cardinal':
-					if ((game.ejectedPlayers || []).length >= 2) {
-						winners.push(player.id)
-					}
+					if ((game.ejectedPlayers || []).length >= 2) winners.push(player.id)
 					break
-
 				case 'role_false_witness':
-					if (suspiciousNonHiddenPlayers.length > 0) {
-						winners.push(player.id)
-					}
+					if (suspiciousNonHiddenPlayers.length > 0) winners.push(player.id)
 					break
-
-				default:
+				case 'role_mad_scientist':
+					if (player.researchProgress && player.researchProgress >= 100) winners.push(player.id)
+					break
+				case 'secret_alien_spy':
+					if (player.alienSpyTrustedBy && player.alienSpyTrustedBy.length >= 1) winners.push(player.id)
 					break
 			}
 		})
-
 		return winners
 	}
 
 	private sendFullSync(socket: Socket, game: GameState, player?: GamePlayer) {
-		socket.emit('GAME_STATE', {
-			gameState: this.serializeGameState(game),
-		})
-
-		if (player) {
-			this.sendPlayerCards(game, player)
-		}
+		socket.emit('GAME_STATE', { gameState: this.serializeGameState(game) })
+		if (player) this.sendPlayerCards(game, player)
 	}
 
 	private sendCardsToAllPlayers(game: GameState) {
-		Array.from(game.players.values()).forEach(player => {
-			this.sendPlayerCards(game, player)
-		})
+		Array.from(game.players.values()).forEach(player => this.sendPlayerCards(game, player))
 	}
 
 	private sendPlayerCards(game: GameState, player: GamePlayer) {
@@ -2150,166 +2924,56 @@ export class GameGateway
 
 		const currentCards: Record<string, PublicCard> = {}
 
-		if (player.profession) {
-			currentCards.profession = this.toPublicCard(
-				'profession',
-				player.profession,
-			)
-		}
-
-		if (player.healthStatus) {
-			currentCards.healthStatus = this.toPublicCard(
-				'health',
-				player.healthStatus,
-			)
-		}
-
-		if (player.psychologicalTrait) {
-			currentCards.psychologicalTrait = this.toPublicCard(
-				'trait',
-				player.psychologicalTrait,
-			)
-		}
-
-		if (player.secret) {
-			currentCards.secret = this.toPublicCard('secret', player.secret)
-		}
-
-		if (player.resource) {
-			currentCards.resource = this.toPublicCard('resource', player.resource)
-		}
-
-		if (player.hiddenRole) {
-			currentCards.hiddenRole = this.toPublicCard('role', player.hiddenRole)
-		}
-
-		// НЕ отправляем roleCard - это служебная роль, не карта
-
-		if (player.gender) {
-			currentCards.gender = this.toPublicCard('gender', player.gender)
-		}
-
-		if (player.age) {
-			currentCards.age = this.toPublicCard('age', player.age)
-		}
-
-		if (player.bodyType) {
-			currentCards.bodyType = this.toPublicCard('body', player.bodyType)
-		}
+		if (player.profession) currentCards.profession = this.toPublicCard('profession', player.profession)
+		if (player.healthStatus) currentCards.healthStatus = this.toPublicCard('health', player.healthStatus)
+		if (player.psychologicalTrait) currentCards.psychologicalTrait = this.toPublicCard('trait', player.psychologicalTrait)
+		if (player.secret) currentCards.secret = this.toPublicCard('secret', player.secret)
+		if (player.resource) currentCards.resource = this.toPublicCard('resource', player.resource)
+		if (player.hiddenRole) currentCards.hiddenRole = this.toPublicCard('role', player.hiddenRole)
+		if (player.gender) currentCards.gender = this.toPublicCard('gender', player.gender)
+		if (player.age) currentCards.age = this.toPublicCard('age', player.age)
+		if (player.bodyType) currentCards.bodyType = this.toPublicCard('body', player.bodyType)
 
 		socket.emit('YOUR_CARDS', currentCards)
 	}
 
 	private normalizeCardType(type?: string): CardKey | null {
 		switch (type) {
-			case 'profession':
-				return 'profession'
-
-			case 'health':
-			case 'healthStatus':
-				return 'health'
-
-			case 'trait':
-			case 'psychologicalTrait':
-				return 'trait'
-
-			case 'secret':
-				return 'secret'
-
-			case 'role':
-			case 'hiddenRole':
-			case 'roleCard':
-				return 'role'
-
-			case 'resource':
-				return 'resource'
-
-			case 'gender':
-				return 'gender'
-
-			case 'age':
-				return 'age'
-
-			case 'body':
-			case 'bodyType':
-				return 'body'
-
-			default:
-				return null
+			case 'profession': return 'profession'
+			case 'health': case 'healthStatus': return 'health'
+			case 'trait': case 'psychologicalTrait': return 'trait'
+			case 'secret': return 'secret'
+			case 'role': case 'hiddenRole': case 'roleCard': return 'role'
+			case 'resource': return 'resource'
+			case 'gender': return 'gender'
+			case 'age': return 'age'
+			case 'body': case 'bodyType': return 'body'
+			default: return null
 		}
 	}
 
-	private getPlayerCardDetails(
-		player: GamePlayer,
-		type: CardKey,
-	): PublicCard | null {
+	private getPlayerCardDetails(player: GamePlayer, type: CardKey): PublicCard | null {
 		switch (type) {
-			case 'profession':
-				return player.profession
-					? this.toPublicCard('profession', player.profession)
-					: null
-
-			case 'health':
-				return player.healthStatus
-					? this.toPublicCard('health', player.healthStatus)
-					: null
-
-			case 'trait':
-				return player.psychologicalTrait
-					? this.toPublicCard('trait', player.psychologicalTrait)
-					: null
-
-			case 'secret':
-				return player.secret ? this.toPublicCard('secret', player.secret) : null
-
-			case 'role':
-				if (player.hiddenRole) {
-					return this.toPublicCard('role', player.hiddenRole)
-				}
-
-				return null
-
-			case 'resource':
-				return player.resource
-					? this.toPublicCard('resource', player.resource)
-					: null
-
-			case 'gender':
-				return player.gender ? this.toPublicCard('gender', player.gender) : null
-
-			case 'age':
-				return player.age ? this.toPublicCard('age', player.age) : null
-
-			case 'body':
-				return player.bodyType
-					? this.toPublicCard('body', player.bodyType)
-					: null
-
-			default:
-				return null
+			case 'profession': return player.profession ? this.toPublicCard('profession', player.profession) : null
+			case 'health': return player.healthStatus ? this.toPublicCard('health', player.healthStatus) : null
+			case 'trait': return player.psychologicalTrait ? this.toPublicCard('trait', player.psychologicalTrait) : null
+			case 'secret': return player.secret ? this.toPublicCard('secret', player.secret) : null
+			case 'role': return player.hiddenRole ? this.toPublicCard('role', player.hiddenRole) : null
+			case 'resource': return player.resource ? this.toPublicCard('resource', player.resource) : null
+			case 'gender': return player.gender ? this.toPublicCard('gender', player.gender) : null
+			case 'age': return player.age ? this.toPublicCard('age', player.age) : null
+			case 'body': return player.bodyType ? this.toPublicCard('body', player.bodyType) : null
+			default: return null
 		}
 	}
 
 	private getRevealableCardTypes(): CardKey[] {
-		return [
-			'profession',
-			'gender',
-			'age',
-			'body',
-			'health',
-			'trait',
-			'secret',
-			'resource',
-			'role',
-		]
+		return ['profession', 'gender', 'age', 'body', 'health', 'trait', 'secret', 'resource', 'role']
 	}
 
 	private revealAllPlayerCards(player: GamePlayer) {
 		this.getRevealableCardTypes().forEach(cardType => {
-			if (
-				this.getPlayerCardDetails(player, cardType) &&
-				!player.revealedCards.includes(cardType)
-			) {
+			if (this.getPlayerCardDetails(player, cardType) && !player.revealedCards.includes(cardType)) {
 				player.revealedCards.push(cardType)
 			}
 		})
@@ -2317,15 +2981,10 @@ export class GameGateway
 
 	private getAllPlayerCards(player: GamePlayer) {
 		const cards: Record<string, PublicCard | null> = {}
-
 		this.getRevealableCardTypes().forEach(type => {
 			const card = this.getPlayerCardDetails(player, type)
-
-			if (card) {
-				cards[type] = card
-			}
+			if (card) cards[type] = card
 		})
-
 		return cards
 	}
 
@@ -2335,28 +2994,17 @@ export class GameGateway
 			if (card.title) return String(card.title)
 			if (card.displayName) return String(card.displayName)
 		}
-
 		switch (type) {
-			case 'profession':
-				return 'Профессия'
-			case 'health':
-				return 'Состояние здоровья'
-			case 'trait':
-				return 'Характеристика'
-			case 'secret':
-				return 'Секрет'
-			case 'role':
-				return 'Роль'
-			case 'resource':
-				return 'Ресурс'
-			case 'gender':
-				return 'Пол'
-			case 'age':
-				return 'Возраст'
-			case 'body':
-				return 'Телосложение'
-			default:
-				return String(type)
+			case 'profession': return 'Профессия'
+			case 'health': return 'Состояние здоровья'
+			case 'trait': return 'Характеристика'
+			case 'secret': return 'Секрет'
+			case 'role': return 'Роль'
+			case 'resource': return 'Ресурс'
+			case 'gender': return 'Пол'
+			case 'age': return 'Возраст'
+			case 'body': return 'Телосложение'
+			default: return String(type)
 		}
 	}
 
@@ -2367,7 +3015,6 @@ export class GameGateway
 			name: String(card.name || this.getDefaultNameForCard(card, type)),
 			description: String(card.description || ''),
 		}
-
 		if (Array.isArray(card.pros)) base.pros = card.pros
 		if (Array.isArray(card.cons)) base.cons = card.cons
 		if (Array.isArray(card.effects)) base.effects = card.effects
@@ -2376,20 +3023,8 @@ export class GameGateway
 		if (typeof card.goal === 'string') base.goal = card.goal
 		if (typeof card.range === 'string') base.range = card.range
 		if (typeof card.effect === 'string') base.effect = card.effect
-		if (typeof card.specialAbility === 'string') {
-			base.specialAbility = card.specialAbility
-		}
-		if (typeof card.winCondition === 'string') {
-			base.winCondition = card.winCondition
-		}
-
-		if (!base.description) {
-			if (base.effects?.length) base.description = base.effects.join(', ')
-			else if (base.bonuses?.length) base.description = base.bonuses.join(', ')
-			else if (base.effect) base.description = base.effect
-			else if (base.range) base.description = base.range
-		}
-
+		if (typeof card.specialAbility === 'string') base.specialAbility = card.specialAbility
+		if (typeof card.winCondition === 'string') base.winCondition = card.winCondition
 		return base
 	}
 
@@ -2404,121 +3039,15 @@ export class GameGateway
 			pool.splice(index, 1)
 			return item
 		}
-
 		return this.getRandomFromArray(fallback)
 	}
 
 	private getAlivePlayers(game: GameState) {
-		return Array.from(game.players.values()).filter(
-			player => player.isAlive === true,
-		)
+		return Array.from(game.players.values()).filter(player => player.isAlive === true)
 	}
 
 	private getRequiredVoteRequests(aliveCount: number) {
 		return Math.max(1, Math.ceil(aliveCount / 2))
-	}
-
-	private handleCaptainVeto(game: GameState, userId: string) {
-		game.votingResults?.clear()
-
-		this.broadcastToGame(game.id, 'CAPTAIN_VETO_USED', {
-			playerId: userId,
-			playerName: game.players.get(userId)?.name,
-			message: 'Капитан использовал право вето на голосование!',
-		})
-
-		this.startDiscussionPhase(game)
-	}
-
-	private handleSabotage(game: GameState, userId: string) {
-		game.capsuleSlots = Math.max(1, game.capsuleSlots - 1)
-
-		const possibleTargets = this.getAlivePlayers(game).filter(
-			player => player.id !== userId && !player.hiddenRole,
-		)
-
-		const suspiciousTarget =
-			possibleTargets.length > 0
-				? possibleTargets[Math.floor(Math.random() * possibleTargets.length)]
-				: undefined
-
-		if (suspiciousTarget) {
-			suspiciousTarget.isSuspicious = true
-		}
-
-		this.broadcastToGame(game.id, 'SABOTAGE_OCCURRED', {
-			playerId: userId,
-			playerName: game.players.get(userId)?.name,
-			suspiciousPlayerId: suspiciousTarget?.id,
-			suspiciousPlayerName: suspiciousTarget?.name,
-			message: suspiciousTarget
-				? `На станции произошёл саботаж! Количество мест в капсуле уменьшено на 1. Улики указывают на игрока ${suspiciousTarget.name}.`
-				: 'На станции произошёл саботаж! Количество мест в капсуле уменьшено на 1.',
-		})
-	}
-
-	private handleFramePlayer(
-		game: GameState,
-		userId: string,
-		targetPlayerId?: string,
-	) {
-		if (!targetPlayerId) return
-
-		const sourcePlayer = game.players.get(userId)
-		const targetPlayer = game.players.get(targetPlayerId)
-
-		if (!sourcePlayer || !targetPlayer || targetPlayer.isAlive !== true) {
-			return
-		}
-
-		if (targetPlayer.id === sourcePlayer.id) {
-			return
-		}
-
-		targetPlayer.isSuspicious = true
-
-		this.broadcastToGame(game.id, 'FALSE_EVIDENCE_PLANTED', {
-			playerId: targetPlayer.id,
-			playerName: targetPlayer.name,
-			sourcePlayerId: sourcePlayer.id,
-			sourcePlayerName: sourcePlayer.name,
-			message: `В системе появились подозрительные улики против игрока ${targetPlayer.name}.`,
-		})
-	}
-
-	private handleInfect(
-		game: GameState,
-		userId: string,
-		targetPlayerId?: string,
-	) {
-		if (!targetPlayerId) return
-
-		const targetPlayer = game.players.get(targetPlayerId)
-
-		if (targetPlayer && targetPlayer.isAlive === true) {
-			targetPlayer.isInfected = true
-
-			this.broadcastToGame(game.id, 'PLAYER_INFECTED', {
-				infectedBy: userId,
-				infectedByName: game.players.get(userId)?.name,
-				playerId: targetPlayerId,
-				playerName: targetPlayer.name,
-			})
-		}
-	}
-
-	private handleNonbinaryAbility(game: GameState, userId: string) {
-		const player = game.players.get(userId)
-
-		if (!player) return
-
-		player.votesAgainst = Math.max(0, player.votesAgainst - 1)
-
-		this.broadcastToGame(game.id, 'NONBINARY_ABILITY_USED', {
-			playerId: userId,
-			playerName: player.name,
-			message: `${player.name} использовал(а) свою способность, отменив один голос против себя`,
-		})
 	}
 
 	private handleSkipTurn(game: GameState) {
@@ -2527,17 +3056,12 @@ export class GameGateway
 
 	private handleEndGame(game: GameState, userId: string) {
 		if (game.creatorId !== userId) {
-			this.logger.warn(
-				`Игрок ${userId} попытался завершить игру без разрешения`,
-			)
+			this.logger.warn(`Игрок ${userId} попытался завершить игру без разрешения`)
 			return
 		}
-
 		game.status = 'cancelled'
 		game.finishedAt = new Date().toISOString()
-
 		this.clearTimer(game)
-
 		this.server.to(game.id).emit('GAME_FINISHED', {
 			gameState: this.serializeGameState(game),
 			reason: 'cancelled_by_creator',
@@ -2546,21 +3070,15 @@ export class GameGateway
 
 	private handlePlayerAction(game: GameState, userId: string, payload: any) {
 		const player = game.players.get(userId)
-
-		if (player) {
-			player.score += payload?.points || 1
-		}
+		if (player) player.score += payload?.points || 1
 	}
 
 	private serializeGameState(game: GameState) {
 		const players = Array.from(game.players.values()).map(player => {
 			const revealedCardsInfo: Record<string, PublicCard> = {}
-
 			player.revealedCards.forEach(cardType => {
 				const card = this.getPlayerCardDetails(player, cardType)
-				if (!card) return
-
-				revealedCardsInfo[cardType] = card
+				if (card) revealedCardsInfo[cardType] = card
 			})
 
 			return {
@@ -2651,15 +3169,11 @@ export class GameGateway
 				isCaptain: false,
 				isSeniorOfficer: false,
 			}
-
 			gamePlayers.set(player.id, gamePlayer)
 		})
 
 		const rawDifficulty = settings?.difficulty
-		const difficulty: GameSettings['difficulty'] =
-			rawDifficulty === 'easy' || rawDifficulty === 'hard'
-				? rawDifficulty
-				: 'normal'
+		const difficulty: GameSettings['difficulty'] = rawDifficulty === 'easy' || rawDifficulty === 'hard' ? rawDifficulty : 'normal'
 
 		const gameState: GameState = {
 			id: gameId,
@@ -2678,10 +3192,7 @@ export class GameGateway
 				maxRounds: settings?.maxRounds || 10,
 				discussionTime: settings?.discussionTime || 180,
 				votingTime: settings?.votingTime || 60,
-				hiddenRolesCount: Math.min(
-					settings?.hiddenRolesCount ?? 0,
-					Math.max(0, players.length - 1),
-				),
+				hiddenRolesCount: Math.min(settings?.hiddenRolesCount ?? 0, Math.max(0, players.length - 1)),
 				enableCrises: settings?.enableCrises !== false,
 				difficulty,
 				tournamentMode: settings?.tournamentMode || false,
@@ -2714,14 +3225,12 @@ export class GameGateway
 		}
 
 		this.games.set(gameId, gameState)
-
 		return gameState
 	}
 
 	getGameState(gameId: string) {
 		const game = this.games.get(gameId)
 		if (!game) return null
-
 		return this.serializeGameState(game)
 	}
 
@@ -2729,9 +3238,7 @@ export class GameGateway
 		return Array.from(this.games.entries()).map(([gameId, game]) => ({
 			gameId,
 			status: game.status,
-			players: Array.from(game.players.values()).map(
-				player => `${player.name}(${player.isAlive})`,
-			),
+			players: Array.from(game.players.values()).map(player => `${player.name}(${player.isAlive})`),
 			round: game.round,
 			startedAt: game.startedAt,
 		}))
@@ -2740,10 +3247,7 @@ export class GameGateway
 	private broadcastGameState(gameId: string) {
 		const game = this.games.get(gameId)
 		if (!game) return
-
-		this.server.to(gameId).emit('GAME_STATE', {
-			gameState: this.serializeGameState(game),
-		})
+		this.server.to(gameId).emit('GAME_STATE', { gameState: this.serializeGameState(game) })
 	}
 
 	private broadcastToGame(gameId: string, event: string, data: any) {

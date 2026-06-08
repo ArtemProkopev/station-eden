@@ -2,6 +2,8 @@
 import { useProfile } from '@/app/profile/hooks/useProfile'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import {
+	AbilityInfo,
+	AbilityType,
 	CardDetails,
 	CardType,
 	CrisisInfo,
@@ -147,6 +149,8 @@ export function useGameSession(gameId: string) {
 		},
 	)
 	const [newCardsThisRound, setNewCardsThisRound] = useState<CardDetails[]>([])
+	const [playerAbilities, setPlayerAbilities] = useState<AbilityInfo[]>([])
+	const [usedAbilities, setUsedAbilities] = useState<Set<string>>(new Set())
 
 	const currentRoundRef = useRef<number>(0)
 	const sendRef = useRef<((msg: unknown) => void) | null>(null)
@@ -258,6 +262,7 @@ export function useGameSession(gameId: string) {
 		setCardsReceivedThisRound(0)
 		setMyRevealedCardsThisRound([])
 		setSelectedVote('')
+		// Не сбрасываем usedAbilities - они на всю игру
 	}, [])
 
 	const buildCardsFromPayload = useCallback((payload: ServerCardPayload) => {
@@ -290,6 +295,210 @@ export function useGameSession(gameId: string) {
 		setNarration(null)
 		setCanSkipNarration(false)
 	}, [])
+
+	// Функция для получения доступных способностей на основе карт игрока
+	const updatePlayerAbilities = useCallback(() => {
+		if (!myCards || !userId || !gameState) return
+
+		const abilities: AbilityInfo[] = []
+		const currentPhase = gameState.phase
+		const isDiscussionPhase = currentPhase === 'discussion'
+		const isVotingPhase = currentPhase === 'voting'
+
+		// Проверяем скрытую роль
+		const hiddenRole = myCards.role
+		if (hiddenRole) {
+			switch (hiddenRole.id) {
+				case 'role_saboteur':
+					if (!usedAbilities.has('sabotage')) {
+						abilities.push({
+							id: 'sabotage' as AbilityType,
+							name: 'Саботаж',
+							description: 'Уменьшить количество мест в капсуле и подставить другого игрока',
+							available: isDiscussionPhase,
+							used: false,
+						})
+					}
+					break
+				case 'role_xenophag':
+					if (!usedAbilities.has('infect')) {
+						abilities.push({
+							id: 'infect' as AbilityType,
+							name: 'Заражение',
+							description: 'Заразить выбранного игрока',
+							available: isDiscussionPhase,
+							used: false,
+							targetType: 'other',
+						})
+					}
+					break
+				case 'role_false_witness':
+					if (!usedAbilities.has('frame')) {
+						abilities.push({
+							id: 'frame' as AbilityType,
+							name: 'Подставить',
+							description: 'Сделать выбранного игрока подозрительным',
+							available: isDiscussionPhase,
+							used: false,
+							targetType: 'other',
+						})
+					}
+					break
+				case 'role_mad_scientist':
+					if (!usedAbilities.has('mad_scientist_crisis')) {
+						abilities.push({
+							id: 'mad_scientist_crisis' as AbilityType,
+							name: 'Эксперимент',
+							description: 'Создать кризис для исследования',
+							available: isDiscussionPhase,
+							used: false,
+						})
+					}
+					break
+			}
+		}
+
+		// Проверяем секрет
+		const secret = myCards.secret
+		if (secret && secret.id === 'secret_alien_spy') {
+			if (!usedAbilities.has('alien_spy_disguise')) {
+				abilities.push({
+					id: 'alien_spy_disguise' as AbilityType,
+					name: 'Смена внешности',
+					description: 'Притвориться другой профессией',
+					available: isDiscussionPhase,
+					used: false,
+					targetType: 'profession',
+				})
+			}
+			if (!usedAbilities.has('alien_spy_request_help')) {
+				abilities.push({
+					id: 'alien_spy_request_help' as AbilityType,
+					name: 'Просьба о помощи',
+					description: 'Попросить другого игрока помочь скрыться',
+					available: isDiscussionPhase,
+					used: false,
+					targetType: 'other',
+				})
+			}
+		}
+
+		// Проверяем профессию
+		const profession = myCards.profession
+		if (profession) {
+			switch (profession.id) {
+				case 'prof_genetic_engineer':
+					if (!usedAbilities.has('genetic_modification')) {
+						abilities.push({
+							id: 'genetic_modification' as AbilityType,
+							name: 'Генная модификация',
+							description: 'Изменить свои гены (риск мутации)',
+							available: isDiscussionPhase,
+							used: false,
+							targetType: 'self',
+						})
+					}
+					break
+				case 'prof_blogger':
+					if (!usedAbilities.has('blogger_stream')) {
+						abilities.push({
+							id: 'blogger_stream' as AbilityType,
+							name: 'Запись стрима',
+							description: 'Получить подсказку от зрителей',
+							available: isDiscussionPhase,
+							used: false,
+							targetType: 'self',
+						})
+					}
+					break
+				case 'prof_ex_boss':
+					if (!usedAbilities.has('ex_boss_connection')) {
+						abilities.push({
+							id: 'ex_boss_connection' as AbilityType,
+							name: 'Старые связи',
+							description: 'Получить информацию или помощь',
+							available: isDiscussionPhase,
+							used: false,
+							targetType: 'self',
+						})
+					}
+					break
+				case 'prof_ecologist':
+					if (!usedAbilities.has('ecologist_recycling') && myCards.resource) {
+						abilities.push({
+							id: 'ecologist_recycling' as AbilityType,
+							name: 'Переработка',
+							description: 'Переработать ресурс в кислород',
+							available: isDiscussionPhase,
+							used: false,
+							targetType: 'self',
+						})
+					}
+					break
+				case 'prof_xenopsychologist':
+					if (!usedAbilities.has('xenopsychologist_detect')) {
+						abilities.push({
+							id: 'xenopsychologist_detect' as AbilityType,
+							name: 'Выявление',
+							description: 'Попытаться выявить заражённого',
+							available: isDiscussionPhase,
+							used: false,
+							targetType: 'self',
+						})
+					}
+					break
+				case 'prof_crypto_trader':
+					if (!usedAbilities.has('crypto_trader_exchange') && myCards.resource) {
+						abilities.push({
+							id: 'crypto_trader_exchange' as AbilityType,
+							name: 'Обмен',
+							description: 'Обменяться ресурсами с другим игроком',
+							available: isDiscussionPhase,
+							used: false,
+							targetType: 'other',
+						})
+					}
+					break
+			}
+		}
+
+		// Проверяем ресурсы
+		const resource = myCards.resource
+		if (resource && resource.id === 'resource_nano_medkit') {
+			if (!usedAbilities.has('nano_medkit_use')) {
+				abilities.push({
+					id: 'nano_medkit_use' as AbilityType,
+					name: 'Аптечка с наноботами',
+					description: 'Вылечить все негативные эффекты у цели',
+					available: isDiscussionPhase,
+					used: false,
+					targetType: 'other',
+				})
+			}
+		}
+
+		// Проверяем гендер
+		const gender = myCards.gender
+		if (gender && gender.id === 'gender_nonbinary') {
+			if (!usedAbilities.has('nonbinary_ability')) {
+				abilities.push({
+					id: 'nonbinary_ability' as AbilityType,
+					name: 'Смена восприятия',
+					description: 'Отменить один голос против себя',
+					available: isVotingPhase,
+					used: false,
+					targetType: 'self',
+				})
+			}
+		}
+
+		setPlayerAbilities(abilities)
+	}, [myCards, gameState?.phase, userId, usedAbilities])
+
+	// Вызываем при изменении карт или фазы
+	useEffect(() => {
+		updatePlayerAbilities()
+	}, [updatePlayerAbilities])
 
 	const handleWebSocketMessage = useCallback(
 		(data: unknown) => {
@@ -750,7 +959,8 @@ export function useGameSession(gameId: string) {
 				case 'VOTE_TIED':
 				case 'CAPTAIN_VETO_USED':
 				case 'SABOTAGE_OCCURRED':
-				case 'NONBINARY_ABILITY_USED': {
+				case 'NONBINARY_ABILITY_USED':
+				case 'FALSE_EVIDENCE_PLANTED': {
 					addToChat('Система', String(msg.message ?? ''), true)
 					break
 				}
@@ -834,7 +1044,6 @@ export function useGameSession(gameId: string) {
 				}
 
 				case 'SPEAKER_CHANGED': {
-					// Обновляем текущего говорящего в состоянии игры
 					setGameState(prev => {
 						if (!prev) return prev
 						return {
@@ -853,7 +1062,6 @@ export function useGameSession(gameId: string) {
 				}
 
 				case 'REVEAL_QUEUE_CHANGED': {
-					// Обновляем очередь раскрытия карт
 					setGameState(prev => {
 						if (!prev) return prev
 						return {
@@ -1080,11 +1288,21 @@ export function useGameSession(gameId: string) {
 		sendRef.current?.({ type: 'VOTE_PLAYER', targetPlayerId })
 	}
 
-	const handleUseAbility = (ability: string, targetPlayerId?: string) => {
+	const handleUseAbility = useCallback((ability: string, targetPlayerId?: string, extraData?: string) => {
 		if (!isConnected) return
 
-		sendRef.current?.({ type: 'USE_ABILITY', ability, targetPlayerId })
-	}
+		// Отмечаем способность как использованную
+		setUsedAbilities(prev => new Set(prev).add(ability))
+
+		// Отправляем запрос на сервер
+		sendRef.current?.({
+			type: 'USE_ABILITY',
+			ability,
+			targetPlayerId,
+			professionId: extraData,
+			resourceId: extraData,
+		})
+	}, [isConnected])
 
 	const handleSolveCrisis = () => {
 		if (!isConnected) return
@@ -1146,6 +1364,7 @@ export function useGameSession(gameId: string) {
 		username,
 		profile,
 		isConnected,
+		playerAbilities,
 		setShowMyCards,
 		setShowCardsTable,
 		setActiveCrisis,

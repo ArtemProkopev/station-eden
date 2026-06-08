@@ -449,3 +449,68 @@ export interface WsMessage {
 	type: string
 	[key: string]: unknown
 }
+
+// ==============================================================================
+// ABILITIES TYPES (ДОБАВЛЕНО)
+// ==============================================================================
+
+export type AbilityType =
+	| 'sabotage'                    // Саботажник
+	| 'infect'                      // Агент ксенофагов
+	| 'frame'                       // Ложный свидетель
+	| 'nonbinary_ability'           // Небинарная персона
+	| 'alien_spy_disguise'          // Инопланетный шпион - смена внешности
+	| 'alien_spy_request_help'      // Инопланетный шпион - просьба о помощи
+	| 'nano_medkit_use'             // Аптечка с наноботами
+	| 'mad_scientist_crisis'        // Безумный учёный
+	| 'crypto_trader_exchange'      // Крипто-трейдер
+	| 'genetic_modification'        // Генный инженер
+	| 'blogger_stream'              // Космический блогер
+	| 'ex_boss_connection'          // Бывший начальник
+	| 'ecologist_recycling'         // Эколог
+	| 'xenopsychologist_detect'     // Ксенопсихолог
+	| 'psychiatrist_stabilize'      // Штатный психиатр
+	| 'captain_veto'                // Капитан (вето)
+	| 'sabotage_skill'              // Умение саботажника
+	| 'infect_skill'                // Умение заражения
+
+export interface AbilityInfo {
+	id: AbilityType
+	name: string
+	description: string
+	available: boolean
+	used: boolean
+	targetType?: 'self' | 'other' | 'profession' | 'resource'
+}
+
+export interface AbilityTarget {
+	playerId?: string
+	professionId?: string
+	resourceId?: string
+}
+
+// ==============================================================================
+// PROFESSION TYPES (ДОБАВЛЕНО для клиента)
+// ==============================================================================
+
+export interface ProfessionInfo {
+	id: string
+	name: string
+	description: string
+}
+
+export interface ResourceInfo {
+	id: string
+	name: string
+	description: string
+}
+
+// ==============================================================================
+// PLAYER INFO (ДОБАВЛЕНО)
+// ==============================================================================
+
+export interface PlayerBasicInfo {
+	id: string
+	name: string
+	isAlive: boolean
+}
