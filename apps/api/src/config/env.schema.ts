@@ -40,11 +40,12 @@ const RawEnvSchema = z.object({
 
 	ADMIN_EMAILS: z.preprocess(emptyToUndef, z.string().optional().default('')),
 
-	// Google
-	ENABLE_GOOGLE_LOGIN: boolStr,
-	GOOGLE_CLIENT_ID: strOpt,
-	GOOGLE_CLIENT_SECRET: strOpt,
-	GOOGLE_REDIRECT_URL: urlOpt,
+	// VK ID
+	ENABLE_VK_LOGIN: boolStr,
+	VK_CLIENT_ID: strOpt,
+	VK_CLIENT_SECRET: strOpt,
+	VK_SERVICE_TOKEN: strOpt,
+	VK_REDIRECT_URL: urlOpt,
 	WEB_AFTER_LOGIN_URL: urlOpt,
 
 	// Yandex
@@ -70,6 +71,33 @@ export const EnvSchema = RawEnvSchema.transform(env => ({
 		message: 'Required',
 	})
 	.superRefine((e, ctx) => {
+		if (e.ENABLE_VK_LOGIN === 'true') {
+			if (!e.VK_CLIENT_ID)
+				ctx.addIssue({
+					code: 'custom',
+					path: ['VK_CLIENT_ID'],
+					message: 'Required when ENABLE_VK_LOGIN=true',
+				})
+			if (!e.VK_CLIENT_SECRET)
+				ctx.addIssue({
+					code: 'custom',
+					path: ['VK_CLIENT_SECRET'],
+					message: 'Required when ENABLE_VK_LOGIN=true',
+				})
+			if (!e.VK_SERVICE_TOKEN)
+				ctx.addIssue({
+					code: 'custom',
+					path: ['VK_SERVICE_TOKEN'],
+					message: 'Required when ENABLE_VK_LOGIN=true',
+				})
+			if (!e.VK_REDIRECT_URL)
+				ctx.addIssue({
+					code: 'custom',
+					path: ['VK_REDIRECT_URL'],
+					message: 'Required when ENABLE_VK_LOGIN=true',
+				})
+		}
+
 		if (e.ENABLE_YANDEX_LOGIN === 'true') {
 			if (!e.YANDEX_CLIENT_ID)
 				ctx.addIssue({

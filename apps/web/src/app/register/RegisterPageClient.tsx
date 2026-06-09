@@ -14,8 +14,7 @@ import {
 import { useForm } from 'react-hook-form'
 
 // Components
-import GoogleAuthButton from '@/components/auth/google/GoogleAuthButton'
-import YandexAuthButton from '@/components/auth/yandex/YandexAuthButton'
+import SocialAuthSection from '@/components/auth/SocialAuthSection'
 import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
 import { EyeIcon, EyeOffIcon } from '@/components/ui/Icons'
 import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
@@ -23,7 +22,7 @@ import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
 // Hooks & Utils
 import { useUsernameGenerator } from '@/hooks/useUsernameGenerator'
 import { api, getUserMessage } from '@/lib/api'
-import { GOOGLE_ENABLED, YANDEX_ENABLED } from '@/lib/flags'
+import { VK_ENABLED, YANDEX_ENABLED } from '@/lib/flags'
 import { measureStrength, strengthMeta } from '@/utils/passwordStrength'
 
 // Schemas из shared (валидация без сообщений)
@@ -103,8 +102,6 @@ export default function RegisterPageClient() {
 	// Memoized values
 	const strength = useMemo(() => measureStrength(password), [password])
 	const strengthInfo = useMemo(() => strengthMeta(strength), [strength])
-	const googleEnabled = GOOGLE_ENABLED
-	const yandexEnabled = YANDEX_ENABLED
 	const reason = searchParams.get('reason')
 
 	// куда редиректить после oauth/verify (если пробрасывают next)
@@ -259,10 +256,17 @@ export default function RegisterPageClient() {
 						</h1>
 					</header>
 
-					{reason === 'google_no_account' && (
+					{reason === 'vk_email_missing' && (
 						<p className={`${styles.notice} ${styles.info}`} role='status'>
-							Такого Google-аккаунта у нас ещё нет — вы можете
-							зарегистрироваться сейчас.
+							VK ID не вернул email. Разрешите доступ к email в VK ID или
+							зарегистрируйтесь через обычную форму.
+						</p>
+					)}
+
+					{reason === 'vk_no_account' && (
+						<p className={`${styles.notice} ${styles.info}`} role='status'>
+							Такого VK ID-аккаунта у нас ещё нет — вы можете зарегистрироваться
+							сейчас.
 						</p>
 					)}
 
@@ -445,39 +449,13 @@ export default function RegisterPageClient() {
 						</Link>
 					</p>
 
-					{formState.mounted && googleEnabled && (
-						<>
-							<div
-								className={styles.hr}
-								role='separator'
-								aria-label='Или через Google'
-							>
-								<span>Или через Google</span>
-							</div>
-							<div className={styles.oauthBlock}>
-								<GoogleAuthButton mode='register' label='Продолжить с Google' />
-							</div>
-						</>
-					)}
-
-					{formState.mounted && yandexEnabled && (
-						<>
-							<div
-								className={styles.hr}
-								role='separator'
-								aria-label='Или через Яндекс'
-							>
-								<span>Или через Яндекс</span>
-							</div>
-							<div className={styles.oauthBlock}>
-								<YandexAuthButton
-									label='Продолжить с Яндекс ID'
-									mode='register'
-									size='m'
-									next={next}
-								/>
-							</div>
-						</>
+					{formState.mounted && (
+						<SocialAuthSection
+							mode='register'
+							next={next}
+							vkEnabled={VK_ENABLED}
+							yandexEnabled={YANDEX_ENABLED}
+						/>
 					)}
 				</section>
 			</div>

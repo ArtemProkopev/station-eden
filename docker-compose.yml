@@ -13,10 +13,11 @@ services:
       JWT_REFRESH_TTL_MS: ${JWT_REFRESH_TTL_MS}
       ADMIN_EMAILS: ${ADMIN_EMAILS}
       DATABASE_URL: ${DATABASE_URL}
-      ENABLE_GOOGLE_LOGIN: ${ENABLE_GOOGLE_LOGIN}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL}
+      ENABLE_VK_LOGIN: ${ENABLE_VK_LOGIN}
+      VK_CLIENT_ID: ${VK_CLIENT_ID}
+      VK_CLIENT_SECRET: ${VK_CLIENT_SECRET}
+      VK_SERVICE_TOKEN: ${VK_SERVICE_TOKEN}
+      VK_REDIRECT_URL: ${VK_REDIRECT_URL}
       WEB_AFTER_LOGIN_URL: ${WEB_AFTER_LOGIN_URL}
       ENABLE_YANDEX_LOGIN: ${ENABLE_YANDEX_LOGIN}
       YANDEX_CLIENT_ID: ${YANDEX_CLIENT_ID}
@@ -54,7 +55,9 @@ services:
     environment:
       NEXT_PUBLIC_API_BASE: "https://api.stationeden.ru"
       NEXT_PUBLIC_WS_BASE: "wss://api.stationeden.ru"
-      NEXT_PUBLIC_ENABLE_GOOGLE: "true"
+      NEXT_PUBLIC_ENABLE_VK: "true"
+      NEXT_PUBLIC_VK_CLIENT_ID: "54630306"
+      NEXT_PUBLIC_VK_REDIRECT_URL: "https://api.stationeden.ru/auth/vk/callback"
       NEXT_PUBLIC_ENABLE_YANDEX: "true"
       NEXT_PUBLIC_ASSETS_BASE: "https://cdn.assets.stationeden.ru"
       NEXT_PUBLIC_ASSETS_FALLBACK: "https://station-eden-media.s3.ru-1.storage.selcloud.ru"

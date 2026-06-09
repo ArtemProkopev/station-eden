@@ -16,6 +16,8 @@ import { EmailService } from './email.service'
 import { OAuthAccount } from './oauth-account.entity'
 import { RefreshToken } from './refresh-token.entity'
 
+type OAuthProvider = 'yandex' | 'vk'
+
 function isEmailLike(s: string) {
 	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
 }
@@ -405,26 +407,10 @@ export class AuthService {
 	// ===== OAuth helpers =====
 
 	/** Найти привязку OAuth (provider+sub) */
-	private findOAuth(provider: 'google' | 'yandex', providerUserId: string) {
+	private findOAuth(provider: OAuthProvider, providerUserId: string) {
 		return this.oaRepo.findOne({
 			where: { provider, providerUserId },
 		})
-	}
-
-	/** Создать/обновить привязку OAuth к userId (идемпотентно) */
-	public async linkGoogleAccount(userId: string, sub: string, email: string) {
-		const existing = await this.findOAuth('google', sub)
-		if (existing && existing.userId === userId) return existing
-		if (existing && existing.userId !== userId) {
-			throw new UnauthorizedException('This Google account is linked elsewhere')
-		}
-		const rec = this.oaRepo.create({
-			provider: 'google',
-			providerUserId: sub,
-			email: email.toLowerCase(),
-			userId,
-		})
-		return this.oaRepo.save(rec)
 	}
 
 	public async linkYandexAccount(
@@ -446,31 +432,19 @@ export class AuthService {
 		return this.oaRepo.save(rec)
 	}
 
-	public async findOrCreateUserByGoogle(
-		sub: string,
-		email: string,
-	): Promise<User> {
-		const bySub = await this.findOAuth('google', sub)
-		if (bySub) {
-			const u = await this.users.findById(bySub.userId)
-			if (!u) throw new UnauthorizedException('Linked user not found')
-			return u
+	public async linkVkAccount(userId: string, vkId: string, email: string) {
+		const existing = await this.findOAuth('vk', vkId)
+		if (existing && existing.userId === userId) return existing
+		if (existing && existing.userId !== userId) {
+			throw new UnauthorizedException('This VK ID account is linked elsewhere')
 		}
-
-		const byEmail = await this.users.findByEmail(email)
-		if (byEmail) {
-			await this.linkGoogleAccount(byEmail.id, sub, email)
-			return byEmail
-		}
-
-		const created = await this.users.create({
+		const rec = this.oaRepo.create({
+			provider: 'vk',
+			providerUserId: vkId,
 			email: email.toLowerCase(),
-			passwordHash: null,
-			username: null,
-			role: 'user',
+			userId,
 		})
-		await this.linkGoogleAccount(created.id, sub, email)
-		return created
+		return this.oaRepo.save(rec)
 	}
 
 	public async findOrCreateUserByYandex(
@@ -497,6 +471,33 @@ export class AuthService {
 			role: 'user',
 		})
 		await this.linkYandexAccount(created.id, yandexId, email)
+		return created
+	}
+
+	public async findOrCreateUserByVk(
+		vkId: string,
+		email: string,
+	): Promise<User> {
+		const byId = await this.findOAuth('vk', vkId)
+		if (byId) {
+			const u = await this.users.findById(byId.userId)
+			if (!u) throw new UnauthorizedException('Linked user not found')
+			return u
+		}
+
+		const byEmail = await this.users.findByEmail(email)
+		if (byEmail) {
+			await this.linkVkAccount(byEmail.id, vkId, email)
+			return byEmail
+		}
+
+		const created = await this.users.create({
+			email: email.toLowerCase(),
+			passwordHash: null,
+			username: null,
+			role: 'user',
+		})
+		await this.linkVkAccount(created.id, vkId, email)
 		return created
 	}
 }

@@ -11,7 +11,7 @@ import {
 } from 'typeorm'
 import { User } from '../users/user.entity'
 
-type OAuthProvider = 'google' | 'yandex'
+type OAuthProvider = 'yandex' | 'vk'
 
 @Entity('oauth_accounts')
 @Unique('uq_provider_sub', ['provider', 'providerUserId'])

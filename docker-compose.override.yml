@@ -46,7 +46,7 @@ services:
       CSRF_COOKIE_DOMAIN: ""
       AUTH_COOKIE_DOMAIN: ""
 
-      GOOGLE_REDIRECT_URL: https://localhost/auth/google/callback
+      VK_REDIRECT_URL: https://localhost/auth/vk/callback
       YANDEX_REDIRECT_URL: https://localhost/auth/yandex/callback
       WEB_AFTER_LOGIN_URL: https://localhost/profile
 
@@ -57,7 +57,9 @@ services:
       args:
         NEXT_PUBLIC_API_BASE: /api
         NEXT_PUBLIC_WS_BASE: https://localhost
-        NEXT_PUBLIC_ENABLE_GOOGLE: ${NEXT_PUBLIC_ENABLE_GOOGLE:-true}
+        NEXT_PUBLIC_ENABLE_VK: ${NEXT_PUBLIC_ENABLE_VK:-true}
+        NEXT_PUBLIC_VK_CLIENT_ID: ${NEXT_PUBLIC_VK_CLIENT_ID:-54630306}
+        NEXT_PUBLIC_VK_REDIRECT_URL: ${NEXT_PUBLIC_VK_REDIRECT_URL:-https://localhost/auth/vk/callback}
         NEXT_PUBLIC_ENABLE_YANDEX: ${NEXT_PUBLIC_ENABLE_YANDEX:-true}
         NEXT_PUBLIC_ASSETS_BASE: https://cdn.assets.stationeden.ru
         NEXT_PUBLIC_ASSETS_FALLBACK: https://station-eden-media.s3.ru-1.storage.selcloud.ru
@@ -66,7 +68,9 @@ services:
     environment:
       NEXT_PUBLIC_API_BASE: /api
       NEXT_PUBLIC_WS_BASE: https://localhost
-      NEXT_PUBLIC_ENABLE_GOOGLE: ${NEXT_PUBLIC_ENABLE_GOOGLE:-true}
+      NEXT_PUBLIC_ENABLE_VK: ${NEXT_PUBLIC_ENABLE_VK:-true}
+      NEXT_PUBLIC_VK_CLIENT_ID: ${NEXT_PUBLIC_VK_CLIENT_ID:-54630306}
+      NEXT_PUBLIC_VK_REDIRECT_URL: ${NEXT_PUBLIC_VK_REDIRECT_URL:-https://localhost/auth/vk/callback}
       NEXT_PUBLIC_ENABLE_YANDEX: ${NEXT_PUBLIC_ENABLE_YANDEX:-true}
       NEXT_PUBLIC_ASSETS_BASE: https://cdn.assets.stationeden.ru
       NEXT_PUBLIC_ASSETS_FALLBACK: https://station-eden-media.s3.ru-1.storage.selcloud.ru

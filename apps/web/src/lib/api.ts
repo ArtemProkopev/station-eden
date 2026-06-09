@@ -287,6 +287,20 @@ export const api = {
 			true,
 		),
 
+	vkOneTap: (payload: {
+		code: string
+		deviceId?: string
+		state?: string
+		next?: string
+		mode?: 'login' | 'register'
+	}) =>
+		postJSON<{ mfa?: string; email?: string; next?: string }>(
+			'/auth/vk/onetap',
+			payload,
+			'default',
+			true,
+		),
+
 	verifyEmailCode: (code: string, email?: string, newPassword?: string) =>
 		postJSON(
 			'/auth/verify-email-code',

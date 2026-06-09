@@ -44,6 +44,20 @@ export function mapToUserMessage(
 		return 'Не удалось подключиться к серверу. Проверьте интернет и попробуйте ещё раз.'
 	}
 
+	if (
+		msg.includes('vk') ||
+		msg.includes('vk id') ||
+		msg.includes('onetap') ||
+		msg.includes('one tap') ||
+		msg.includes('service_token')
+	) {
+		return 'Не удалось войти через VK ID. Попробуйте ещё раз или войдите по email.'
+	}
+
+	if (msg.includes('csrf')) {
+		return 'Сессия защиты истекла. Обновите страницу и повторите попытку.'
+	}
+
 	if (status === 401) {
 		if (context === 'login') return 'Неверный логин или пароль.'
 		return 'Не авторизован. Пожалуйста, войдите в аккаунт.'
@@ -64,9 +78,6 @@ export function mapToUserMessage(
 	if (status >= 500)
 		return 'На сервере возникла ошибка. Уже чиним — попробуйте ещё раз позже.'
 
-	if (msg.includes('csrf')) {
-		return 'Сессия защиты истекла. Обновите страницу и повторите попытку.'
-	}
 	if (msg.includes('invalid credentials')) {
 		return context === 'login'
 			? 'Неверный логин или пароль.'

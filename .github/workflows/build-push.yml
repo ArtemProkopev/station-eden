@@ -93,8 +93,12 @@ jobs:
           provenance: false
           sbom: false
           build-args: |
-            NEXT_PUBLIC_API_BASE=${{ vars.NEXT_PUBLIC_API_BASE }}
-            NEXT_PUBLIC_ENABLE_GOOGLE=${{ vars.NEXT_PUBLIC_ENABLE_GOOGLE }}
+            NEXT_PUBLIC_API_BASE=https://api.stationeden.ru
+            NEXT_PUBLIC_WS_BASE=wss://api.stationeden.ru
+            NEXT_PUBLIC_ENABLE_VK=true
+            NEXT_PUBLIC_VK_CLIENT_ID=54630306
+            NEXT_PUBLIC_VK_REDIRECT_URL=https://api.stationeden.ru/auth/vk/callback
+            NEXT_PUBLIC_ENABLE_YANDEX=true
             BUILDKIT_INLINE_CACHE=1
           cache-from: |
             type=registry,ref=ghcr.io/${{ steps.owner.outputs.lc }}/station-eden-web:latest
@@ -338,77 +342,14 @@ jobs:
               mkdir -p "$APP_DIR"
               cd "$APP_DIR"
 
-              echo "==> Check Docker daemon"
-              docker info >/dev/null
-
-              echo "==> Initial disk state"
-              print_disk_info
-
-              echo "==> Pre-deploy cleanup"
-              cleanup_safe
-              print_disk_info
-
               update_repository
-
-              login_ghcr
-
-              echo "==> Load .env file"
-              set +x
-              set -a
-              [ -f .env ] && source .env
-              set +a
-              set -x
-
-              export GHCR_OWNER="${{ steps.owner.outputs.lc }}"
-              export GHCR_REG="ghcr.io"
-              export IMAGE_TAG="${{ github.sha }}"
-
-              if [ -z "${IMAGE_TAG:-}" ]; then
-                IMAGE_TAG="latest"
-                export IMAGE_TAG
-              fi
-
               detect_compose
-
-              echo "==> Check free space before pulling images"
               ensure_min_free_space
+              login_ghcr
+              compose_pull_with_retry "initial" 3
 
-              echo "==> Pull commit SHA images"
-              if ! compose_pull_with_retry "commit SHA ${IMAGE_TAG}" 3; then
-                echo "Commit SHA pull failed after retries."
-                echo "Trying maintenance fallback with compose down..."
-                echo "==> This may cause a short downtime, but helps free old images on small disks."
+              echo "==> Start containers"
+              $COMP up -d --remove-orphans
 
-                $COMP down --remove-orphans || true
-
-                cleanup_aggressive
-                print_disk_info
-                ensure_min_free_space
-                login_ghcr
-
-                if ! compose_pull_with_retry "commit SHA ${IMAGE_TAG} after cleanup" 2; then
-                  echo "Commit SHA pull still failed. Fallback to latest..."
-                  export IMAGE_TAG="latest"
-
-                  if ! compose_pull_with_retry "latest" 3; then
-                    echo "Latest pull failed after retries"
-                    exit 1
-                  fi
-                fi
-              fi
-
-              echo "==> Up containers"
-              $COMP up -d --force-recreate --remove-orphans
-
-              echo "==> Final cleanup after successful deploy"
-              docker container prune -f || true
-              docker image prune -af --filter "until=24h" || true
-              docker builder prune -af --filter "until=24h" || true
-              docker network prune -f || true
-
-              echo "==> Final disk state"
-              print_disk_info
-
-              echo "==> Status"
-              docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+              echo "==> Done"
           REMOTE_SCRIPT

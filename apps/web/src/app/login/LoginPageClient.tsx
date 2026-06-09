@@ -7,8 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
-import GoogleAuthButton from '@/components/auth/google/GoogleAuthButton'
-import YandexAuthButton from '@/components/auth/yandex/YandexAuthButton'
+import SocialAuthSection from '@/components/auth/SocialAuthSection'
 import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
 import { ClockIcon, EyeIcon, EyeOffIcon } from '@/components/ui/Icons'
 import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
@@ -16,7 +15,7 @@ import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
 import { useAuthLock } from '@/hooks/useAuthLock'
 import { api, getUserMessage } from '@/lib/api'
 import { clearForcedLogoutFlags } from '@/lib/authUtils'
-import { GOOGLE_ENABLED, YANDEX_ENABLED } from '@/lib/flags'
+import { VK_ENABLED, YANDEX_ENABLED } from '@/lib/flags'
 import { clearLock, normLogin, writeLock } from '@/utils/authLock'
 import { parseServerInfo } from '@/utils/serverInfoParser'
 import {
@@ -310,21 +309,23 @@ export default function LoginPageClient() {
 		if (!reason) return null
 
 		const messages = {
-			google_exists:
-				'Аккаунт с этим Google-email уже существует — просто войдите.',
-			google_no_account:
-				'Похоже, такого аккаунта ещё нет. Вы можете зарегистрироваться.',
+			vk_email_missing:
+				'VK ID не вернул email. Проверьте доступ к email в VK ID или используйте вход по email.',
+			vk_exists: 'Аккаунт с этим VK ID уже существует — просто войдите.',
+			vk_no_account:
+				'Похоже, такого VK ID-аккаунта ещё нет. Вы можете зарегистрироваться.',
 			yandex_exists:
 				'Аккаунт с этим Яндекс-email уже существует — просто войдите.',
 			yandex_no_account:
 				'Похоже, такого аккаунта ещё нет. Вы можете зарегистрироваться.',
 		}
 
-		const key = reason as keyof typeof messages
+		const message = messages[reason as keyof typeof messages]
+		if (!message) return null
 
 		return (
 			<p className={`${styles.notice} ${styles.info}`} role='status'>
-				{messages[key]}
+				{message}
 			</p>
 		)
 	}, [reason])
@@ -454,39 +455,13 @@ export default function LoginPageClient() {
 						</Link>
 					</p>
 
-					{formState.mounted && GOOGLE_ENABLED && (
-						<>
-							<div
-								className={styles.hr}
-								role='separator'
-								aria-label='Или через Google'
-							>
-								<span>Или через Google</span>
-							</div>
-							<div className={styles.oauthBlock}>
-								<GoogleAuthButton label='Войти с Google' mode='login' />
-							</div>
-						</>
-					)}
-
-					{formState.mounted && YANDEX_ENABLED && (
-						<>
-							<div
-								className={styles.hr}
-								role='separator'
-								aria-label='Или через Яндекс'
-							>
-								<span>Или через Яндекс</span>
-							</div>
-							<div className={styles.oauthBlock}>
-								<YandexAuthButton
-									label='Войти с Яндекс ID'
-									mode='login'
-									size='m'
-									next={next}
-								/>
-							</div>
-						</>
+					{formState.mounted && (
+						<SocialAuthSection
+							mode='login'
+							next={next}
+							vkEnabled={VK_ENABLED}
+							yandexEnabled={YANDEX_ENABLED}
+						/>
 					)}
 				</section>
 			</div>

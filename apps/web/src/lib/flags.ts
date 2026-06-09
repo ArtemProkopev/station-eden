@@ -18,11 +18,18 @@ function normalizeBaseUrl(raw: string | undefined): string {
 	return v.replace(/\/+$/, '')
 }
 
+function trimEnv(raw: string | undefined | null): string {
+	return (raw || '').trim()
+}
+
 export const API_BASE = normalizeBaseUrl(process.env.NEXT_PUBLIC_API_BASE)
 
 // Важно: в prod дефолт FALSE, чтобы случайно не светить OAuth-кнопки
-export const GOOGLE_ENABLED =
-	toBool(process.env.NEXT_PUBLIC_ENABLE_GOOGLE) ?? false
+export const VK_ENABLED = toBool(process.env.NEXT_PUBLIC_ENABLE_VK) ?? false
+
+export const VK_CLIENT_ID = trimEnv(process.env.NEXT_PUBLIC_VK_CLIENT_ID)
+
+export const VK_REDIRECT_URL = trimEnv(process.env.NEXT_PUBLIC_VK_REDIRECT_URL)
 
 export const YANDEX_ENABLED =
 	toBool(process.env.NEXT_PUBLIC_ENABLE_YANDEX) ?? false

@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler'
-import { randomBytes } from 'crypto'
+import { createHash, randomBytes } from 'crypto'
 import type { Request, Response } from 'express'
 import { ensureCsrfCookie, getCookieOptions } from '../common'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
@@ -26,6 +26,12 @@ import { RegisterDto } from './dto/register.dto'
 
 type OAuthMode = 'login' | 'register' | 'link'
 
+type VkStateCookie = {
+	state: string
+	mode: OAuthMode
+	codeVerifier: string
+}
+
 function parseDurationMs(raw: string | undefined, fallbackMs: number) {
 	const s = (raw || '').trim()
 	const m = s.match(/^(\d+)([mhd])$/i)
@@ -36,6 +42,10 @@ function parseDurationMs(raw: string | undefined, fallbackMs: number) {
 	if (u === 'h') return n * 3_600_000
 	if (u === 'd') return n * 86_400_000
 	return fallbackMs
+}
+
+function isEmailLike(s: string) {
+	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
 }
 
 @Controller('auth')
@@ -95,8 +105,8 @@ export class AuthController {
 		return parseDurationMs(process.env.JWT_ACCESS_EXPIRES, 15 * 60 * 1000)
 	}
 
-	private googleEnabled() {
-		return process.env.ENABLE_GOOGLE_LOGIN === 'true'
+	private vkEnabled() {
+		return process.env.ENABLE_VK_LOGIN === 'true'
 	}
 
 	private yandexEnabled() {
@@ -105,6 +115,22 @@ export class AuthController {
 
 	private makeState(len = 24) {
 		return randomBytes(len).toString('hex')
+	}
+
+	private base64Url(buf: Buffer) {
+		return buf
+			.toString('base64')
+			.replace(/\+/g, '-')
+			.replace(/\//g, '_')
+			.replace(/=+$/g, '')
+	}
+
+	private makeCodeVerifier() {
+		return this.base64Url(randomBytes(64))
+	}
+
+	private makeCodeChallenge(verifier: string) {
+		return this.base64Url(createHash('sha256').update(verifier).digest())
 	}
 
 	/**
@@ -125,12 +151,45 @@ export class AuthController {
 	}
 
 	// ---------- provider state cookies ----------
-	private setGoogleStateCookie(res: Response, raw: string) {
-		res.cookie('google_oauth_state', raw, this.oauthCookieOpts())
+	private setVkStateCookie(res: Response, payload: VkStateCookie) {
+		res.cookie(
+			'vk_oauth_state',
+			JSON.stringify(payload),
+			this.oauthCookieOpts(),
+		)
 	}
 
-	private clearGoogleStateCookie(res: Response) {
-		this.clearWithSameAttrs(res, 'google_oauth_state', this.oauthCookieOpts())
+	private readVkStateCookie(req: Request): VkStateCookie | null {
+		const raw = (req as any).cookies?.vk_oauth_state as string | undefined
+		if (!raw) return null
+
+		try {
+			const parsed = JSON.parse(raw) as Partial<VkStateCookie>
+			if (
+				!parsed ||
+				typeof parsed.state !== 'string' ||
+				typeof parsed.codeVerifier !== 'string'
+			) {
+				return null
+			}
+
+			const mode: OAuthMode =
+				parsed.mode === 'register' || parsed.mode === 'link'
+					? parsed.mode
+					: 'login'
+
+			return {
+				state: parsed.state,
+				mode,
+				codeVerifier: parsed.codeVerifier,
+			}
+		} catch {
+			return null
+		}
+	}
+
+	private clearVkStateCookie(res: Response) {
+		this.clearWithSameAttrs(res, 'vk_oauth_state', this.oauthCookieOpts())
 	}
 
 	private setYandexStateCookie(res: Response, raw: string) {
@@ -192,6 +251,38 @@ export class AuthController {
 					'Failed to send verification email',
 				)
 			}
+		}
+	}
+
+	private async issueOAuthSession(user: any, res: Response) {
+		const access = this.auth.signAccess(user)
+		const { plain: refreshToken, expires: refreshExpires } =
+			await this.auth.issueRefresh(user.id)
+
+		res.cookie('access_token', access, {
+			...this.authCookieOpts(),
+			maxAge: this.accessMaxAgeMs(),
+		})
+
+		const refreshMaxAge = Math.max(0, this.msUntil(refreshExpires))
+
+		res.cookie('refresh_token', refreshToken, {
+			...this.authCookieOpts(),
+			maxAge: refreshMaxAge,
+		})
+
+		this.clearWithSameAttrs(res, 'preauth', this.preauthCookieOpts())
+
+		return {
+			user: {
+				userId: user.id,
+				id: user.id,
+				email: user.email,
+				role: user.role,
+				username: user.username,
+				avatar: user.avatar,
+				frame: user.frame,
+			},
 		}
 	}
 
@@ -538,12 +629,157 @@ export class AuthController {
 		}
 	}
 
-	// ====================== GOOGLE ======================
+	@UseGuards(ThrottlerGuard)
+	@Throttle({ default: { limit: 20, ttl: 300000 } })
+	@Post('vk/onetap')
+	async vkOneTap(
+		@Body()
+		body: {
+			code?: string
+			deviceId?: string
+			device_id?: string
+			state?: string
+			next?: string
+			mode?: OAuthMode
+		},
+		@Res({ passthrough: true }) res: Response,
+	) {
+		if (!this.vkEnabled()) {
+			throw new NotFoundException('VK ID login disabled')
+		}
 
-	@Get('google')
-	async google(@Req() req: Request, @Res() res: Response) {
-		if (!this.googleEnabled())
-			throw new NotFoundException('Google login disabled')
+		const code = String(body?.code || '').trim()
+		const deviceId = String(body?.deviceId || body?.device_id || '').trim()
+		const vkState = String(body?.state || '').trim()
+		const next = this.sanitizeNext(body?.next)
+
+		if (!code) {
+			throw new BadRequestException('VK ID code is required')
+		}
+
+		try {
+			const clientId = process.env.VK_CLIENT_ID
+			const clientSecret = process.env.VK_CLIENT_SECRET
+			const redirectUri = process.env.VK_REDIRECT_URL
+			const serviceToken = process.env.VK_SERVICE_TOKEN
+
+			if (!clientId || !clientSecret || !redirectUri || !serviceToken) {
+				throw new Error(
+					'Missing VK_CLIENT_ID/SECRET/REDIRECT_URL/SERVICE_TOKEN env vars',
+				)
+			}
+
+			const tokenParams = new URLSearchParams({
+				grant_type: 'authorization_code',
+				code,
+				client_id: clientId,
+				client_secret: clientSecret,
+				redirect_uri: redirectUri,
+				service_token: serviceToken,
+			})
+
+			if (deviceId) {
+				tokenParams.set('device_id', deviceId)
+			}
+
+			if (vkState) {
+				tokenParams.set('state', vkState)
+			}
+
+			const tokenResp = await fetch('https://id.vk.com/oauth2/auth', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: tokenParams,
+			})
+
+			if (!tokenResp.ok) {
+				const txt = await tokenResp.text().catch(() => '')
+				throw new UnauthorizedException(
+					`VK One Tap token exchange failed: ${txt}`,
+				)
+			}
+
+			const tokens = (await tokenResp.json()) as any
+
+			if (tokens?.error) {
+				throw new UnauthorizedException(
+					`VK One Tap token exchange failed: ${JSON.stringify(tokens)}`,
+				)
+			}
+
+			const accessToken = tokens?.access_token
+
+			if (!accessToken) {
+				throw new UnauthorizedException(
+					`No access_token in VK ID response: ${JSON.stringify(tokens)}`,
+				)
+			}
+
+			const infoParams = new URLSearchParams({
+				access_token: accessToken,
+				client_id: clientId,
+			})
+
+			const infoResp = await fetch('https://id.vk.com/oauth2/user_info', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: infoParams,
+			})
+
+			if (!infoResp.ok) {
+				const txt = await infoResp.text().catch(() => '')
+				throw new UnauthorizedException(
+					`Failed to fetch VK ID user info: ${txt}`,
+				)
+			}
+
+			const vkInfo = (await infoResp.json()) as any
+			const profile = vkInfo?.user || vkInfo
+
+			const vkId = String(
+				profile?.user_id || profile?.id || tokens?.user_id || '',
+			).trim()
+
+			const email = String(profile?.email || tokens?.email || '')
+				.toLowerCase()
+				.trim()
+
+			if (!vkId || !isEmailLike(email)) {
+				throw new BadRequestException({
+					code: 'vk_email_missing',
+					message:
+						'VK ID не вернул email. Разрешите доступ к почте в настройках VK ID или используйте вход по email.',
+				})
+			}
+
+			const user = await this.auth.findOrCreateUserByVk(vkId, email)
+			await this.auth['users'].ensureAdminRoleFor(user.email)
+
+			const session = await this.issueOAuthSession(user, res)
+
+			return {
+				ok: true,
+				...session,
+				next,
+			}
+		} catch (error: any) {
+			if (error instanceof HttpException) throw error
+
+			const msg = error?.message || JSON.stringify(error)
+			console.error('[VK One Tap Error]:', error)
+			throw new InternalServerErrorException(
+				`VK ID One Tap Auth Failed: ${msg}`,
+			)
+		}
+	}
+
+	// ====================== VK ID ======================
+
+	@Get('vk')
+	async vk(@Req() req: Request, @Res() res: Response) {
+		if (!this.vkEnabled()) {
+			throw new NotFoundException('VK ID login disabled')
+		}
 
 		const q = (req.query as any) || {}
 		const mode: OAuthMode = q?.mode === 'register' ? 'register' : 'login'
@@ -551,61 +787,94 @@ export class AuthController {
 		const next = this.sanitizeNext(q?.next)
 		this.setNextCookie(res, next)
 
-		const nonce = this.makeState()
-		const packed = `${nonce}:${mode}`
-		this.setGoogleStateCookie(res, packed)
+		const clientId = process.env.VK_CLIENT_ID
+		const redirectUri = process.env.VK_REDIRECT_URL
+
+		if (!clientId || !redirectUri) {
+			throw new InternalServerErrorException(
+				'Missing VK_CLIENT_ID / VK_REDIRECT_URL',
+			)
+		}
+
+		const state = this.makeState()
+		const codeVerifier = this.makeCodeVerifier()
+		const codeChallenge = this.makeCodeChallenge(codeVerifier)
+
+		this.setVkStateCookie(res, {
+			state,
+			mode,
+			codeVerifier,
+		})
 
 		const params = new URLSearchParams({
-			client_id: process.env.GOOGLE_CLIENT_ID!,
-			redirect_uri: process.env.GOOGLE_REDIRECT_URL!,
 			response_type: 'code',
-			scope: 'openid email profile',
-			access_type: 'offline',
-			include_granted_scopes: 'true',
-			state: packed,
-			prompt: 'consent',
+			client_id: clientId,
+			redirect_uri: redirectUri,
+			scope: 'email',
+			state,
+			code_challenge: codeChallenge,
+			code_challenge_method: 'S256',
 		})
-		res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`)
+
+		res.redirect(`https://id.vk.com/authorize?${params}`)
 		return
 	}
 
-	@Get('google/callback')
-	async googleCallback(@Req() req: Request, @Res() res: Response) {
-		if (!this.googleEnabled())
-			throw new NotFoundException('Google login disabled')
+	@Get('vk/callback')
+	async vkCallback(@Req() req: Request, @Res() res: Response) {
+		if (!this.vkEnabled()) {
+			throw new NotFoundException('VK ID login disabled')
+		}
 
-		const { code, state } = req.query as { code?: string; state?: string }
-		const stateCookie = (req as any).cookies?.google_oauth_state as
-			| string
-			| undefined
+		const { code, state } = req.query as {
+			code?: string
+			state?: string
+		}
 
-		if (!code || !state || !stateCookie || state !== stateCookie) {
+		const deviceId = String((req.query as any)?.device_id || '').trim()
+		const stateCookie = this.readVkStateCookie(req)
+
+		if (!code || !state || !stateCookie || state !== stateCookie.state) {
 			console.warn(
-				`[OAuth Error] Mismatch. UrlState: ${state}, CookieState: ${stateCookie}`,
+				`[OAuth Error] VK mismatch. UrlState: ${state}, CookieState: ${stateCookie?.state}`,
 			)
-			this.clearGoogleStateCookie(res)
+			this.clearVkStateCookie(res)
 			this.clearNextCookie(res)
 			throw new BadRequestException(
 				'Invalid OAuth state/code (Cookie mismatch)',
 			)
 		}
 
-		this.clearGoogleStateCookie(res)
+		this.clearVkStateCookie(res)
 
 		try {
-			if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-				throw new Error('Missing GOOGLE_CLIENT_ID/SECRET env vars')
+			const clientId = process.env.VK_CLIENT_ID
+			const clientSecret = process.env.VK_CLIENT_SECRET
+			const serviceToken = process.env.VK_SERVICE_TOKEN
+			const redirectUri = process.env.VK_REDIRECT_URL
+
+			if (!clientId || !clientSecret || !serviceToken || !redirectUri) {
+				throw new Error(
+					'Missing VK_CLIENT_ID/SECRET/SERVICE_TOKEN/REDIRECT_URL env vars',
+				)
 			}
 
 			const tokenParams = new URLSearchParams({
-				code,
-				client_id: process.env.GOOGLE_CLIENT_ID!,
-				client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-				redirect_uri: process.env.GOOGLE_REDIRECT_URL!,
 				grant_type: 'authorization_code',
+				code,
+				client_id: clientId,
+				client_secret: clientSecret,
+				service_token: serviceToken,
+				redirect_uri: redirectUri,
+				code_verifier: stateCookie.codeVerifier,
+				state,
 			})
 
-			const tokenResp = await fetch('https://oauth2.googleapis.com/token', {
+			if (deviceId) {
+				tokenParams.set('device_id', deviceId)
+			}
+
+			const tokenResp = await fetch('https://id.vk.com/oauth2/auth', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 				body: tokenParams,
@@ -613,58 +882,76 @@ export class AuthController {
 
 			if (!tokenResp.ok) {
 				const txt = await tokenResp.text()
-				throw new UnauthorizedException(`Google token exchange failed: ${txt}`)
+				throw new UnauthorizedException(`VK token exchange failed: ${txt}`)
 			}
 
 			const tokens = (await tokenResp.json()) as any
-			const { access_token } = tokens
 
-			if (!access_token) {
-				throw new UnauthorizedException('No access_token in Google response')
-			}
-
-			const userResp = await fetch(
-				'https://www.googleapis.com/oauth2/v3/userinfo',
-				{
-					headers: { Authorization: `Bearer ${access_token}` },
-				},
-			)
-
-			if (!userResp.ok) {
-				throw new UnauthorizedException('Failed to fetch Google user info')
-			}
-
-			const googleUser = (await userResp.json()) as any
-			const email = googleUser.email?.toLowerCase()
-			const emailVerified = googleUser.email_verified
-			const sub = googleUser.sub
-
-			if (!email || !emailVerified || !sub) {
+			if (tokens?.error) {
 				throw new UnauthorizedException(
-					'Google email not verified or sub missing',
+					`VK token exchange failed: ${JSON.stringify(tokens)}`,
 				)
 			}
 
-			const user = await this.auth.findOrCreateUserByGoogle(sub, email)
+			const accessToken = tokens?.access_token
+
+			if (!accessToken) {
+				throw new UnauthorizedException(
+					`No access_token in VK ID response: ${JSON.stringify(tokens)}`,
+				)
+			}
+
+			const infoParams = new URLSearchParams({
+				access_token: accessToken,
+				client_id: clientId,
+			})
+
+			const infoResp = await fetch('https://id.vk.com/oauth2/user_info', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: infoParams,
+			})
+
+			if (!infoResp.ok) {
+				const txt = await infoResp.text().catch(() => '')
+				throw new UnauthorizedException(
+					`Failed to fetch VK ID user info: ${txt}`,
+				)
+			}
+
+			const vkInfo = (await infoResp.json()) as any
+			const profile = vkInfo?.user || vkInfo
+
+			const vkId = String(
+				profile?.user_id || profile?.id || tokens?.user_id || '',
+			).trim()
+
+			const email = String(profile?.email || tokens?.email || '')
+				.toLowerCase()
+				.trim()
+
+			if (!vkId || !isEmailLike(email)) {
+				this.clearNextCookie(res)
+
+				const target = stateCookie.mode === 'register' ? '/register' : '/login'
+				res.redirect(
+					this.urlTo(
+						`${target}?reason=${encodeURIComponent('vk_email_missing')}`,
+					),
+				)
+				return
+			}
+
+			const user = await this.auth.findOrCreateUserByVk(vkId, email)
 			await this.auth['users'].ensureAdminRoleFor(user.email)
-
-			const pre = this.auth.signPreauth(user.id, user.email)
-			res.cookie('preauth', pre, this.preauthCookieOpts())
-
-			await this.sendMfaOrThrow(
-				() => this.auth.startEmailMfa(user.id, user.email),
-				'startEmailMfa(google-callback)',
-			)
 
 			const next = this.readNextCookie(req) || '/profile'
 			this.clearNextCookie(res)
 
-			const verifyUrl = this.urlTo(
-				`/login/verify?email=${encodeURIComponent(
-					user.email,
-				)}&next=${encodeURIComponent(next)}`,
-			)
-			res.redirect(verifyUrl)
+			await this.issueOAuthSession(user, res)
+
+			res.redirect(this.urlTo(next))
+			return
 		} catch (error: any) {
 			this.clearNextCookie(res)
 
@@ -672,8 +959,8 @@ export class AuthController {
 			if (error instanceof HttpException) throw error
 
 			const msg = error?.message || JSON.stringify(error)
-			console.error('[Google Callback Error]:', error)
-			throw new InternalServerErrorException(`Google Auth Failed: ${msg}`)
+			console.error('[VK Callback Error]:', error)
+			throw new InternalServerErrorException(`VK ID Auth Failed: ${msg}`)
 		}
 	}
 
@@ -707,9 +994,13 @@ export class AuthController {
 			response_type: 'code',
 			client_id: clientId,
 			redirect_uri: redirectUri,
-			scope: 'login:info login:email',
 			state: packed,
 		})
+
+		const scope = (process.env.YANDEX_SCOPE || '').trim()
+		if (scope) {
+			params.set('scope', scope)
+		}
 
 		res.redirect(`https://oauth.yandex.com/authorize?${params}`)
 		return
@@ -720,10 +1011,27 @@ export class AuthController {
 		if (!this.yandexEnabled())
 			throw new NotFoundException('Yandex login disabled')
 
-		const { code, state } = req.query as { code?: string; state?: string }
+		const { code, state, error, error_description } = req.query as {
+			code?: string
+			state?: string
+			error?: string
+			error_description?: string
+		}
 		const stateCookie = (req as any).cookies?.yandex_oauth_state as
 			| string
 			| undefined
+
+		if (error) {
+			console.warn(
+				`[OAuth Error] Yandex returned error: ${error}. Description: ${error_description || ''}`,
+			)
+			this.clearYandexStateCookie(res)
+			this.clearNextCookie(res)
+			res.redirect(
+				this.urlTo(`/login?reason=${encodeURIComponent('yandex_oauth_error')}`),
+			)
+			return
+		}
 
 		if (!code || !state || !stateCookie || state !== stateCookie) {
 			console.warn(
@@ -731,9 +1039,12 @@ export class AuthController {
 			)
 			this.clearYandexStateCookie(res)
 			this.clearNextCookie(res)
-			throw new BadRequestException(
-				'Invalid OAuth state/code (Cookie mismatch)',
+			res.redirect(
+				this.urlTo(
+					`/login?reason=${encodeURIComponent('yandex_state_mismatch')}`,
+				),
 			)
+			return
 		}
 
 		this.clearYandexStateCookie(res)
@@ -794,32 +1105,26 @@ export class AuthController {
 				.toLowerCase()
 				.trim()
 
-			if (!yandexId || !email) {
-				throw new UnauthorizedException(
-					'Yandex user id/email missing (check scopes: login:email)',
-				)
+			if (!yandexId) {
+				throw new UnauthorizedException('Yandex user id missing')
 			}
 
-			const user = await this.auth.findOrCreateUserByYandex(yandexId, email)
-			await this.auth['users'].ensureAdminRoleFor(user.email)
+			const normalizedEmail = isEmailLike(email)
+				? email
+				: `yandex-${yandexId}@oauth.stationeden.local`
 
-			const pre = this.auth.signPreauth(user.id, user.email)
-			res.cookie('preauth', pre, this.preauthCookieOpts())
-
-			await this.sendMfaOrThrow(
-				() => this.auth.startEmailMfa(user.id, user.email),
-				'startEmailMfa(yandex-callback)',
+			const user = await this.auth.findOrCreateUserByYandex(
+				yandexId,
+				normalizedEmail,
 			)
+			await this.auth['users'].ensureAdminRoleFor(user.email)
 
 			const next = this.readNextCookie(req) || '/profile'
 			this.clearNextCookie(res)
 
-			const verifyUrl = this.urlTo(
-				`/login/verify?email=${encodeURIComponent(
-					user.email,
-				)}&next=${encodeURIComponent(next)}`,
-			)
-			res.redirect(verifyUrl)
+			await this.issueOAuthSession(user, res)
+
+			res.redirect(this.urlTo(next))
 		} catch (error: any) {
 			this.clearNextCookie(res)
 
