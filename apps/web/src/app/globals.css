@@ -28,7 +28,48 @@
 
 * {
 	box-sizing: border-box;
+	scrollbar-width: thin;
+	scrollbar-color: rgba(99, 239, 255, 0.58) rgba(1, 10, 24, 0.7);
 }
+
+*::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+	border: 1px solid rgba(99, 239, 255, 0.08);
+	border-radius: 999px;
+	background:
+		linear-gradient(180deg, rgba(99, 239, 255, 0.05), rgba(8, 18, 34, 0.68)),
+		rgba(1, 10, 24, 0.86);
+}
+
+*::-webkit-scrollbar-thumb {
+	border: 2px solid rgba(1, 10, 24, 0.86);
+	border-radius: 999px;
+	background: linear-gradient(
+		180deg,
+		rgba(99, 239, 255, 0.82),
+		rgba(35, 153, 183, 0.62)
+	);
+	box-shadow:
+		0 0 12px rgba(99, 239, 255, 0.18),
+		inset 0 0 8px rgba(255, 255, 255, 0.08);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+	background: linear-gradient(
+		180deg,
+		rgba(125, 249, 255, 0.96),
+		rgba(99, 239, 255, 0.74)
+	);
+}
+
+*::-webkit-scrollbar-corner {
+	background: rgba(1, 10, 24, 0.86);
+}
+
 html,
 body {
 	height: 100%;

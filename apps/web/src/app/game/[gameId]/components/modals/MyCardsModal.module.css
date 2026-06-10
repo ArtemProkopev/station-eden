@@ -23,7 +23,7 @@
 	display: flex;
 	flex-direction: column;
 	width: min(1120px, calc(100vw - 48px));
-	max-height: min(760px, calc(100dvh - 72px));
+	max-height: min(860px, calc(100dvh - 36px));
 	overflow: hidden;
 	border: 1px solid rgba(99, 239, 255, 0.28);
 	border-radius: 18px;
@@ -182,7 +182,7 @@
 
 .cardsList {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
 	gap: 14px;
 	min-height: 0;
 	overflow: auto;
@@ -195,7 +195,8 @@
 	display: flex;
 	flex-direction: column;
 	gap: 12px;
-	min-height: 320px;
+	min-height: 390px;
+	height: auto;
 	overflow: hidden;
 	padding: 16px;
 	border: 1px solid rgba(99, 239, 255, 0.16);
@@ -226,6 +227,15 @@
 		transparent
 	);
 	opacity: 0.46;
+}
+
+.cardTopline,
+.cardItem h3,
+.cardDescription,
+.cardDetailsGrid,
+.revealButton {
+	position: relative;
+	z-index: 1;
 }
 
 .newCard {
@@ -297,8 +307,9 @@
 	display: flex;
 	flex-direction: column;
 	gap: 10px;
-	flex: 1 1 auto;
-	min-height: 0;
+	flex: 0 0 auto;
+	min-height: auto;
+	overflow: visible;
 }
 
 .cardDetailsBlock {
@@ -360,6 +371,8 @@
 }
 
 .revealButton {
+	position: relative;
+	z-index: 2;
 	margin-top: auto;
 	min-height: 38px;
 	border: 1px solid rgba(99, 239, 255, 0.42);
@@ -436,7 +449,7 @@
 	}
 
 	.cardItem {
-		min-height: 0;
+		min-height: 360px;
 	}
 }
 

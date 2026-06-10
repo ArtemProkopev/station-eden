@@ -24,6 +24,11 @@ export default function PlayersPanel({
 	const alivePlayers = players.filter(player => player.isAlive === true)
 	const ejectedPlayers = players.filter(player => player.isAlive !== true)
 
+	const activePlayerId =
+		gameState.phase === 'discussion'
+			? gameState.currentRevealPlayerId || gameState.currentSpeakerId
+			: gameState.currentSpeakerId || gameState.currentRevealPlayerId
+
 	return (
 		<section className={styles.playersPanel}>
 			<div className={styles.panelHeader}>
@@ -45,6 +50,7 @@ export default function PlayersPanel({
 						gamePhase={gamePhase}
 						creatorId={gameState.creatorId}
 						currentPlayer={currentPlayer}
+						isTurnActive={activePlayerId === player.id}
 						onVote={onVote}
 					/>
 				))}
@@ -77,6 +83,7 @@ interface PlayerCardProps {
 	gamePhase: string
 	creatorId?: string
 	currentPlayer?: ExtendedGamePlayer
+	isTurnActive: boolean
 	onVote: (targetPlayerId: string) => void
 }
 
@@ -87,6 +94,7 @@ function PlayerCard({
 	gamePhase,
 	creatorId,
 	currentPlayer,
+	isTurnActive,
 	onVote,
 }: PlayerCardProps) {
 	const isAlive = player.isAlive === true
@@ -111,7 +119,9 @@ function PlayerCard({
 				isMe ? styles.me : ''
 			} ${player.isInfected ? styles.infectedState : ''} ${
 				player.isSuspicious ? styles.suspiciousState : ''
-			} ${hasVoted ? styles.votedForMe : ''}`}
+			} ${hasVoted ? styles.votedForMe : ''} ${
+				isTurnActive && isAlive ? styles.activeTurn : ''
+			} ${hasRevealedThisRound ? styles.revealedThisRound : ''}`}
 		>
 			<div className={styles.playerMain}>
 				<div className={styles.playerNumber}>
@@ -167,22 +177,6 @@ function PlayerCard({
 					<span className={`${styles.statusBadge} ${statusClassName}`}>
 						{status.label}
 					</span>
-
-					<span
-						className={`${styles.activityIndicator} ${
-							hasRevealedThisRound ? styles.activityActive : ''
-						}`}
-						title={
-							hasRevealedThisRound
-								? 'Раскрыл карту в этом раунде'
-								: 'Ожидает действия'
-						}
-						aria-label={
-							hasRevealedThisRound
-								? 'Раскрыл карту в этом раунде'
-								: 'Ожидает действия'
-						}
-					/>
 				</div>
 			</div>
 

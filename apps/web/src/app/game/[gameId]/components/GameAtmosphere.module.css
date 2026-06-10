@@ -18,38 +18,28 @@
 	background-image: url('https://cdn.assets.stationeden.ru/web/game-optimized.webp');
 	background-size: cover;
 	background-position: center;
-	opacity: 0.66;
-	filter: saturate(1.1) brightness(0.68) contrast(1.08);
-	transform: scale(1.02) translateZ(0);
-}
-
-.gameAtmosphereGalaxy {
-	position: absolute;
-	inset: 0;
-	opacity: 0.34;
-	mix-blend-mode: screen;
-	transform: translateZ(0);
+	opacity: 0.62;
+	transform: scale(1.02);
 }
 
 .gameAtmosphereCore {
 	position: absolute;
 	left: 50%;
 	top: 42%;
-	width: min(760px, 58vw);
+	width: min(680px, 52vw);
 	aspect-ratio: 1;
 	border-radius: 999px;
-	transform: translate(-50%, -50%) scale(0.98) translateZ(0);
+	transform: translate(-50%, -50%) scale(0.98);
 	background: radial-gradient(
 		circle,
-		rgba(99, 239, 255, 0.3) 0%,
-		rgba(99, 239, 255, 0.14) 18%,
-		rgba(124, 92, 255, 0.075) 42%,
-		transparent 68%
+		rgba(99, 239, 255, 0.22) 0%,
+		rgba(99, 239, 255, 0.1) 20%,
+		rgba(124, 92, 255, 0.055) 44%,
+		transparent 70%
 	);
-	filter: blur(2px);
-	opacity: 0.68;
-	animation: gameCorePulse 8.4s ease-in-out infinite;
-	will-change: transform, opacity;
+	opacity: 0.58;
+	animation: gameCorePulse 10s ease-in-out infinite;
+	will-change: opacity, transform;
 }
 
 .gameAtmosphereCore::before {

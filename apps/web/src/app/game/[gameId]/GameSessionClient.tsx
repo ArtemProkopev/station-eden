@@ -8,7 +8,6 @@ import {
 } from '@station-eden/shared'
 import type React from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import AbilitiesPanel from './components/AbilitiesPanel'
 import GameAtmosphere from './components/GameAtmosphere'
 import GameChat from './components/GameChat'
 import GameFooter from './components/GameFooter'
@@ -65,7 +64,6 @@ export default function GameSessionClient({ gameId }: Props) {
 		setActiveCrisis,
 		resetReveal,
 
-		// Новые поля для способностей
 		playerAbilities,
 		handleUseAbility,
 
@@ -111,7 +109,6 @@ export default function GameSessionClient({ gameId }: Props) {
 	const [isIntroCinematicVisible, setIsIntroCinematicVisible] = useState(false)
 	const [introPlayersCount, setIntroPlayersCount] = useState(0)
 
-	// Список профессий для выбора при маскировке
 	const availableProfessions = useMemo(() => {
 		return [
 			{ id: 'prof_engineer', name: 'Инженер-кинетик' },
@@ -133,7 +130,6 @@ export default function GameSessionClient({ gameId }: Props) {
 		]
 	}, [])
 
-	// Список ресурсов для обмена
 	const availableResources = useMemo(() => {
 		return [
 			{ id: 'resource_medkit', name: 'Медицинский набор' },
@@ -154,12 +150,11 @@ export default function GameSessionClient({ gameId }: Props) {
 		]
 	}, [])
 
-	// Список игроков для выбора цели
 	const playersList = useMemo(() => {
-		return players.map(p => ({
-			id: p.id,
-			name: p.name,
-			isAlive: p.isAlive === true,
+		return players.map(player => ({
+			id: player.id,
+			name: player.name,
+			isAlive: player.isAlive === true,
 		}))
 	}, [players])
 
@@ -296,9 +291,6 @@ export default function GameSessionClient({ gameId }: Props) {
 	const alivePlayers = players.filter(player => player.isAlive === true)
 	const phaseDurationDisplay = getPhaseDuration(gameState, phaseTimeLeft)
 
-	// Определяем, доступны ли способности (только в фазах discussion и voting)
-	const abilitiesDisabled = gameState.phase !== 'discussion' && gameState.phase !== 'voting'
-
 	return (
 		<div className={styles.container}>
 			<GameAtmosphere />
@@ -402,6 +394,11 @@ export default function GameSessionClient({ gameId }: Props) {
 					myCards={myCards}
 					newCardsCount={newCardsCount}
 					systemMessages={systemMessages}
+					playerAbilities={playerAbilities}
+					onUseAbility={handleUseAbility}
+					playersList={playersList}
+					availableProfessions={availableProfessions}
+					availableResources={availableResources}
 				/>
 
 				<GameChat
@@ -411,27 +408,13 @@ export default function GameSessionClient({ gameId }: Props) {
 					onMessageChange={handleMessageChange}
 					onSendMessage={handleSendMessage}
 					onKeyPress={
-						handleKeyPress as (e: React.KeyboardEvent<Element>) => void
+						handleKeyPress as (event: React.KeyboardEvent<Element>) => void
 					}
 					onChatScroll={handleChatScroll}
 					disabled={!isConnected || gameState.phase === 'game_over'}
 					currentUserId={userId}
 				/>
 			</main>
-
-			{/* Панель способностей */}
-			{playerAbilities && playerAbilities.length > 0 && (
-				<div className={styles.abilitiesWrapper}>
-					<AbilitiesPanel
-						abilities={playerAbilities}
-						onUseAbility={handleUseAbility}
-						players={playersList}
-						professions={availableProfessions}
-						resources={availableResources}
-						disabled={abilitiesDisabled}
-					/>
-				</div>
-			)}
 
 			<GameFooter
 				gameState={gameState}

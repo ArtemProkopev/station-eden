@@ -1,131 +1,164 @@
-// apps/web/src/app/game/[gameId]/hooks/useGameTimer.ts
+// apps/web/src/app/game/[gameId]/components/hooks/useGameTimer.ts
 import { ExtendedGameState } from '@station-eden/shared'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+const TIMER_SYNC_INTERVAL_MS = 30_000
+const MAX_ACCEPTED_SERVER_OFFSET_MS = 10_000
+
+type TimerSnapshot = {
+	endTimeMs: number | null
+	phaseKey: string
+}
+
+function toSafeSeconds(value: unknown, fallback = 0): number {
+	const parsed = typeof value === 'number' ? value : Number(value)
+
+	if (!Number.isFinite(parsed)) return fallback
+
+	return Math.max(0, Math.ceil(parsed))
+}
+
+function getSecondsLeft(endTimeMs: number, offsetMs: number): number {
+	const now = Date.now() + offsetMs
+	return Math.max(0, Math.ceil((endTimeMs - now) / 1000))
+}
+
+function getPhaseKey(game: ExtendedGameState): string {
+	return [
+		String(game.id ?? ''),
+		String(game.phase ?? ''),
+		String(game.round ?? ''),
+		String(game.phaseEndTime ?? ''),
+	].join(':')
+}
+
 export function useGameTimer() {
-	const [phaseTimeLeft, setPhaseTimeLeft] = useState<number>(0)
-	const [serverTimeOffset, setServerTimeOffset] = useState<number>(0)
+	const [phaseTimeLeft, setPhaseTimeLeftState] = useState<number>(0)
+
 	const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-	const lastSyncRef = useRef<{ time: number; value: number }>({ time: 0, value: 0 })
+	const serverTimeOffsetRef = useRef(0)
+	const snapshotRef = useRef<TimerSnapshot>({
+		endTimeMs: null,
+		phaseKey: '',
+	})
+
+	const setPhaseTimeLeft = useCallback(
+		(value: number | ((prev: number) => number)) => {
+			setPhaseTimeLeftState(prev => {
+				const nextValue = typeof value === 'function' ? value(prev) : value
+				const next = toSafeSeconds(nextValue)
+
+				return prev === next ? prev : next
+			})
+		},
+		[],
+	)
 
 	const stopTimer = useCallback(() => {
-		if (intervalRef.current) {
-			clearInterval(intervalRef.current)
-			intervalRef.current = null
-		}
+		if (!intervalRef.current) return
+
+		clearInterval(intervalRef.current)
+		intervalRef.current = null
 	}, [])
 
 	const startTimer = useCallback(
-		(duration: number, endTime?: number) => {
+		(duration: number, endTimeMs?: number) => {
 			stopTimer()
 
-			if (duration <= 0 || isNaN(duration)) {
+			const safeDuration = toSafeSeconds(duration)
+			const hasServerEndTime =
+				typeof endTimeMs === 'number' && Number.isFinite(endTimeMs)
+
+			if (safeDuration <= 0 && !hasServerEndTime) {
 				setPhaseTimeLeft(0)
 				return
 			}
 
-			// Если есть точное время окончания от сервера - используем его
-			if (endTime && !isNaN(endTime)) {
-				let lastValue = duration
-				
-				const updateTimer = () => {
-					const now = Date.now() + (serverTimeOffset || 0)
-					const remaining = Math.max(0, Math.floor((endTime - now) / 1000))
-					
-					if (!isNaN(remaining)) {
-						// Сглаживание: не обновляем если разница меньше 1 секунды
-						const diff = Math.abs(remaining - lastValue)
-						if (diff <= 1 && lastValue > 0) {
-							// Плавное уменьшение
-							setPhaseTimeLeft(prev => Math.max(0, prev - 1))
-							lastValue = Math.max(0, lastValue - 1)
-						} else {
-							setPhaseTimeLeft(remaining)
-							lastValue = remaining
-						}
-					}
-					
-					if (lastValue <= 0) {
-						stopTimer()
-					}
+			const fallbackEndTimeMs = Date.now() + safeDuration * 1000
+			const targetEndTimeMs = hasServerEndTime
+				? Number(endTimeMs)
+				: fallbackEndTimeMs
+
+			const tick = () => {
+				const secondsLeft = getSecondsLeft(
+					targetEndTimeMs,
+					serverTimeOffsetRef.current,
+				)
+
+				setPhaseTimeLeft(secondsLeft)
+
+				if (secondsLeft <= 0) {
+					stopTimer()
 				}
-				
-				updateTimer()
-				const interval = setInterval(updateTimer, 1000)
-				intervalRef.current = interval
-				return
 			}
 
-			// Резервный вариант - простой обратный отсчет
-			setPhaseTimeLeft(duration)
-			const interval = setInterval(() => {
-				setPhaseTimeLeft(prev => {
-					if (prev <= 1) {
-						clearInterval(interval)
-						intervalRef.current = null
-						return 0
-					}
-					return prev - 1
-				})
-			}, 1000)
-			intervalRef.current = interval
+			tick()
+			intervalRef.current = setInterval(tick, 1000)
 		},
-		[stopTimer, serverTimeOffset],
+		[setPhaseTimeLeft, stopTimer],
 	)
 
 	const syncTimerWithServer = useCallback(
 		(game: ExtendedGameState) => {
-			if (!game?.phase || !game.phaseEndTime) {
+			if (!game?.phase) {
 				setPhaseTimeLeft(0)
 				stopTimer()
 				return
 			}
 
-			try {
-				// Используем скорректированное время
-				const serverTime = Date.now() + (serverTimeOffset || 0)
-				const endTime = new Date(String(game.phaseEndTime)).getTime()
-				
-				if (isNaN(endTime)) {
-					console.error('Неверный формат phaseEndTime:', game.phaseEndTime)
+			const phaseKey = getPhaseKey(game)
+			const parsedEndTimeMs = game.phaseEndTime
+				? new Date(String(game.phaseEndTime)).getTime()
+				: NaN
+			const hasValidEndTime = Number.isFinite(parsedEndTimeMs)
+
+			if (!hasValidEndTime) {
+				const fallbackDuration = toSafeSeconds(game.phaseDuration, 0)
+
+				if (fallbackDuration <= 0) {
 					setPhaseTimeLeft(0)
 					stopTimer()
 					return
 				}
-				
-				const secondsLeft = Math.max(0, Math.floor((endTime - serverTime) / 1000))
 
-				if (!isNaN(secondsLeft)) {
-					// Сглаживание: не обновляем если разница меньше 2 секунд и таймер уже идет
-					const diff = Math.abs(secondsLeft - phaseTimeLeft)
-					const now = Date.now()
-					const timeSinceLastSync = now - lastSyncRef.current.time
-					
-					// Обновляем только если разница значительная или прошло много времени с последней синхронизации
-					if (diff > 2 || timeSinceLastSync > 10000) {
-						setPhaseTimeLeft(secondsLeft)
-						lastSyncRef.current = { time: now, value: secondsLeft }
+				if (snapshotRef.current.phaseKey !== phaseKey) {
+					const fallbackEndTimeMs = Date.now() + fallbackDuration * 1000
+
+					snapshotRef.current = {
+						phaseKey,
+						endTimeMs: fallbackEndTimeMs,
 					}
+
+					startTimer(fallbackDuration, fallbackEndTimeMs)
 				}
 
-				if (secondsLeft > 0) {
-					startTimer(secondsLeft, endTime)
-				} else {
-					stopTimer()
-				}
-			} catch (error) {
-				console.error('Ошибка синхронизации таймера:', error)
-				setPhaseTimeLeft(0)
+				return
+			}
+
+			snapshotRef.current = {
+				phaseKey,
+				endTimeMs: parsedEndTimeMs,
+			}
+
+			const secondsLeft = getSecondsLeft(
+				parsedEndTimeMs,
+				serverTimeOffsetRef.current,
+			)
+
+			setPhaseTimeLeft(secondsLeft)
+
+			if (secondsLeft > 0) {
+				startTimer(secondsLeft, parsedEndTimeMs)
+			} else {
 				stopTimer()
 			}
 		},
-		[startTimer, stopTimer, serverTimeOffset, phaseTimeLeft],
+		[setPhaseTimeLeft, startTimer, stopTimer],
 	)
 
-	// Синхронизация времени с сервером
 	const syncServerTime = useCallback(async () => {
 		try {
-			const startTime = Date.now()
+			const requestStartedAt = Date.now()
 			const response = await fetch('/api/time', {
 				method: 'GET',
 				headers: {
@@ -133,40 +166,38 @@ export function useGameTimer() {
 				},
 				credentials: 'include',
 			})
-			
-			if (!response.ok) {
-				throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+
+			if (!response.ok) return
+
+			const data = (await response.json()) as { timestamp?: unknown }
+			const serverTimestamp = Number(data?.timestamp)
+
+			if (!Number.isFinite(serverTimestamp)) return
+
+			const responseReceivedAt = Date.now()
+			const roundTripTime = responseReceivedAt - requestStartedAt
+			const estimatedServerTime = serverTimestamp + roundTripTime / 2
+			const offset = estimatedServerTime - responseReceivedAt
+
+			if (
+				Number.isFinite(offset) &&
+				Math.abs(offset) <= MAX_ACCEPTED_SERVER_OFFSET_MS
+			) {
+				serverTimeOffsetRef.current = offset
 			}
-			
-			const data = await response.json()
-			
-			if (!data || typeof data.timestamp !== 'number') {
-				throw new Error('Неверный формат ответа от сервера')
-			}
-			
-			const endTime = Date.now()
-			const roundTripTime = endTime - startTime
-			const estimatedServerTime = data.timestamp + (roundTripTime / 2)
-			const offset = estimatedServerTime - endTime
-			
-			if (!isNaN(offset) && Math.abs(offset) < 10000) { // Ограничиваем максимальное смещение
-				setServerTimeOffset(offset)
-				console.log(`Смещение времени сервера: ${offset}ms (RTT: ${roundTripTime}ms)`)
-			}
-		} catch (error) {
-			console.error('Не удалось синхронизировать время:', error)
-			// Не сбрасываем offset, используем предыдущее значение
+		} catch {
+			// Таймер продолжает работать по локальному времени, если синхронизация недоступна.
 		}
 	}, [])
 
-	// Синхронизируем время каждые 30 секунд (чаще для точности)
 	useEffect(() => {
 		syncServerTime()
-		const interval = setInterval(syncServerTime, 30000)
+
+		const interval = setInterval(syncServerTime, TIMER_SYNC_INTERVAL_MS)
+
 		return () => clearInterval(interval)
 	}, [syncServerTime])
 
-	// Очистка при размонтировании
 	useEffect(() => {
 		return () => stopTimer()
 	}, [stopTimer])
