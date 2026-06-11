@@ -30,7 +30,6 @@ export default function SettingsPageClient() {
 
 	useScrollPrevention()
 
-	// Инициализация данных
 	useEffect(() => {
 		let cancelled = false
 
@@ -49,7 +48,6 @@ export default function SettingsPageClient() {
 		}
 	}, [loadUserData, loadSettings])
 
-	// Приводим ProfileState → формат, который ждёт TopHUD
 	const topHudProfile = useMemo(
 		() => ({
 			status: profile.status,

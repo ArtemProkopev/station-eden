@@ -186,7 +186,6 @@ export function useGameTimer() {
 				serverTimeOffsetRef.current = offset
 			}
 		} catch {
-			// Таймер продолжает работать по локальному времени, если синхронизация недоступна.
 		}
 	}, [])
 

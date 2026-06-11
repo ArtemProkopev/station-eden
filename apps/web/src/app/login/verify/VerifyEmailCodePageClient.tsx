@@ -138,8 +138,6 @@ export default function VerifyEmailCodePageClient() {
 		if (code.length === 6 && !busy && mode !== 'set_password') {
 			onSubmit()
 		}
-		// намеренно: onSubmit зависит от canSubmit и busy, здесь нужен автосабмит по коду
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [code, mode])
 
 	const title =

@@ -42,7 +42,6 @@
     0 0 10px rgba(99, 239, 255, 0.8);
 }
 
-/* Адаптивность */
 @media (max-width: 768px) {
   .sliderContainer {
     min-width: auto;

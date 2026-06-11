@@ -26,6 +26,5 @@ export const PROFILE_CONFIG = {
 	} as const,
 } as const
 
-// Функции для генерации ключей localStorage с учётом userId
 export const avatarKey = (userId: string) => `profile_avatar_${userId}`
 export const frameKey = (userId: string) => `profile_frame_${userId}`

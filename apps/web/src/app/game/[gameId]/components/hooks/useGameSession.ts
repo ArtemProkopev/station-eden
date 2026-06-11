@@ -283,7 +283,6 @@ export function useGameSession(gameId: string) {
 		addCard(payload.secret, 'secret')
 		addCard(payload.resource, 'resource')
 		addCard(payload.hiddenRole, 'role')
-		// roleCard НЕ добавляем - это служебная роль, не карта
 		addCard(payload.gender, 'gender')
 		addCard(payload.age, 'age')
 		addCard(payload.bodyType, 'body')
@@ -296,7 +295,6 @@ export function useGameSession(gameId: string) {
 		setCanSkipNarration(false)
 	}, [])
 
-	// Функция для получения доступных способностей на основе карт игрока
 	const updatePlayerAbilities = useCallback(() => {
 		if (!myCards || !userId || !gameState) return
 
@@ -358,7 +356,6 @@ export function useGameSession(gameId: string) {
 			}
 		}
 
-		// Проверяем секрет
 		const secret = myCards.secret
 		if (secret && secret.id === 'secret_alien_spy') {
 			if (!usedAbilities.has('alien_spy_disguise')) {
@@ -383,7 +380,6 @@ export function useGameSession(gameId: string) {
 			}
 		}
 
-		// Проверяем профессию
 		const profession = myCards.profession
 		if (profession) {
 			switch (profession.id) {
@@ -462,7 +458,6 @@ export function useGameSession(gameId: string) {
 			}
 		}
 
-		// Проверяем ресурсы
 		const resource = myCards.resource
 		if (resource && resource.id === 'resource_nano_medkit') {
 			if (!usedAbilities.has('nano_medkit_use')) {
@@ -477,7 +472,6 @@ export function useGameSession(gameId: string) {
 			}
 		}
 
-		// Проверяем гендер
 		const gender = myCards.gender
 		if (gender && gender.id === 'gender_nonbinary') {
 			if (!usedAbilities.has('nonbinary_ability')) {
@@ -495,7 +489,6 @@ export function useGameSession(gameId: string) {
 		setPlayerAbilities(abilities)
 	}, [myCards, gameState?.phase, userId, usedAbilities])
 
-	// Вызываем при изменении карт или фазы
 	useEffect(() => {
 		updatePlayerAbilities()
 	}, [updatePlayerAbilities])
@@ -1291,10 +1284,8 @@ export function useGameSession(gameId: string) {
 	const handleUseAbility = useCallback((ability: string, targetPlayerId?: string, extraData?: string) => {
 		if (!isConnected) return
 
-		// Отмечаем способность как использованную
 		setUsedAbilities(prev => new Set(prev).add(ability))
 
-		// Отправляем запрос на сервер
 		sendRef.current?.({
 			type: 'USE_ABILITY',
 			ability,

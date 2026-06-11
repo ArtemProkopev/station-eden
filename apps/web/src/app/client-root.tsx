@@ -16,7 +16,6 @@ declare global {
 	}
 }
 
-// --- fetch interceptor ---
 const setupFetchInterceptor = (): (() => void) | undefined => {
 	if (typeof window === 'undefined') return undefined
 
@@ -48,7 +47,6 @@ const setupFetchInterceptor = (): (() => void) | undefined => {
 	}
 }
 
-// --- WebSocket interceptor ---
 const setupWebSocketInterceptor = (): (() => void) | undefined => {
 	if (typeof window === 'undefined') return undefined
 

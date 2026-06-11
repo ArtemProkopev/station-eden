@@ -76,7 +76,6 @@
 	transition: all 0.3s ease;
 }
 
-/* Стили для бейджей блокировки и попыток */
 .pillRow {
 	display: flex;
 	flex-direction: column;
@@ -202,11 +201,11 @@
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	margin-bottom: 8px; /* такой же отступ до инпута, как у обычного label */
+	margin-bottom: 8px;
 }
 
 .labelRow .label {
-	margin-bottom: 0; /* убираем внутренний margin, он уже на .labelRow */
+	margin-bottom: 0;
 }
 
 .label {
@@ -375,7 +374,6 @@
 	transition: all 0.3s ease;
 }
 
-/* текст "Нет аккаунта? Зарегистрироваться" */
 .swap {
 	text-align: center;
 	margin-top: 20px;
@@ -384,7 +382,6 @@
 	width: 100%;
 }
 
-/* нижняя строка: слева регистрация, справа "Забыли пароль?" */
 .bottomRow {
 	display: flex;
 	justify-content: space-between;
@@ -394,7 +391,6 @@
 	flex-wrap: wrap;
 }
 
-/* старый вариант кнопки "Забыли пароль?" — если вдруг где-то используется */
 .forgotBtn {
 	background: none;
 	border: 0;
@@ -442,7 +438,6 @@
 	text-shadow: 0 0 8px rgba(79, 216, 255, 0.6);
 }
 
-/* Разделитель "Или через Google" как в регистрации */
 .hr {
 	display: flex;
 	align-items: center;
@@ -487,9 +482,6 @@
 	}
 }
 
-/* АДАПТИВ ПО ВЫСОТЕ ЭКРАНА ДЛЯ ДЕСКТОПОВ */
-
-/* Высота 900px и меньше */
 @media (max-height: 900px) and (min-width: 769px) {
 	.page {
 		padding: 20px;
@@ -517,7 +509,6 @@
 	}
 }
 
-/* Высота 800px и меньше */
 @media (max-height: 800px) and (min-width: 769px) {
 	.page {
 		padding: 16px;
@@ -595,7 +586,6 @@
 	}
 }
 
-/* Высота 700px и меньше */
 @media (max-height: 700px) and (min-width: 769px) {
 	.page {
 		padding: 12px;
@@ -685,7 +675,6 @@
 	}
 }
 
-/* Высота 600px и меньше - компактный режим */
 @media (max-height: 600px) and (min-width: 769px) {
 	.page {
 		padding: 8px;
@@ -780,7 +769,6 @@
 	}
 }
 
-/* Высота 500px и меньше - ультра компактный режим */
 @media (max-height: 500px) and (min-width: 769px) {
 	.page {
 		padding: 4px;
@@ -863,7 +851,6 @@
 	}
 }
 
-/* Адаптив по ширине: на узких экранах нижний ряд становится колонкой */
 @media (max-width: 480px) {
 	.bottomRow {
 		flex-direction: column;

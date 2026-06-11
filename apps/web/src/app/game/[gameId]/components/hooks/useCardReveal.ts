@@ -8,7 +8,6 @@ export function useCardReveal(addToChat: (playerName: string, text: string, isSy
   const [revealedCards, setRevealedCards] = useState<Record<string, boolean>>({})
   const [currentRevealIndex, setCurrentRevealIndex] = useState<number>(0)
   const [isRevealing, setIsRevealing] = useState<boolean>(false)
-  // Используем RevealedPlayer | null для начального состояния
   const [revealedPlayer, setRevealedPlayer] = useState<RevealedPlayer | null>(null)
 
   useEffect(() => {

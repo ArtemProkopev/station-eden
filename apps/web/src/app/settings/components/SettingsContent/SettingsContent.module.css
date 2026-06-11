@@ -12,7 +12,7 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  max-width: 1200px; /* ← Увеличили до 1200px */
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -23,7 +23,6 @@
   width: 100%;
 }
 
-/* Адаптивность */
 @media (max-width: 1600px) {
   .content {
     max-width: 1100px;

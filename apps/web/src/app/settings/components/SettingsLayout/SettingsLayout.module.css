@@ -2,7 +2,7 @@
 .layout {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 4rem; /* ← Увеличили gap до 4rem */
+  gap: 4rem;
   align-items: start;
   justify-content: center;
   width: 100%;

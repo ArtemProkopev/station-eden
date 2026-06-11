@@ -50,7 +50,6 @@
 		inset 0 0 15px color-mix(in srgb, var(--neon-blue) 10%, transparent);
 }
 
-/* Header section */
 .headerSection {
 	position: relative;
 	z-index: 2;
@@ -214,8 +213,6 @@
 	align-items: start;
 }
 
-/* ---------- АВАТАР + НИК ---------- */
-
 .avatarSection {
 	display: flex;
 	flex-direction: column;
@@ -288,7 +285,6 @@
 	z-index: 3;
 }
 
-/* строка @ник + кнопка смены */
 .handleRow {
 	display: flex;
 	align-items: center;
@@ -326,8 +322,6 @@
 	background: rgba(99, 239, 255, 0.15);
 	box-shadow: 0 0 10px var(--neon-glow-light);
 }
-
-/* ---------- ИНФО БЛОК ---------- */
 
 .infoSection {
 	display: flex;
@@ -405,8 +399,6 @@
 	width: 60%;
 }
 
-/* ---------- СТАТИСТИКА ---------- */
-
 .statsSection {
 	width: 100%;
 	max-width: 800px;
@@ -445,8 +437,6 @@
 		0 0 15px var(--neon-glow-light);
 	margin: 0;
 }
-
-/* ---------- КНОПКА КОПИРОВАНИЯ ---------- */
 
 .copyBtn {
 	background: none;
@@ -503,8 +493,6 @@
 	animation: spin 1s linear infinite;
 }
 
-/* ---------- МОДАЛКА СМЕНЫ НИКА ---------- */
-
 .usernameModalBackdrop {
 	position: fixed;
 	inset: 0;
@@ -552,7 +540,6 @@
 	gap: 12px;
 }
 
-/* Блок с анимацией ввода (адаптация Uiverse) */
 .umInputContainer {
 	filter: drop-shadow(20px 16px 24px #4090b5)
 		drop-shadow(-20px -16px 25px #9e30a9);
@@ -774,8 +761,6 @@
 	width: 100%;
 }
 
-/* ---------- АНИМАЦИИ ---------- */
-
 @keyframes spin {
 	0% {
 		transform: rotate(0deg);
@@ -813,7 +798,6 @@
 	}
 }
 
-/* анимация для блока инпута (из примера) */
 @keyframes backglitch {
 	0% {
 		box-shadow: inset 0px 20px 20px 30px #212121;
@@ -855,7 +839,6 @@
 	}
 }
 
-/* Accessibility */
 @media (prefers-reduced-motion: reduce) {
 	.header {
 		animation: none;
@@ -866,7 +849,6 @@
 	}
 }
 
-/* Упрощенные медиа-запросы */
 @media (max-width: 768px) {
 	.contentGrid {
 		grid-template-columns: 1fr;

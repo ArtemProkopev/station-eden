@@ -5,7 +5,6 @@ import { SoundSettings, UserSettings } from '@station-eden/shared'
 import { LanguageSettings } from '../sections/LanguageSettings/LanguageSettings'
 import { PurchasesSettings } from '../sections/PurchasesSettings/PurchasesSettings'
 import { SessionsSettings } from '../sections/SessionsSettings/SessionsSettings'
-// Импортируем компонент (а тип SoundSettings уже взяли из shared)
 import { SoundSettings as SoundSettingsComponent } from '../sections/SoundSettings/SoundSettings'
 import { SettingsSection } from '../SettingsSidebar/SettingsSidebar'
 import styles from './SettingsContent.module.css'

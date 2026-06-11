@@ -1,5 +1,4 @@
 // apps/web/src/app/profile/components/ProfileAvatar.tsx
-/* eslint-disable @next/next/no-img-element */
 'use client'
 
 import ImgCdn from '@/components/ImgCdn'
@@ -11,7 +10,6 @@ interface ProfileAvatarProps {
 	avatar: string
 	frame: string
 	username?: string | null
-	/** клик по кнопке «сменить» под ником */
 	onChangeUsernameClick?: () => void
 }
 

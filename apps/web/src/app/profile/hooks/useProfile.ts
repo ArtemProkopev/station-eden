@@ -26,10 +26,6 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 function unwrapAny<T = unknown>(v: unknown): T {
-	// возможные обёртки
-	// - {data: {...}}
-	// - {user: {...}}
-	// - {status:'signed-in', user:{...}}
 	if (!isRecord(v)) return v as T
 
 	if (isRecord(v.data)) return v.data as T
@@ -73,8 +69,6 @@ export const useProfile = () => {
 
 	const [isEditModalOpen, setIsEditModalOpen] = useState(false)
 	const [isUsernameModalOpen, setIsUsernameModalOpen] = useState(false)
-
-	// ✅ держим актуальный profile в ref, чтобы колбэки не зависели от profile в deps
 	const profileRef = useRef(profile)
 
 	useEffect(() => {
@@ -88,11 +82,6 @@ export const useProfile = () => {
 		[],
 	)
 
-	/**
-	 * ✅ Кэш по userId — только fallback.
-	 * ВАЖНО: этот колбэк должен быть стабильным и НЕ зависеть от profile,
-	 * иначе будет бесконечный цикл в местах где useEffect([loadUserData]).
-	 */
 	const loadSavedAssets = useCallback((userId?: string) => {
 		try {
 			const currentProfile = profileRef.current
@@ -139,13 +128,9 @@ export const useProfile = () => {
 		setIconsStatus(prev => ({ ...prev, ...statusUpdates }))
 	}, [])
 
-	/**
-	 * ✅ Грузим профиль через единый API-клиент.
-	 */
 	const loadUserData = useCallback(async () => {
 		try {
 			const raw = await api.me().catch((e: unknown) => {
-				// api.me() кидает ApiError; обработаем 401 красиво
 				if (isApiErrorLike(e) && e.status === 401) {
 					setProfile({
 						status: 'unauth',
@@ -163,7 +148,6 @@ export const useProfile = () => {
 
 			const payload = unwrapAny<Record<string, unknown>>(raw)
 
-			// поддерживаем userId или id
 			const userId =
 				pickString(payload.userId) ||
 				pickString(payload.id) ||
@@ -216,8 +200,6 @@ export const useProfile = () => {
 				},
 			})
 
-			// Сервер — источник истины.
-			// Но если в БД null — используем кэш.
 			if (avatarAbs) {
 				setAssets(prev => ({ ...prev, avatar: avatarAbs }))
 				localStorage.setItem(avatarKey(userId), avatarAbs)
@@ -240,12 +222,11 @@ export const useProfile = () => {
 				}
 			}
 
-			// подтягиваем кэш “на всякий”
 			loadSavedAssets(userId)
 		} catch (error: unknown) {
 			console.error('Profile data loading error:', error)
 
-			// Если это ApiError — покажем userMessage
+
 			if (isApiErrorLike(error)) {
 				setProfile({
 					status: 'error',
@@ -386,7 +367,6 @@ export const useProfile = () => {
 		})
 	}, [])
 
-	// (не используется прямо сейчас, но оставляю как пример безопасного чтения чисел)
 	void pickNumber
 
 	return {

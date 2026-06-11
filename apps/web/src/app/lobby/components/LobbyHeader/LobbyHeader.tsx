@@ -33,7 +33,6 @@ export default function LobbyHeader({
 				await navigator.clipboard.writeText(text)
 				return
 			} catch {
-				// Если Clipboard API недоступен, ниже используем fallback.
 			}
 		}
 

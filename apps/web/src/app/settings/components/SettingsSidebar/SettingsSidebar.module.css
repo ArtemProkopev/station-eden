@@ -2,7 +2,7 @@
 .sidebar {
   background: transparent;
   padding: 0;
-  width: 300px; /* ← Уменьшили до 300px */
+  width: 300px;
   height: fit-content;
 }
 
@@ -51,7 +51,6 @@
   box-shadow: 0 0 10px rgba(99, 239, 255, 0.8);
 }
 
-/* Адаптивность */
 @media (max-width: 1600px) {
   .sidebar {
     width: 280px;
@@ -81,7 +80,6 @@
   }
 }
 
-/* Мобильная версия оставляем как есть */
 @media (max-width: 768px) {
   .sidebar {
     width: 100%;

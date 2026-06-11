@@ -7,5 +7,5 @@
 }
 
 .settingRow {
-  margin-bottom: 0; /* Убираем возможные отступы из родительского компонента */
+  margin-bottom: 0;
 }

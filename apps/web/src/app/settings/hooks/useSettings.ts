@@ -57,12 +57,6 @@ export function useSettings() {
 		asset(PROFILE_CONFIG.DEFAULT.AVATAR),
 	)
 
-	/**
-	 * Грузим аватар из:
-	 * 1) server avatar (если есть)
-	 * 2) localStorage per-user key (profile_avatar:<userId>)
-	 * 3) дефолт
-	 */
 	const loadSavedAvatar = useCallback((userId?: string) => {
 		try {
 			const uid = pickString(userId) || null
@@ -101,11 +95,6 @@ export function useSettings() {
 		}
 	}, [])
 
-	/**
-	 * ✅ ВАЖНО:
-	 * Грузим профиль через единый API-клиент (NEXT_PUBLIC_API_BASE),
-	 * чтобы dev и prod работали одинаково и не было 404 от Next на /auth/me.
-	 */
 	const loadUserData = useCallback(async () => {
 		try {
 			const raw = await api.me().catch((e: unknown) => {
@@ -125,7 +114,6 @@ export function useSettings() {
 
 			const payload = unwrapAny<Record<string, unknown>>(raw)
 
-			// поддерживаем id/userId и вложенные варианты
 			const userId =
 				pickString(payload.userId) ||
 				pickString(payload.id) ||
@@ -177,7 +165,6 @@ export function useSettings() {
 				},
 			})
 
-			// ставим аватар: сервер > per-user cache > дефолт
 			if (avatarAbs) {
 				setAvatar(avatarAbs)
 				localStorage.setItem(avatarKey(userId), avatarAbs)
@@ -185,7 +172,6 @@ export function useSettings() {
 				loadSavedAvatar(userId)
 			}
 
-			// frameAbs тут не нужен напрямую, но оставляем в profile
 			void frameAbs
 		} catch (error: unknown) {
 			console.error('User data loading error:', error)

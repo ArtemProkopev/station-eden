@@ -114,7 +114,6 @@
   text-shadow: 0 0 6px rgba(99, 239, 255, 0.4);
 }
 
-/* Стили для OTP инпута */
 .otp {
   display: flex;
   gap: 12px;
@@ -434,7 +433,6 @@
   }
 }
 
-/* Скрыть элемент для скринридеров */
 .srOnly {
   position: absolute;
   width: 1px;

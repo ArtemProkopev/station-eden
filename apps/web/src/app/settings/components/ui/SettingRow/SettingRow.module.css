@@ -36,7 +36,6 @@
   text-align: center;
 }
 
-/* Адаптивность */
 @media (max-width: 768px) {
   .settingRow {
     grid-template-columns: 1fr !important;

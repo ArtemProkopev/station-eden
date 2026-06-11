@@ -12,30 +12,21 @@ import {
 	type KeyboardEvent,
 } from 'react'
 import { useForm } from 'react-hook-form'
-
-// Components
 import SocialAuthSection from '@/components/auth/SocialAuthSection'
 import { FirefliesProfile } from '@/components/ui/Fireflies/FirefliesProfile'
 import { EyeIcon, EyeOffIcon } from '@/components/ui/Icons'
 import { TwinklingStars } from '@/components/ui/TwinklingStars/TwinklingStars'
-
-// Hooks & Utils
 import { useUsernameGenerator } from '@/hooks/useUsernameGenerator'
 import { api, getUserMessage } from '@/lib/api'
 import { VK_ENABLED, YANDEX_ENABLED } from '@/lib/flags'
 import { measureStrength, strengthMeta } from '@/utils/passwordStrength'
-
-// Schemas из shared (валидация без сообщений)
 import { ClientRegisterForm, ClientRegisterSchema } from '@station-eden/shared'
 
-// Styles
 import styles from './page.module.css'
 
-// Constants
 const FORM_ANIMATION_DURATION = 340
 const USERNAME_COOLDOWN = 120
 
-// Memoized components
 const MemoizedFireflies = memo(FirefliesProfile)
 const MemoizedStars = memo(TwinklingStars)
 
@@ -58,7 +49,6 @@ export default function RegisterPageClient() {
 	const searchParams = useSearchParams()
 	const router = useRouter()
 
-	// Form state
 	const [formState, setFormState] = useState<FormState>({
 		showPassword: false,
 		showConfirmPassword: false,
@@ -69,7 +59,6 @@ export default function RegisterPageClient() {
 		genCooldown: false,
 	})
 
-	// Form handling
 	const {
 		register,
 		handleSubmit,
@@ -81,42 +70,31 @@ export default function RegisterPageClient() {
 		mode: 'onChange',
 	})
 
-	// Watched fields
 	const password = watch('password', '')
 	const confirm = watch('confirm', '')
 	const username = watch('username', '')
 	const email = watch('email', '')
 
-	// Hooks
 	const {
 		generateUsername,
 		loading: generating,
 		isWasmSupported,
 	} = useUsernameGenerator()
 
-	// Effects
 	useEffect(() => {
 		setFormState(prev => ({ ...prev, mounted: true }))
 	}, [])
 
-	// Memoized values
 	const strength = useMemo(() => measureStrength(password), [password])
 	const strengthInfo = useMemo(() => strengthMeta(strength), [strength])
 	const reason = searchParams.get('reason')
 
-	// куда редиректить после oauth/verify (если пробрасывают next)
 	const next = searchParams.get('next') || '/profile'
 
 	const confirmHasValue = confirm.length > 0
 	const confirmMatches = confirmHasValue && confirm === password
 	const confirmInvalid = confirmHasValue && !confirmMatches
 
-	/**
-	 * ✅ FIX hydration:
-	 * Пока mounted=false (на сервере и на первом клиентском рендере) —
-	 * показываем одинаковый текст/атрибуты.
-	 * После mounted=true можно показывать реальное состояние wasm/loader.
-	 */
 	const genButtonTitle = useMemo(() => {
 		if (!formState.mounted) return 'Сгенерировать ник'
 		return isWasmSupported
@@ -130,12 +108,10 @@ export default function RegisterPageClient() {
 	}, [formState.mounted, generating])
 
 	const genButtonDisabled = useMemo(() => {
-		// до mounted держим disabled, чтобы не было рассинхрона с SSR
 		if (!formState.mounted) return true
 		return generating || formState.genCooldown
 	}, [formState.mounted, generating, formState.genCooldown])
 
-	// Event handlers
 	const handleCapsLock = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
 		const capsOn = e.getModifierState?.('CapsLock') ?? false
 		setFormState(prev => ({ ...prev, capsLockOn: capsOn }))
@@ -175,7 +151,6 @@ export default function RegisterPageClient() {
 		}, FORM_ANIMATION_DURATION)
 	}, [])
 
-	// Form submission
 	const onSubmit = useCallback(
 		async (data: ClientRegisterForm) => {
 			setFormState(prev => ({ ...prev, error: null }))
@@ -212,7 +187,6 @@ export default function RegisterPageClient() {
 		triggerShake()
 	}, [triggerShake])
 
-	// Render helpers
 	const renderPasswordStrength = useMemo(() => {
 		if (password.length === 0 || errors.password) return null
 
@@ -288,7 +262,6 @@ export default function RegisterPageClient() {
 						autoComplete='on'
 						aria-describedby={formState.error ? 'form-error' : undefined}
 					>
-						{/* Email Field */}
 						<div className={styles.inputGroup}>
 							<label htmlFor='email' className={styles.label}>
 								Email
@@ -310,7 +283,6 @@ export default function RegisterPageClient() {
 							</p>
 						</div>
 
-						{/* Username Field */}
 						<div className={styles.inputGroup}>
 							<div className={styles.usernameHeader}>
 								<label htmlFor='username' className={styles.label}>
@@ -349,7 +321,6 @@ export default function RegisterPageClient() {
 							</p>
 						</div>
 
-						{/* Password Field */}
 						<div className={styles.inputGroup}>
 							<label htmlFor='password' className={styles.label}>
 								Пароль
@@ -388,7 +359,6 @@ export default function RegisterPageClient() {
 							{renderCapsLockWarning}
 						</div>
 
-						{/* Confirm Password Field */}
 						<div className={styles.inputGroup}>
 							<label htmlFor='confirm' className={styles.label}>
 								Подтвердите пароль

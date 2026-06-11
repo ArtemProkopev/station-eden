@@ -78,27 +78,16 @@ export default function VoicePanel({
 	onStatsChange,
 }: VoicePanelProps) {
 	const roomRef = useRef<Room | null>(null)
-
 	const [joining, setJoining] = useState(false)
 	const [joined, setJoined] = useState(false)
-
-	// muted=true => микрофон НЕ публикуется в комнату
 	const [muted, setMuted] = useState(false)
-
 	const [selfMonitor, setSelfMonitor] = useState(false)
 	const selfMonitorActiveRef = useRef(false)
-
 	const [participants, setParticipants] = useState<UiParticipant[]>([])
 	const [error, setError] = useState<string>('')
 	const [audioBlocked, setAudioBlocked] = useState(false)
-
-	// запоминаем состояние микрофона перед self-monitor
 	const micEnabledBeforeSelfMonitorRef = useRef<boolean>(true)
-
-	// audio-элементы для удалённых участников: participantSid -> [HTMLAudioElement]
 	const audioElementsRef = useRef<Map<string, HTMLAudioElement[]>>(new Map())
-
-	// self-monitor (локальный getUserMedia)
 	const selfMonitorStreamRef = useRef<MediaStream | null>(null)
 	const selfMonitorAudioRef = useRef<HTMLAudioElement | null>(null)
 
@@ -110,7 +99,6 @@ export default function VoicePanel({
 						el.muted = flag
 						el.volume = flag ? 0 : 1
 					} catch {
-						/* noop */
 					}
 				})
 			})
@@ -346,17 +334,14 @@ export default function VoicePanel({
 				try {
 					if (track) track.detach(el)
 				} catch {
-					/* noop */
 				}
 				try {
 					el.pause()
 				} catch {
-					/* noop */
 				}
 				try {
 					;(el as HTMLMediaElement).srcObject = null
 				} catch {
-					/* noop */
 				}
 				el.remove()
 			})
@@ -374,17 +359,14 @@ export default function VoicePanel({
 					try {
 						el.pause()
 					} catch {
-						/* noop */
 					}
 					try {
 						;(el as HTMLMediaElement).srcObject = null
 					} catch {
-						/* noop */
 					}
 					try {
 						el.remove()
 					} catch {
-						/* noop */
 					}
 				})
 		}
@@ -396,11 +378,9 @@ export default function VoicePanel({
 					try {
 						t.stop()
 					} catch {
-						/* noop */
 					}
 				})
 			} catch {
-				/* noop */
 			}
 		}
 
@@ -596,10 +576,8 @@ export default function VoicePanel({
 			try {
 				await r.localParticipant.setMicrophoneEnabled(false)
 			} catch {
-				/* noop */
 			}
 
-			// жёсткий stop локального трека без any
 			try {
 				const pub = getMicrophonePublication(r.localParticipant)
 				const t = pub?.track
@@ -607,35 +585,28 @@ export default function VoicePanel({
 					try {
 						await r.localParticipant.unpublishTrack(t)
 					} catch {
-						/* noop */
 					}
 					try {
 						t.stop()
 					} catch {
-						/* noop */
 					}
 				}
 			} catch {
-				/* noop */
 			}
 
-			// чистим remote audio
 			audioElementsRef.current.forEach(els => {
 				els.forEach(el => {
 					try {
 						el.pause()
 					} catch {
-						/* noop */
 					}
 					try {
 						;(el as HTMLMediaElement).srcObject = null
 					} catch {
-						/* noop */
 					}
 					try {
 						el.remove()
 					} catch {
-						/* noop */
 					}
 				})
 			})
@@ -645,7 +616,6 @@ export default function VoicePanel({
 				r.disconnect()
 				r.removeAllListeners()
 			} catch {
-				/* noop */
 			}
 
 			roomRef.current = null
@@ -661,11 +631,10 @@ export default function VoicePanel({
 		const r = roomRef.current
 		if (!r) return
 
-		// в self-monitor публикация всегда выключена
 		if (selfMonitorActiveRef.current) return
 
 		try {
-			const nextEnabled = muted // muted=true => включаем
+			const nextEnabled = muted
 			await r.localParticipant.setMicrophoneEnabled(nextEnabled)
 
 			const pub = getMicrophonePublication(r.localParticipant)
@@ -675,7 +644,6 @@ export default function VoicePanel({
 					if (nextEnabled) await t.unmute()
 					else await t.mute()
 				} catch {
-					/* noop */
 				}
 			}
 
@@ -701,7 +669,6 @@ export default function VoicePanel({
 				try {
 					await r.localParticipant.setMicrophoneEnabled(shouldEnable)
 				} catch {
-					/* noop */
 				}
 				setMuted(!shouldEnable)
 
@@ -714,7 +681,6 @@ export default function VoicePanel({
 			try {
 				await r.localParticipant.setMicrophoneEnabled(false)
 			} catch {
-				/* noop */
 			}
 			setMuted(true)
 
@@ -752,7 +718,6 @@ export default function VoicePanel({
 		return () => window.removeEventListener('pagehide', handler)
 	}, [leaveVoice])
 
-	// ВАЖНО: фикс eslint warning про audioElementsRef.current — берём "снимок" (на самом деле это тот же Map-объект)
 	useEffect(() => {
 		const audioMap = audioElementsRef.current
 
@@ -760,7 +725,6 @@ export default function VoicePanel({
 			try {
 				disableSelfMonitor()
 			} catch {
-				/* noop */
 			}
 
 			try {
@@ -769,23 +733,19 @@ export default function VoicePanel({
 						try {
 							el.pause()
 						} catch {
-							/* noop */
 						}
 						try {
 							;(el as HTMLMediaElement).srcObject = null
 						} catch {
-							/* noop */
 						}
 						try {
 							el.remove()
 						} catch {
-							/* noop */
 						}
 					})
 				})
 				audioMap.clear()
 			} catch {
-				/* noop */
 			}
 
 			const r = roomRef.current
@@ -793,13 +753,11 @@ export default function VoicePanel({
 				try {
 					r.localParticipant.setMicrophoneEnabled(false)
 				} catch {
-					/* noop */
 				}
 				try {
 					r.disconnect()
 					r.removeAllListeners()
 				} catch {
-					/* noop */
 				}
 			}
 
@@ -809,7 +767,6 @@ export default function VoicePanel({
 			try {
 				syncSpeakingToPlayersList([])
 			} catch {
-				/* noop */
 			}
 		}
 	}, [disableSelfMonitor, syncSpeakingToPlayersList])

@@ -1,7 +1,6 @@
 // apps/web/src/app/profile/layout.tsx
 import { Metadata } from 'next'
 
-// Константы для переиспользования
 const METADATA = {
   title: 'Профиль',
   description: 'Настройки профиля',
@@ -24,7 +23,6 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-// Экспортируем константы отдельно для лучшей читаемости
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 export const fetchCache = 'default-no-store'
@@ -36,7 +34,6 @@ interface LayoutProps {
 export default async function Layout({ children }: LayoutProps) {
   return (
     <>
-      {/* Background */}
       <div
         style={{
           position: 'fixed',
@@ -50,7 +47,6 @@ export default async function Layout({ children }: LayoutProps) {
         role="presentation"
       />
       
-      {/* Content */}
       {children}
     </>
   )

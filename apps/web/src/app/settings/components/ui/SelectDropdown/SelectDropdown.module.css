@@ -28,7 +28,6 @@
   font-size: 1.1rem;
 }
 
-/* Адаптивность */
 @media (max-width: 768px) {
   .select {
     width: 100%;

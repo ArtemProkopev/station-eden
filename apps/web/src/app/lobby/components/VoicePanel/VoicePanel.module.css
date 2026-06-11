@@ -1,5 +1,3 @@
-/* Голосовой блок в стиле чата (неон + стекло) */
-
 .voiceBlock {
 	position: relative;
 	padding: 16px 20px;
@@ -20,13 +18,10 @@
 	box-sizing: border-box;
 }
 
-/* Акцент при активности (кто-то говорит) */
 .voiceActive {
 	box-shadow: 0 0 22px rgba(99, 239, 255, 0.55);
 	border-color: #63efff;
 }
-
-/* -------- Верх: иконка-анимация, заголовок и бейдж -------- */
 
 .headerRow {
 	display: flex;
@@ -43,8 +38,6 @@
 	flex: 1;
 	min-width: 0;
 }
-
-/* Только анимация без квадратного фона */
 
 .loader {
 	display: flex;
@@ -104,8 +97,6 @@
 	text-overflow: ellipsis;
 }
 
-/* подпись с количеством игроков */
-
 .participantsLabel {
 	font-size: 12px;
 	color: rgba(230, 250, 255, 0.9);
@@ -117,8 +108,6 @@
 	position: relative;
 	max-width: 220px;
 }
-
-/* точка-индикатор: базовое состояние (для есть-игроки) */
 
 .participantsLabel::before {
 	content: '';
@@ -136,8 +125,6 @@
 	margin-top: 0px;
 }
 
-/* когда никого нет — точка вообще не рисуется, текст встаёт строго под заголовком */
-
 .participantsLabelEmpty {
 	color: rgba(180, 200, 220, 0.7);
 	text-shadow: none;
@@ -147,23 +134,17 @@
 	content: none;
 }
 
-/* когда есть игроки — точка всегда видна */
-
 .participantsLabelHasPlayers::before {
 	opacity: 1;
 	transform: scale(1);
 	box-shadow: 0 0 4px rgba(99, 255, 193, 0.7);
 }
 
-/* когда кто-то говорит — усиливаем свечение */
-
 .participantsLabelSpeaking::before {
 	opacity: 1;
 	transform: scale(1.05);
 	box-shadow: 0 0 8px rgba(99, 255, 193, 1);
 }
-
-/* -------- Бейдж подключения -------- */
 
 .statusBadge {
 	padding: 4px 14px;
@@ -177,8 +158,6 @@
 	text-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
 	white-space: nowrap;
 	flex-shrink: 0;
-
-	/* выравнивание текста по центру бейджа */
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -199,8 +178,6 @@
 	box-shadow: 0 0 10px rgba(255, 120, 150, 0.4);
 }
 
-/* -------- Средняя строка: статус -------- */
-
 .statusRow {
 	display: flex;
 	flex-wrap: wrap;
@@ -219,8 +196,6 @@
 	text-shadow: 0 0 4px rgba(99, 239, 255, 0.3);
 }
 
-/* -------- Низ: кнопки -------- */
-
 .buttonsRow {
 	display: flex;
 	flex-wrap: wrap;
@@ -230,19 +205,13 @@
 	min-width: 0;
 }
 
-/* центрируем JOIN, когда не в голосе */
-
 .buttonsRowCentered {
 	justify-content: center;
 }
 
-/* когда в голосе — кнопки в один ряд */
-
 .buttonsRowJoined {
 	justify-content: space-between;
 }
-
-/* левая группа кнопок (микрофон / self / выйти) */
 
 .buttonsGroupLeft {
 	display: flex;
@@ -251,13 +220,9 @@
 	gap: 8px;
 }
 
-/* правая кнопка "Включить звук" */
-
 .audioButtonRight {
 	margin-left: auto;
 }
-
-/* Ошибка */
 
 .error {
 	font-size: 12px;
@@ -269,8 +234,6 @@
 	margin-top: 4px;
 	text-shadow: 0 0 4px rgba(0, 0, 0, 0.7);
 }
-
-/* === Глитч-кнопка JOIN === */
 
 .glitchButton,
 .glitchButton::after {
@@ -333,8 +296,6 @@
 	box-shadow: none;
 }
 
-/* === Кнопки управления (Mute / Self / Leave) === */
-
 .controlButton {
 	position: relative;
 	padding: 0.5em 1.4em;
@@ -374,8 +335,6 @@
 	box-shadow: none;
 }
 
-/* Активная (self monitor включен) */
-
 .controlButtonActive {
 	background: linear-gradient(
 		90deg,
@@ -387,8 +346,6 @@
 	border-color: #22c55e;
 	color: #dcfce7;
 }
-
-/* Muted */
 
 .controlButtonMuted {
 	background: linear-gradient(
@@ -402,8 +359,6 @@
 	color: #ffe4e6;
 }
 
-/* Опасная (Leave) */
-
 .controlButtonDanger {
 	background: linear-gradient(
 		90deg,
@@ -416,16 +371,12 @@
 	color: #ffe1e8;
 }
 
-/* Группа дополнительных действий */
-
 .actionGroup {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 8px;
 }
-
-/* Анимация для глитч */
 
 @keyframes glitch_4011 {
 	0% {
@@ -484,8 +435,6 @@
 	}
 }
 
-/* --- Состояние "Подключение" с глитч-эффектом и анимацией точек --- */
-
 .connectingWrapper {
 	display: flex;
 	align-items: center;
@@ -520,14 +469,14 @@
 .connectingGlitch::before {
 	animation: connectingGlitch 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) both
 		infinite;
-	color: #63efff; /* голубой как свечение кнопки */
+	color: #63efff;
 	z-index: -1;
 }
 
 .connectingGlitch::after {
 	animation: connectingGlitch 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) reverse
 		both infinite;
-	color: #e94be8; /* розовый как обводка/тень кнопки */
+	color: #e94be8;
 	z-index: -2;
 }
 
@@ -633,8 +582,6 @@
 	}
 }
 
-/* --- Баннер "браузер заблокировал звук" --- */
-
 .audioBanner {
 	display: flex;
 	align-items: center;
@@ -703,15 +650,11 @@
 	box-shadow: 0 0 8px rgba(255, 138, 101, 0.8);
 }
 
-/* убираем квадратный синий outline у кнопок */
-
 .glitchButton:focus,
 .controlButton:focus,
 .audioBannerButton:focus {
 	outline: none;
 }
-
-/* Адаптивность */
 
 @media (max-width: 900px) {
 	.voiceBlock {

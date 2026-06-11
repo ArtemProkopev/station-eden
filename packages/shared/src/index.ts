@@ -1,19 +1,10 @@
 // packages/shared/src/index.ts
 import { z } from 'zod'
 
-// ==============================================================================
-// ZOD GLOBAL ERROR MAP (глушим дефолтные сообщения)
-// ==============================================================================
 z.setErrorMap(() => ({ message: '' }))
 
-// ==============================================================================
-// COMMON
-// ==============================================================================
 export type ISODateString = string
 
-// ==============================================================================
-// AUTH
-// ==============================================================================
 export const LoginSchema = z.object({
 	login: z.string().trim().min(1),
 	password: z.string().min(1),
@@ -68,9 +59,6 @@ export interface LockPayload {
 	lockedUntilIso: ISODateString
 }
 
-// ==============================================================================
-// LOBBY / GAME
-// ==============================================================================
 export const LobbyVisibilitySchema = z.enum([
 	'public',
 	'password',
@@ -196,9 +184,6 @@ export interface GameState {
 	settings: GameSettings
 }
 
-// ==============================================================================
-// WEBSOCKETS
-// ==============================================================================
 export type WebSocketMessageType =
 	| 'JOIN_LOBBY'
 	| 'PLAYER_JOINED'
@@ -239,9 +224,6 @@ export interface GameStateMessage {
 	gameState: GameState
 }
 
-// ==============================================================================
-// NOTIFICATIONS
-// ==============================================================================
 export type NotificationType =
 	| 'news'
 	| 'game_invite'
@@ -286,9 +268,6 @@ export type Notification =
 	| SystemNotification
 	| FriendRequestNotification
 
-// ==============================================================================
-// SETTINGS / FRIENDS
-// ==============================================================================
 export interface SoundSettings {
 	masterVolume: number
 	musicVolume: number
@@ -320,9 +299,6 @@ export interface FriendsState {
 	isLoading: boolean
 }
 
-// ==============================================================================
-// GAME TYPES (добавлено из game.types.ts)
-// ==============================================================================
 export type CardType =
 	| 'profession'
 	| 'health'
@@ -450,29 +426,25 @@ export interface WsMessage {
 	[key: string]: unknown
 }
 
-// ==============================================================================
-// ABILITIES TYPES (ДОБАВЛЕНО)
-// ==============================================================================
-
 export type AbilityType =
-	| 'sabotage'                    // Саботажник
-	| 'infect'                      // Агент ксенофагов
-	| 'frame'                       // Ложный свидетель
-	| 'nonbinary_ability'           // Небинарная персона
-	| 'alien_spy_disguise'          // Инопланетный шпион - смена внешности
-	| 'alien_spy_request_help'      // Инопланетный шпион - просьба о помощи
-	| 'nano_medkit_use'             // Аптечка с наноботами
-	| 'mad_scientist_crisis'        // Безумный учёный
-	| 'crypto_trader_exchange'      // Крипто-трейдер
-	| 'genetic_modification'        // Генный инженер
-	| 'blogger_stream'              // Космический блогер
-	| 'ex_boss_connection'          // Бывший начальник
-	| 'ecologist_recycling'         // Эколог
-	| 'xenopsychologist_detect'     // Ксенопсихолог
-	| 'psychiatrist_stabilize'      // Штатный психиатр
-	| 'captain_veto'                // Капитан (вето)
-	| 'sabotage_skill'              // Умение саботажника
-	| 'infect_skill'                // Умение заражения
+	| 'sabotage'
+	| 'infect'
+	| 'frame'
+	| 'nonbinary_ability'
+	| 'alien_spy_disguise'
+	| 'alien_spy_request_help'
+	| 'nano_medkit_use'
+	| 'mad_scientist_crisis'
+	| 'crypto_trader_exchange'
+	| 'genetic_modification'
+	| 'blogger_stream'
+	| 'ex_boss_connection'
+	| 'ecologist_recycling'
+	| 'xenopsychologist_detect'
+	| 'psychiatrist_stabilize'
+	| 'captain_veto'
+	| 'sabotage_skill'
+	| 'infect_skill'
 
 export interface AbilityInfo {
 	id: AbilityType
@@ -489,10 +461,6 @@ export interface AbilityTarget {
 	resourceId?: string
 }
 
-// ==============================================================================
-// PROFESSION TYPES (ДОБАВЛЕНО для клиента)
-// ==============================================================================
-
 export interface ProfessionInfo {
 	id: string
 	name: string
@@ -504,10 +472,6 @@ export interface ResourceInfo {
 	name: string
 	description: string
 }
-
-// ==============================================================================
-// PLAYER INFO (ДОБАВЛЕНО)
-// ==============================================================================
 
 export interface PlayerBasicInfo {
 	id: string

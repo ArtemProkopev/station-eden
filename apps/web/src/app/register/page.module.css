@@ -430,7 +430,6 @@
   box-shadow: none;
 }
 
-/* Анимация загрузки для кнопки */
 .generateBtn:disabled::after {
   content: '';
   position: absolute;
@@ -449,8 +448,6 @@
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
-
-/* Бэдж WebAssembly */
 .wasmBadge {
   display: inline-flex;
   align-items: center;
@@ -498,7 +495,6 @@
   }
 }
 
-/* Высота 800px и меньше */
 @media (max-height: 800px) and (min-width: 769px) {
   .page {
     padding: 16px;
@@ -800,7 +796,6 @@
   }
 }
 
-/* Высота 500px и меньше - ультра компактный режим */
 @media (max-height: 500px) and (min-width: 769px) {
   .page {
     padding: 4px;

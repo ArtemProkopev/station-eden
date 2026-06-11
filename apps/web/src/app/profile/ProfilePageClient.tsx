@@ -38,10 +38,6 @@ export default function ProfilePageClient() {
 	const router = useRouter()
 	useScrollPrevention()
 
-	/**
-	 * Лоадер завязан на один init-запуск + статус профиля.
-	 * Так мы гарантированно не зависнем “навсегда”.
-	 */
 	const [isLoading, setIsLoading] = useState(true)
 	const didInitRef = useRef(false)
 	const redirectedRef = useRef(false)
@@ -63,26 +59,13 @@ export default function ProfilePageClient() {
 			try {
 				setIsLoading(true)
 
-				// Иконки не должны блокировать профиль — грузим фоном
 				checkIconsAvailability().catch(() => {})
-
-				// Главный источник истины: /auth/me (same-origin)
 				await loadUserData()
-
-				// Подтягиваем кэш (fallback) уже после того, как хук поставит profile.data.id
-				// (если userId не будет — loadSavedAssets просто ничего не сделает)
 				loadSavedAssets()
 			} catch (e) {
-				// На всякий случай: если loadUserData кинет исключение — покажем ошибку через profile.status=error
-				// и всё равно не будем висеть в лоадере.
-				 
 				console.error('Profile init error:', e)
 			} finally {
 				if (!cancelled) {
-					// НЕ снимаем лоадер здесь окончательно — ниже есть эффект,
-					// который снимет его, когда profile.status станет ok/unauth/error.
-					// Но на случай совсем нестандартных ситуаций оставим "страховку":
-					// если профиль так и остался loading — лоадер снимется через эффект по статусу.
 				}
 			}
 		}
@@ -94,7 +77,6 @@ export default function ProfilePageClient() {
 		}
 	}, [checkIconsAvailability, loadUserData, loadSavedAssets])
 
-	// 2) Завершаем лоадер строго по факту статуса профиля
 	useEffect(() => {
 		if (profile.status === 'loading') return
 		setIsLoading(false)
@@ -143,8 +125,6 @@ export default function ProfilePageClient() {
 		)
 	}
 
-	// Если всё же unauth — мы уже отправили редирект, но на момент рендера просто покажем лоадер,
-	// чтобы не мелькала “пустая” страница.
 	if (profile.status === 'unauth') {
 		return (
 			<main className={styles.root}>

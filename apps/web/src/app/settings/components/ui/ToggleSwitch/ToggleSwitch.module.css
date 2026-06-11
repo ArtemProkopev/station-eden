@@ -40,7 +40,6 @@
   transition: all 0.3s ease;
 }
 
-/* Адаптивность */
 @media (max-width: 768px) {
   .toggleSlider {
     width: 90px;
