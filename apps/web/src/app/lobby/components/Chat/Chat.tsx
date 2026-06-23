@@ -9,7 +9,7 @@ interface LobbyChatProps {
 	newMessage: string
 	onMessageChange: (message: string) => void
 	onSendMessage: (e: React.FormEvent) => void
-	onKeyPress: (e: React.KeyboardEvent) => void
+	onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void
 	onChatScroll: () => void
 }
 
@@ -21,7 +21,7 @@ export default function LobbyChat(props: LobbyChatProps) {
 			newMessage={props.newMessage}
 			onMessageChange={props.onMessageChange}
 			onSendMessage={props.onSendMessage}
-			onKeyPress={props.onKeyPress}
+			onKeyDown={props.onKeyDown}
 			onChatScroll={props.onChatScroll}
 			showVoiceTab={true}
 			placeholder='Написать сообщение...'

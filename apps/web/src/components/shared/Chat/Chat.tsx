@@ -12,7 +12,7 @@ interface ChatProps {
 	newMessage: string
 	onMessageChange: (message: string) => void
 	onSendMessage: (e: React.FormEvent) => void
-	onKeyPress: (e: React.KeyboardEvent) => void
+	onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void
 	onChatScroll: () => void
 	// Опциональные пропсы для игры
 	disabled?: boolean
@@ -27,7 +27,7 @@ export default function Chat({
 	newMessage,
 	onMessageChange,
 	onSendMessage,
-	onKeyPress,
+	onKeyDown,
 	onChatScroll,
 	disabled = false,
 	placeholder = 'Написать сообщение...',
@@ -39,18 +39,6 @@ export default function Chat({
 
 	// индикатор "в голосе кто-то есть" для вкладки (без числа)
 	const [hasVoiceActivity, setHasVoiceActivity] = useState(false)
-
-	// Обработчик прокрутки колесиком мыши
-	const handleWheel = useCallback(
-		(e: React.WheelEvent<HTMLDivElement>) => {
-			if (messagesContainerRef.current) {
-				messagesContainerRef.current.scrollTop += e.deltaY
-				onChatScroll()
-				e.preventDefault()
-			}
-		},
-		[onChatScroll],
-	)
 
 	// Установка обработчика на контейнер сообщений
 	useEffect(() => {
@@ -118,7 +106,6 @@ export default function Chat({
 						className={styles.chatMessagesContainer}
 						ref={messagesContainerRef}
 						onScroll={onChatScroll}
-						onWheel={handleWheel}
 					>
 						<div className={styles.chatMessages}>
 							{messages.length === 0 ? (
@@ -155,7 +142,7 @@ export default function Chat({
 							type='text'
 							value={newMessage}
 							onChange={e => onMessageChange(e.target.value.slice(0, 300))}
-							onKeyPress={onKeyPress}
+							onKeyDown={onKeyDown}
 							placeholder={disabled ? 'Чат недоступен...' : placeholder}
 							className={styles.chatInput}
 							maxLength={300}

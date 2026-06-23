@@ -109,7 +109,7 @@ const LobbyContent = memo(function LobbyContent({
 							newMessage={lobby.newMessage}
 							onMessageChange={lobby.setNewMessage}
 							onSendMessage={lobby.handleSendMessage}
-							onKeyPress={lobby.handleKeyPress}
+							onKeyDown={lobby.handleKeyPress}
 							onChatScroll={lobby.handleChatScroll}
 						/>
 					</div>

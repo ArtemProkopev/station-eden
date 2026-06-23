@@ -1,8 +1,21 @@
 'use client'
 
-import { LocalAudioTrack, Room, RoomEvent, Track } from 'livekit-client'
+import {
+	LocalAudioTrack,
+	LogLevel,
+	Room,
+	RoomEvent,
+	setLogLevel,
+	Track,
+} from 'livekit-client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import styles from './VoicePanel.module.css'
+import {
+	getParticipantLogData,
+	getPublicationLogData,
+	getTrackLogData,
+	voiceLogger,
+} from './voiceLogger'
 
 type VoicePanelProps = {
 	lobbyId: string
@@ -22,6 +35,8 @@ type UiParticipant = {
 
 const LIVEKIT_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL
 
+setLogLevel(LogLevel.warn)
+
 function isRecord(v: unknown): v is Record<string, unknown> {
 	return !!v && typeof v === 'object' && !Array.isArray(v)
 }
@@ -31,9 +46,10 @@ function unwrapDataLayers(value: unknown): unknown {
 	let guard = 0
 
 	while (isRecord(current) && 'data' in current && guard < 5) {
-		current = (current as Record<string, unknown>).data
-		guard++
+		current = current.data
+		guard += 1
 	}
+
 	return current
 }
 
@@ -56,9 +72,12 @@ type ParticipantLike = {
 
 function asParticipantLike(v: unknown): ParticipantLike | null {
 	if (!v || typeof v !== 'object') return null
+
 	const p = v as ParticipantLike
+
 	if (typeof p.sid !== 'string') return null
 	if (typeof p.identity !== 'string') return null
+
 	return p
 }
 
@@ -78,6 +97,7 @@ export default function VoicePanel({
 	onStatsChange,
 }: VoicePanelProps) {
 	const roomRef = useRef<Room | null>(null)
+	const manualDisconnectRef = useRef(false)
 	const [joining, setJoining] = useState(false)
 	const [joined, setJoined] = useState(false)
 	const [muted, setMuted] = useState(false)
@@ -89,7 +109,16 @@ export default function VoicePanel({
 	const micEnabledBeforeSelfMonitorRef = useRef<boolean>(true)
 	const audioElementsRef = useRef<Map<string, HTMLAudioElement[]>>(new Map())
 	const selfMonitorStreamRef = useRef<MediaStream | null>(null)
-	const selfMonitorAudioRef = useRef<HTMLAudioElement | null>(null)
+
+	const getVoiceRoomName = useCallback(
+		(r?: Room | null) => {
+			const roomLike = r as unknown as { name?: unknown } | null | undefined
+			const name = typeof roomLike?.name === 'string' ? roomLike.name : ''
+
+			return name || lobbyId
+		},
+		[lobbyId],
+	)
 
 	const setRemoteAudioMuted = useCallback((flag: boolean) => {
 		try {
@@ -98,12 +127,14 @@ export default function VoicePanel({
 					try {
 						el.muted = flag
 						el.volume = flag ? 0 : 1
-					} catch {
-					}
+					} catch {}
 				})
 			})
 		} catch (e: unknown) {
-			console.warn('[voice] setRemoteAudioMuted error:', e)
+			voiceLogger.audioError(
+				'Ошибка при изменении состояния воспроизведения remote audio',
+				e,
+			)
 		}
 	}, [])
 
@@ -123,6 +154,7 @@ export default function VoicePanel({
 
 			list.forEach(p => {
 				if (!p.identity) return
+
 				let id = p.identity
 
 				const cssEscape =
@@ -142,6 +174,7 @@ export default function VoicePanel({
 				const card = document.querySelector<HTMLElement>(
 					`[data-player-id="${id}"]`,
 				)
+
 				if (!card) return
 
 				card.dataset.voiceMuted = p.isMuted ? '1' : '0'
@@ -152,21 +185,31 @@ export default function VoicePanel({
 				}
 			})
 		} catch (e: unknown) {
-			console.warn('[voice] syncSpeakingToPlayersList failed', e)
+			voiceLogger.error(
+				'Ошибка при синхронизации состояния голоса со списком игроков',
+				e,
+			)
 		}
 	}, [])
 
 	useEffect(() => {
 		if (!onStatsChange) return
+
 		const participantsCount = participants.length
 		const someoneSpeaking = participants.some(p => p.isSpeaking)
+
 		onStatsChange({ participantsCount, someoneSpeaking })
 	}, [participants, onStatsChange])
 
 	const fetchToken = useCallback(async () => {
+		const roomName = lobbyId
+
 		const res = await fetch(
 			`/api/voice/token?lobbyId=${encodeURIComponent(lobbyId)}`,
-			{ method: 'GET', credentials: 'include' },
+			{
+				method: 'GET',
+				credentials: 'include',
+			},
 		)
 
 		const text = await res.text()
@@ -174,17 +217,29 @@ export default function VoicePanel({
 
 		try {
 			json = text ? (JSON.parse(text) as unknown) : {}
-		} catch {
-			console.error('[voice] raw response (not JSON):', text)
+		} catch (e: unknown) {
+			voiceLogger.liveKitError('Ошибка при разборе ответа сервера LiveKit', e, {
+				roomName,
+			})
+
 			throw new Error('Сервер вернул невалидный JSON для токена LiveKit')
 		}
 
 		if (!res.ok) {
-			console.error('[voice] error response from /api/voice/token:', json)
 			let message = 'Не удалось получить токен для голосового чата'
-			if (isRecord(json) && typeof json.message === 'string')
+
+			if (isRecord(json) && typeof json.message === 'string') {
 				message = json.message
-			if (isRecord(json) && typeof json.error === 'string') message = json.error
+			}
+
+			if (isRecord(json) && typeof json.error === 'string') {
+				message = json.error
+			}
+
+			voiceLogger.liveKitError('Ошибка при запросе токена LiveKit', message, {
+				roomName,
+			})
+
 			throw new Error(message)
 		}
 
@@ -201,14 +256,13 @@ export default function VoicePanel({
 				unwrapped.accessToken ??
 				unwrapped.authToken ??
 				unwrapped.jwt
+
 			if (typeof rawToken === 'string') token = rawToken
 			if (typeof unwrapped.url === 'string') urlFromServer = unwrapped.url
 		}
 
 		if (!token) {
-			throw new Error(
-				'Сервер не вернул корректный токен для LiveKit (поле token / accessToken / authToken / jwt не найдено)',
-			)
+			throw new Error('Сервер не вернул корректный токен для LiveKit')
 		}
 
 		return { token, url: urlFromServer }
@@ -219,6 +273,7 @@ export default function VoicePanel({
 			const list: UiParticipant[] = []
 
 			const lpLike = asParticipantLike(r.localParticipant)
+
 			if (lpLike) {
 				const audioLevel =
 					typeof lpLike.audioLevel === 'number' ? lpLike.audioLevel : 0
@@ -233,6 +288,7 @@ export default function VoicePanel({
 					: micEnabledFromSdk
 
 				const isMutedFlag = !micEnabledForRoom
+
 				const speakingFlag =
 					(audioLevel > 0.003 ||
 						(typeof lpLike.isSpeaking === 'boolean' && lpLike.isSpeaking)) &&
@@ -259,8 +315,7 @@ export default function VoicePanel({
 
 				const trackMuted = !!(isRecord(track) &&
 				('isMuted' in track || 'muted' in track)
-					? ((track as Record<string, unknown>).isMuted ??
-						(track as Record<string, unknown>).muted)
+					? (track.isMuted ?? track.muted)
 					: micPub?.isMuted)
 
 				const micEnabledFlag =
@@ -291,11 +346,23 @@ export default function VoicePanel({
 	)
 
 	const attachAudioForParticipant = useCallback(
-		(participantSid: string, track: Track) => {
+		(
+			participantSid: string,
+			participant: unknown,
+			track: Track,
+			roomName: string,
+		) => {
 			if (!track || track.kind !== Track.Kind.Audio) return
 			if (typeof document === 'undefined') return
 
+			const logData = {
+				roomName,
+				...getParticipantLogData(participant),
+				...getTrackLogData(track),
+			}
+
 			const audioEl = document.createElement('audio')
+
 			audioEl.autoplay = true
 			audioEl.controls = false
 			audioEl.style.display = 'none'
@@ -303,13 +370,21 @@ export default function VoicePanel({
 			audioEl.setAttribute('playsinline', 'true')
 
 			audioEl.onerror = e => {
-				console.error('[voice] Audio element error:', e, audioEl.error)
+				voiceLogger.audioError(
+					'Ошибка воспроизведения audio element',
+					e,
+					logData,
+				)
 			}
 
 			try {
 				track.attach(audioEl)
 			} catch (e: unknown) {
-				console.error('[voice] attach audio error:', e)
+				voiceLogger.audioError(
+					'Ошибка при привязке remote audio track к audio element',
+					e,
+					logData,
+				)
 				audioEl.remove()
 				return
 			}
@@ -319,34 +394,60 @@ export default function VoicePanel({
 			const existing = audioElementsRef.current.get(participantSid) ?? []
 			audioElementsRef.current.set(participantSid, [...existing, audioEl])
 
+			voiceLogger.audioAttached(logData)
+
 			const r = roomRef.current
-			if (r && !r.canPlaybackAudio) setAudioBlocked(true)
+
+			if (r && !r.canPlaybackAudio) {
+				setAudioBlocked(true)
+				voiceLogger.audioPlaybackBlocked(logData)
+			}
 		},
 		[],
 	)
 
 	const detachAudioForParticipant = useCallback(
-		(participantSid: string, track?: Track) => {
+		(
+			participantSid: string,
+			track?: Track,
+			participant?: unknown,
+			roomName?: string,
+		) => {
 			const list = audioElementsRef.current.get(participantSid)
+
 			if (!list || list.length === 0) return
+
+			const logData = {
+				roomName,
+				...getParticipantLogData(participant),
+				...getTrackLogData(track),
+			}
 
 			list.forEach(el => {
 				try {
 					if (track) track.detach(el)
-				} catch {
+				} catch (e: unknown) {
+					voiceLogger.audioError(
+						'Ошибка при отвязке remote audio track от audio element',
+						e,
+						logData,
+					)
 				}
+
 				try {
 					el.pause()
-				} catch {
-				}
+				} catch {}
+
 				try {
 					;(el as HTMLMediaElement).srcObject = null
-				} catch {
-				}
+				} catch {}
+
 				el.remove()
 			})
 
 			audioElementsRef.current.delete(participantSid)
+
+			voiceLogger.audioDetached(logData)
 		},
 		[],
 	)
@@ -358,34 +459,31 @@ export default function VoicePanel({
 				.forEach(el => {
 					try {
 						el.pause()
-					} catch {
-					}
+					} catch {}
+
 					try {
 						;(el as HTMLMediaElement).srcObject = null
-					} catch {
-					}
+					} catch {}
+
 					try {
 						el.remove()
-					} catch {
-					}
+					} catch {}
 				})
 		}
 
 		const stream = selfMonitorStreamRef.current
+
 		if (stream) {
 			try {
 				stream.getTracks().forEach(t => {
 					try {
 						t.stop()
-					} catch {
-					}
+					} catch {}
 				})
-			} catch {
-			}
+			} catch {}
 		}
 
 		selfMonitorStreamRef.current = null
-		selfMonitorAudioRef.current = null
 	}, [])
 
 	const enableSelfMonitor = useCallback(async () => {
@@ -395,17 +493,21 @@ export default function VoicePanel({
 			typeof navigator === 'undefined' ||
 			!navigator.mediaDevices?.getUserMedia
 		) {
-			console.warn('[voice] getUserMedia not available for self-monitor')
+			voiceLogger.audioPlaybackBlocked()
 			return
 		}
 
 		try {
 			const stream = await navigator.mediaDevices.getUserMedia({
-				audio: { echoCancellation: true, noiseSuppression: true },
+				audio: {
+					echoCancellation: true,
+					noiseSuppression: true,
+				},
 				video: false,
 			})
 
 			const audioEl = document.createElement('audio')
+
 			audioEl.autoplay = true
 			audioEl.controls = false
 			audioEl.style.display = 'none'
@@ -415,53 +517,158 @@ export default function VoicePanel({
 			;(audioEl as HTMLMediaElement).srcObject = stream
 
 			const playResult = audioEl.play()
+
 			if (
 				playResult &&
 				typeof (playResult as Promise<void>).catch === 'function'
 			) {
 				;(playResult as Promise<void>).catch(err => {
-					console.warn('[voice] self monitor audio play blocked:', err)
+					voiceLogger.audioError(
+						'Браузер заблокировал воспроизведение режима прослушивания себя',
+						err,
+					)
 				})
 			}
 
 			document.body.appendChild(audioEl)
 
 			selfMonitorStreamRef.current = stream
-			selfMonitorAudioRef.current = audioEl
 		} catch (e: unknown) {
-			console.error('[voice] self monitor getUserMedia error:', e)
+			voiceLogger.audioError(
+				'Ошибка доступа к микрофону для режима прослушивания себя',
+				e,
+			)
 		}
 	}, [disableSelfMonitor])
 
 	const attachListeners = useCallback(
 		(r: Room) => {
-			r.on(RoomEvent.ParticipantConnected, () => updateParticipants(r))
+			r.on(RoomEvent.ParticipantConnected, participant => {
+				voiceLogger.participantConnected({
+					roomName: getVoiceRoomName(r),
+					...getParticipantLogData(participant),
+				})
 
-			r.on(RoomEvent.ParticipantDisconnected, participant => {
-				detachAudioForParticipant(participant.sid)
 				updateParticipants(r)
 			})
 
-			r.on(RoomEvent.ActiveSpeakersChanged, () => updateParticipants(r))
+			r.on(RoomEvent.ParticipantDisconnected, participant => {
+				const roomName = getVoiceRoomName(r)
 
-			r.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
+				voiceLogger.participantDisconnected({
+					roomName,
+					...getParticipantLogData(participant),
+				})
+
+				detachAudioForParticipant(
+					participant.sid,
+					undefined,
+					participant,
+					roomName,
+				)
+				updateParticipants(r)
+			})
+
+			r.on(RoomEvent.ActiveSpeakersChanged, () => {
+				updateParticipants(r)
+			})
+
+			r.on(RoomEvent.LocalTrackPublished, publication => {
+				const publicationData = getPublicationLogData(publication)
+
+				const isAudioPublication =
+					publicationData.trackKind === Track.Kind.Audio ||
+					publicationData.trackSource === Track.Source.Microphone
+
+				if (!isAudioPublication) return
+
+				voiceLogger.localTrackPublished({
+					roomName: getVoiceRoomName(r),
+					...getParticipantLogData(r.localParticipant),
+					...publicationData,
+				})
+			})
+
+			r.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
 				if (!participant.isLocal && track.kind === Track.Kind.Audio) {
-					attachAudioForParticipant(participant.sid, track)
-					if (selfMonitorActiveRef.current) setRemoteAudioMuted(true)
+					const roomName = getVoiceRoomName(r)
+
+					voiceLogger.remoteTrackSubscribed({
+						roomName,
+						...getParticipantLogData(participant),
+						...getTrackLogData(track),
+					})
+
+					attachAudioForParticipant(
+						participant.sid,
+						participant,
+						track,
+						roomName,
+					)
+
+					if (selfMonitorActiveRef.current) {
+						setRemoteAudioMuted(true)
+					}
 				}
 			})
 
-			r.on(RoomEvent.TrackUnsubscribed, (track, _pub, participant) => {
+			r.on(RoomEvent.TrackUnsubscribed, (track, _publication, participant) => {
 				if (track.kind === Track.Kind.Audio) {
-					detachAudioForParticipant(participant.sid, track)
+					const roomName = getVoiceRoomName(r)
+
+					voiceLogger.remoteTrackUnsubscribed({
+						roomName,
+						...getParticipantLogData(participant),
+						...getTrackLogData(track),
+					})
+
+					detachAudioForParticipant(
+						participant.sid,
+						track,
+						participant,
+						roomName,
+					)
 				}
+			})
+
+			r.on(RoomEvent.TrackSubscriptionFailed, (trackSid, participant) => {
+				voiceLogger.liveKitError(
+					'Ошибка при подписке на remote audio track',
+					undefined,
+					{
+						roomName: getVoiceRoomName(r),
+						trackSid,
+						...getParticipantLogData(participant),
+					},
+				)
 			})
 
 			r.on(RoomEvent.AudioPlaybackStatusChanged, () => {
-				setAudioBlocked(!r.canPlaybackAudio)
+				const blocked = !r.canPlaybackAudio
+
+				setAudioBlocked(blocked)
+
+				const details = {
+					roomName: getVoiceRoomName(r),
+					...getParticipantLogData(r.localParticipant),
+				}
+
+				if (blocked) {
+					voiceLogger.audioPlaybackBlocked(details)
+				} else {
+					voiceLogger.audioPlaybackReady(details)
+				}
 			})
 
 			r.on(RoomEvent.Disconnected, () => {
+				if (!manualDisconnectRef.current) {
+					voiceLogger.roomDisconnected({
+						roomName: getVoiceRoomName(r),
+						...getParticipantLogData(r.localParticipant),
+					})
+				}
+
+				manualDisconnectRef.current = false
 				selfMonitorActiveRef.current = false
 				setJoined(false)
 				setMuted(false)
@@ -475,6 +682,7 @@ export default function VoicePanel({
 		[
 			attachAudioForParticipant,
 			detachAudioForParticipant,
+			getVoiceRoomName,
 			setRemoteAudioMuted,
 			syncSpeakingToPlayersList,
 			updateParticipants,
@@ -490,6 +698,7 @@ export default function VoicePanel({
 		try {
 			const { token, url } = await fetchToken()
 			const connectUrl = url || LIVEKIT_URL
+
 			if (!connectUrl) {
 				throw new Error(
 					'LiveKit URL не настроен. Задай NEXT_PUBLIC_LIVEKIT_URL или верни url из /api/voice/token',
@@ -513,15 +722,50 @@ export default function VoicePanel({
 			})
 
 			attachListeners(newRoom)
-			await newRoom.connect(connectUrl, token, { autoSubscribe: true })
+
+			await newRoom.connect(connectUrl, token, {
+				autoSubscribe: true,
+			})
 
 			roomRef.current = newRoom
+			manualDisconnectRef.current = false
 			setJoined(true)
+
+			voiceLogger.roomConnected({
+				roomName: getVoiceRoomName(newRoom),
+				...getParticipantLogData(newRoom.localParticipant),
+			})
 
 			newRoom
 				.startAudio()
-				.then(() => setAudioBlocked(!newRoom.canPlaybackAudio))
-				.catch(() => setAudioBlocked(true))
+				.then(() => {
+					const blocked = !newRoom.canPlaybackAudio
+
+					setAudioBlocked(blocked)
+
+					const details = {
+						roomName: getVoiceRoomName(newRoom),
+						...getParticipantLogData(newRoom.localParticipant),
+					}
+
+					if (blocked) {
+						voiceLogger.audioPlaybackBlocked(details)
+					} else {
+						voiceLogger.audioPlaybackReady(details)
+					}
+				})
+				.catch((e: unknown) => {
+					setAudioBlocked(true)
+
+					voiceLogger.audioError(
+						'Ошибка при запуске воспроизведения аудио',
+						e,
+						{
+							roomName: getVoiceRoomName(newRoom),
+							...getParticipantLogData(newRoom.localParticipant),
+						},
+					)
+				})
 
 			selfMonitorActiveRef.current = false
 			setSelfMonitor(false)
@@ -530,19 +774,36 @@ export default function VoicePanel({
 			try {
 				await newRoom.localParticipant.setMicrophoneEnabled(true)
 				setMuted(false)
+
+				voiceLogger.localMicrophoneEnabled({
+					roomName: getVoiceRoomName(newRoom),
+					...getParticipantLogData(newRoom.localParticipant),
+				})
 			} catch (e: unknown) {
-				console.error('[voice] failed to enable microphone:', e)
+				voiceLogger.liveKitError(
+					'Ошибка при включении или публикации локального микрофона',
+					e,
+					{
+						roomName: getVoiceRoomName(newRoom),
+						...getParticipantLogData(newRoom.localParticipant),
+					},
+				)
+
 				setMuted(true)
 			}
 
 			updateParticipants(newRoom)
 		} catch (e: unknown) {
-			console.error('[voice] join error:', e)
+			voiceLogger.error('Ошибка при подключении к голосовой комнате', e, {
+				roomName: lobbyId,
+			})
+
 			setError(
 				e instanceof Error ? e.message : 'Ошибка подключения к голосовому чату',
 			)
 
 			roomRef.current = null
+			manualDisconnectRef.current = false
 			setJoined(false)
 			setParticipants([])
 			setAudioBlocked(false)
@@ -556,8 +817,10 @@ export default function VoicePanel({
 	}, [
 		attachListeners,
 		fetchToken,
+		getVoiceRoomName,
 		joined,
 		joining,
+		lobbyId,
 		setRemoteAudioMuted,
 		syncSpeakingToPlayersList,
 		updateParticipants,
@@ -565,7 +828,10 @@ export default function VoicePanel({
 
 	const leaveVoice = useCallback(async () => {
 		const r = roomRef.current
+
 		if (!r) return
+
+		const roomName = getVoiceRoomName(r)
 
 		try {
 			disableSelfMonitor()
@@ -575,47 +841,111 @@ export default function VoicePanel({
 
 			try {
 				await r.localParticipant.setMicrophoneEnabled(false)
-			} catch {
+
+				voiceLogger.localMicrophoneDisabled({
+					roomName,
+					...getParticipantLogData(r.localParticipant),
+				})
+			} catch (e: unknown) {
+				voiceLogger.liveKitError(
+					'Ошибка при выключении локального микрофона',
+					e,
+					{
+						roomName,
+						...getParticipantLogData(r.localParticipant),
+					},
+				)
 			}
 
 			try {
 				const pub = getMicrophonePublication(r.localParticipant)
 				const t = pub?.track
+
 				if (isLocalAudioTrack(t)) {
 					try {
 						await r.localParticipant.unpublishTrack(t)
-					} catch {
+
+						voiceLogger.localTrackUnpublished({
+							roomName,
+							...getParticipantLogData(r.localParticipant),
+							...getTrackLogData(t),
+						})
+					} catch (e: unknown) {
+						voiceLogger.liveKitError(
+							'Ошибка при снятии публикации локального audio track',
+							e,
+							{
+								roomName,
+								...getParticipantLogData(r.localParticipant),
+								...getTrackLogData(t),
+							},
+						)
 					}
+
 					try {
 						t.stop()
-					} catch {
+
+						voiceLogger.localTrackStopped({
+							roomName,
+							...getParticipantLogData(r.localParticipant),
+							...getTrackLogData(t),
+						})
+					} catch (e: unknown) {
+						voiceLogger.audioError(
+							'Ошибка при остановке локального audio track',
+							e,
+							{
+								roomName,
+								...getParticipantLogData(r.localParticipant),
+								...getTrackLogData(t),
+							},
+						)
 					}
 				}
-			} catch {
+			} catch (e: unknown) {
+				voiceLogger.liveKitError(
+					'Ошибка при подготовке очистки локального audio track',
+					e,
+					{
+						roomName,
+						...getParticipantLogData(r.localParticipant),
+					},
+				)
 			}
 
 			audioElementsRef.current.forEach(els => {
 				els.forEach(el => {
 					try {
 						el.pause()
-					} catch {
-					}
+					} catch {}
+
 					try {
 						;(el as HTMLMediaElement).srcObject = null
-					} catch {
-					}
+					} catch {}
+
 					try {
 						el.remove()
-					} catch {
-					}
+					} catch {}
 				})
 			})
+
 			audioElementsRef.current.clear()
 		} finally {
 			try {
+				manualDisconnectRef.current = true
+
+				voiceLogger.roomDisconnected({
+					roomName,
+					...getParticipantLogData(r.localParticipant),
+				})
+
 				r.disconnect()
 				r.removeAllListeners()
-			} catch {
+			} catch (e: unknown) {
+				voiceLogger.error('Ошибка при отключении от голосовой комнаты', e, {
+					roomName,
+					...getParticipantLogData(r.localParticipant),
+				})
 			}
 
 			roomRef.current = null
@@ -625,37 +955,76 @@ export default function VoicePanel({
 			setAudioBlocked(false)
 			syncSpeakingToPlayersList([])
 		}
-	}, [disableSelfMonitor, setRemoteAudioMuted, syncSpeakingToPlayersList])
+	}, [
+		disableSelfMonitor,
+		getVoiceRoomName,
+		setRemoteAudioMuted,
+		syncSpeakingToPlayersList,
+	])
 
 	const toggleMute = useCallback(async () => {
 		const r = roomRef.current
-		if (!r) return
 
+		if (!r) return
 		if (selfMonitorActiveRef.current) return
 
 		try {
 			const nextEnabled = muted
+
 			await r.localParticipant.setMicrophoneEnabled(nextEnabled)
 
 			const pub = getMicrophonePublication(r.localParticipant)
 			const t = pub?.track
+
 			if (isLocalAudioTrack(t)) {
 				try {
-					if (nextEnabled) await t.unmute()
-					else await t.mute()
-				} catch {
+					if (nextEnabled) {
+						await t.unmute()
+
+						voiceLogger.localMicrophoneEnabled({
+							roomName: getVoiceRoomName(r),
+							...getParticipantLogData(r.localParticipant),
+							...getTrackLogData(t),
+						})
+					} else {
+						await t.mute()
+
+						voiceLogger.localMicrophoneDisabled({
+							roomName: getVoiceRoomName(r),
+							...getParticipantLogData(r.localParticipant),
+							...getTrackLogData(t),
+						})
+					}
+				} catch (e: unknown) {
+					voiceLogger.liveKitError(
+						'Ошибка при изменении состояния локального audio track',
+						e,
+						{
+							roomName: getVoiceRoomName(r),
+							...getParticipantLogData(r.localParticipant),
+							...getTrackLogData(t),
+						},
+					)
 				}
 			}
 
 			setMuted(!nextEnabled)
 			updateParticipants(r)
 		} catch (e: unknown) {
-			console.error('[voice] toggleMute error:', e)
+			voiceLogger.liveKitError(
+				'Ошибка при переключении локального микрофона',
+				e,
+				{
+					roomName: getVoiceRoomName(r),
+					...getParticipantLogData(r.localParticipant),
+				},
+			)
 		}
-	}, [muted, updateParticipants])
+	}, [getVoiceRoomName, muted, updateParticipants])
 
 	const toggleSelfMonitor = useCallback(async () => {
 		const r = roomRef.current
+
 		if (!r) return
 
 		try {
@@ -666,13 +1035,23 @@ export default function VoicePanel({
 				setRemoteAudioMuted(false)
 
 				const shouldEnable = micEnabledBeforeSelfMonitorRef.current
+
 				try {
 					await r.localParticipant.setMicrophoneEnabled(shouldEnable)
-				} catch {
+				} catch (e: unknown) {
+					voiceLogger.liveKitError(
+						'Ошибка при восстановлении состояния локального микрофона',
+						e,
+						{
+							roomName: getVoiceRoomName(r),
+							...getParticipantLogData(r.localParticipant),
+						},
+					)
 				}
-				setMuted(!shouldEnable)
 
+				setMuted(!shouldEnable)
 				updateParticipants(r)
+
 				return
 			}
 
@@ -680,11 +1059,20 @@ export default function VoicePanel({
 
 			try {
 				await r.localParticipant.setMicrophoneEnabled(false)
-			} catch {
+			} catch (e: unknown) {
+				voiceLogger.liveKitError(
+					'Ошибка при выключении микрофона для режима прослушивания себя',
+					e,
+					{
+						roomName: getVoiceRoomName(r),
+						...getParticipantLogData(r.localParticipant),
+					},
+				)
 			}
-			setMuted(true)
 
+			setMuted(true)
 			setRemoteAudioMuted(true)
+
 			await enableSelfMonitor()
 
 			selfMonitorActiveRef.current = true
@@ -692,11 +1080,19 @@ export default function VoicePanel({
 
 			updateParticipants(r)
 		} catch (e: unknown) {
-			console.error('[voice] toggleSelfMonitor error:', e)
+			voiceLogger.error(
+				'Ошибка при переключении режима прослушивания себя',
+				e,
+				{
+					roomName: getVoiceRoomName(r),
+					...getParticipantLogData(r.localParticipant),
+				},
+			)
 		}
 	}, [
 		disableSelfMonitor,
 		enableSelfMonitor,
+		getVoiceRoomName,
 		muted,
 		setRemoteAudioMuted,
 		updateParticipants,
@@ -704,17 +1100,23 @@ export default function VoicePanel({
 
 	useEffect(() => {
 		if (!joined) return
+
 		const id = setInterval(() => {
 			const r = roomRef.current
+
 			if (!r) return
+
 			updateParticipants(r)
 		}, 120)
+
 		return () => clearInterval(id)
 	}, [joined, updateParticipants])
 
 	useEffect(() => {
 		const handler = () => void leaveVoice()
+
 		window.addEventListener('pagehide', handler)
+
 		return () => window.removeEventListener('pagehide', handler)
 	}, [leaveVoice])
 
@@ -724,50 +1126,46 @@ export default function VoicePanel({
 		return () => {
 			try {
 				disableSelfMonitor()
-			} catch {
-			}
+			} catch {}
 
 			try {
 				audioMap.forEach(els => {
 					els.forEach(el => {
 						try {
 							el.pause()
-						} catch {
-						}
+						} catch {}
+
 						try {
 							;(el as HTMLMediaElement).srcObject = null
-						} catch {
-						}
+						} catch {}
+
 						try {
 							el.remove()
-						} catch {
-						}
+						} catch {}
 					})
 				})
+
 				audioMap.clear()
-			} catch {
-			}
+			} catch {}
 
 			const r = roomRef.current
+
 			if (r) {
-				try {
-					r.localParticipant.setMicrophoneEnabled(false)
-				} catch {
-				}
+				void r.localParticipant.setMicrophoneEnabled(false).catch(() => {})
+
 				try {
 					r.disconnect()
 					r.removeAllListeners()
-				} catch {
-				}
+				} catch {}
 			}
 
 			roomRef.current = null
+			manualDisconnectRef.current = false
 			selfMonitorActiveRef.current = false
 
 			try {
 				syncSpeakingToPlayersList([])
-			} catch {
-			}
+			} catch {}
 		}
 	}, [disableSelfMonitor, syncSpeakingToPlayersList])
 
@@ -787,7 +1185,9 @@ export default function VoicePanel({
 
 	return (
 		<div
-			className={`${styles.voiceBlock} ${someoneSpeaking ? styles.voiceActive : ''}`}
+			className={`${styles.voiceBlock} ${
+				someoneSpeaking ? styles.voiceActive : ''
+			}`}
 		>
 			<div className={styles.headerRow}>
 				<div className={styles.loader} aria-hidden='true'>
@@ -799,6 +1199,7 @@ export default function VoicePanel({
 				<div className={styles.headerMain}>
 					<div className={styles.titleColumn}>
 						<span className={styles.title}>Голос</span>
+
 						<span
 							className={`${styles.participantsLabel} ${
 								!hasParticipants
@@ -856,7 +1257,9 @@ export default function VoicePanel({
 					<>
 						<div className={styles.buttonsGroupLeft}>
 							<button
-								className={`${styles.controlButton} ${muted ? styles.controlButtonMuted : ''}`}
+								className={`${styles.controlButton} ${
+									muted ? styles.controlButtonMuted : ''
+								}`}
 								onClick={toggleMute}
 								disabled={selfMonitor}
 								title={
@@ -869,7 +1272,9 @@ export default function VoicePanel({
 							</button>
 
 							<button
-								className={`${styles.controlButton} ${selfMonitor ? styles.controlButtonActive : ''}`}
+								className={`${styles.controlButton} ${
+									selfMonitor ? styles.controlButtonActive : ''
+								}`}
 								onClick={toggleSelfMonitor}
 							>
 								{selfMonitor ? 'Скрыть себя' : 'Слышать себя'}
@@ -888,12 +1293,36 @@ export default function VoicePanel({
 								className={`${styles.controlButton} ${styles.audioButtonRight}`}
 								onClick={async () => {
 									const r = roomRef.current
+
 									if (!r) return
+
 									try {
 										await r.startAudio()
-										setAudioBlocked(!r.canPlaybackAudio)
+
+										const blocked = !r.canPlaybackAudio
+
+										setAudioBlocked(blocked)
+
+										const details = {
+											roomName: getVoiceRoomName(r),
+											...getParticipantLogData(r.localParticipant),
+										}
+
+										if (blocked) {
+											voiceLogger.audioPlaybackBlocked(details)
+										} else {
+											voiceLogger.audioPlaybackReady(details)
+										}
 									} catch (err: unknown) {
-										console.warn('[voice] manual startAudio failed:', err)
+										voiceLogger.audioError(
+											'Ошибка при ручном запуске воспроизведения аудио',
+											err,
+											{
+												roomName: getVoiceRoomName(r),
+												...getParticipantLogData(r.localParticipant),
+											},
+										)
+
 										setAudioBlocked(true)
 									}
 								}}
